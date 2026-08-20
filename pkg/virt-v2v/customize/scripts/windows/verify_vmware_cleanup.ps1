@@ -19,13 +19,16 @@ $PnpUtil = Join-Path $Sys32 'pnputil.exe'
 $RegExe  = Join-Path $Sys32 'reg.exe'
 
 # ===================================================================
-# Data declarations — kept in sync with 9100_cleanup_vmware.ps1
+# Data declarations - kept in sync with 9100_cleanup_vmware.ps1
 # ===================================================================
 
+# pvscsi intentionally excluded here too - 9100_cleanup_vmware.ps1
+# deliberately leaves it installed (see its $VMwareServices comment),
+# so checking for its absence would be a false failure.
 $VMwareServices = @(
     'VGAuthService', 'VM3DService', 'VMTools', 'vmvss', 'GISvc',
     'vmhgfs', 'vmmemctl', 'vmrawdsk', 'vnetWFP', 'vnetflt', 'vsepflt',
-    'vmci', 'vmxnet3', 'vmxnet3ndis6', 'pvscsi',
+    'vmci', 'vmxnet3', 'vmxnet3ndis6',
     'vmusbmouse', 'vmmouse',
     'vm3dmp', 'vm3dmp-debug', 'vm3dmp-stats', 'vm3dmp_loader',
     # Additional short names - mirrors 9100_cleanup_vmware.ps1.
@@ -76,10 +79,9 @@ $VMwareTempDirPatterns = @(
 
 $VMwareDriverFiles = @(
     'vmci.sys', 'vmmouse.sys', 'vmrawdsk.sys', 'vmhgfs.sys',
-    'vmusbmouse.sys', 'pvscsi.sys', 'vmxnet3.sys',
+    'vmusbmouse.sys', 'vmxnet3.sys',
     'vm3dmp.sys', 'vm3dmp-debug.sys', 'vm3dmp-stats.sys', 'vm3dmp_loader.sys',
-    'vsock.sys', 'vmmemctl.sys', 'vsepflt.sys', 'vnetWFP.sys',
-    'vnetflt.sys',
+    'vsock.sys', 'vmmemctl.sys', 'vsepflt.sys', 'vnetWFP.sys', 'vnetflt.sys',
     # svga_wddm/efifw/vmaudio - mirrors 9100_cleanup_vmware.ps1.
     'svga_wddm.sys', 'efifw.sys', 'vmaudio.sys',
     # Legacy pre-WDDM driver files.
@@ -113,8 +115,9 @@ $VMwareSysWOW64Files = @(
     'vm3dum_loader.dll'
 )
 
-# Excludes Hyper-V services (vmbus, vmgid, vmgen*, etc.)
-$SweepPattern = '^(vm(3d|ci|hgfs|mouse|rawdsk|memctl|xnet|ware|tools|vss|usb)|VGAuth|pvscsi|vsepflt|vnetWFP|vnetflt|GISvc)'
+# Excludes Hyper-V services (vmbus, vmgid, vmgen*, etc.). pvscsi excluded
+# too - it's deliberately left installed by 9100_cleanup_vmware.ps1.
+$SweepPattern = '^(vm(3d|ci|hgfs|mouse|rawdsk|memctl|xnet|ware|tools|vss|usb)|VGAuth|vsepflt|vnetWFP|vnetflt|GISvc)'
 
 # ===================================================================
 # Helpers
@@ -151,6 +154,25 @@ function Get-RegValue {
     $m = [regex]::Match($out, [regex]::Escape($ValueName) + '\s+REG_\w+\s+(.+)')
     if ($m.Success) { return $m.Groups[1].Value.Trim() }
     return $null
+}
+
+# .NET registry reads used for in-process tree scans (DeviceClasses,
+# CLSID/TypeLib). These throw a terminating SecurityException/
+# UnauthorizedAccessException on a restricted-ACL key, which neither
+# $ErrorActionPreference value suppresses - swallow it here so one
+# unreadable key doesn't abort the rest of the checks (and the final
+# RESULTS/exit code below).
+function Get-SafeSubKeyNames {
+    param([Microsoft.Win32.RegistryKey]$Key)
+    try { return $Key.GetSubKeyNames() } catch { return @() }
+}
+function Open-SafeSubKey {
+    param([Microsoft.Win32.RegistryKey]$Key, [string]$Name)
+    try { return $Key.OpenSubKey($Name) } catch { return $null }
+}
+function Get-SafeRegValue {
+    param([Microsoft.Win32.RegistryKey]$Key, [string]$Name)
+    try { return $Key.GetValue($Name) } catch { return $null }
 }
 
 # ===================================================================
@@ -276,13 +298,18 @@ $VMwareInfNames = ((($VMwareDriverFiles | ForEach-Object { $_ -replace '\.sys$',
     ForEach-Object { [regex]::Escape($_) }) -join '|'
 
 # Get-WindowsDriver is locale-independent; pnputil's text fields are English-only.
+# pvscsi excluded - 9100_cleanup_vmware.ps1 deliberately leaves its
+# driver package alone, so it staying in the store isn't a failure.
 $publishedNames = $null
 try {
     $publishedNames = @(
         Get-WindowsDriver -Online -ErrorAction Stop |
             Where-Object {
-                $_.ProviderName -match 'VMware' -or
-                $_.OriginalFileName -match "(?i)($VMwareInfNames)"
+                $_.OriginalFileName -notmatch '(?i)^pvscsi\.inf$' -and
+                (
+                    $_.ProviderName -match 'VMware' -or
+                    $_.OriginalFileName -match "(?i)($VMwareInfNames)"
+                )
             } |
             ForEach-Object { $_.Driver }
     )
@@ -302,8 +329,11 @@ if ($null -ne $publishedNames) {
     $pnpOutput = & $PnpUtil /enum-drivers 2>&1 | Out-String
     $driverBlocks = $pnpOutput -split '(?=Published Name)' |
         Where-Object {
-            $_ -match 'VMware' -or
-            $_ -match "(?i)Original Name:\s*($VMwareInfNames)\b"
+            $_ -notmatch '(?i)Original Name:\s*pvscsi\.inf\b' -and
+            (
+                $_ -match 'VMware' -or
+                $_ -match "(?i)Original Name:\s*($VMwareInfNames)\b"
+            )
         }
 
     if ($driverBlocks.Count -eq 0) {
@@ -366,19 +396,21 @@ if (-not $vmDevices -or $vmDevices.Count -eq 0) {
 # Builds an InstanceId -> [DeviceClasses key path] lookup in one pass via
 # .NET instead of reg.exe (mirrors 9100_cleanup_vmware.ps1). DeviceClasses
 # can hold thousands of entries - walking it per device via reg.exe would
-# mean tens of thousands of process spawns.
+# mean tens of thousands of process spawns. DeviceClasses entries often
+# carry restrictive ACLs, so every read below goes through the
+# Get-Safe*/Open-Safe* helpers above.
 function Get-DeviceClassesInstanceMap {
     $map = @{}
     $hklm64 = [Microsoft.Win32.RegistryKey]::OpenBaseKey('LocalMachine', 'Registry64')
     $root = $hklm64.OpenSubKey('SYSTEM\CurrentControlSet\Control\DeviceClasses')
     if (-not $root) { return $map }
-    foreach ($ifaceGuidName in $root.GetSubKeyNames()) {
-        $ifaceGuidKey = $root.OpenSubKey($ifaceGuidName)
+    foreach ($ifaceGuidName in (Get-SafeSubKeyNames $root)) {
+        $ifaceGuidKey = Open-SafeSubKey $root $ifaceGuidName
         if (-not $ifaceGuidKey) { continue }
-        foreach ($instName in $ifaceGuidKey.GetSubKeyNames()) {
-            $instKey = $ifaceGuidKey.OpenSubKey($instName)
+        foreach ($instName in (Get-SafeSubKeyNames $ifaceGuidKey)) {
+            $instKey = Open-SafeSubKey $ifaceGuidKey $instName
             if ($instKey) {
-                $devInst = $instKey.GetValue('DeviceInstance')
+                $devInst = Get-SafeRegValue $instKey 'DeviceInstance'
                 if ($devInst) {
                     if (-not $map.ContainsKey($devInst)) {
                         $map[$devInst] = New-Object System.Collections.Generic.List[string]
@@ -466,46 +498,47 @@ if ($strayKeys.Count -eq 0) {
 # Stray COM registrations (CLSID/TypeLib) - mirrors 9100_cleanup_vmware.ps1.
 # Uses .NET directly rather than "reg query /s" - CLSID/TypeLib can each
 # have tens of thousands of subkeys, and text-parsing took minutes.
+# Ownership is decided by the COM server module path/name, not by "VMware"
+# appearing anywhere in the subtree - see 9100_cleanup_vmware.ps1 for why.
 Write-Host ""
 Write-Host "--- COM registrations (CLSID/TypeLib) ---"
-function Test-RegValueContainsVMware {
-    param([Microsoft.Win32.RegistryKey]$Key)
-    if (-not $Key) { return $false }
-    foreach ($valName in $Key.GetValueNames()) {
-        $v = $Key.GetValue($valName)
-        if ($v -and "$v" -match 'VMware') { return $true }
-    }
-    return $false
-}
+$VMwareComServerPattern = '(?i)(\\Program Files( \(x86\))?\\(Common Files\\)?VMware\\|\\vm3d|\\vmGuestLib|\\vmhgfs|VMWSU\.DLL)'
 
-# Bounded-depth recursive scan - mirrors 9100_cleanup_vmware.ps1. CLSID's
-# path is one level down, TypeLib's is two - depth 3 covers both.
-function Test-KeyTreeContainsVMware {
+# CLSID's server path is one level down (InprocServer32/LocalServer32);
+# TypeLib's is three levels down (version\lcid\win32|win64) - depth 3
+# covers both while still only matching those specific named subkeys.
+function Test-KeyTreeHasVMwareComServer {
     param([Microsoft.Win32.RegistryKey]$Key, [int]$Depth = 3)
-    if (-not $Key) { return $false }
-    if (Test-RegValueContainsVMware $Key) { return $true }
-    if ($Depth -le 0) { return $false }
-    foreach ($childName in $Key.GetSubKeyNames()) {
-        $child = $Key.OpenSubKey($childName)
-        if ($child) {
-            $found = Test-KeyTreeContainsVMware $child ($Depth - 1)
-            $child.Close()
-            if ($found) { return $true }
+    if (-not $Key -or $Depth -le 0) { return $false }
+    foreach ($childName in (Get-SafeSubKeyNames $Key)) {
+        $child = Open-SafeSubKey $Key $childName
+        if (-not $child) { continue }
+        if ($childName -in @('InprocServer32', 'LocalServer32', 'win32', 'win64')) {
+            $modulePath = Get-SafeRegValue $child ''
+            if ($modulePath -and "$modulePath" -match $VMwareComServerPattern) {
+                $child.Close()
+                return $true
+            }
         }
+        if (Test-KeyTreeHasVMwareComServer $child ($Depth - 1)) {
+            $child.Close()
+            return $true
+        }
+        $child.Close()
     }
     return $false
 }
 
-function Get-VMwareStrayComKeys {
+function Get-VMwareStrayComKey {
     param([string]$SubPath, [string]$RootPathForLog)
     $hklm64 = [Microsoft.Win32.RegistryKey]::OpenBaseKey('LocalMachine', 'Registry64')
     $root = $hklm64.OpenSubKey($SubPath)
     if (-not $root) { return @() }
     $stray = @()
-    foreach ($guidName in $root.GetSubKeyNames()) {
-        $guidKey = $root.OpenSubKey($guidName)
+    foreach ($guidName in (Get-SafeSubKeyNames $root)) {
+        $guidKey = Open-SafeSubKey $root $guidName
         if (-not $guidKey) { continue }
-        if (Test-KeyTreeContainsVMware $guidKey) { $stray += "$RootPathForLog\$guidName" }
+        if (Test-KeyTreeHasVMwareComServer $guidKey) { $stray += "$RootPathForLog\$guidName" }
         $guidKey.Close()
     }
     $root.Close()
@@ -520,7 +553,7 @@ $comRoots = @(
 )
 $strayComTotal = 0
 foreach ($root in $comRoots) {
-    foreach ($strayKey in (Get-VMwareStrayComKeys $root.SubPath $root.LogPath)) {
+    foreach ($strayKey in (Get-VMwareStrayComKey $root.SubPath $root.LogPath)) {
         Check-Fail "Stray VMware COM registration: $strayKey"
         $strayComTotal++
     }
@@ -700,7 +733,11 @@ Write-Host ""
 Write-Host "--- Component Store Integrity ---"
 
 Write-Host "  Running DISM /Online /Cleanup-Image /CheckHealth..."
-$dismOutput = & DISM.exe /Online /Cleanup-Image /CheckHealth 2>&1 | Out-String
+# Bare "DISM.exe" resolves via WOW64 to the 32-bit SysWOW64 copy on a
+# 32-bit PowerShell host, which can't service a running 64-bit image -
+# $Sys32 (Sysnative on WOW64) forces the real 64-bit DISM.
+$DismExe = Join-Path $Sys32 'Dism.exe'
+$dismOutput = & $DismExe /Online /Cleanup-Image /CheckHealth 2>&1 | Out-String
 $dismNormalized = ($dismOutput.ToLowerInvariant() -replace '[^a-z]', '')
 if ($dismNormalized -match 'nocomponentstorecorruptiondetected') {
     Check-Pass "DISM /CheckHealth: no component store corruption detected"
@@ -723,20 +760,26 @@ if ($dismNormalized -match 'nocomponentstorecorruptiondetected') {
 Write-Host ""
 Write-Host "--- Windows Update Driver History (informational) ---"
 
+# Only match "VMware" by name - the generic "Broadcom" vendor name would
+# also flag unrelated Broadcom NIC/storage drivers that have nothing to do
+# with VMware Tools, and Get-Package's Name field has no VMware-specific
+# text to disambiguate a republished VMware driver from those.
 $msuEntries = $null
+$msuAvailable = $false
 try {
     $msuEntries = Get-Package -ProviderName msu -ErrorAction Stop |
-        Where-Object { $_.Name -match 'VMware|Broadcom' }
+        Where-Object { $_.Name -match 'VMware' }
+    $msuAvailable = $true
 } catch {
     Write-Host "  (Get-Package msu provider unavailable on this system - skipped)"
 }
 
-if ($null -ne $msuEntries -and $msuEntries) {
+if ($msuEntries) {
     foreach ($e in $msuEntries) {
         Check-Warn "WU package history still references: $($e.Name) (Status=$($e.Status)) - expected residue, no supported removal path"
     }
-} elseif ($null -ne $msuEntries) {
-    Check-Pass "No VMware/Broadcom entries in Windows Update package history"
+} elseif ($msuAvailable) {
+    Check-Pass "No VMware entries in Windows Update package history"
 }
 
 # -------------------------------------------------------------------

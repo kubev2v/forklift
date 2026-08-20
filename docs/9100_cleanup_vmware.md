@@ -49,7 +49,10 @@ bookkeeping, so VMware would keep reappearing in "Programs and Features" /
 1. Scans the `Uninstall` registry key (and `WOW6432Node`) for any entry
    whose `DisplayName` matches `VMware`.
 2. For each match, extracts the MSI product code and runs
-   `msiexec /x {ProductCode} /qn /norestart`.
+   `msiexec /x {ProductCode} /qn /norestart` with a bounded 10-minute wait
+   (this runs unattended on firstboot, so a stuck msiexec must not hang the
+   rest of the script) and accepts exit codes `0`, `1641`, and `3010` as
+   success (the latter two mean "succeeded, reboot required").
 3. Force-deletes the Add/Remove Programs key afterwards regardless of
    whether msiexec succeeded.
 4. Cleans orphaned **Windows Installer product registrations** (drives
@@ -64,7 +67,9 @@ bookkeeping, so VMware would keep reappearing in "Programs and Features" /
 
 1. Looks up every name in `$VMwareServices` (see below) via `Get-Service`.
 2. Also scans all services for a `DisplayName`/`Name`/`PathName` matching
-   VMware, catching anything not on the static list.
+   VMware, catching anything not on the static list — except `pvscsi`,
+   which is explicitly excluded even if this broad match would otherwise
+   catch it (see the note under "Services" below).
 3. For each match: `sc.exe stop`, wait 2s, force-kill if still running,
    then `sc.exe config ... start= disabled`.
 4. Services are **not deleted yet** — that's Phase 4.
@@ -74,8 +79,9 @@ bookkeeping, so VMware would keep reappearing in "Programs and Features" /
 1. Prefers `Get-WindowsDriver -Online` (locale-independent — works
    regardless of display language), matching `ProviderName = VMware` or
    `OriginalFileName` against known VMware `.inf` basenames (derived from
-   `$VMwareDriverFiles`, plus `vm3d.inf` added explicitly). The `.inf`-name
-   match exists because post-Broadcom-acquisition packages get republished
+   `$VMwareDriverFiles`, plus `vm3d.inf` added explicitly), excluding
+   `pvscsi.inf` even though its provider is VMware. The
+   `.inf`-name match exists because post-Broadcom-acquisition packages get republished
    as `Provider Name: Broadcom Inc.` — matching "Broadcom" alone would be
    unsafe since unrelated Broadcom hardware exists.
 2. Falls back to parsing `pnputil /enum-drivers` text output if
@@ -98,7 +104,8 @@ bookkeeping, so VMware would keep reappearing in "Programs and Features" /
    `ROOT\VMware` (ROOT-enumerated software devices that can lack a VMware
    name entirely).
 4. For each device: `Disable-PnpDevice`, then `pnputil /remove-device` if
-   supported by the OS.
+   supported by the OS (exit code `3010` = reboot-required success, not a
+   failure).
 5. Ghost devices (`Status = Unknown`) that survive both are removed via
    `CM_Uninstall_DevNode` — the same API Device Manager's "Uninstall
    device" uses.
@@ -126,9 +133,14 @@ already deleted in Phase 3).
    auto-generated `Services\<name>` key per entry in `$VMwareServices`.
 2. Deletes the `VMware Host Open` value under `RegisteredApplications`.
 3. Sweeps stray **COM registrations** under `CLSID`/`TypeLib` (native and
-   `WOW6432Node`) for GUID subtrees mentioning `VMware`, up to 3 levels
-   deep. Uses the .NET registry API directly instead of spawning `reg.exe`
-   per GUID — these keys can each have tens of thousands of subkeys.
+   `WOW6432Node`): a GUID subtree is deleted only when its COM server
+   module (`InprocServer32`/`LocalServer32`'s default value, or
+   `TypeLib`'s `win32`/`win64` default value) resolves to a VMware install
+   path or a known VMware module name — not when "VMware" merely appears
+   somewhere else in the subtree, which could delete an unrelated
+   component's entire registration. Uses the .NET registry API directly
+   instead of spawning `reg.exe` per GUID — these keys can each have tens
+   of thousands of subkeys.
 4. Sweeps `Installer\Folders` for value **names** containing `VMware`
    (records folders an MSI wrote to; not reliably pruned by `msiexec /x`).
 5. Sweeps `Run`/`RunOnce` autostart entries for any value whose name or
@@ -183,7 +195,7 @@ DriverStore residuals left for manual follow-up.
 
 ```
 VGAuthService, VM3DService, VMTools, vmvss, GISvc, vmhgfs, vmmemctl,
-vmrawdsk, vnetWFP, vnetflt, vsepflt, vmci, vmxnet3, vmxnet3ndis6, pvscsi,
+vmrawdsk, vnetWFP, vnetflt, vsepflt, vmci, vmxnet3, vmxnet3ndis6,
 vmusbmouse, vmmouse, vm3dmp, vm3dmp-debug, vm3dmp-stats, vm3dmp_loader,
 vsock, efifw, svga_wddm, vmaudio, vgauth, cblauncher, vmwtimeprovider,
 vmstatsprovider, vmupgradehelper, vmwefifw,
@@ -192,14 +204,29 @@ vmware, vmx86, VMwareCertService
 ```
 
 Notes: `vnetflt` is the legacy predecessor of `vnetWFP` and can be left
-behind by a Tools installer bug, BSODing alongside `vsepflt` if not
-removed. `vgauth`/`cblauncher` are legacy alternate names (no-op if
-absent). `vm3dservice` is the service behind `vm3dservice.exe` (already in
+behind by a Tools installer bug alongside `vsepflt`; both are removed
+normally like any other service. `vgauth`/`cblauncher` are legacy alternate
+names (no-op if absent). `vm3dservice` is the service behind `vm3dservice.exe` (already in
 `$VMwareSystemFiles`) — without it, deleting the file alone leaves an
 orphaned service definition. `vmxnet`, `vmx_svga`, `vmkbd`, `vmdesched`,
 `vmdebug`, `vmware` are legacy pre-WDDM names; `vmx86`/`VMwareCertService`
 are newer names checked defensively. Each also gets its own
 `Services\<name>` registry key removed in Phase 5.
+
+**`pvscsi` is deliberately never touched** (not stopped, not deleted,
+not swept by the broad `DisplayName`/`PathName` match, and its driver
+package is skipped even though its `ProviderName` is VMware). virt-v2v
+is supposed to have already replaced the VMware Paravirtual SCSI
+controller with VirtIO by the time this script runs, making `pvscsi` an
+inert leftover — but that swap isn't guaranteed for every guest OS
+virt-v2v doesn't fully recognize (e.g. an early Windows Server 2025
+Insider Build image). On such a guest, `pvscsi` can still be the live
+boot-critical storage driver; deleting its service/file there pulls the
+disk driver Windows is actually booting from out from under it,
+bricking the boot volume with `INACCESSIBLE_BOOT_DEVICE`. Leaving it
+installed is simpler and safer than trying to detect the swap per-guest.
+`verify_vmware_cleanup.ps1` mirrors this and doesn't check for its
+absence either.
 
 ### Explicit registry keys (`$VMwareRegistryKeys`)
 
@@ -250,11 +277,14 @@ HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\vmtoolsd.exe
 
 ```
 vmci.sys, vmmouse.sys, vmrawdsk.sys, vmhgfs.sys, vmusbmouse.sys,
-pvscsi.sys, vmxnet3.sys, vm3dmp.sys, vm3dmp-debug.sys, vm3dmp-stats.sys,
+vmxnet3.sys, vm3dmp.sys, vm3dmp-debug.sys, vm3dmp-stats.sys,
 vm3dmp_loader.sys, vsock.sys, vmmemctl.sys, vsepflt.sys, vnetWFP.sys,
 vnetflt.sys, svga_wddm.sys, efifw.sys, vmaudio.sys,
 vmx_svga.sys, vmkbd.sys, vmdesched.sys
 ```
+
+(`pvscsi.sys` intentionally excluded — see the `pvscsi` note under
+"Services" above.)
 
 Each `.sys` name is also converted to a matching `.inf` basename for the
 Phase 2 driver-package match (plus `vm3d.inf` added explicitly).
@@ -302,8 +332,18 @@ vm3dum_10.dll, vm3dum_10-debug.dll, vm3dum_10-stats.dll, vm3dum_loader.dll
 
 Kept in sync with this script's data lists so it can confirm nothing was
 missed. It also runs `DISM /Online /Cleanup-Image /CheckHealth` at the
-end, since Phase 6 no longer force-deletes `DriverStore` folders — that
-check catches any resulting (or unrelated) component-store corruption.
+end (via `$Sys32\Dism.exe`, not the bare command, so a 32-bit PowerShell
+host doesn't silently invoke the 32-bit DISM against a 64-bit image),
+since Phase 6 no longer force-deletes `DriverStore` folders — that check
+catches any resulting (or unrelated) component-store corruption.
 `sfc /scannow` was deliberately left out: it can take 10-20+ minutes on a
 real VM, disproportionate to what this script verifies; run it manually
-if `DISM /CheckHealth` flags corruption.
+if `DISM /CheckHealth` flags corruption. It also reports (informational,
+non-failing) any `VMware`-named entry left in Windows Update's driver
+package history — it deliberately doesn't match the generic `Broadcom`
+vendor name there, since that would also flag unrelated Broadcom NIC/
+storage drivers that have nothing to do with VMware Tools. Like
+`9100_cleanup_vmware.ps1`, it never checks for `pvscsi`'s
+absence (service, file, driver-store package, or the registry sweep) -
+it's deliberately left installed, so flagging it would be a false
+failure.
