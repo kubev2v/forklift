@@ -383,3 +383,69 @@ func TestListAllV4StopsOnEmptyPage(t *testing.T) {
 		t.Fatalf("expected no entities, got %d", len(entities))
 	}
 }
+
+// TestListAllV3PaginationLimit verifies ListAllV3 stops when a server keeps
+// returning the same page instead of honouring offset.
+func TestListAllV3PaginationLimit(t *testing.T) {
+	savedMaxPages := maxListPages
+	maxListPages = 3
+	t.Cleanup(func() {
+		maxListPages = savedMaxPages
+	})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		entity := struct {
+			Metadata struct {
+				UUID string `json:"uuid"`
+			} `json:"metadata"`
+		}{}
+		entity.Metadata.UUID = "same-page"
+		resp := map[string]interface{}{
+			"entities": []interface{}{entity},
+			"metadata": map[string]interface{}{"total_matches": maxListPages + 10},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := newTestClient(server.URL)
+
+	_, err := ListAllV3[struct {
+		Metadata struct {
+			UUID string `json:"uuid"`
+		} `json:"metadata"`
+	}](client, "vm", 1, nil)
+	if err == nil {
+		t.Fatal("expected pagination limit error")
+	}
+}
+
+// TestSendUsesFixedLengthBody verifies POST requests declare Content-Length
+// rather than chunked encoding for JSON bodies.
+func TestSendUsesFixedLengthBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/nutanix/v3/clusters/list" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+			return
+		}
+		if r.TransferEncoding != nil {
+			t.Errorf("expected fixed-length body, got transfer encoding %v", r.TransferEncoding)
+		}
+		if r.ContentLength <= 0 {
+			t.Errorf("expected positive ContentLength, got %d", r.ContentLength)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(server.URL)
+
+	var result map[string]interface{}
+	if status, err := client.Post(server.URL+"/mutate", map[string]interface{}{"a": 1}, &result); err != nil || status != http.StatusOK {
+		t.Fatalf("Post failed: status=%d err=%v", status, err)
+	}
+}

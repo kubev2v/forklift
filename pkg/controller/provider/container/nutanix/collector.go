@@ -232,6 +232,10 @@ func (r *Collector) Shutdown() {
 
 // Collect all inventory resources.
 func (r *Collector) collect() (err error) {
+	if _, err = r.client.connect(); err != nil {
+		return err
+	}
+
 	mark := time.Now()
 
 	// Collect all resources

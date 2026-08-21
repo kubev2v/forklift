@@ -138,10 +138,10 @@ func TestResolvePrismConfig_AutoDetect(t *testing.T) {
 	}
 }
 
-// TestEnsurePrismConfig_CachesResult verifies that a second call to
-// ensurePrismConfig doesn't re-resolve (and re-probe the API) once the mode
-// has already been determined.
-func TestEnsurePrismConfig_CachesResult(t *testing.T) {
+// TestConnect_CachesPrismConfig verifies that a second call to connect()
+// doesn't re-resolve (and re-probe the API) once the mode has already been
+// determined.
+func TestConnect_CachesPrismConfig(t *testing.T) {
 	requestCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
@@ -160,7 +160,7 @@ func TestEnsurePrismConfig_CachesResult(t *testing.T) {
 
 	client := createTestClientWithSettings(server.URL, map[string]string{})
 
-	if err := client.ensurePrismConfig(); err != nil {
+	if _, err := client.connect(); err != nil {
 		t.Fatalf("unexpected error on first call: %v", err)
 	}
 	if client.prism.Mode != PrismCentral {
@@ -172,11 +172,11 @@ func TestEnsurePrismConfig_CachesResult(t *testing.T) {
 		t.Fatal("expected the first call to make at least one request")
 	}
 
-	if err := client.ensurePrismConfig(); err != nil {
+	if _, err := client.connect(); err != nil {
 		t.Fatalf("unexpected error on second call: %v", err)
 	}
 	if requestCount != countAfterFirst {
-		t.Fatalf("expected ensurePrismConfig to be cached after the first resolution; "+
+		t.Fatalf("expected connect to cache prism resolution after the first call; "+
 			"request count grew from %d to %d", countAfterFirst, requestCount)
 	}
 }
