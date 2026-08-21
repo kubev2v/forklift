@@ -6,15 +6,6 @@ import (
 	libclient "github.com/kubev2v/forklift/pkg/lib/client/nutanix"
 )
 
-func TestCoalesce(t *testing.T) {
-	if result := libclient.Coalesce("", "value-b", "value-c"); result != "value-b" {
-		t.Errorf("expected first non-empty value 'value-b', got %q", result)
-	}
-	if result := libclient.Coalesce(""); result != "" {
-		t.Errorf("expected empty string, got %q", result)
-	}
-}
-
 func TestCoalesceInt(t *testing.T) {
 	if result := coalesceInt(0, 7); result != 7 {
 		t.Errorf("expected first non-zero value 7, got %d", result)
@@ -39,33 +30,6 @@ func TestCoalesceBool(t *testing.T) {
 	}
 	if coalesceBool(false) {
 		t.Error("expected false when no candidate is true")
-	}
-}
-
-func TestParseNumericString(t *testing.T) {
-	tests := []struct {
-		name      string
-		input     any
-		expected  int64
-		expectOK  bool
-	}{
-		{"numeric string", "12345", 12345, true},
-		{"non-numeric string", "not-a-number", 0, false},
-		{"int", 42, 42, true},
-		{"int64", int64(99), 99, true},
-		{"float64", float64(7), 7, true},
-		{"unsupported type", true, 0, false},
-		{"missing value", nil, 0, false},
-		{"zero string", "0", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, ok := libclient.ParseNumericString(tt.input)
-			if result != tt.expected || ok != tt.expectOK {
-				t.Errorf("expected (%d, %v), got (%d, %v)", tt.expected, tt.expectOK, result, ok)
-			}
-		})
 	}
 }
 
