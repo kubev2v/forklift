@@ -165,6 +165,18 @@ func isThrottled(recorder *record.FakeRecorder) bool {
 	}
 }
 
+// createdPrimePVCLabels returns the labels of the prime PVC created via the fake kubeClient, or nil if none was created.
+func createdPrimePVCLabels(fakeClient *fake.Clientset) map[string]string {
+	for _, action := range fakeClient.Actions() {
+		if action.GetVerb() == "create" && action.GetResource().Resource == "persistentvolumeclaims" {
+			obj := action.(interface{ GetObject() runtime.Object }).GetObject()
+			pvc := obj.(*corev1.PersistentVolumeClaim)
+			return pvc.Labels
+		}
+	}
+	return nil
+}
+
 // createdPodLabels returns the labels of the pod created via the fake kubeClient, or nil if none was created.
 func createdPodLabels(fakeClient *fake.Clientset) map[string]string {
 	for _, action := range fakeClient.Actions() {
@@ -308,6 +320,36 @@ func TestThrottle_Mixed_WithMigrationHost_ThrottlesOnMigrationHost(t *testing.T)
 	}
 	if !isThrottled(recorder) {
 		t.Error("expected throttle on dedicated-host even though sourceHost is free")
+	}
+}
+
+// Prime PVC inherits all labels from the source PVC (e.g. CSI affinity-source-naa).
+func TestPrimePVC_InheritsSourceLabels(t *testing.T) {
+	const naaLabel = "volume.csi.k8s.io/affinity-source-naa"
+	pvc := makePVC("pvc-1", "test-ns", "cr-1", "test-sc")
+	pvc.Labels = map[string]string{
+		"migration": "migration-uid",
+		"plan":      "plan-uid",
+		"vmID":      "vm-1",
+		"vmdkKey":   "42",
+		naaLabel:    "eui.b4f2d1234567890",
+	}
+	cr := makeCR("cr-1", "test-ns", "source-host", "")
+
+	c, fakeClient, _ := buildController(t, 10, nil, []*corev1.PersistentVolumeClaim{pvc}, []*unstructured.Unstructured{cr})
+
+	err := c.syncPvc(context.Background(), "test-ns/pvc-1", "test-ns", "pvc-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	labels := createdPrimePVCLabels(fakeClient)
+	if labels == nil {
+		t.Fatal("expected prime PVC to be created")
+	}
+	for key, want := range pvc.Labels {
+		if got := labels[key]; got != want {
+			t.Errorf("prime PVC label %q = %q, want %q", key, got, want)
+		}
 	}
 }
 
