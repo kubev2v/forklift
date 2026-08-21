@@ -3535,7 +3535,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 
 	extraConfigMapExists := len(Settings.Migration.VirtV2vExtraConfConfigMap) > 0
 	if extraConfigMapExists {
-		volumes = append(volumes, core.Volume{
+		extraV2vConfVol := core.Volume{
 			Name: ExtraV2vConf,
 			VolumeSource: core.VolumeSource{
 				ConfigMap: &core.ConfigMapVolumeSource{
@@ -3544,21 +3544,16 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 					},
 				},
 			},
-		})
+		}
+		extraV2vConfMount := core.VolumeMount{
+			Name:      ExtraV2vConf,
+			MountPath: fmt.Sprintf("/mnt/%s", ExtraV2vConf),
+		}
+		volumes = append(volumes, extraV2vConfVol)
+		mounts = append(mounts, extraV2vConfMount)
+		extraVolumes = append(extraVolumes, extraV2vConfVol)
+		extraMounts = append(extraMounts, extraV2vConfMount)
 	}
-	if vddkConfigmap != nil {
-		volumes = append(volumes, core.Volume{
-			Name: VddkConf,
-			VolumeSource: core.VolumeSource{
-				ConfigMap: &core.ConfigMapVolumeSource{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: vddkConfigmap.Name,
-					},
-				},
-			},
-		})
-	}
-
 	switch r.Source.Provider.Type() {
 	case api.Ova, api.HyperV:
 		var pvc *core.PersistentVolumeClaim
@@ -3616,21 +3611,25 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 				MountPath: "/opt",
 			},
 		)
-		if extraConfigMapExists {
-			mounts = append(mounts,
-				core.VolumeMount{
-					Name:      ExtraV2vConf,
-					MountPath: fmt.Sprintf("/mnt/%s", ExtraV2vConf),
-				},
-			)
-		}
 		if vddkConfigmap != nil {
-			mounts = append(mounts,
-				core.VolumeMount{
-					Name:      VddkConf,
-					MountPath: fmt.Sprintf("/mnt/%s", VddkConf),
+			vddkConfVol := core.Volume{
+				Name: VddkConf,
+				VolumeSource: core.VolumeSource{
+					ConfigMap: &core.ConfigMapVolumeSource{
+						LocalObjectReference: core.LocalObjectReference{
+							Name: vddkConfigmap.Name,
+						},
+					},
 				},
-			)
+			}
+			vddkConfMount := core.VolumeMount{
+				Name:      VddkConf,
+				MountPath: fmt.Sprintf("/mnt/%s", VddkConf),
+			}
+			volumes = append(volumes, vddkConfVol)
+			mounts = append(mounts, vddkConfMount)
+			extraVolumes = append(extraVolumes, vddkConfVol)
+			extraMounts = append(extraMounts, vddkConfMount)
 		}
 	}
 
