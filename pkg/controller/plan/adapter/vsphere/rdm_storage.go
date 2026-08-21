@@ -9,7 +9,9 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -126,20 +128,80 @@ func vendorFromNAA(deviceName string, prefixes []naaVendorEntry) (api.StorageVen
 	return "", false
 }
 
-// findStorageMapEntriesForVendor searches the storage map for all entries whose
-// offload plugin matches the given vendor.
-func findStorageMapEntriesForVendor(storageMap []api.StoragePair, vendor api.StorageVendorProduct) []*api.StoragePair {
+type passthroughOffloadKind int
+
+const (
+	offloadKindXcopy passthroughOffloadKind = iota
+	offloadKindCsi
+)
+
+func findStorageMapEntriesForVendor(storageMap []api.StoragePair, vendor api.StorageVendorProduct, kind passthroughOffloadKind) []*api.StoragePair {
 	var matches []*api.StoragePair
 	for i := range storageMap {
 		entry := &storageMap[i]
-		if entry.OffloadPlugin == nil || entry.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+		if entry.OffloadPlugin == nil {
 			continue
 		}
-		if entry.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct == vendor {
-			matches = append(matches, entry)
+		switch kind {
+		case offloadKindXcopy:
+			if cfg := entry.OffloadPlugin.VSphereXcopyPluginConfig; cfg != nil && cfg.StorageVendorProduct == vendor {
+				matches = append(matches, entry)
+			}
+		case offloadKindCsi:
+			if cfg := entry.OffloadPlugin.CsiVolumeImport; cfg != nil && cfg.StorageVendorProduct == vendor {
+				matches = append(matches, entry)
+			}
 		}
 	}
 	return matches
+}
+
+func passthroughIdentifier(disk vsphere.Disk) string {
+	if disk.RDM && disk.DeviceName != "" {
+		return disk.DeviceName
+	}
+	return ""
+}
+
+// Unresolved disks (not passthrough, unrecognized vendor, ambiguous) are omitted;
+// callers fall back to datastore-ID matching for those.
+func resolvePassthroughDisksByVendor(
+	sortedDisks []vsphere.Disk,
+	dsMapIn []api.StoragePair,
+	inventory datastoreFinder,
+	naaPrefixes []naaVendorEntry,
+	kind passthroughOffloadKind,
+	log logging.LevelLogger,
+) map[int]*api.StoragePair {
+	resolved := make(map[int]*api.StoragePair)
+	for diskIndex, disk := range sortedDisks {
+		identifier := passthroughIdentifier(disk)
+		if identifier == "" {
+			continue
+		}
+		vendor, matched := vendorFromNAA(identifier, naaPrefixes)
+		if !matched {
+			log.Info("RDM disk NAA prefix not recognized, leaving unresolved for this copy method",
+				"diskKey", disk.Key, "identifier", identifier, "kind", kind)
+			continue
+		}
+		candidates := findStorageMapEntriesForVendor(dsMapIn, vendor, kind)
+		switch len(candidates) {
+		case 0:
+			log.Info("no storage map entry found for vendor of this kind, leaving unresolved for this copy method",
+				"diskKey", disk.Key, "vendor", vendor, "kind", kind)
+		case 1:
+			resolved[diskIndex] = candidates[0]
+		default:
+			if entry, err := disambiguateRDMByNAA(inventory, candidates, identifier, naaPrefixes); err == nil {
+				resolved[diskIndex] = entry
+			} else {
+				log.Info("NAA disambiguation failed, leaving unresolved for this copy method",
+					"diskKey", disk.Key, "vendor", vendor, "kind", kind, "error", err)
+			}
+		}
+	}
+	return resolved
 }
 
 // datastoreFinder can look up a Datastore by ref. Satisfied by web.Client.
