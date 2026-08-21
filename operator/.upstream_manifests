@@ -11543,6 +11543,13 @@ rules:
   - networkpolicies
   verbs:
   - '*'
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -11608,7 +11615,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: forklift-operator
-  namespace: konveyor-forklift
+  namespace: forklift-operator-system
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -11723,6 +11730,7 @@ metadata:
   name: forklift-controller
   namespace: konveyor-forklift
 spec:
+  feature_network_policies: "false"
   feature_ui_plugin: "true"
   feature_validation: "true"
   feature_volume_populator: "true"
@@ -11868,7 +11876,8 @@ metadata:
         "spec": {
           "feature_ui_plugin": "true",
           "feature_validation": "true",
-          "feature_volume_populator": "true"
+          "feature_volume_populator": "true",
+          "feature_network_policies": "false"
         }
       }
     operatorframework.io/suggested-namespace: konveyor-forklift
