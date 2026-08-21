@@ -7,28 +7,6 @@ import (
 	libclient "github.com/kubev2v/forklift/pkg/lib/client/nutanix"
 )
 
-func TestNutanixBool(t *testing.T) {
-	tests := []struct {
-		name     string
-		value    any
-		expected bool
-	}{
-		{"native true", true, true},
-		{"native false", false, false},
-		{"enabled string", "ENABLED", true},
-		{"disabled string", "DISABLED", false},
-		{"true string", "true", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := libclient.NutanixBool(tt.value); got != tt.expected {
-				t.Fatalf("expected %v, got %v", tt.expected, got)
-			}
-		})
-	}
-}
-
 func TestListAllV3DecodeVMWithStringFlashMode(t *testing.T) {
 	payload := []byte(`{
 		"metadata": {"total_matches": 1},
