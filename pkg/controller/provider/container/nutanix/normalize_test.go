@@ -44,22 +44,26 @@ func TestCoalesceBool(t *testing.T) {
 
 func TestParseNumericString(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    interface{}
-		expected int64
+		name      string
+		input     any
+		expected  int64
+		expectOK  bool
 	}{
-		{"numeric string", "12345", 12345},
-		{"non-numeric string", "not-a-number", 0},
-		{"int", 42, 42},
-		{"int64", int64(99), 99},
-		{"float64", float64(7), 7},
-		{"unsupported type", true, 0},
+		{"numeric string", "12345", 12345, true},
+		{"non-numeric string", "not-a-number", 0, false},
+		{"int", 42, 42, true},
+		{"int64", int64(99), 99, true},
+		{"float64", float64(7), 7, true},
+		{"unsupported type", true, 0, false},
+		{"missing value", nil, 0, false},
+		{"zero string", "0", 0, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if result := libclient.ParseNumericString(tt.input); result != tt.expected {
-				t.Errorf("expected %d, got %d", tt.expected, result)
+			result, ok := libclient.ParseNumericString(tt.input)
+			if result != tt.expected || ok != tt.expectOK {
+				t.Errorf("expected (%d, %v), got (%d, %v)", tt.expected, tt.expectOK, result, ok)
 			}
 		})
 	}

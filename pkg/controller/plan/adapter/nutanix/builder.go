@@ -27,6 +27,7 @@ import (
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // Firmware boot types (model.VM.BootType).
@@ -45,6 +46,12 @@ const (
 
 // Labels / secret keys for Prism Central download-cookie Secrets referenced
 // via DataVolumeSourceHTTP.SecretExtraHeaders.
+//
+// The cookie Secret is created in DataVolumes() before the DataVolume exists
+// in the API, so it cannot receive a DataVolume owner reference until later.
+// Owner references are applied in two places (both idempotent):
+//   - AdoptDownloadCookieSecretOwner, called from kubevirt.EnsureDataVolumes
+//   - RefreshImportCredentials, merged into the cookie Secret update on auth failure
 const (
 	labelDownloadCookie = "forklift.konveyor.io/nutanix-download-cookie"
 	cookieHeaderKey     = "cookie"
@@ -585,6 +592,58 @@ func (r *Builder) ensureDownloadCookieSecret(vmRef ref.Ref, diskUUID, cookie str
 	return secret, nil
 }
 
+// setDownloadCookieSecretOwner marks the DataVolume as owner of its
+// download-cookie Secret in memory. The caller must persist the Secret.
+func (r *Builder) setDownloadCookieSecretOwner(secret *core.Secret, dv *cdi.DataVolume) error {
+	if secret == nil || dv == nil || dv.Name == "" {
+		return nil
+	}
+
+	owner := &cdi.DataVolume{}
+	err := r.Destination.Get(
+		context.TODO(),
+		types.NamespacedName{Namespace: dv.Namespace, Name: dv.Name},
+		owner,
+	)
+	if err != nil {
+		return liberr.Wrap(err, "dv.name", dv.Name, "dv.namespace", dv.Namespace)
+	}
+
+	return controllerutil.SetOwnerReference(owner, secret, r.Destination.Scheme())
+}
+
+// AdoptDownloadCookieSecretOwner sets the DataVolume as owner of its
+// download-cookie Secret so Kubernetes GC removes the Secret when the
+// DataVolume is deleted. Called from kubevirt.EnsureDataVolumes via a
+// type assertion once the DataVolume exists in the API.
+func (r *Builder) AdoptDownloadCookieSecretOwner(dv *cdi.DataVolume) error {
+	if dv == nil || dv.Name == "" || dv.Spec.Source == nil || dv.Spec.Source.HTTP == nil {
+		return nil
+	}
+	if len(dv.Spec.Source.HTTP.SecretExtraHeaders) == 0 {
+		return nil
+	}
+
+	secretName := dv.Spec.Source.HTTP.SecretExtraHeaders[0]
+	secret := &core.Secret{}
+	err := r.Destination.Get(
+		context.TODO(),
+		types.NamespacedName{Namespace: dv.Namespace, Name: secretName},
+		secret,
+	)
+	if err != nil {
+		return liberr.Wrap(err, "secret", secretName, "dv.name", dv.Name)
+	}
+
+	if err = r.setDownloadCookieSecretOwner(secret, dv); err != nil {
+		return err
+	}
+	if err = r.Destination.Update(context.TODO(), secret); err != nil {
+		return liberr.Wrap(err, "secret", secret.Name, "dv.name", dv.Name)
+	}
+	return nil
+}
+
 func cookieHeaderValue(cookie string) string {
 	return "Cookie: " + cookie
 }
@@ -593,6 +652,9 @@ func cookieHeaderValue(cookie string) string {
 // for a DataVolume whose importer failed with an auth error, updates the
 // SecretExtraHeaders Secret (and the DV URL if the Location changed), and
 // returns refreshed=true so the caller can restart the importer pod.
+//
+// Also re-applies the DataVolume owner reference on the cookie Secret in
+// the same Update (see AdoptDownloadCookieSecretOwner for the creation path).
 func (r *Builder) RefreshImportCredentials(dv *cdi.DataVolume) (bool, error) {
 	if dv == nil || dv.Spec.Source == nil || dv.Spec.Source.HTTP == nil {
 		return false, nil
@@ -647,6 +709,9 @@ func (r *Builder) RefreshImportCredentials(dv *cdi.DataVolume) (bool, error) {
 		return false, liberr.Wrap(err, "secret", secretName)
 	}
 	secret.StringData = map[string]string{cookieHeaderKey: cookieHeaderValue(cookie)}
+	if err = r.setDownloadCookieSecretOwner(secret, dv); err != nil {
+		return false, liberr.Wrap(err, "secret", secretName, "dv.name", dv.Name)
+	}
 	if err = r.Destination.Update(context.TODO(), secret); err != nil {
 		return false, liberr.Wrap(err, "secret", secretName)
 	}

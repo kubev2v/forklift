@@ -74,7 +74,16 @@ func (r *Client) deleteImageV4(vmRef ref.Ref, diskUUID string) {
 		return
 	}
 	requestURL := fmt.Sprintf("%s%s/%s", r.URL, imagesV4Path, url.PathEscape(entity.ExtID))
-	if status, err := r.Delete(requestURL, nil); err != nil || (status != http.StatusOK && status != http.StatusAccepted) {
+	status, err := r.Delete(requestURL, nil)
+	if err != nil || (status != http.StatusOK && status != http.StatusAccepted) {
+		if err == nil {
+			err = liberr.New(
+				"unexpected status deleting image",
+				"vm", vmRef.String(),
+				"image", entity.ExtID,
+				"status", status,
+			)
+		}
 		r.Context.Log.Error(err, "Failed to delete temporary image", "vm", vmRef.String(), "image", entity.ExtID, "status", status)
 	}
 }
@@ -160,7 +169,7 @@ func (r *Client) preferClusterExternalURL(downloadURL string) string {
 // CVM address -- so callers rewrite the Location host to this VIP.
 // Prism Central's own pseudo-cluster has no external_ip and is skipped.
 func (r *Client) clusterExternalIP() (string, error) {
-	result, err := libclient.ListV3[libclient.Cluster](&r.Client, "cluster", 0, 20, nil)
+	result, err := libclient.ListV3[libclient.Cluster](&r.Client, "cluster", 0, 20, "")
 	if err != nil {
 		return "", err
 	}

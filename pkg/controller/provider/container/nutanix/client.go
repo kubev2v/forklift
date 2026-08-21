@@ -115,12 +115,12 @@ func (r *Client) get(url string, object any, params ...libweb.Param) (status int
 }
 
 // listAllV3 pages through a v3 list endpoint via the shared client.
-func listAllV3[T any](r *Client, resourceKind string, filter map[string]any, pageSize int) ([]T, error) {
+func listAllV3[T any](r *Client, resourceKind string, filter string, pageSize int) ([]T, error) {
 	return nutanixweb.ListAllV3[T](&r.web, resourceKind, pageSize, filter)
 }
 
 // listAll pages through a v3 list endpoint and returns raw entity maps.
-func (r *Client) listAll(resourceKind string, filter map[string]any, pageSize int) (entities []map[string]any, err error) {
+func (r *Client) listAll(resourceKind string, filter string, pageSize int) (entities []map[string]any, err error) {
 	return listAllV3[map[string]any](r, resourceKind, filter, pageSize)
 }
 
@@ -133,7 +133,7 @@ func listAllV4[T any](r *Client, path string, pageSize int) ([]T, error) {
 // Prism Central's own self-registered pseudo-cluster entry is excluded --
 // see isPrismCentralCluster.
 func (r *Client) listClusters() (entities []clusterEntity, err error) {
-	entities, err = listAllV3[clusterEntity](r, "cluster", nil, clusterPageSize)
+	entities, err = listAllV3[clusterEntity](r, "cluster", "", clusterPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -147,11 +147,11 @@ func (r *Client) listClusters() (entities []clusterEntity, err error) {
 // belonging to Prism Central's own pseudo-cluster (i.e. its underlying
 // appliance, not a real hypervisor node) are excluded.
 func (r *Client) listHosts() (entities []hostEntity, err error) {
-	entities, err = listAllV3[hostEntity](r, "host", nil, hostPageSize)
+	entities, err = listAllV3[hostEntity](r, "host", "", hostPageSize)
 	if err != nil {
 		return nil, err
 	}
-	clusters, err := listAllV3[clusterEntity](r, "cluster", nil, clusterPageSize)
+	clusters, err := listAllV3[clusterEntity](r, "cluster", "", clusterPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (r *Client) listHosts() (entities []hostEntity, err error) {
 
 // List all VMs, scoped to the configured clusterUuid (if any).
 func (r *Client) listVMs() (entities []vmEntity, err error) {
-	entities, err = listAllV3[vmEntity](r, "vm", nil, vmPageSize)
+	entities, err = listAllV3[vmEntity](r, "vm", "", vmPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func (r *Client) listVMs() (entities []vmEntity, err error) {
 
 // List all subnets (networks), scoped to the configured clusterUuid (if any).
 func (r *Client) listSubnets() (entities []networkEntity, err error) {
-	entities, err = listAllV3[networkEntity](r, "subnet", nil, subnetPageSize)
+	entities, err = listAllV3[networkEntity](r, "subnet", "", subnetPageSize)
 	if err != nil {
 		return nil, err
 	}

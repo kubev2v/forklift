@@ -310,7 +310,7 @@ func TestListAllPaginates(t *testing.T) {
 		Metadata struct {
 			UUID string `json:"uuid"`
 		} `json:"metadata"`
-	}](client, "vm", pageSize, nil)
+	}](client, "vm", pageSize, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -438,7 +438,7 @@ func TestListAllV3PaginationLimit(t *testing.T) {
 		Metadata struct {
 			UUID string `json:"uuid"`
 		} `json:"metadata"`
-	}](client, "vm", 1, nil)
+	}](client, "vm", 1, "")
 	if err == nil {
 		t.Fatal("expected pagination limit error")
 	}

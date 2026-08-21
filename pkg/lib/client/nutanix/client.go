@@ -78,7 +78,10 @@ func (r *Client) Connect() (status int, err error) {
 
 	var tlsClientConfig *tls.Config
 	if base.GetInsecureSkipVerifyFlag(r.Secret) {
-		tlsClientConfig = &tls.Config{InsecureSkipVerify: true}
+		tlsClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionTLS12,
+		}
 	} else if cacert, found := util.GetCACert(r.Secret); found {
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM(cacert)
@@ -86,9 +89,15 @@ func (r *Client) Connect() (status int, err error) {
 			err = liberr.New("failed to parse CA certificate")
 			return http.StatusBadRequest, err
 		}
-		tlsClientConfig = &tls.Config{RootCAs: roots}
+		tlsClientConfig = &tls.Config{
+			RootCAs:    roots,
+			MinVersion: tls.VersionTLS12,
+		}
 	} else {
-		tlsClientConfig = &tls.Config{InsecureSkipVerify: false}
+		tlsClientConfig = &tls.Config{
+			InsecureSkipVerify: false,
+			MinVersion:         tls.VersionTLS12,
+		}
 	}
 
 	r.URL = strings.TrimRight(r.URL, "/")
@@ -281,11 +290,11 @@ func (r *Client) send(method, url string, in, out any, header http.Header) (stat
 }
 
 // ListV3 resources using the Nutanix v3 API pattern: POST with an
-// offset/length body. filter is optional (nil omits the filter field).
-func ListV3[T any](r *Client, resourceKind string, offset, length int, filter map[string]any) (result V3ListResponse[T], err error) {
+// offset/length body. filter is optional (empty omits the filter field).
+func ListV3[T any](r *Client, resourceKind string, offset, length int, filter string) (result V3ListResponse[T], err error) {
 	url := fmt.Sprintf("%s/api/nutanix/v3/%ss/list", r.URL, resourceKind)
 	var body any
-	if filter != nil {
+	if filter != "" {
 		body = v3ListRequestWithFilter{
 			Kind:   resourceKind,
 			Offset: offset,
@@ -312,8 +321,8 @@ func ListV3[T any](r *Client, resourceKind string, offset, length int, filter ma
 }
 
 // ListAllV3 pages through a v3 list endpoint, following total_matches.
-// filter is optional (nil omits the filter field).
-func ListAllV3[T any](r *Client, resourceKind string, pageSize int, filter map[string]any) (entities []T, err error) {
+// filter is optional (empty omits the filter field).
+func ListAllV3[T any](r *Client, resourceKind string, pageSize int, filter string) (entities []T, err error) {
 	offset := 0
 	pages := 0
 	entities = make([]T, 0)

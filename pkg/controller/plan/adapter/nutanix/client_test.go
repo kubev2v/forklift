@@ -433,9 +433,15 @@ func newImageTestServer(t *testing.T, images map[string]libclient.V3Image) *http
 		case r.Method == http.MethodGet && r.URL.Path == prismCentralPath:
 			w.WriteHeader(http.StatusNotFound)
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/images/list"):
+			var body struct {
+				Filter string `json:"filter"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
 			entities := make([]libclient.V3Image, 0, len(images))
 			for _, image := range images {
-				entities = append(entities, image)
+				if body.Filter == "" || body.Filter == libclient.V3ImageNameFilter(image.Spec.Name) {
+					entities = append(entities, image)
+				}
 			}
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(v3ImageListResponse{
