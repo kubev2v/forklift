@@ -856,7 +856,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		r.mapCPU(vmRef, vm, object)
 		r.mapMemory(vm, object)
 	}
-	r.mapClock(host, object)
+	r.mapClock(vm, host, object)
 	r.mapInput(object)
 	r.mapTpm(vm, object)
 	err = r.mapNetworks(vm, object)
@@ -1016,12 +1016,16 @@ func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Devices.Inputs = []cnv.Input{tablet}
 }
 
-func (r *Builder) mapClock(host *model.Host, object *cnv.VirtualMachineSpec) {
-	if host.Timezone != "" {
+func (r *Builder) mapClock(vm *model.VM, host *model.Host, object *cnv.VirtualMachineSpec) {
+	timezone := vm.Timezone
+	if timezone == "" {
+		timezone = host.Timezone
+	}
+	if timezone != "" {
 		if object.Template.Spec.Domain.Clock == nil {
 			object.Template.Spec.Domain.Clock = &cnv.Clock{}
 		}
-		tz := cnv.ClockOffsetTimezone(host.Timezone)
+		tz := cnv.ClockOffsetTimezone(timezone)
 		object.Template.Spec.Domain.Clock.ClockOffset.Timezone = &tz
 	}
 }
