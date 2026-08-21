@@ -30,12 +30,6 @@ if [ ! -f "$V2V_MAP_FILE" ]; then
     exit 0
 fi
 
-# Check if udev rules file exists and is not empty
-if [ -f "$UDEV_RULES_FILE" ] && [ -s "$UDEV_RULES_FILE" ]; then
-    log "File $UDEV_RULES_FILE already exists and is not empty. Exiting."
-    exit 0
-fi
-
 # Helper functions
 # ----------------
 
@@ -605,17 +599,61 @@ check_dupe_hws() {
     echo "$deduped"
 }
 
+# Skip a generated rule when its MAC or interface name is already in
+# 70-persistent-net.rules.
+filter_existing_udev_rules() {
+    if [ ! -f "$UDEV_RULES_FILE" ] || [ ! -s "$UDEV_RULES_FILE" ]; then
+        cat
+        return 0
+    fi
+
+    while IFS= read -r rule || [ -n "$rule" ]; do
+        [ -z "$rule" ] && continue
+
+        mac=$(echo "$rule" | sed -nE 's/.*ATTR\{address\}=="([^"]+)".*/\1/p')
+        name=$(echo "$rule" | sed -nE 's/.*NAME="([^"]+)".*/\1/p')
+
+        if [ -n "$mac" ] && grep -qi "ATTR{address}==\"${mac}\"" "$UDEV_RULES_FILE"; then
+            log "Info: MAC $mac already present in $UDEV_RULES_FILE, skipping rule."
+            continue
+        fi
+
+        if [ -n "$name" ] && { grep -qF "NAME=\"${name}\"" "$UDEV_RULES_FILE" || grep -qF "NAME==\"${name}\"" "$UDEV_RULES_FILE"; }; then
+            log "Info: interface name $name already present in $UDEV_RULES_FILE, skipping rule."
+            continue
+        fi
+
+        echo "$rule"
+    done
+}
+
 # Create udev rules check for duplicates and write them to udev file
 main() {
-    {
-        udev_from_ifcfg
-        udev_from_nm
-        udev_from_nm_dhcp_lease
-        udev_from_dhclient_lease
-        udev_from_netplan
-        udev_from_ifquery
-        udev_from_wicked
-    } | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
+    mkdir -p "$(dirname "$UDEV_RULES_FILE")"
+
+    new_rules=$(
+        {
+            udev_from_ifcfg
+            udev_from_nm
+            udev_from_nm_dhcp_lease
+            udev_from_dhclient_lease
+            udev_from_netplan
+            udev_from_ifquery
+            udev_from_wicked
+        } | check_dupe_hws | filter_existing_udev_rules
+    )
+
+    if [ -n "$new_rules" ]; then
+        if [ -s "$UDEV_RULES_FILE" ] && [ "$(tail -c1 "$UDEV_RULES_FILE")" != "" ]; then
+            printf '\n' >> "$UDEV_RULES_FILE"
+        fi
+        printf '%s\n' "$new_rules" >> "$UDEV_RULES_FILE"
+        log "Wrote udev rules to $UDEV_RULES_FILE"
+    else
+        [ -f "$UDEV_RULES_FILE" ] || : > "$UDEV_RULES_FILE"
+        log "No new udev rules to write to $UDEV_RULES_FILE."
+    fi
+
     echo "New udev rule:"
     cat $UDEV_RULES_FILE
 

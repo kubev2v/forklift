@@ -40,8 +40,6 @@ test_dir() {
 
     cp -a $TEST_SRC_DIR/root/* $TEST_DIR
 
-    # Clean up from previous runs
-    rm -f "$UDEV_RULES_FILE"
     mkdir -p $(dirname "$UDEV_RULES_FILE")
 
     # Source the script under test
