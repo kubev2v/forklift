@@ -717,11 +717,11 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 			// If PVC' doesn't exist yet, create it
 			if pvcPrime == nil {
-				pvcPrimeLabels := make(map[string]string)
-				for _, key := range []string{"migration", "plan", "vmID"} {
-					if val, ok := pvc.Labels[key]; ok {
-						pvcPrimeLabels[key] = val
-					}
+				// Copy all source PVC labels so CSI drivers (e.g. affinity-source-naa)
+				// see the same metadata on the object they actually provision.
+				pvcPrimeLabels := make(map[string]string, len(pvc.Labels))
+				for key, val := range pvc.Labels {
+					pvcPrimeLabels[key] = val
 				}
 				pvcPrime = &corev1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
