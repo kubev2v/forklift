@@ -114,7 +114,7 @@ func newTestCollector(t *testing.T, serverURL string) (*Collector, libmodel.DB) 
 	provider := &api.Provider{
 		Spec: api.ProviderSpec{
 			// Pin the Prism mode explicitly so every collect method's
-			// ensurePrismConfig() call resolves deterministically off the
+			// connect() resolves prism mode deterministically off the
 			// same "return {entities:[...]} for anything" mock server,
 			// without an extra auto-detection probe.
 			Settings: map[string]string{
@@ -133,6 +133,9 @@ func newTestCollector(t *testing.T, serverURL string) (*Collector, libmodel.DB) 
 	collector.client.url = serverURL
 	collector.client.log = logging.WithName("test")
 	collector.client.clientTimeout = 30 * time.Second
+	if _, err := collector.client.connect(); err != nil {
+		t.Fatalf("connect failed: %v", err)
+	}
 	collector.ctx, collector.cancel = context.WithCancel(context.Background())
 	t.Cleanup(collector.cancel)
 

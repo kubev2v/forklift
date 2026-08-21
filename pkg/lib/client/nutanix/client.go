@@ -15,6 +15,7 @@ import (
 	liburl "net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,9 +32,17 @@ import (
 // a more specific Client.Timeout.
 const ConnectionTimeout = 30 * time.Second
 
+// maxListPages bounds pagination against a server that ignores page
+// parameters and returns the same page indefinitely.
+var maxListPages = 1000
+
 // Client is a minimal Nutanix Prism (v3/v4) REST client shared by the
 // inventory collector and the migration plan adapter. Callers set URL and
 // Secret (and optionally Timeout and Log) before calling Connect().
+//
+// A connected Client is safe for concurrent use by multiple goroutines once
+// Connect has succeeded. Connect uses double-checked locking so concurrent
+// first callers serialize transport setup; failed connects may be retried.
 type Client struct {
 	// Base URL (e.g., https://prism-central:9440).
 	URL string
@@ -44,6 +53,7 @@ type Client struct {
 	// Logger. Defaults to a package logger when unset.
 	Log logging.LevelLogger
 
+	mu     sync.Mutex
 	client *libweb.Client
 }
 
@@ -51,7 +61,12 @@ type Client struct {
 // on an already-connected Client are a no-op. Connectivity is verified with
 // a minimal request (listing a single cluster).
 func (r *Client) Connect() (status int, err error) {
-	var tlsClientConfig *tls.Config
+	if r.client != nil {
+		return http.StatusOK, nil
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	if r.client != nil {
 		return http.StatusOK, nil
@@ -61,6 +76,7 @@ func (r *Client) Connect() (status int, err error) {
 		r.Log = logging.WithName("client|nutanix")
 	}
 
+	var tlsClientConfig *tls.Config
 	if base.GetInsecureSkipVerifyFlag(r.Secret) {
 		tlsClientConfig = &tls.Config{InsecureSkipVerify: true}
 	} else if cacert, found := util.GetCACert(r.Secret); found {
@@ -118,7 +134,7 @@ func (r *Client) testConnection() (status int, err error) {
 		Length: 1,
 	}
 
-	status, err = r.Post(url, body, nil)
+	status, err = r.send(http.MethodPost, url, body, nil, r.createMutatingHeader())
 	if err != nil {
 		return status, liberr.Wrap(err, "connection test failed")
 	}
@@ -135,8 +151,19 @@ func (r *Client) Get(url string, out any, params ...libweb.Param) (status int, e
 	if err != nil {
 		return
 	}
-	r.client.Header = r.createAuthHeader()
-	return r.client.Get(url, out, params...)
+	if len(params) > 0 {
+		parsedURL, parseErr := liburl.Parse(url)
+		if parseErr != nil {
+			return 0, liberr.Wrap(parseErr, "URL not valid", "url", url)
+		}
+		query := parsedURL.Query()
+		for _, param := range params {
+			query.Add(param.Key, param.Value)
+		}
+		parsedURL.RawQuery = query.Encode()
+		url = parsedURL.String()
+	}
+	return r.send(http.MethodGet, url, nil, out, r.createAuthHeader())
 }
 
 // GetNoRedirect issues an authenticated GET without following redirects,
@@ -158,11 +185,9 @@ func (r *Client) GetNoRedirect(url string) (status int, header http.Header, err 
 	}
 	request.Header = r.createAuthHeader()
 
-	client := http.Client{
-		Transport: r.client.Transport,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
+	client := r.httpClient()
+	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
 	}
 	response, err := client.Do(request)
 	if err != nil {
@@ -183,8 +208,7 @@ func (r *Client) Post(url string, body any, out any) (status int, err error) {
 	if err != nil {
 		return
 	}
-	r.client.Header = r.createMutatingHeader()
-	return r.client.Post(url, body, out)
+	return r.send(http.MethodPost, url, body, out, r.createMutatingHeader())
 }
 
 // Put issues an authenticated PUT request (Nutanix v3's update pattern:
@@ -215,29 +239,27 @@ func (r *Client) send(method, url string, in, out any, header http.Header) (stat
 	if err != nil {
 		return 0, liberr.Wrap(err, "URL not valid", "url", url)
 	}
-	var body io.ReadCloser
+	var bodyReader io.Reader
 	if in != nil {
-		var reader *bytes.Reader
 		switch v := in.(type) {
 		case string:
-			reader = bytes.NewReader([]byte(v))
+			bodyReader = strings.NewReader(v)
 		default:
 			var marshaled []byte
 			marshaled, err = json.Marshal(in)
 			if err != nil {
 				return 0, liberr.Wrap(err, "json marshal failed", "url", url)
 			}
-			reader = bytes.NewReader(marshaled)
+			bodyReader = bytes.NewReader(marshaled)
 		}
-		body = io.NopCloser(reader)
 	}
-	request := &http.Request{
-		Header: header,
-		Method: method,
-		Body:   body,
-		URL:    parsedURL,
+	request, err := http.NewRequest(method, parsedURL.String(), bodyReader)
+	if err != nil {
+		return 0, liberr.Wrap(err, "failed to build request", "url", url)
 	}
-	client := http.Client{Transport: r.client.Transport}
+	request.Header = header
+
+	client := r.httpClient()
 	response, err := client.Do(request)
 	if err != nil {
 		return 0, liberr.Wrap(err, method+" failed", "url", url)
@@ -293,9 +315,15 @@ func ListV3[T any](r *Client, resourceKind string, offset, length int, filter ma
 // filter is optional (nil omits the filter field).
 func ListAllV3[T any](r *Client, resourceKind string, pageSize int, filter map[string]any) (entities []T, err error) {
 	offset := 0
+	pages := 0
 	entities = make([]T, 0)
 
 	for {
+		if pages >= maxListPages {
+			return nil, liberr.New("pagination limit exceeded", "resource", resourceKind, "pages", pages)
+		}
+		pages++
+
 		result, err := ListV3[T](r, resourceKind, offset, pageSize, filter)
 		if err != nil {
 			return nil, err
@@ -325,6 +353,10 @@ func ListAllV4[T any](r *Client, path string, pageSize int) (entities []T, err e
 	entities = make([]T, 0)
 
 	for {
+		if page >= maxListPages {
+			return nil, liberr.New("pagination limit exceeded", "path", path, "pages", page)
+		}
+
 		var result V4ListResponse[T]
 		status, err := r.Get(url, &result,
 			libweb.Param{Key: "$page", Value: strconv.Itoa(page)},
@@ -351,6 +383,17 @@ func ListAllV4[T any](r *Client, path string, pageSize int) (entities []T, err e
 	}
 
 	return entities, nil
+}
+
+func (r *Client) httpClient() http.Client {
+	timeout := r.Timeout
+	if timeout <= 0 {
+		timeout = ConnectionTimeout
+	}
+	return http.Client{
+		Transport: r.client.Transport,
+		Timeout:   timeout,
+	}
 }
 
 // createAuthHeader builds a Basic Auth header from Secret's user/password.

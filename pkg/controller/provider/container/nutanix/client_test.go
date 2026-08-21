@@ -42,6 +42,13 @@ func createTestClientWithSettings(url string, settings map[string]string) *Clien
 	return client
 }
 
+func mustConnect(t *testing.T, client *Client) {
+	t.Helper()
+	if _, err := client.connect(); err != nil {
+		t.Fatalf("connect failed: %v", err)
+	}
+}
+
 // TestClientConnect tests the connect method.
 func TestClientConnect(t *testing.T) {
 	// Create mock server
@@ -114,6 +121,7 @@ func TestClientListClusters(t *testing.T) {
 
 	client := createTestClient(server.URL)
 	client.url = server.URL // Override to use mock server
+	mustConnect(t, client)
 
 	entities, err := client.listClusters()
 	if err != nil {
@@ -154,6 +162,7 @@ func TestClientListHosts(t *testing.T) {
 
 	client := createTestClient(server.URL)
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := client.listHosts()
 	if err != nil {
@@ -190,6 +199,7 @@ func TestClientListClusters_ExcludesPrismCentral(t *testing.T) {
 
 	client := createTestClient(server.URL)
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := client.listClusters()
 	if err != nil {
@@ -255,6 +265,7 @@ func TestClientListHosts_ExcludesPrismCentralHosts(t *testing.T) {
 
 	client := createTestClient(server.URL)
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := client.listHosts()
 	if err != nil {
@@ -305,6 +316,7 @@ func TestClientListVMs(t *testing.T) {
 
 	client := createTestClient(server.URL)
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := client.listVMs()
 	if err != nil {
@@ -341,6 +353,7 @@ func TestClientListSubnets(t *testing.T) {
 
 	client := createTestClient(server.URL)
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := client.listSubnets()
 	if err != nil {
@@ -384,6 +397,7 @@ func TestClientListStorageContainers(t *testing.T) {
 		api.NutanixPrismType: api.NutanixPrismElement,
 	})
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := client.listStorageContainers()
 	if err != nil {
@@ -425,6 +439,7 @@ func TestClientListStorageContainersCentral(t *testing.T) {
 		api.NutanixPrismType: api.NutanixPrismCentral,
 	})
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := client.listStorageContainers()
 	if err != nil {
@@ -469,6 +484,7 @@ func TestClientListImagesCentral(t *testing.T) {
 		api.NutanixPrismType: api.NutanixPrismCentral,
 	})
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := client.listImages()
 	if err != nil {
@@ -513,6 +529,7 @@ func TestClientListImages(t *testing.T) {
 
 	client := createTestClient(server.URL)
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := client.listImages()
 	if err != nil {
@@ -546,6 +563,7 @@ func TestClientListClusters_ScopedToCluster(t *testing.T) {
 		api.NutanixClusterUUID: prodClusterUUID,
 	})
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := client.listClusters()
 	if err != nil {
@@ -580,6 +598,7 @@ func TestClientListHosts_ScopedToCluster(t *testing.T) {
 		api.NutanixClusterUUID: devClusterUUID,
 	})
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := client.listHosts()
 	if err != nil {
@@ -617,6 +636,7 @@ func TestClientListVMs_ScopedToCluster(t *testing.T) {
 		api.NutanixClusterUUID: prodClusterUUID,
 	})
 	scoped.url = server.URL
+	mustConnect(t, scoped)
 
 	entities, err := scoped.listVMs()
 	if err != nil {
@@ -635,6 +655,7 @@ func TestClientListVMs_ScopedToCluster(t *testing.T) {
 		api.NutanixPrismType: api.NutanixPrismCentral,
 	})
 	unscoped.url = server.URL
+	mustConnect(t, unscoped)
 
 	all, err := unscoped.listVMs()
 	if err != nil {
@@ -732,6 +753,7 @@ func TestClientListAllStopsOnEmptyPage(t *testing.T) {
 
 	client := createTestClient(server.URL)
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := client.listAll("cluster", nil, 2)
 	if err != nil {
@@ -845,6 +867,7 @@ func TestClientListAllV4StopsOnEmptyPage(t *testing.T) {
 
 	client := createTestClient(server.URL)
 	client.url = server.URL
+	mustConnect(t, client)
 
 	entities, err := listAllV4[map[string]interface{}](client, storageContainersV4Path, 2)
 	if err != nil {
@@ -869,8 +892,7 @@ func TestClientErrorHandling(t *testing.T) {
 	client := createTestClient(server.URL)
 	client.url = server.URL
 
-	// Try to list clusters which should fail with unauthorized
-	_, err := client.listClusters()
+	_, err := client.connect()
 
 	if err == nil {
 		t.Error("Expected error for unauthorized request")

@@ -8,10 +8,6 @@ import (
 )
 
 func (r *Client) listStorageContainers() (entities []storageContainerEntity, err error) {
-	if err = r.ensurePrismConfig(); err != nil {
-		return nil, err
-	}
-
 	switch r.prism.Mode {
 	case PrismElement:
 		return r.listStorageContainersElement()

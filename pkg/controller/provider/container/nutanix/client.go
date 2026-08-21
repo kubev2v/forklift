@@ -1,6 +1,7 @@
 package nutanix
 
 import (
+	"net/http"
 	"time"
 
 	nutanixweb "github.com/kubev2v/forklift/pkg/lib/client/nutanix"
@@ -34,8 +35,10 @@ const (
 )
 
 // Client wraps the shared pkg/lib/client/nutanix REST client with the
-// collector-specific concerns: Prism mode resolution/caching and the
+// collector-specific concerns: Prism mode resolution and the
 // cluster-scoped, entity-specific list methods used by the collector.
+// The owner must call connect() once before any list method; collect()
+// does this at the start of each inventory pass.
 type Client struct {
 	// Base URL (e.g., https://prism-central:9440)
 	url string
@@ -47,10 +50,10 @@ type Client struct {
 	clientTimeout time.Duration
 	// Logger
 	log logging.LevelLogger
-	// Resolved Prism endpoint configuration.
+	// Resolved Prism endpoint configuration, set once by connect().
 	prism PrismConfig
-	// Whether prism config has been resolved.
-	prismResolved bool
+	// Whether connect() has completed successfully.
+	connected bool
 
 	// Shared REST client (connect/auth/get/post/pagination).
 	web nutanixweb.Client
@@ -74,6 +77,10 @@ func (r *Client) ensureWebClient() {
 // Connect and authenticate with Nutanix Prism, then resolve the Prism
 // mode (Central vs Element) for this provider.
 func (r *Client) connect() (status int, err error) {
+	if r.connected {
+		return http.StatusOK, nil
+	}
+
 	r.ensureWebClient()
 
 	status, err = r.web.Connect()
@@ -83,10 +90,18 @@ func (r *Client) connect() (status int, err error) {
 	// Pick up the trimmed (no trailing slash) URL.
 	r.url = r.web.URL
 
-	if err = r.ensurePrismConfig(); err != nil {
+	config, err := r.resolvePrismConfig()
+	if err != nil {
 		return status, err
 	}
+	r.prism = config
+	r.log.Info(
+		"Prism endpoint resolved",
+		"mode", config.Mode,
+		"explicit", config.Explicit,
+		"clusterUuid", config.ClusterUUID)
 
+	r.connected = true
 	r.log.Info("Successfully connected to Nutanix",
 		"url", r.url,
 		"prismMode", r.prism.Mode)
@@ -94,20 +109,13 @@ func (r *Client) connect() (status int, err error) {
 	return status, nil
 }
 
-// GET request
+// GET request. Requires a prior successful connect().
 func (r *Client) get(url string, object any, params ...libweb.Param) (status int, err error) {
-	status, err = r.connect()
-	if err != nil {
-		return
-	}
 	return r.web.Get(url, object, params...)
 }
 
 // listAllV3 pages through a v3 list endpoint via the shared client.
 func listAllV3[T any](r *Client, resourceKind string, filter map[string]any, pageSize int) ([]T, error) {
-	if _, err := r.connect(); err != nil {
-		return nil, err
-	}
 	return nutanixweb.ListAllV3[T](&r.web, resourceKind, pageSize, filter)
 }
 
@@ -118,9 +126,6 @@ func (r *Client) listAll(resourceKind string, filter map[string]any, pageSize in
 
 // listAllV4 pages through a v4 list endpoint via the shared client.
 func listAllV4[T any](r *Client, path string, pageSize int) ([]T, error) {
-	if _, err := r.connect(); err != nil {
-		return nil, err
-	}
 	return nutanixweb.ListAllV4[T](&r.web, path, pageSize)
 }
 
@@ -133,9 +138,6 @@ func (r *Client) listClusters() (entities []clusterEntity, err error) {
 		return nil, err
 	}
 	entities = withoutPrismCentralClusters(entities)
-	if err = r.ensurePrismConfig(); err != nil {
-		return nil, err
-	}
 	return filterByMatch(entities, r.prism.ClusterUUID, func(entity clusterEntity) string {
 		return entity.Metadata.UUID
 	}), nil
@@ -154,9 +156,6 @@ func (r *Client) listHosts() (entities []hostEntity, err error) {
 		return nil, err
 	}
 	entities = excludeHostsByCluster(entities, excludedClusterUUIDs(clusters))
-	if err = r.ensurePrismConfig(); err != nil {
-		return nil, err
-	}
 	return filterByMatch(entities, r.prism.ClusterUUID, func(entity hostEntity) string {
 		return entity.clusterUUID()
 	}), nil
@@ -168,9 +167,6 @@ func (r *Client) listVMs() (entities []vmEntity, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = r.ensurePrismConfig(); err != nil {
-		return nil, err
-	}
 	return filterByMatch(entities, r.prism.ClusterUUID, func(entity vmEntity) string {
 		return entity.Spec.ClusterReference.UUID
 	}), nil
@@ -180,9 +176,6 @@ func (r *Client) listVMs() (entities []vmEntity, err error) {
 func (r *Client) listSubnets() (entities []networkEntity, err error) {
 	entities, err = listAllV3[networkEntity](r, "subnet", nil, subnetPageSize)
 	if err != nil {
-		return nil, err
-	}
-	if err = r.ensurePrismConfig(); err != nil {
 		return nil, err
 	}
 	return filterByMatch(entities, r.prism.ClusterUUID, func(entity networkEntity) string {

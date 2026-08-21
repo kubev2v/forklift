@@ -10,10 +10,6 @@ import (
 // single owning cluster_reference), which is also why model.Image has no
 // Cluster field.
 func (r *Client) listImages() (entities []imageEntity, err error) {
-	if err = r.ensurePrismConfig(); err != nil {
-		return nil, err
-	}
-
 	switch r.prism.Mode {
 	case PrismElement:
 		return r.listImagesElement()
