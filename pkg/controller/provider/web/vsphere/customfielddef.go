@@ -79,7 +79,7 @@ func (h *CustomFieldDefHandler) Get(ctx *gin.Context) {
 			err,
 			"url",
 			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
+		ctx.Status(http.StatusBadRequest)
 		return
 	}
 	m := &model.CustomFieldDef{
