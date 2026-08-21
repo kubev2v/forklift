@@ -560,22 +560,7 @@ func TestMaybeRefreshImportCredentials(t *testing.T) {
 			Namespace: "target-ns",
 		},
 	}
-	importer := &core.Pod{
-		ObjectMeta: meta.ObjectMeta{
-			Name:      "importer-test-dv",
-			Namespace: "target-ns",
-		},
-		Status: core.PodStatus{
-			ContainerStatuses: []core.ContainerStatus{{
-				State: core.ContainerState{
-					Terminated: &core.ContainerStateTerminated{
-						ExitCode: 1,
-						Message:  "http: expected status code 200, got 401. Status: 401 Unauthorized",
-					},
-				},
-			}},
-		},
-	}
+	importer := authFailureImporterPod()
 	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(dv, importer).Build()
 
 	refresher := &stubImportCredentialRefresher{refreshed: true}
@@ -606,6 +591,113 @@ func TestMaybeRefreshImportCredentials(t *testing.T) {
 	g.Expect(client.Create(context.TODO(), importer2)).To(gomega.Succeed())
 	m.maybeRefreshImportCredentials(vm, updated, importer2)
 	g.Expect(refresher.calls).To(gomega.Equal(0))
+}
+
+func TestMaybeRefreshImportCredentials_NotRefreshed(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	g.Expect(core.AddToScheme(scheme)).To(gomega.Succeed())
+	g.Expect(cdi.AddToScheme(scheme)).To(gomega.Succeed())
+
+	dv := &cdi.DataVolume{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "test-dv",
+			Namespace: "target-ns",
+		},
+	}
+	importer := authFailureImporterPod()
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(dv, importer).Build()
+
+	refresher := &stubImportCredentialRefresher{refreshed: false}
+	m := &Migration{
+		Context: &plancontext.Context{
+			Destination: plancontext.Destination{Client: client},
+			Log:         logging.WithName("test"),
+		},
+		builder: refresher,
+	}
+	vm := &plan.VMStatus{
+		VM: plan.VM{Ref: ref.Ref{ID: "vm-1", Name: "test-vm"}},
+	}
+
+	m.maybeRefreshImportCredentials(vm, dv, importer)
+
+	g.Expect(refresher.calls).To(gomega.Equal(1))
+	updated := &cdi.DataVolume{}
+	g.Expect(client.Get(context.TODO(), types.NamespacedName{Namespace: dv.Namespace, Name: dv.Name}, updated)).To(gomega.Succeed())
+	g.Expect(updated.Annotations[annCookieRefreshedAt]).To(gomega.BeEmpty())
+	err := client.Get(context.TODO(), types.NamespacedName{Namespace: importer.Namespace, Name: importer.Name}, &core.Pod{})
+	g.Expect(k8serr.IsNotFound(err)).To(gomega.BeFalse())
+}
+
+func TestMaybeRefreshImportCredentials_NonAuthFailure(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	g.Expect(core.AddToScheme(scheme)).To(gomega.Succeed())
+	g.Expect(cdi.AddToScheme(scheme)).To(gomega.Succeed())
+
+	dv := &cdi.DataVolume{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "test-dv",
+			Namespace: "target-ns",
+		},
+	}
+	importer := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "importer-test-dv",
+			Namespace: "target-ns",
+		},
+		Status: core.PodStatus{
+			ContainerStatuses: []core.ContainerStatus{{
+				State: core.ContainerState{
+					Terminated: &core.ContainerStateTerminated{
+						ExitCode: 1,
+						Message:  "connection reset by peer",
+					},
+				},
+			}},
+		},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(dv, importer).Build()
+
+	refresher := &stubImportCredentialRefresher{refreshed: true}
+	m := &Migration{
+		Context: &plancontext.Context{
+			Destination: plancontext.Destination{Client: client},
+			Log:         logging.WithName("test"),
+		},
+		builder: refresher,
+	}
+	vm := &plan.VMStatus{
+		VM: plan.VM{Ref: ref.Ref{ID: "vm-1", Name: "test-vm"}},
+	}
+
+	m.maybeRefreshImportCredentials(vm, dv, importer)
+
+	g.Expect(refresher.calls).To(gomega.Equal(0))
+	err := client.Get(context.TODO(), types.NamespacedName{Namespace: importer.Namespace, Name: importer.Name}, &core.Pod{})
+	g.Expect(k8serr.IsNotFound(err)).To(gomega.BeFalse())
+}
+
+func authFailureImporterPod() *core.Pod {
+	return &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "importer-test-dv",
+			Namespace: "target-ns",
+		},
+		Status: core.PodStatus{
+			ContainerStatuses: []core.ContainerStatus{{
+				State: core.ContainerState{
+					Terminated: &core.ContainerStateTerminated{
+						ExitCode: 1,
+						Message:  "http: expected status code 200, got 401. Status: 401 Unauthorized",
+					},
+				},
+			}},
+		},
+	}
 }
 
 type stubImportCredentialRefresher struct {

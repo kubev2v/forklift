@@ -257,36 +257,50 @@ func newConnectedTestClient(t *testing.T, url string) *Client {
 	return client
 }
 
+func powerTestVMID(t *testing.T, name string) string {
+	t.Helper()
+	vmID := "vm-power-" + name
+	t.Cleanup(func() {
+		clearPowerOffTracking(testMigrationUID, vmID)
+	})
+	return vmID
+}
+
 func TestPowerState(t *testing.T) {
 	cases := []struct {
+		name string
 		raw  string
 		want planapi.VMPowerState
 	}{
-		{powerStateOn, planapi.VMPowerStateOn},
-		{powerStateOff, planapi.VMPowerStateOff},
-		{"", planapi.VMPowerStateUnknown},
+		{"on", powerStateOn, planapi.VMPowerStateOn},
+		{"off", powerStateOff, planapi.VMPowerStateOff},
+		{"unknown", "", planapi.VMPowerStateUnknown},
 	}
 	for _, c := range cases {
-		server, _, _ := newPowerTestServer(t, vmEntityPtr("uuid-1", c.raw))
-		defer server.Close()
+		t.Run(c.name, func(t *testing.T) {
+			vmID := powerTestVMID(t, "state-"+c.name)
+			server, _, _ := newPowerTestServer(t, vmEntityPtr(vmID, c.raw))
+			defer server.Close()
 
-		client := newConnectedTestClient(t, server.URL)
-		state, err := client.PowerState(ref.Ref{ID: "uuid-1"})
-		if err != nil {
-			t.Fatalf("unexpected error for raw state %q: %v", c.raw, err)
-		}
-		if state != c.want {
-			t.Fatalf("raw state %q: expected %s, got %s", c.raw, c.want, state)
-		}
+			client := newConnectedTestClient(t, server.URL)
+			state, err := client.PowerState(ref.Ref{ID: vmID})
+			if err != nil {
+				t.Fatalf("unexpected error for raw state %q: %v", c.raw, err)
+			}
+			if state != c.want {
+				t.Fatalf("raw state %q: expected %s, got %s", c.raw, c.want, state)
+			}
+		})
 	}
 }
 
 func TestPoweredOff(t *testing.T) {
-	server, _, _ := newPowerTestServer(t, vmEntityPtr("uuid-1", powerStateOff))
+	vmID := powerTestVMID(t, "already-off")
+	server, _, _ := newPowerTestServer(t, vmEntityPtr(vmID, powerStateOff))
 	defer server.Close()
 
 	client := newConnectedTestClient(t, server.URL)
-	off, err := client.PoweredOff(ref.Ref{ID: "uuid-1"})
+	off, err := client.PoweredOff(ref.Ref{ID: vmID})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -298,11 +312,12 @@ func TestPoweredOff(t *testing.T) {
 // TestPowerOff_SkipsAcpiWhenAlreadyOff verifies PowerOff is a no-op when the
 // VM is already off.
 func TestPowerOff_SkipsAcpiWhenAlreadyOff(t *testing.T) {
-	server, puts, transitions := newPowerTestServer(t, vmEntityPtr("uuid-1", powerStateOff))
+	vmID := powerTestVMID(t, "skip-acpi")
+	server, puts, transitions := newPowerTestServer(t, vmEntityPtr(vmID, powerStateOff))
 	defer server.Close()
 
 	client := newConnectedTestClient(t, server.URL)
-	if err := client.PowerOff(ref.Ref{ID: "uuid-1"}); err != nil {
+	if err := client.PowerOff(ref.Ref{ID: vmID}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(*puts) != 0 {
@@ -317,11 +332,12 @@ func TestPowerOff_SkipsAcpiWhenAlreadyOff(t *testing.T) {
 // and leaves the VM running until PoweredOff forces OFF after the grace
 // period.
 func TestPowerOff_SubmitsAcpiShutdown(t *testing.T) {
-	server, puts, transitions := newPowerTestServer(t, vmEntityPtr("uuid-1", powerStateOn))
+	vmID := powerTestVMID(t, "acpi-shutdown")
+	server, puts, transitions := newPowerTestServer(t, vmEntityPtr(vmID, powerStateOn))
 	defer server.Close()
 
 	client := newConnectedTestClient(t, server.URL)
-	if err := client.PowerOff(ref.Ref{ID: "uuid-1"}); err != nil {
+	if err := client.PowerOff(ref.Ref{ID: vmID}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(*puts) != 0 {
@@ -338,7 +354,7 @@ func TestPowerOff_SubmitsAcpiShutdown(t *testing.T) {
 		)
 	}
 
-	off, err := client.PoweredOff(ref.Ref{ID: "uuid-1"})
+	off, err := client.PoweredOff(ref.Ref{ID: vmID})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -352,15 +368,16 @@ func TestPoweredOff_ForcesHardOffAfterGracePeriod(t *testing.T) {
 	powerOffGracePeriod = 0
 	t.Cleanup(func() { powerOffGracePeriod = oldGrace })
 
-	server, puts, transitions := newPowerTestServer(t, vmEntityPtr("uuid-1", powerStateOn))
+	vmID := powerTestVMID(t, "hard-off")
+	server, puts, transitions := newPowerTestServer(t, vmEntityPtr(vmID, powerStateOn))
 	defer server.Close()
 
 	client := newConnectedTestClient(t, server.URL)
-	if err := client.PowerOff(ref.Ref{ID: "uuid-1"}); err != nil {
+	if err := client.PowerOff(ref.Ref{ID: vmID}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	off, err := client.PoweredOff(ref.Ref{ID: "uuid-1"})
+	off, err := client.PoweredOff(ref.Ref{ID: vmID})
 	if err != nil {
 		t.Fatalf("unexpected error on first PoweredOff: %v", err)
 	}
@@ -377,7 +394,7 @@ func TestPoweredOff_ForcesHardOffAfterGracePeriod(t *testing.T) {
 		t.Fatalf("expected no PUT requests, got %d", len(*puts))
 	}
 
-	off, err = client.PoweredOff(ref.Ref{ID: "uuid-1"})
+	off, err = client.PoweredOff(ref.Ref{ID: vmID})
 	if err != nil {
 		t.Fatalf("unexpected error on second PoweredOff: %v", err)
 	}
@@ -388,11 +405,12 @@ func TestPoweredOff_ForcesHardOffAfterGracePeriod(t *testing.T) {
 
 // TestPowerOn_SkipsPutWhenAlreadyOn mirrors TestPowerOff_SkipsPutWhenAlreadyOff.
 func TestPowerOn_SkipsPutWhenAlreadyOn(t *testing.T) {
-	server, puts, _ := newPowerTestServer(t, vmEntityPtr("uuid-1", powerStateOn))
+	vmID := powerTestVMID(t, "skip-on")
+	server, puts, _ := newPowerTestServer(t, vmEntityPtr(vmID, powerStateOn))
 	defer server.Close()
 
 	client := newConnectedTestClient(t, server.URL)
-	if err := client.PowerOn(ref.Ref{ID: "uuid-1"}); err != nil {
+	if err := client.PowerOn(ref.Ref{ID: vmID}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(*puts) != 0 {
@@ -721,17 +739,17 @@ func TestCreateImage_PostsExpectedBody(t *testing.T) {
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/images"):
 			var body v3ImageCreateRequest
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatalf("decode create body: %v", err)
+				t.Errorf("decode create body: %v", err)
 			}
 			if body.Spec.Name != "forklift-migration-vm-1-disk-1" {
-				t.Fatalf("unexpected image name: %q", body.Spec.Name)
+				t.Errorf("unexpected image name: %q", body.Spec.Name)
 			}
 			if body.Spec.Resources.ImageType != "DISK_IMAGE" {
-				t.Fatalf("expected image_type DISK_IMAGE, got %q", body.Spec.Resources.ImageType)
+				t.Errorf("expected image_type DISK_IMAGE, got %q", body.Spec.Resources.ImageType)
 			}
 			if body.Spec.Resources.DataSourceReference.Kind != "vm_disk" ||
 				body.Spec.Resources.DataSourceReference.UUID != "disk-uuid-1" {
-				t.Fatalf("unexpected data_source_reference: %+v", body.Spec.Resources.DataSourceReference)
+				t.Errorf("unexpected data_source_reference: %+v", body.Spec.Resources.DataSourceReference)
 			}
 			images["image-1"] = testV3Image("image-1", body.Spec.Name, imageStatePending)
 			w.WriteHeader(http.StatusOK)

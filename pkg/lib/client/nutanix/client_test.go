@@ -3,8 +3,11 @@ package nutanix
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -38,9 +41,9 @@ func TestBasicAuth(t *testing.T) {
 
 // TestConnect verifies that Connect authenticates and is idempotent.
 func TestConnect(t *testing.T) {
-	requestCount := 0
+	var requestCount atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		requestCount.Add(1)
 		if r.Header.Get("Authorization") == "" {
 			t.Error("expected Authorization header")
 		}
@@ -54,16 +57,16 @@ func TestConnect(t *testing.T) {
 	if status, err := client.Connect(); err != nil || status != http.StatusOK {
 		t.Fatalf("unexpected result: status=%d err=%v", status, err)
 	}
-	if requestCount != 1 {
-		t.Fatalf("expected 1 connectivity probe request, got %d", requestCount)
+	if requestCount.Load() != 1 {
+		t.Fatalf("expected 1 connectivity probe request, got %d", requestCount.Load())
 	}
 
 	// Second call should be a no-op (already connected).
 	if status, err := client.Connect(); err != nil || status != http.StatusOK {
 		t.Fatalf("unexpected result on second connect: status=%d err=%v", status, err)
 	}
-	if requestCount != 1 {
-		t.Fatalf("expected no additional requests on repeated connect, got %d total", requestCount)
+	if requestCount.Load() != 1 {
+		t.Fatalf("expected no additional requests on repeated connect, got %d total", requestCount.Load())
 	}
 }
 
@@ -80,6 +83,9 @@ func TestConnectFailure(t *testing.T) {
 	if _, err := client.Connect(); err == nil {
 		t.Fatal("expected an error from a failed connectivity probe")
 	}
+	if _, err := client.Connect(); err == nil {
+		t.Fatal("expected a repeated Connect() to fail while the probe keeps failing")
+	}
 }
 
 // TestGetPost verifies Get and Post issue authenticated requests and decode
@@ -87,6 +93,12 @@ func TestConnectFailure(t *testing.T) {
 func TestGetPost(t *testing.T) {
 	var sawRequestID bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+			return
+		}
 		if r.Method == http.MethodPost {
 			if id := r.Header.Get("NTNX-Request-Id"); id == "" {
 				t.Errorf("POST missing NTNX-Request-Id")
@@ -146,7 +158,7 @@ func TestGetNoRedirect(t *testing.T) {
 			w.WriteHeader(http.StatusFound)
 			return
 		}
-		t.Fatalf("expected the redirect not to be followed, got a request for %s", r.URL.Path)
+		t.Errorf("expected the redirect not to be followed, got a request for %s", r.URL.Path)
 	}))
 	defer server.Close()
 
@@ -221,9 +233,11 @@ func TestDelete(t *testing.T) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("expected DELETE, got %s", r.Method)
 		}
-		buf := make([]byte, 1)
-		n, _ := r.Body.Read(buf)
-		sawBody = buf[:n]
+		body, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			t.Errorf("read body failed: %v", readErr)
+		}
+		sawBody = body
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":{"execution_context":{"task_uuid":"abc"}}}`))
@@ -251,13 +265,21 @@ func TestDelete(t *testing.T) {
 func TestListAllPaginates(t *testing.T) {
 	const total = 5
 	const pageSize = 2
-	requests := 0
+	var requests atomic.Int32
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
+		requests.Add(1)
 		var body map[string]interface{}
-		_ = json.NewDecoder(r.Body).Decode(&body)
-		offset := int(body["offset"].(float64))
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode body failed: %v", err)
+			return
+		}
+		offsetValue, ok := body["offset"].(float64)
+		if !ok {
+			t.Errorf("expected numeric offset in request body, got %T", body["offset"])
+			return
+		}
+		offset := int(offsetValue)
 
 		remaining := total - offset
 		if remaining > pageSize {
@@ -296,8 +318,8 @@ func TestListAllPaginates(t *testing.T) {
 		t.Fatalf("expected %d entities, got %d", total, len(entities))
 	}
 	// 1 connectivity probe (from Connect) + 3 list pages (2+2+1).
-	if requests != 4 {
-		t.Fatalf("expected 4 requests, got %d", requests)
+	if requests.Load() != 4 {
+		t.Fatalf("expected 4 requests, got %d", requests.Load())
 	}
 }
 
