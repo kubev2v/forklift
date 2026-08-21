@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/go-toolset:1.25.7-1773088126 AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:1.26.5-1787080706 AS builder
 USER root
 WORKDIR /forklift
 
@@ -24,7 +24,7 @@ WORKDIR /forklift/cmd/vsphere-xcopy-volume-populator
 RUN CGO_ENABLED=0 go test -c -tags=e2e -o /tests.test ./e2e-tests/tests
 
 # Final stage
-FROM golang:1.26
+FROM golang:1.27
 
 # Set shell with pipefail and error handling for the entire stage
 SHELL ["/bin/bash", "-o", "pipefail", "-e", "-c"]
