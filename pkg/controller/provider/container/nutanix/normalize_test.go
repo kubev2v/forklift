@@ -1,15 +1,10 @@
 package nutanix
 
-import "testing"
+import (
+	"testing"
 
-func TestCoalesce(t *testing.T) {
-	if result := coalesce("", "value-b", "value-c"); result != "value-b" {
-		t.Errorf("expected first non-empty value 'value-b', got %q", result)
-	}
-	if result := coalesce(""); result != "" {
-		t.Errorf("expected empty string, got %q", result)
-	}
-}
+	libclient "github.com/kubev2v/forklift/pkg/lib/client/nutanix"
+)
 
 func TestCoalesceInt(t *testing.T) {
 	if result := coalesceInt(0, 7); result != 7 {
@@ -38,33 +33,10 @@ func TestCoalesceBool(t *testing.T) {
 	}
 }
 
-func TestParseNumericString(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    interface{}
-		expected int64
-	}{
-		{"numeric string", "12345", 12345},
-		{"non-numeric string", "not-a-number", 0},
-		{"int", 42, 42},
-		{"int64", int64(99), 99},
-		{"float64", float64(7), 7},
-		{"unsupported type", true, 0},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if result := parseNumericString(tt.input); result != tt.expected {
-				t.Errorf("expected %d, got %d", tt.expected, result)
-			}
-		})
-	}
-}
-
 func TestFilterByMatch_EmptyClusterUUID(t *testing.T) {
 	entities := []clusterEntity{
-		{Metadata: metadata{UUID: "cluster-a"}},
-		{Metadata: metadata{UUID: "cluster-b"}},
+		{Metadata: libclient.Metadata{UUID: "cluster-a"}},
+		{Metadata: libclient.Metadata{UUID: "cluster-b"}},
 	}
 
 	filtered := filterByMatch(entities, "", func(entity clusterEntity) string {
@@ -77,8 +49,8 @@ func TestFilterByMatch_EmptyClusterUUID(t *testing.T) {
 
 func TestFilterByMatch_Matches(t *testing.T) {
 	entities := []clusterEntity{
-		{Metadata: metadata{UUID: "cluster-a"}},
-		{Metadata: metadata{UUID: "cluster-b"}},
+		{Metadata: libclient.Metadata{UUID: "cluster-a"}},
+		{Metadata: libclient.Metadata{UUID: "cluster-b"}},
 	}
 
 	filtered := filterByMatch(entities, "cluster-a", func(entity clusterEntity) string {
@@ -95,19 +67,19 @@ func TestFilterByMatch_Matches(t *testing.T) {
 func TestFilterByMatch_FallbackClusterRef(t *testing.T) {
 	entities := []hostEntity{
 		{Spec: struct {
-			ClusterReference ref    `json:"cluster_reference"`
-			Name             string `json:"name"`
-		}{ClusterReference: ref{UUID: "cluster-a"}}},
+			ClusterReference libclient.Ref `json:"cluster_reference"`
+			Name             string        `json:"name"`
+		}{ClusterReference: libclient.Ref{UUID: "cluster-a"}}},
 		{Status: struct {
-			ClusterReference ref           `json:"cluster_reference"`
+			ClusterReference libclient.Ref `json:"cluster_reference"`
 			Name             string        `json:"name"`
 			State            string        `json:"state"`
 			Resources        hostResources `json:"resources"`
-		}{ClusterReference: ref{UUID: "cluster-a"}}},
+		}{ClusterReference: libclient.Ref{UUID: "cluster-a"}}},
 		{Spec: struct {
-			ClusterReference ref    `json:"cluster_reference"`
-			Name             string `json:"name"`
-		}{ClusterReference: ref{UUID: "cluster-b"}}},
+			ClusterReference libclient.Ref `json:"cluster_reference"`
+			Name             string        `json:"name"`
+		}{ClusterReference: libclient.Ref{UUID: "cluster-b"}}},
 	}
 
 	filtered := filterByMatch(entities, "cluster-a", func(entity hostEntity) string {
@@ -120,7 +92,7 @@ func TestFilterByMatch_FallbackClusterRef(t *testing.T) {
 
 func clusterEntityWithServiceList(uuid string, services ...string) clusterEntity {
 	return clusterEntity{
-		Metadata: metadata{UUID: uuid},
+		Metadata: libclient.Metadata{UUID: uuid},
 		Status: struct {
 			Name      string `json:"name"`
 			State     string `json:"state"`
@@ -209,13 +181,13 @@ func TestExcludedClusterUUIDs(t *testing.T) {
 func TestExcludeHostsByCluster(t *testing.T) {
 	entities := []hostEntity{
 		{Spec: struct {
-			ClusterReference ref    `json:"cluster_reference"`
-			Name             string `json:"name"`
-		}{ClusterReference: ref{UUID: "pc-cluster"}}},
+			ClusterReference libclient.Ref `json:"cluster_reference"`
+			Name             string        `json:"name"`
+		}{ClusterReference: libclient.Ref{UUID: "pc-cluster"}}},
 		{Spec: struct {
-			ClusterReference ref    `json:"cluster_reference"`
-			Name             string `json:"name"`
-		}{ClusterReference: ref{UUID: "real-cluster"}}},
+			ClusterReference libclient.Ref `json:"cluster_reference"`
+			Name             string        `json:"name"`
+		}{ClusterReference: libclient.Ref{UUID: "real-cluster"}}},
 	}
 
 	filtered := excludeHostsByCluster(entities, map[string]bool{"pc-cluster": true})

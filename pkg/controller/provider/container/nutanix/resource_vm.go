@@ -4,95 +4,17 @@ import (
 	"strings"
 
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/nutanix"
+	libclient "github.com/kubev2v/forklift/pkg/lib/client/nutanix"
 )
 
-type vmEntity struct {
-	Metadata metadata `json:"metadata"`
-	Spec     struct {
-		ClusterReference ref         `json:"cluster_reference"`
-		Description      string      `json:"description"`
-		Name             string      `json:"name"`
-		Resources        vmResources `json:"resources"`
-	} `json:"spec"`
-	Status struct {
-		Resources vmResources `json:"resources"`
-	} `json:"status"`
-}
-
-type vmResources struct {
-	BootConfig struct {
-		BootDeviceOrderList []string `json:"boot_device_order_list"`
-		BootType            string   `json:"boot_type"`
-	} `json:"boot_config"`
-	DiskList          []diskEntity `json:"disk_list"`
-	GuestOSID         string       `json:"guest_os_id"`
-	GuestTools        guestTools   `json:"guest_tools"`
-	HardwareClockTZ   string       `json:"hardware_clock_timezone"`
-	HostReference     ref          `json:"host_reference"`
-	HypervisorType    string       `json:"hypervisor_type"`
-	MachineType       string       `json:"machine_type"`
-	MemorySizeMiB     int64        `json:"memory_size_mib"`
-	NICList           []nicEntity  `json:"nic_list"`
-	NumSockets        int          `json:"num_sockets"`
-	NumThreadsPerCore int          `json:"num_threads_per_core"`
-	NumVcpusPerSocket int          `json:"num_vcpus_per_socket"`
-	PowerState        string       `json:"power_state"`
-	SerialPortList    []serialPort `json:"serial_port_list"`
-	VGAConsoleEnabled bool         `json:"vga_console_enabled"`
-}
-
-type serialPort struct {
-	Index       int  `json:"index"`
-	IsConnected bool `json:"is_connected"`
-}
-
-type nicEntity struct {
-	IPEndpointList []struct {
-		IP string `json:"ip"`
-	} `json:"ip_endpoint_list"`
-	IsConnected     bool   `json:"is_connected"`
-	MACAddress      string `json:"mac_address"`
-	Model           string `json:"model"`
-	NicType         string `json:"nic_type"`
-	SubnetReference ref    `json:"subnet_reference"`
-	UUID            string `json:"uuid"`
-	VlanMode        string `json:"vlan_mode"`
-}
-
-type diskEntity struct {
-	DataSourceReference ref `json:"data_source_reference"`
-	DeviceProperties    struct {
-		DeviceType  string `json:"device_type"`
-		DiskAddress struct {
-			AdapterType string `json:"adapter_type"`
-			DeviceIndex int    `json:"device_index"`
-		} `json:"disk_address"`
-	} `json:"device_properties"`
-	DiskSizeBytes int64 `json:"disk_size_bytes"`
-	DiskSizeMiB   int64 `json:"disk_size_mib"`
-	StorageConfig struct {
-		FlashMode                 interface{} `json:"flash_mode"`
-		StorageContainerReference ref         `json:"storage_container_reference"`
-	} `json:"storage_config"`
-	StorageContainerReference ref    `json:"storage_container_reference"`
-	UUID                      string `json:"uuid"`
-}
-
-type guestTools struct {
-	NutanixGuestTools struct {
-		Enabled        bool   `json:"enabled"`
-		GuestOSVersion string `json:"guest_os_version"`
-		ISOMountState  string `json:"iso_mount_state"`
-		IsReachable    bool   `json:"is_reachable"`
-		Version        string `json:"version"`
-	} `json:"nutanix_guest_tools"`
-}
+// vmEntity is a v3 VM wire entity mapped into inventory.
+type vmEntity libclient.VM
 
 func (e vmEntity) id() string {
 	return e.Metadata.UUID
 }
 
-func (e vmEntity) mergedResources() vmResources {
+func (e vmEntity) mergedResources() libclient.VMResources {
 	spec := e.Spec.Resources
 	status := e.Status.Resources
 	out := spec
@@ -114,7 +36,7 @@ func (e *vmEntity) ApplyTo(m *model.VM) {
 
 	m.ID = e.id()
 	m.UUID = e.id()
-	m.Name = coalesce(e.Spec.Name, e.Metadata.Name)
+	m.Name = libclient.Coalesce(e.Spec.Name, e.Metadata.Name)
 	m.Categories = e.Metadata.Categories
 	m.Cluster = e.Spec.ClusterReference.UUID
 	m.Host = e.Status.Resources.HostReference.UUID
@@ -130,7 +52,7 @@ func (e *vmEntity) ApplyTo(m *model.VM) {
 	m.HardwareClockTZ = resources.HardwareClockTZ
 	m.VGAConsoleEnabled = resources.VGAConsoleEnabled
 	m.HypervisorType = e.Status.Resources.HypervisorType
-	m.GuestOSID = coalesce(e.Spec.Resources.GuestOSID, e.Status.Resources.GuestOSID)
+	m.GuestOSID = libclient.Coalesce(e.Spec.Resources.GuestOSID, e.Status.Resources.GuestOSID)
 
 	m.SerialPorts = applySerialPorts(resources.SerialPortList)
 	m.NICs = applyNICs(resources.NICList)
@@ -138,7 +60,7 @@ func (e *vmEntity) ApplyTo(m *model.VM) {
 	mergeGuestTools(e.Spec.Resources.GuestTools, e.Status.Resources.GuestTools, m)
 }
 
-func applySerialPorts(ports []serialPort) []model.SerialPort {
+func applySerialPorts(ports []libclient.VMSerialPort) []model.SerialPort {
 	result := make([]model.SerialPort, 0, len(ports))
 	for _, port := range ports {
 		result = append(result, model.SerialPort{
@@ -149,7 +71,7 @@ func applySerialPorts(ports []serialPort) []model.SerialPort {
 	return result
 }
 
-func applyNICs(nics []nicEntity) []model.NIC {
+func applyNICs(nics []libclient.VMNIC) []model.NIC {
 	result := make([]model.NIC, 0, len(nics))
 	for _, nic := range nics {
 		addresses := make([]string, 0, len(nic.IPEndpointList))
@@ -174,21 +96,21 @@ func applyNICs(nics []nicEntity) []model.NIC {
 	return result
 }
 
-func applyDisks(disks []diskEntity) []model.Disk {
+func applyDisks(disks []libclient.VMDisk) []model.Disk {
 	result := make([]model.Disk, 0, len(disks))
-	for _, disk := range disks {
-		result = append(result, disk.ApplyTo())
+	for i := range disks {
+		result = append(result, applyDisk(&disks[i]))
 	}
 	return result
 }
 
-func (d *diskEntity) ApplyTo() model.Disk {
+func applyDisk(d *libclient.VMDisk) model.Disk {
 	disk := model.Disk{
 		AdapterType:     d.DeviceProperties.DiskAddress.AdapterType,
 		DeviceIndex:     d.DeviceProperties.DiskAddress.DeviceIndex,
 		DeviceType:      d.DeviceProperties.DeviceType,
 		DiskSizeMiB:     d.DiskSizeMiB,
-		FlashMode:       nutanixBool(d.StorageConfig.FlashMode),
+		FlashMode:       libclient.NutanixBool(d.StorageConfig.FlashMode),
 		IsCdrom:         d.DeviceProperties.DeviceType == "CDROM",
 		SourceImageUUID: d.DataSourceReference.UUID,
 		UUID:            d.UUID,
@@ -211,8 +133,8 @@ func (d *diskEntity) ApplyTo() model.Disk {
 	return disk
 }
 
-func mergeGuestTools(spec, status guestTools, m *model.VM) {
-	for _, tools := range []guestTools{spec, status} {
+func mergeGuestTools(spec, status libclient.VMGuestTools, m *model.VM) {
+	for _, tools := range []libclient.VMGuestTools{spec, status} {
 		ngt := tools.NutanixGuestTools
 		if ngt.Enabled {
 			m.GuestToolsEnabled = ngt.Enabled
