@@ -541,16 +541,18 @@ var _ = Describe("vSphere builder", func() {
 				VM1: model.VM1{
 					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
 				},
-				CustomDef: []vsphere.CustomFieldDef{
-					{Key: 100, Name: "app-name"},
-					{Key: 101, Name: "app-version"},
-				},
 				CustomValues: []vsphere.CustomFieldValue{
 					{Key: 100, Value: "my-application"},
 					{Key: 101, Value: "v1.2.3"},
 				},
 			}
-			builder.Source.Inventory = &mockInventory{vm: vm}
+			builder.Source.Inventory = &mockInventory{
+				vm:         vm,
+				customDefs: []model.CustomFieldDef{
+					{Key: 100, Name: "app-name"},
+					{Key: 101, Name: "app-version"},
+				},
+			}
 
 			labels, annotations, _, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, nil)
 
@@ -614,14 +616,16 @@ var _ = Describe("vSphere builder", func() {
 				Tags: []vsphere.Tag{
 					{Name: "owner", Description: "platform-team"},
 				},
-				CustomDef: []vsphere.CustomFieldDef{
-					{Key: 100, Name: "app-name"},
-				},
 				CustomValues: []vsphere.CustomFieldValue{
 					{Key: 100, Value: "my-application"},
 				},
 			}
-			builder.Source.Inventory = &mockInventory{vm: vm}
+			builder.Source.Inventory = &mockInventory{
+				vm: vm,
+				customDefs: []model.CustomFieldDef{
+					{Key: 100, Name: "app-name"},
+				},
+			}
 
 			labels, annotations, _, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, nil)
 
@@ -642,14 +646,16 @@ var _ = Describe("vSphere builder", func() {
 					{Name: "owner", Description: "platform-team"},
 					{Name: "environment", Description: "production"},
 				},
-				CustomDef: []vsphere.CustomFieldDef{
-					{Key: 100, Name: "app-name"},
-				},
 				CustomValues: []vsphere.CustomFieldValue{
 					{Key: 100, Value: "my-application"},
 				},
 			}
-			builder.Source.Inventory = &mockInventory{vm: vm}
+			builder.Source.Inventory = &mockInventory{
+				vm: vm,
+				customDefs: []model.CustomFieldDef{
+					{Key: 100, Name: "app-name"},
+				},
+			}
 
 			tagMapping := &v1beta1.TagMapping{
 				Disabled: true,
@@ -715,14 +721,16 @@ var _ = Describe("vSphere builder", func() {
 				VM1: model.VM1{
 					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
 				},
-				CustomDef: []vsphere.CustomFieldDef{
-					{Key: 100, Name: "invalid attr name"},
-				},
 				CustomValues: []vsphere.CustomFieldValue{
 					{Key: 100, Value: "some-value"},
 				},
 			}
-			builder.Source.Inventory = &mockInventory{vm: vm}
+			builder.Source.Inventory = &mockInventory{
+				vm: vm,
+				customDefs: []model.CustomFieldDef{
+					{Key: 100, Name: "invalid attr name"},
+				},
+			}
 
 			_, annotations, sanitizationReport, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, nil)
 
@@ -739,16 +747,18 @@ var _ = Describe("vSphere builder", func() {
 				VM1: model.VM1{
 					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
 				},
-				CustomDef: []vsphere.CustomFieldDef{
-					{Key: 100, Name: "!@#$"},
-					{Key: 101, Name: "valid-attr"},
-				},
 				CustomValues: []vsphere.CustomFieldValue{
 					{Key: 100, Value: "should-be-skipped"},
 					{Key: 101, Value: "kept"},
 				},
 			}
-			builder.Source.Inventory = &mockInventory{vm: vm}
+			builder.Source.Inventory = &mockInventory{
+				vm: vm,
+				customDefs: []model.CustomFieldDef{
+					{Key: 100, Name: "!@#$"},
+					{Key: 101, Name: "valid-attr"},
+				},
+			}
 
 			_, annotations, _, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, nil)
 
