@@ -103,7 +103,7 @@ func (r *Client) Finalize(vms []*planapi.VMStatus, _ string) {
 		return
 	}
 	for _, vm := range vms {
-		clearPowerOffTracking(string(r.Context.Migration.UID), vm.Ref.ID)
+		clearPowerOffTracking(string(r.Context.Migration.UID), vm.ID)
 		disks, err := r.vmDisks(vm.Ref)
 		if err != nil {
 			r.Context.Log.Error(err, "Failed to look up VM disks for image cleanup", "vm", vm.String())
