@@ -11,6 +11,7 @@ RUN go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-monitor ./cmd/virt-v2v
 RUN go build -buildvcs=false -ldflags="-w -s" -o image-converter ./cmd/image-converter/image-converter.go
 RUN go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper ./cmd/virt-v2v/entrypoint.go
 RUN go build -buildvcs=false -ldflags="-w -s" -o forklift-wait-for-reboot github.com/kubev2v/forklift/cmd/forklift-wait-for-reboot
+RUN go build -buildvcs=false -ldflags="-w -s" -o kc-copy ./cmd/kc-copy/main.go
 
 # Main container
 FROM quay.io/centos/centos:stream9
@@ -81,6 +82,8 @@ COPY --from=builder /app/image-converter /usr/local/bin/image-converter
 COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
 
 COPY --from=builder /app/forklift-wait-for-reboot /usr/local/bin/forklift-wait-for-reboot
+
+COPY --from=builder /app/kc-copy /usr/local/bin/kc-copy
 
 ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 
