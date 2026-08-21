@@ -712,7 +712,7 @@ func TestClientListAllPaginates(t *testing.T) {
 	}
 	requests = 0
 
-	entities, err := client.listAll("cluster", nil, pageSize)
+	entities, err := client.listAll("cluster", "", pageSize)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -755,7 +755,7 @@ func TestClientListAllStopsOnEmptyPage(t *testing.T) {
 	client.url = server.URL
 	mustConnect(t, client)
 
-	entities, err := client.listAll("cluster", nil, 2)
+	entities, err := client.listAll("cluster", "", 2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

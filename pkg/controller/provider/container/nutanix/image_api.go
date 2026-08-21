@@ -23,7 +23,7 @@ func (r *Client) listImages() (entities []imageEntity, err error) {
 // listImagesElement lists images via the v3 "image" kind, which Prism
 // Element serves directly.
 func (r *Client) listImagesElement() ([]imageEntity, error) {
-	return listAllV3[imageEntity](r, "image", nil, imagePageSize)
+	return listAllV3[imageEntity](r, "image", "", imagePageSize)
 }
 
 // listImagesCentral lists images via Prism Central's Image Service (vmm v4

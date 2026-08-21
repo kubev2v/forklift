@@ -46,10 +46,27 @@ type v3ListRequest struct {
 }
 
 type v3ListRequestWithFilter struct {
-	Kind   string         `json:"kind"`
-	Offset int            `json:"offset"`
-	Length int            `json:"length"`
-	Filter map[string]any `json:"filter,omitempty"`
+	Kind   string `json:"kind"`
+	Offset int    `json:"offset"`
+	Length int    `json:"length"`
+	Filter string `json:"filter,omitempty"`
+}
+
+// V3ImageNameFilter returns a v3 list FIQL filter matching image spec.name.
+func V3ImageNameFilter(name string) string {
+	return "name==" + escapeFIQLLiteral(name)
+}
+
+func escapeFIQLLiteral(value string) string {
+	if value == "" {
+		return "''"
+	}
+	for _, r := range value {
+		if r == ';' || r == ',' || r == '=' || r == ' ' || r == '*' || r == '\'' {
+			return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+		}
+	}
+	return value
 }
 
 // V3Image is a v3 Image Service entity.
@@ -297,19 +314,20 @@ func NutanixBool(value any) bool {
 }
 
 // ParseNumericString parses Nutanix numeric fields that may arrive as strings.
-func ParseNumericString(value any) int64 {
+// ok is false when the value is missing or cannot be parsed.
+func ParseNumericString(value any) (parsed int64, ok bool) {
 	switch typed := value.(type) {
 	case string:
 		parsed, err := strconv.ParseInt(typed, 10, 64)
 		if err == nil {
-			return parsed
+			return parsed, true
 		}
 	case int:
-		return int64(typed)
+		return int64(typed), true
 	case int64:
-		return typed
+		return typed, true
 	case float64:
-		return int64(typed)
+		return int64(typed), true
 	}
-	return 0
+	return 0, false
 }

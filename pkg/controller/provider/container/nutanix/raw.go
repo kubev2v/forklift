@@ -31,9 +31,10 @@ func (r storageContainerV2Raw) toEntity() storageContainerEntity {
 
 	usageBytes := int64(0)
 	if r.UsageStats != nil {
-		usageBytes = libclient.ParseNumericString(r.UsageStats["storage.user_usage_bytes"])
-		if usageBytes == 0 {
-			usageBytes = libclient.ParseNumericString(r.UsageStats["storage.reserved_usage_bytes"])
+		if value, ok := libclient.ParseNumericString(r.UsageStats["storage.user_usage_bytes"]); ok {
+			usageBytes = value
+		} else if value, ok := libclient.ParseNumericString(r.UsageStats["storage.reserved_usage_bytes"]); ok {
+			usageBytes = value
 		}
 	}
 

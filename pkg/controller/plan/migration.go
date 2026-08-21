@@ -2564,7 +2564,8 @@ func (r *Migration) maybeRefreshImportCredentials(vm *plan.VMStatus, dv *cdi.Dat
 	if err != nil {
 		log.Error(err, "Failed to refresh import credentials.",
 			"vm", vm.String(),
-			"dv", path.Join(dv.Namespace, dv.Name))
+			"dv.name", dv.Name,
+			"dv.namespace", dv.Namespace)
 		return
 	}
 	if !refreshed {
@@ -2579,7 +2580,8 @@ func (r *Migration) maybeRefreshImportCredentials(vm *plan.VMStatus, dv *cdi.Dat
 	)
 	if err != nil {
 		log.Error(err, "Failed to get DataVolume after credential refresh.",
-			"dv", path.Join(dv.Namespace, dv.Name))
+			"dv.name", dv.Name,
+			"dv.namespace", dv.Namespace)
 		return
 	}
 	if fresh.Annotations == nil {
@@ -2588,19 +2590,24 @@ func (r *Migration) maybeRefreshImportCredentials(vm *plan.VMStatus, dv *cdi.Dat
 	fresh.Annotations[annCookieRefreshedAt] = time.Now().UTC().Format(time.RFC3339)
 	if err = r.Destination.Update(context.TODO(), fresh); err != nil {
 		log.Error(err, "Failed to annotate DataVolume after credential refresh.",
-			"dv", path.Join(dv.Namespace, dv.Name))
+			"dv.name", dv.Name,
+			"dv.namespace", dv.Namespace)
 		return
 	}
 
 	if err = r.Destination.Delete(context.TODO(), importer); err != nil && !k8serr.IsNotFound(err) {
 		log.Error(err, "Failed to restart importer after credential refresh.",
-			"pod", path.Join(importer.Namespace, importer.Name),
-			"dv", path.Join(dv.Namespace, dv.Name))
+			"pod.name", importer.Name,
+			"pod.namespace", importer.Namespace,
+			"dv.name", dv.Name,
+			"dv.namespace", dv.Namespace)
 		return
 	}
 	log.Info("Restarted importer after credential refresh.",
-		"pod", path.Join(importer.Namespace, importer.Name),
-		"dv", path.Join(dv.Namespace, dv.Name),
+		"pod.name", importer.Name,
+		"pod.namespace", importer.Namespace,
+		"dv.name", dv.Name,
+		"dv.namespace", dv.Namespace,
 		"vm", vm.String())
 }
 
