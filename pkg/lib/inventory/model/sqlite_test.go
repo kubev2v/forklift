@@ -187,6 +187,51 @@ func TestIOErrHealerNil(t *testing.T) {
 	g.Expect(healer.Observe(errors.New("SQLITE_IOERR"))).To(gomega.BeFalse())
 }
 
+func TestCollectorRetryLoopRebuildsEmptyDirCache(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	cacheDir, err := os.MkdirTemp("", "emptydir-cache")
+	g.Expect(err).ToNot(gomega.HaveOccurred())
+	defer os.RemoveAll(cacheDir)
+
+	dbPath := filepath.Join(cacheDir, "provider.db")
+	db := New(dbPath, &PlainObject{})
+	err = db.Open(true)
+	g.Expect(err).ToNot(gomega.HaveOccurred())
+	defer db.Close(true)
+
+	marker := &PlainObject{ID: 42, Name: "stale-inventory", Age: 1}
+	g.Expect(db.Insert(marker)).ToNot(gomega.HaveOccurred())
+
+	healer := &IOErrHealer{
+		DB:        db,
+		Log:       logging.WithName("collector|vsphere"),
+		Threshold: DefaultIOErrRebuildThreshold,
+	}
+	ioErr := sqliteErrorWithCode(sqlite3lib.SQLITE_IOERR_SHORT_READ)
+
+	attempts := 0
+	rebuilt := false
+	for attempts < 5 && !rebuilt {
+		attempts++
+		if healer.Observe(ioErr) {
+			rebuilt = true
+			break
+		}
+	}
+
+	g.Expect(rebuilt).To(gomega.BeTrue())
+	g.Expect(attempts).To(gomega.Equal(DefaultIOErrRebuildThreshold))
+
+	got := &PlainObject{ID: 42}
+	err = db.Get(got)
+	g.Expect(errors.Is(err, NotFound)).To(gomega.BeTrue())
+
+	g.Expect(db.Insert(marker)).ToNot(gomega.HaveOccurred())
+	got = &PlainObject{ID: 42}
+	g.Expect(db.Get(got)).ToNot(gomega.HaveOccurred())
+	g.Expect(got.Name).To(gomega.Equal("stale-inventory"))
+}
+
 // sqliteErrorWithCode builds a modernc.org/sqlite Error with the given result
 // code. The Error fields are unexported, so tests set them through an identical
 // layout.
