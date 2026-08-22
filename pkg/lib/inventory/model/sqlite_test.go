@@ -67,6 +67,56 @@ func TestRebuildDiscardsCache(t *testing.T) {
 	g.Expect(got.Name).To(gomega.Equal("cached"))
 }
 
+func TestRebuildIsIdempotent(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	tmpDir, err := os.MkdirTemp("", "rebuild-idempotent-test")
+	g.Expect(err).ToNot(gomega.HaveOccurred())
+	defer os.RemoveAll(tmpDir)
+
+	db := New(filepath.Join(tmpDir, "test.db"), &PlainObject{})
+	err = db.Open(true)
+	g.Expect(err).ToNot(gomega.HaveOccurred())
+	defer db.Close(true)
+
+	client := db.(*Client)
+	modelCount := len(client.models)
+
+	g.Expect(Rebuild(db)).ToNot(gomega.HaveOccurred())
+	g.Expect(Rebuild(db)).ToNot(gomega.HaveOccurred())
+	g.Expect(len(client.models)).To(gomega.Equal(modelCount))
+
+	obj := &PlainObject{ID: 2, Name: "after-rebuilds", Age: 9}
+	g.Expect(db.Insert(obj)).ToNot(gomega.HaveOccurred())
+	got := &PlainObject{ID: 2}
+	g.Expect(db.Get(got)).ToNot(gomega.HaveOccurred())
+	g.Expect(got.Name).To(gomega.Equal("after-rebuilds"))
+}
+
+func TestRebuildRemovesSidecarFiles(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	tmpDir, err := os.MkdirTemp("", "rebuild-sidecar-test")
+	g.Expect(err).ToNot(gomega.HaveOccurred())
+	defer os.RemoveAll(tmpDir)
+
+	path := filepath.Join(tmpDir, "test.db")
+	db := New(path, &PlainObject{})
+	err = db.Open(true)
+	g.Expect(err).ToNot(gomega.HaveOccurred())
+	defer db.Close(true)
+
+	g.Expect(db.Close(false)).ToNot(gomega.HaveOccurred())
+	g.Expect(os.WriteFile(path+"-wal", []byte("corrupt-wal"), 0644)).To(gomega.Succeed())
+	g.Expect(os.WriteFile(path+"-shm", []byte("corrupt-shm"), 0644)).To(gomega.Succeed())
+	g.Expect(os.WriteFile(path+"-journal", []byte("corrupt-journal"), 0644)).To(gomega.Succeed())
+
+	g.Expect(Rebuild(db)).ToNot(gomega.HaveOccurred())
+	obj := &PlainObject{ID: 3, Name: "fresh", Age: 1}
+	g.Expect(db.Insert(obj)).ToNot(gomega.HaveOccurred())
+	got := &PlainObject{ID: 3}
+	g.Expect(db.Get(got)).ToNot(gomega.HaveOccurred())
+	g.Expect(got.Name).To(gomega.Equal("fresh"))
+}
+
 func TestIOErrHealerRebuildsAfterThreshold(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 	tmpDir, err := os.MkdirTemp("", "healer-test")

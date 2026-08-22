@@ -347,7 +347,9 @@ func (r *Client) EndWatch(watch *Watch) {
 
 // Build the data model.
 func (r *Client) build() (err error) {
-	r.models = append(r.models, &Label{})
+	if !hasLabelModel(r.models) {
+		r.models = append(r.models, &Label{})
+	}
 	r.dm, err = NewModel(r.models)
 	if err != nil {
 		return err
@@ -375,6 +377,15 @@ func (r *Client) build() (err error) {
 	}
 
 	return nil
+}
+
+func hasLabelModel(models []interface{}) bool {
+	for _, m := range models {
+		if _, ok := m.(*Label); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // Database transaction.
