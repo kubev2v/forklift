@@ -65,7 +65,12 @@ func Execute() error {
 
 		// Create SSE handler
 		sseHandler := mcp.NewSSEHandler(func(req *http.Request) *mcp.Server {
-			return CreateReadServer()
+			server, err := CreateServer()
+			if err != nil {
+				log.Printf("Failed to create server: %v", err)
+				return nil
+			}
+			return server
 		}, nil)
 
 		// Wrap handler with middleware to extract token from Authorization header
@@ -108,6 +113,9 @@ func Execute() error {
 	}
 
 	// Stdio mode - default behavior
-	server := CreateReadServer()
+	server, err := CreateServer()
+	if err != nil {
+		return fmt.Errorf("failed to create server: %w", err)
+	}
 	return server.Run(context.Background(), &mcp.StdioTransport{})
 }
