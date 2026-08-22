@@ -544,6 +544,20 @@ var AllSettings = map[string]SettingDefinition{
 		Description: "Global default ServiceAccount for migration pods in the target namespace. Overridden by Plan-level serviceAccount",
 		Category:    CategoryPerformance,
 	},
+	"controller_pvc_name_template": {
+		Name:        "controller_pvc_name_template",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Global default Go template for generating PVC names during non-OCP migrations. Used when the Plan-level pvcNameTemplate is empty. When this field is also empty, the controller falls back to the hardcoded default: \"\\{\\{trunc 15 .PlanName\\}\\}-\\{\\{trunc 15 .TargetVmName\\}\\}-disk-\\{\\{.DiskIndex\\}\\}\". Does not apply to OpenShift sources (see controller_ocp_pvc_name_template). IMPORTANT: Curly braces must be escaped with a backslash (\\{ and \\}) to avoid conflicts with the operator's Ansible/Jinja2 templating engine. The controller unescapes them before parsing the Go template. Example: \"\\{\\{trunc 10 .PlanName\\}\\}-\\{\\{.TargetVmName\\}\\}-\\{\\{.DiskIndex\\}\\}\"",
+		Category:    CategoryPerformance,
+	},
+	"controller_ocp_pvc_name_template": {
+		Name:        "controller_ocp_pvc_name_template",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Global default Go template for generating PVC names during OpenShift (OCP) migrations. Used when the Plan-level pvcNameTemplate is empty. When this field is also empty, the controller falls back to \"\\{\\{.SourcePVCName\\}\\}\" (preserves the source PVC name). Does not apply to non-OCP providers (see controller_pvc_name_template). IMPORTANT: Curly braces must be escaped with a backslash (\\{ and \\}) to avoid conflicts with the operator's Ansible/Jinja2 templating engine. The controller unescapes them before parsing the Go template. Example: \"\\{\\{.SourcePVCNamespace\\}\\}-\\{\\{.SourcePVCName\\}\\}\"",
+		Category:    CategoryPerformance,
+	},
 	"controller_max_vm_inflight": {
 		Name:        "controller_max_vm_inflight",
 		Type:        TypeInt,

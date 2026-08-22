@@ -10,16 +10,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	internaljson "github.com/modelcontextprotocol/go-sdk/internal/json"
 	"github.com/modelcontextprotocol/go-sdk/internal/jsonrpc2"
-	"github.com/modelcontextprotocol/go-sdk/internal/xcontext"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 )
+
+// notifyCancellationTimeout bounds the cancellation notification we send to
+// the peer when the caller's context is cancelled. The notification is
+// best-effort: a degraded connection (e.g. an OAuth flow that has been
+// abandoned) must not be able to block the caller's return path or
+// re-trigger expensive recovery on its behalf. See issue #882.
+const notifyCancellationTimeout = 5 * time.Second
 
 // ErrConnectionClosed is returned when sending a message to a connection that
 // is closed or in the process of closing.
@@ -152,7 +159,9 @@ type handler interface {
 	handle(ctx context.Context, req *jsonrpc.Request) (any, error)
 }
 
-func connect[H handler, State any](ctx context.Context, t Transport, b binder[H, State], s State, onClose func()) (H, error) {
+// connect wires a transport to a binder. logger must be non-nil; it receives
+// jsonrpc2 internal errors that would otherwise be dropped (see #218).
+func connect[H handler, State any](ctx context.Context, t Transport, b binder[H, State], s State, onClose func(), logger *slog.Logger) (H, error) {
 	var zero H
 	mcpConn, err := t.Connect(ctx)
 	if err != nil {
@@ -178,7 +187,9 @@ func connect[H handler, State any](ctx context.Context, t Transport, b binder[H,
 		OnDone: func() {
 			b.disconnect(h)
 		},
-		OnInternalError: func(err error) { log.Printf("jsonrpc2 error: %v", err) },
+		OnInternalError: func(err error) {
+			logger.Error("jsonrpc2 internal error", "error", err)
+		},
 	})
 	assert(preempter.conn != nil, "unbound preempter")
 	return h, nil
@@ -216,8 +227,9 @@ func call(ctx context.Context, conn *jsonrpc2.Connection, method string, params 
 	case errors.Is(err, jsonrpc2.ErrClientClosing), errors.Is(err, jsonrpc2.ErrServerClosing):
 		return fmt.Errorf("%w: calling %q: %v", ErrConnectionClosed, method, err)
 	case ctx.Err() != nil:
-		// Notify the peer of cancellation.
-		err := conn.Notify(xcontext.Detach(ctx), notificationCancelled, &CancelledParams{
+		notifyCtx, cancelNotify := context.WithTimeout(context.WithoutCancel(ctx), notifyCancellationTimeout)
+		defer cancelNotify()
+		err := conn.Notify(notifyCtx, notificationCancelled, &CancelledParams{
 			Reason:    ctx.Err().Error(),
 			RequestID: call.ID().Raw(),
 		})
@@ -344,7 +356,11 @@ func (r rwc) Close() error {
 //
 // See [msgBatch] for more discussion of message batching.
 type ioConn struct {
-	protocolVersion string // negotiated version, set during session initialization.
+	// protocolVersion is the negotiated version of the protocol,
+	// set during session initialization.
+	// Since writes may be concurrent to reads, we need to guard this with a mutex.
+	sessionMu       sync.Mutex
+	protocolVersion string
 
 	writeMu sync.Mutex         // guards Write, which must be concurrency safe.
 	rwc     io.ReadWriteCloser // the underlying stream
@@ -430,9 +446,15 @@ func (c *ioConn) sessionUpdated(state ServerSessionState) {
 		protocolVersion = state.InitializeParams.ProtocolVersion
 	}
 	if protocolVersion == "" {
+		// 2025-03-26 is used, because it's the last spec version
+		// where specifying the protocol version in the HTTP header
+		// was not required.
 		protocolVersion = protocolVersion20250326
 	}
-	c.protocolVersion = negotiatedVersion(protocolVersion)
+	protocolVersion = negotiatedVersion(protocolVersion)
+	c.sessionMu.Lock()
+	c.protocolVersion = protocolVersion
+	c.sessionMu.Unlock()
 }
 
 // addBatch records a msgBatch for an incoming batch payload.
@@ -533,8 +555,12 @@ func (t *ioConn) Read(ctx context.Context) (jsonrpc.Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	if batch && t.protocolVersion >= protocolVersion20250618 {
-		return nil, fmt.Errorf("JSON-RPC batching is not supported in %s and later (request version: %s)", protocolVersion20250618, t.protocolVersion)
+	var protocolVersion string
+	t.sessionMu.Lock()
+	protocolVersion = t.protocolVersion
+	t.sessionMu.Unlock()
+	if batch && protocolVersion >= protocolVersion20250618 {
+		return nil, fmt.Errorf("JSON-RPC batching is not supported in %s and later (request version: %s)", protocolVersion20250618, protocolVersion)
 	}
 
 	t.queue = msgs[1:]
