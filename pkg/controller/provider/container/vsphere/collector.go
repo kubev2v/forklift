@@ -405,6 +405,10 @@ func (r *Collector) Start() error {
 	ctx := context.Background()
 	ctx, r.cancel = context.WithCancel(ctx)
 	start := func() {
+		healer := &libmodel.IOErrHealer{
+			DB:  r.db,
+			Log: r.log,
+		}
 	try:
 		for {
 			select {
@@ -413,6 +417,7 @@ func (r *Collector) Start() error {
 			default:
 				err := r.getUpdates(ctx)
 				if err != nil {
+					healer.Observe(err)
 					r.log.Error(
 						err,
 						"start failed.",
@@ -556,6 +561,9 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 			if endErr := tx.End(); endErr != nil {
 				r.log.Error(endErr, "tx rollback failed.")
 			}
+		}
+		if libmodel.IsIOErr(err) {
+			return err
 		}
 		if err == nil && (updateSet.Truncated == nil || !*updateSet.Truncated) {
 			if !r.parity {
