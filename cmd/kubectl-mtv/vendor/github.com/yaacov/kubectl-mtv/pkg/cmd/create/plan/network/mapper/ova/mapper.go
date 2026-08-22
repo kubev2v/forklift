@@ -51,7 +51,7 @@ func (m *OVANetworkMapper) CreateNetworkPairs(sourceNetworks []ref.Ref, targetNe
 		}
 
 		networkPairs = append(networkPairs, forkliftv1beta1.NetworkPair{
-			Source:      sourceNetwork,
+			Source:      forkliftv1beta1.NetworkSourceRef{Ref: sourceNetwork},
 			Destination: destination,
 		})
 	}
