@@ -272,6 +272,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	// Warn when concurrent vmkfstools may exceed ESXi hostd-tmp memory
+	if err = r.validateHostdTmpMemory(plan); err != nil {
+		return err
+	}
+
 	// Validate conversion temp storage configuration
 	if err = r.validateConversionTempStorage(plan); err != nil {
 		return err
