@@ -34,7 +34,7 @@ func OpenWithVirtV2V(
 	vpxURL := fmt.Sprintf(
 		"vpx://%s@%s/?moref=%s&snapshot=%s&no_verify=1&password=%s",
 		username,
-		vcenterHost,
+		bracketIPv6(vcenterHost),
 		vmMoref,
 		snapshotMoref,
 		password,

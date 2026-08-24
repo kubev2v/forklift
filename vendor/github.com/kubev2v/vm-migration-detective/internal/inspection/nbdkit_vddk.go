@@ -7,10 +7,12 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -324,10 +326,17 @@ func (s *NBDKitSession) WaitForReady(timeout time.Duration) error {
 	return fmt.Errorf("NBD server not ready after %v (process still running, but socket %s not accessible)", timeout, s.socketPath)
 }
 
+func bracketIPv6(host string) string {
+	if strings.Contains(host, ":") && !strings.HasPrefix(host, "[") {
+		return "[" + host + "]"
+	}
+	return host
+}
+
 // getVCenterThumbprint gets the SSL certificate thumbprint from vCenter
 func getVCenterThumbprint(vcenterHost string) (string, error) {
-	// Connect to vCenter to get SSL certificate
-	conn, err := tls.Dial("tcp", vcenterHost+":443", &tls.Config{
+	// net.JoinHostPort wraps IPv6 addresses in brackets automatically
+	conn, err := tls.Dial("tcp", net.JoinHostPort(vcenterHost, "443"), &tls.Config{
 		InsecureSkipVerify: true, // We just need the cert, not to verify it
 	})
 	if err != nil {
