@@ -233,24 +233,18 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Name:  "VIRTIO_WIN",
 			Value: "/usr/local/virtio-win-legacy.iso",
 		})
-	} else if isWindows(vm) { // We check for multiple IPs per NIC only on Windows VMs
-		macIPCount := make(map[string]int)
-
+	} else if isWindows(vm) {
+		var manualMACs []string
 		for _, gn := range vm.GuestNetworks {
-			// IS ipv4
-			if gn.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) && net.IP.To4(net.ParseIP(gn.IP)) != nil {
-				macIPCount[gn.MAC]++
+			if gn.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
+				manualMACs = append(manualMACs, gn.MAC)
 			}
 		}
-
-		for _, count := range macIPCount {
-			if count > 1 {
-				env = append(env, core.EnvVar{
-					Name:  "V2V_multipleIPsPerNic",
-					Value: "true",
-				})
-				break // stop after the first match
-			}
+		if planbase.HasMultipleIPsPerMAC(manualMACs) {
+			env = append(env, core.EnvVar{
+				Name:  "V2V_multipleIPsPerNic",
+				Value: "true",
+			})
 		}
 	}
 
@@ -311,36 +305,125 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	return
 }
 
+// isNonGlobalIPv6 returns true for link-local (fe80::/10) and ULA (fc00::/7) IPv6 addresses.
+func isNonGlobalIPv6(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil || ip.To4() != nil {
+		return false
+	}
+	if ip.IsLinkLocalUnicast() {
+		return true
+	}
+	if ipv6 := ip.To16(); ipv6 != nil && ipv6[0]&0xfe == 0xfc {
+		return true
+	}
+	return false
+}
+
+func isDefaultRoute(network string) bool {
+	return network == "0.0.0.0" || network == "0.0.0.0/0" || network == "::" || network == "::/0"
+}
+
+// findMatchingStacks returns IP stacks for the given device that have a valid
+// default-route gateway matching the requested IP family.
+func findMatchingStacks(allStacks []vsphere.GuestIpStack, device string, isIPv4 bool) []vsphere.GuestIpStack {
+	var matched []vsphere.GuestIpStack
+	for _, stack := range allStacks {
+		if stack.Device != device {
+			continue
+		}
+		gatewayIP := net.ParseIP(stack.Gateway)
+		if gatewayIP == nil {
+			continue
+		}
+		if isIPv4 != (gatewayIP.To4() != nil) {
+			continue
+		}
+		if !isDefaultRoute(stack.Network) {
+			continue
+		}
+		matched = append(matched, stack)
+	}
+	return matched
+}
+
+// selectIPv6Gateway prefers a global gateway; falls back to link-local for SLAAC scenarios.
+func selectIPv6Gateway(stacks []vsphere.GuestIpStack, isGlobalIPv6 bool) string {
+	var fallbackGW string
+	for _, stack := range stacks {
+		gatewayIP := net.ParseIP(stack.Gateway)
+		if gatewayIP.IsLinkLocalUnicast() {
+			if fallbackGW == "" {
+				fallbackGW = stack.Gateway
+			}
+			continue
+		}
+		return stack.Gateway
+	}
+	if isGlobalIPv6 {
+		return fallbackGW
+	}
+	return ""
+}
+
+// selectGateway picks the default-route gateway for an IP on the given device.
+// Linux: skips non-global IPv6 (link-local/ULA). Windows: considers all addresses.
+// IPv6 prefers global gateways, falling back to link-local (SLAAC).
+func selectGateway(ip string, device string, stacks []vsphere.GuestIpStack, isWindows bool) string {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return ""
+	}
+
+	isIPv4 := parsedIP.To4() != nil
+	isGlobalIPv6 := !isIPv4 && !isNonGlobalIPv6(ip)
+
+	if !isWindows && !isIPv4 && !isGlobalIPv6 {
+		return ""
+	}
+
+	matchedStacks := findMatchingStacks(stacks, device, isIPv4)
+
+	if isIPv4 {
+		if len(matchedStacks) > 0 {
+			return matchedStacks[0].Gateway
+		}
+		return ""
+	}
+
+	return selectIPv6Gateway(matchedStacks, isGlobalIPv6)
+}
+
+// shouldIncludeNetwork filters link-local addresses for all OSes.
+// Linux: all origins included. Windows: only manual origins are preserved.
+func shouldIncludeNetwork(network vsphere.GuestNetwork, isWindows bool) bool {
+	if ip := net.ParseIP(network.IP); ip != nil && ip.IsLinkLocalUnicast() {
+		return false
+	}
+	if !isWindows {
+		return true
+	}
+	return network.Origin == string(types.NetIpConfigInfoIpAddressOriginManual)
+}
+
+func formatNetworkConfig(network vsphere.GuestNetwork, gateway string) string {
+	dnsString := strings.Join(network.DNS, ",")
+	config := fmt.Sprintf("%s:ip:%s,%s,%d,%s",
+		network.MAC, network.IP, gateway, network.PrefixLength, dnsString)
+	return strings.TrimSuffix(config, ",")
+}
+
 func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
-	// on windows machines we check if the interface origin is manual
-	// on linux we collect all networks.
 	isWindowsFlag := isWindows(vm)
+	sortedNetworks := planbase.SortedIPv4First(vm.GuestNetworks, func(gn vsphere.GuestNetwork) string { return gn.IP })
 
 	var configurations []string
-	for _, guestNetwork := range vm.GuestNetworks {
-		if !isWindowsFlag || guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
-			gateway := ""
-			isIpv4 := net.IP.To4(net.ParseIP(guestNetwork.IP)) != nil
-			for _, ipStack := range vm.GuestIpStacks {
-				gwIpv4 := net.IP.To4(net.ParseIP(ipStack.Gateway)) != nil
-				if gwIpv4 && !isIpv4 || !gwIpv4 && isIpv4 {
-					// not the right IPv4 / IPv6 correlation
-					continue
-				}
-				if ipStack.Device != guestNetwork.Device {
-					continue
-				}
-				if ipStack.Network != "0.0.0.0" {
-					continue
-				}
-				gateway = ipStack.Gateway
-			}
-			dnsString := strings.Join(guestNetwork.DNS, ",")
-			configurationString := fmt.Sprintf("%s:ip:%s,%s,%d,%s", guestNetwork.MAC, guestNetwork.IP, gateway, guestNetwork.PrefixLength, dnsString)
-
-			// if DNS is "", we get configurationString with trailing comma, use TrimSuffix to remove it.
-			configurations = append(configurations, strings.TrimSuffix(configurationString, ","))
+	for _, guestNetwork := range sortedNetworks {
+		if !shouldIncludeNetwork(guestNetwork, isWindowsFlag) {
+			continue
 		}
+		gateway := selectGateway(guestNetwork.IP, guestNetwork.Device, vm.GuestIpStacks, isWindowsFlag)
+		configurations = append(configurations, formatNetworkConfig(guestNetwork, gateway))
 	}
 	return strings.Join(configurations, "_"), nil
 }
