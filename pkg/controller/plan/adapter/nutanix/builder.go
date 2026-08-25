@@ -510,11 +510,11 @@ func (r *Builder) centralHTTPSource(vmRef ref.Ref, diskUUID, name string, config
 // redirect+cookie handshake, rewriting the Location host to the PE VIP when
 // possible.
 func (r *Builder) resolveCentralDownload(client *Client, imageName string) (downloadURL, cookie string, err error) {
-	entity, found, _, err := client.findImageV4ByName(imageName)
+	entity, _, err := client.findImageV4ByName(imageName)
 	if err != nil {
 		return "", "", err
 	}
-	if !found {
+	if entity == nil {
 		return "", "", liberr.New("catalog image not found", "image", imageName)
 	}
 	downloadURL, cookie, err = client.resolveImageV4DownloadURL(entity.ExtID)

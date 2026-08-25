@@ -20,29 +20,29 @@ import (
 const imagesV4Path = "/api/vmm/v4.0/content/images"
 
 // findImageV4ByName returns the v4 image entity with the given name.
-// found is false if no such image exists yet. The v4 Image entity has no
+// entity is nil if no such image exists yet. The v4 Image entity has no
 // explicit lifecycle state field (unlike v3's status.state), so ready
 // instead reports whether sizeBytes has been populated -- Nutanix's
 // signal that the image's content has finished uploading.
-func (r *Client) findImageV4ByName(name string) (entity libclient.ImageV4, found, ready bool, err error) {
+func (r *Client) findImageV4ByName(name string) (entity *libclient.ImageV4, ready bool, err error) {
 	requestURL := fmt.Sprintf("%s%s", r.URL, imagesV4Path)
 	var result libclient.V4ListResponse[libclient.ImageV4]
 	status, err := r.Get(requestURL, &result, libweb.Param{Key: "$filter", Value: fmt.Sprintf("name eq '%s'", name)})
 	if err != nil {
-		return libclient.ImageV4{}, false, false, liberr.Wrap(err, "image", name)
+		return nil, false, liberr.Wrap(err, "image", name)
 	}
 	if status != http.StatusOK {
-		return libclient.ImageV4{}, false, false, liberr.New("unexpected status listing images", "image", name, "status", status)
+		return nil, false, liberr.New("unexpected status listing images", "image", name, "status", status)
 	}
 	if len(result.Data) == 0 {
-		return libclient.ImageV4{}, false, false, nil
+		return nil, false, nil
 	}
 	for _, candidate := range result.Data {
 		if candidate.Name == name {
-			return candidate, true, candidate.SizeBytes > 0, nil
+			return &candidate, candidate.SizeBytes > 0, nil
 		}
 	}
-	return libclient.ImageV4{}, false, false, nil
+	return nil, false, nil
 }
 
 // createImageV4 submits a v4 image creation request for a DISK_IMAGE
@@ -65,12 +65,12 @@ func (r *Client) createImageV4(name, diskUUID string) error {
 // exists. Errors are logged rather than returned; see Finalize.
 func (r *Client) deleteImageV4(vmRef ref.Ref, diskUUID string) {
 	name := r.migrationImageName(vmRef, diskUUID)
-	entity, found, _, err := r.findImageV4ByName(name)
+	entity, _, err := r.findImageV4ByName(name)
 	if err != nil {
 		r.Context.Log.Error(err, "Failed to look up image for cleanup", "vm", vmRef.String(), "image", name)
 		return
 	}
-	if !found {
+	if entity == nil {
 		return
 	}
 	requestURL := fmt.Sprintf("%s%s/%s", r.URL, imagesV4Path, url.PathEscape(entity.ExtID))
@@ -96,11 +96,11 @@ func (r *Client) deleteImageV4(vmRef ref.Ref, diskUUID string) {
 // image never appearing in subsequent polls.
 func (r *Client) ensureImageV4(vmRef ref.Ref, disk model.Disk) (ready bool, err error) {
 	name := r.migrationImageName(vmRef, disk.UUID)
-	_, found, ready, err := r.findImageV4ByName(name)
+	entity, ready, err := r.findImageV4ByName(name)
 	if err != nil {
 		return false, err
 	}
-	if !found {
+	if entity == nil {
 		return false, r.createImageV4(name, disk.UUID)
 	}
 	return ready, nil
