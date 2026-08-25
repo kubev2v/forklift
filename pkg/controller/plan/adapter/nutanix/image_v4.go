@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
@@ -18,6 +19,12 @@ import (
 // "image" kind used on Prism Element (see PreTransferActions); this v4
 // endpoint is its replacement.
 const imagesV4Path = "/api/vmm/v4.0/content/images"
+
+// imageV4StallTimeout is the maximum time we wait for a v4 catalog image
+// to report a non-zero sizeBytes before declaring creation stalled. The v4
+// Image entity has no explicit error state, so this is our only signal that
+// creation failed (e.g. invalid disk reference, quota exceeded).
+const imageV4StallTimeout = 30 * time.Minute
 
 // findImageV4ByName returns the v4 image entity with the given name.
 // entity is nil if no such image exists yet. The v4 Image entity has no
@@ -91,9 +98,8 @@ func (r *Client) deleteImageV4(vmRef ref.Ref, diskUUID string) {
 // ensureImageV4 returns whether disk's v4 catalog image has finished
 // uploading, creating it first if it doesn't exist yet. Mirrors
 // ensureImage's create-if-missing/poll-by-name pattern, adapted to the v4
-// Image entity's lack of an explicit error state: a creation failure
-// (e.g. an invalid disk reference) won't be visible here, only as the
-// image never appearing in subsequent polls.
+// Image entity's lack of an explicit error state. A stalled image (sizeBytes
+// still zero after imageV4StallTimeout) is treated as a creation failure.
 func (r *Client) ensureImageV4(vmRef ref.Ref, disk model.Disk) (ready bool, err error) {
 	name := r.migrationImageName(vmRef, disk.UUID)
 	entity, ready, err := r.findImageV4ByName(name)
@@ -103,7 +109,22 @@ func (r *Client) ensureImageV4(vmRef ref.Ref, disk model.Disk) (ready bool, err 
 	if entity == nil {
 		return false, r.createImageV4(name, disk.UUID)
 	}
-	return ready, nil
+	if ready {
+		return true, nil
+	}
+	if entity.CreateTime != "" {
+		created, parseErr := time.Parse(time.RFC3339, entity.CreateTime)
+		if parseErr == nil && time.Since(created) > imageV4StallTimeout {
+			return false, liberr.New(
+				"Nutanix v4 image stalled: sizeBytes still zero after timeout",
+				"vm", vmRef.String(),
+				"disk", disk.UUID,
+				"image", name,
+				"age", time.Since(created).Round(time.Second).String(),
+			)
+		}
+	}
+	return false, nil
 }
 
 // resolveImageV4DownloadURL performs Prism Central's redirect handshake

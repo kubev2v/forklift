@@ -92,9 +92,10 @@ type V3ImageResources struct {
 
 // ImageV4 is a v4 Image Service entity.
 type ImageV4 struct {
-	ExtID     string `json:"extId"`
-	Name      string `json:"name"`
-	SizeBytes int64  `json:"sizeBytes"`
+	ExtID      string `json:"extId"`
+	Name       string `json:"name"`
+	SizeBytes  int64  `json:"sizeBytes"`
+	CreateTime string `json:"createTime"`
 }
 
 // Cluster is a v3 cluster entity (only fields used by migration callers).
