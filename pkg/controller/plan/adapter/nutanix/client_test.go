@@ -703,11 +703,11 @@ func TestFindImageByName_NotFound(t *testing.T) {
 	defer server.Close()
 
 	client := newConnectedTestClient(t, server.URL)
-	_, found, err := client.findImageByName("missing")
+	entity, err := client.findImageByName("missing")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if found {
+	if entity != nil {
 		t.Fatal("expected image not to be found")
 	}
 }
@@ -720,11 +720,11 @@ func TestFindImageByName_Found(t *testing.T) {
 	defer server.Close()
 
 	client := newConnectedTestClient(t, server.URL)
-	entity, found, err := client.findImageByName(testMigrationImageName(ref.Ref{ID: "vm-1"}, "disk-1"))
+	entity, err := client.findImageByName(testMigrationImageName(ref.Ref{ID: "vm-1"}, "disk-1"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !found {
+	if entity == nil {
 		t.Fatal("expected image to be found")
 	}
 	if entity.Metadata.UUID != "image-1" {

@@ -464,11 +464,11 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 // Element catalog image's v3 file download endpoint, authenticated with
 // the same Basic Auth credentials as the rest of the provider's API.
 func (r *Builder) elementHTTPSource(baseURL, name string, secret *core.Secret, configMap *core.ConfigMap, client *Client) (*cdi.DataVolumeSourceHTTP, error) {
-	entity, found, err := client.findImageByName(name)
+	entity, err := client.findImageByName(name)
 	if err != nil {
 		return nil, err
 	}
-	if !found {
+	if entity == nil {
 		return nil, liberr.New("catalog image not found", "image", name)
 	}
 	return &cdi.DataVolumeSourceHTTP{
