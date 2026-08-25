@@ -1,10 +1,12 @@
 package vsphere
 
 import (
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
@@ -626,21 +628,12 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 func TestVmAdapter_Apply_CustomFields(t *testing.T) {
 	tests := []struct {
 		name              string
-		preExistingDef    []model.CustomFieldDef
 		preExistingValues []model.CustomFieldValue
-		availableFieldVal interface{}
 		customValueVal    interface{}
-		expectedDef       []model.CustomFieldDef
 		expectedValues    []model.CustomFieldValue
 	}{
 		{
-			name: "populates CustomDef and CustomValues from scratch",
-			availableFieldVal: types.ArrayOfCustomFieldDef{
-				CustomFieldDef: []types.CustomFieldDef{
-					{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
-					{Name: "env", Key: 200, ManagedObjectType: ""},
-				},
-			},
+			name: "populates CustomValues from scratch",
 			customValueVal: types.ArrayOfCustomFieldValue{
 				CustomFieldValue: []types.BaseCustomFieldValue{
 					&types.CustomFieldStringValue{
@@ -653,24 +646,10 @@ func TestVmAdapter_Apply_CustomFields(t *testing.T) {
 					},
 				},
 			},
-			expectedDef: []model.CustomFieldDef{
-				{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
-				{Name: "env", Key: 200, ManagedObjectType: ""},
-			},
 			expectedValues: []model.CustomFieldValue{
 				{Key: 100, Value: "alice"},
 				{Key: 200, Value: "production"},
 			},
-		},
-		{
-			name: "clears CustomDef when vSphere reports empty availableField",
-			preExistingDef: []model.CustomFieldDef{
-				{Name: "stale", Key: 999},
-			},
-			availableFieldVal: types.ArrayOfCustomFieldDef{
-				CustomFieldDef: []types.CustomFieldDef{},
-			},
-			expectedDef: []model.CustomFieldDef{},
 		},
 		{
 			name: "clears CustomValues when vSphere reports empty customValue (ArrayOf)",
@@ -708,19 +687,11 @@ func TestVmAdapter_Apply_CustomFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			v := &VmAdapter{
 				model: model.VM{
-					CustomDef:    tt.preExistingDef,
 					CustomValues: tt.preExistingValues,
 				},
 			}
 
 			changeSet := []types.PropertyChange{}
-			if tt.availableFieldVal != nil {
-				changeSet = append(changeSet, types.PropertyChange{
-					Op:   Assign,
-					Name: fAvailableField,
-					Val:  tt.availableFieldVal,
-				})
-			}
 			if tt.customValueVal != nil {
 				changeSet = append(changeSet, types.PropertyChange{
 					Op:   Assign,
@@ -733,17 +704,101 @@ func TestVmAdapter_Apply_CustomFields(t *testing.T) {
 				ChangeSet: changeSet,
 			})
 
-			if tt.expectedDef != nil {
-				if !reflect.DeepEqual(v.model.CustomDef, tt.expectedDef) {
-					t.Errorf("CustomDef mismatch\ngot:  %+v\nwant: %+v", v.model.CustomDef, tt.expectedDef)
-				}
-			}
 			if tt.expectedValues != nil {
 				if !reflect.DeepEqual(v.model.CustomValues, tt.expectedValues) {
 					t.Errorf("CustomValues mismatch\ngot:  %+v\nwant: %+v", v.model.CustomValues, tt.expectedValues)
 				}
 			}
 		})
+	}
+}
+
+func newTestInventoryDB(t *testing.T) libmodel.DB {
+	t.Helper()
+	db := libmodel.New(filepath.Join(t.TempDir(), "test.db"), &model.CustomFieldDef{})
+	if err := db.Open(true); err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close(true) })
+	return db
+}
+
+func TestUpsertCustomFieldDefs(t *testing.T) {
+	adapter := Collector{}
+	db := newTestInventoryDB(t)
+	defs := []types.CustomFieldDef{
+		{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
+		{Name: "env", Key: 200, ManagedObjectType: ""},
+	}
+	u := types.ObjectUpdate{
+		Obj: types.ManagedObjectReference{Type: "VirtualMachine"},
+		ChangeSet: []types.PropertyChange{
+			{
+				Op:   Assign,
+				Name: fAvailableField,
+				Val: types.ArrayOfCustomFieldDef{
+					CustomFieldDef: defs,
+				},
+			},
+		},
+	}
+
+	err := db.With(func(tx *libmodel.Tx) error {
+		return adapter.upsertCustomFieldDefs(tx, u)
+	})
+	if err != nil {
+		t.Fatalf("upsertCustomFieldDefs returned error: %v", err)
+	}
+
+	list := []model.CustomFieldDef{}
+	err = db.List(&list, libmodel.ListOptions{Detail: libmodel.MaxDetail})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(list) != len(defs) {
+		t.Fatalf("expected %d defs upserted, got %d", len(defs), len(list))
+	}
+	byKey := make(map[int32]model.CustomFieldDef, len(list))
+	for _, d := range list {
+		byKey[d.Key] = d
+	}
+	for _, f := range defs {
+		got, ok := byKey[f.Key]
+		if !ok {
+			t.Errorf("expected def with key %d to be present", f.Key)
+			continue
+		}
+		expected := model.CustomFieldDef{
+			Name:              f.Name,
+			Key:               f.Key,
+			ManagedObjectType: f.ManagedObjectType,
+		}
+		if !reflect.DeepEqual(got, expected) {
+			t.Errorf("def %d mismatch\ngot:  %+v\nwant: %+v", f.Key, got, expected)
+		}
+	}
+}
+
+func TestUpsertCustomFieldDefsSkipsNonVM(t *testing.T) {
+	adapter := Collector{}
+	db := newTestInventoryDB(t)
+
+	err := db.With(func(tx *libmodel.Tx) error {
+		return adapter.upsertCustomFieldDefs(tx, types.ObjectUpdate{
+			Obj: types.ManagedObjectReference{Type: "HostSystem"},
+		})
+	})
+	if err != nil {
+		t.Fatalf("upsertCustomFieldDefs returned unexpected error: %v", err)
+	}
+
+	list := []model.CustomFieldDef{}
+	err = db.List(&list, libmodel.ListOptions{Detail: libmodel.MaxDetail})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(list) != 0 {
+		t.Errorf("expected no defs for non-VM object, got %d", len(list))
 	}
 }
 
