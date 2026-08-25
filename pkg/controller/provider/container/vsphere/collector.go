@@ -1241,6 +1241,10 @@ func (r Collector) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	err = r.upsertCustomFieldDefs(tx, u)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 
 	return nil
 }
@@ -1260,6 +1264,40 @@ func (r Collector) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	err = tx.Update(m)
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+	err = r.upsertCustomFieldDefs(tx, u)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	return nil
+}
+
+// Upsert the custom field definitions reported on a VirtualMachine update
+// into the provider-global CustomFieldDef table. The same global definition
+// set is reported per-VM, so inserting by key naturally de-duplicates it.
+func (r Collector) upsertCustomFieldDefs(tx *libmodel.Tx, u types.ObjectUpdate) (err error) {
+	if u.Obj.Type != VirtualMachine {
+		return nil
+	}
+	for _, p := range u.ChangeSet {
+		if p.Name != fAvailableField {
+			continue
+		}
+		customFields, ok := p.Val.(types.ArrayOfCustomFieldDef)
+		if !ok {
+			continue
+		}
+		for _, f := range customFields.CustomFieldDef {
+			def := &model.CustomFieldDef{
+				Name:              f.Name,
+				Key:               f.Key,
+				ManagedObjectType: f.ManagedObjectType,
+			}
+			if err = tx.Insert(def); err != nil {
+				return liberr.Wrap(err)
+			}
+		}
 	}
 
 	return nil
