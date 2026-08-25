@@ -80,7 +80,7 @@ func (i *VirtV2vInspector) Inspect(
 	// Password is kept secure in separate file via -ip parameter
 	// Add SSL verification parameter (provided by caller)
 	libvirtURL := fmt.Sprintf("vpx://%s@%s%s?%s",
-		encodedUsername, vcenterHost, computeResourcePath, sslVerify)
+		encodedUsername, bracketIPv6(vcenterHost), computeResourcePath, sslVerify)
 
 	// Create context with timeout
 	inspectCtx, cancel := context.WithTimeout(ctx, i.timeout)

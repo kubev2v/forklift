@@ -443,7 +443,7 @@ github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8
 # github.com/klauspost/cpuid/v2 v2.2.10
 ## explicit; go 1.22
 github.com/klauspost/cpuid/v2
-# github.com/kubev2v/vm-migration-detective v0.0.0-20260506144435-77e61ac7d78d
+# github.com/kubev2v/vm-migration-detective v0.0.0-20260824072410-dcc65c84c443
 ## explicit; go 1.25.0
 github.com/kubev2v/vm-migration-detective/internal/checks
 github.com/kubev2v/vm-migration-detective/internal/cmdbuilder
