@@ -4,14 +4,15 @@ import (
 	"strings"
 
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/nutanix"
+	libclient "github.com/kubev2v/forklift/pkg/lib/client/nutanix"
 )
 
 func entityName(specName, statusName, metadataName string) string {
-	return coalesce(specName, statusName, metadataName)
+	return libclient.Coalesce(specName, statusName, metadataName)
 }
 
 func clusterRef(specUUID, statusUUID string) string {
-	return coalesce(specUUID, statusUUID)
+	return libclient.Coalesce(specUUID, statusUUID)
 }
 
 type clusterConfig struct {
@@ -26,7 +27,7 @@ type clusterConfig struct {
 }
 
 type clusterEntity struct {
-	Metadata metadata `json:"metadata"`
+	Metadata libclient.Metadata `json:"metadata"`
 	Spec     struct {
 		Name      string `json:"name"`
 		Resources struct {
@@ -90,13 +91,13 @@ func (e *clusterEntity) ApplyTo(m *model.Cluster) {
 }
 
 type hostEntity struct {
-	Metadata metadata `json:"metadata"`
+	Metadata libclient.Metadata `json:"metadata"`
 	Spec     struct {
-		ClusterReference ref    `json:"cluster_reference"`
-		Name             string `json:"name"`
+		ClusterReference libclient.Ref `json:"cluster_reference"`
+		Name             string        `json:"name"`
 	} `json:"spec"`
 	Status struct {
-		ClusterReference ref           `json:"cluster_reference"`
+		ClusterReference libclient.Ref `json:"cluster_reference"`
 		Name             string        `json:"name"`
 		State            string        `json:"state"`
 		Resources        hostResources `json:"resources"`
@@ -151,13 +152,13 @@ func (e *hostEntity) ApplyTo(m *model.Host) {
 }
 
 type networkEntity struct {
-	Metadata metadata `json:"metadata"`
+	Metadata libclient.Metadata `json:"metadata"`
 	Spec     struct {
-		ClusterReference ref    `json:"cluster_reference"`
-		Name             string `json:"name"`
+		ClusterReference libclient.Ref `json:"cluster_reference"`
+		Name             string        `json:"name"`
 	} `json:"spec"`
 	Status struct {
-		ClusterReference ref              `json:"cluster_reference"`
+		ClusterReference libclient.Ref    `json:"cluster_reference"`
 		Name             string           `json:"name"`
 		Resources        networkResources `json:"resources"`
 	} `json:"status"`
@@ -210,7 +211,7 @@ func (e *networkEntity) ApplyTo(m *model.Network) {
 }
 
 type storageContainerEntity struct {
-	Metadata metadata               `json:"metadata"`
+	Metadata libclient.Metadata     `json:"metadata"`
 	Status   storageContainerStatus `json:"status"`
 }
 
@@ -219,13 +220,13 @@ type storageContainerStatus struct {
 }
 
 type storageContainerResources struct {
-	ClusterReference   ref    `json:"cluster_reference"`
-	CompressionEnabled bool   `json:"compression_enabled"`
-	ErasureCode        string `json:"erasure_code"`
-	MaxCapacityBytes   int64  `json:"max_capacity_bytes"`
-	OnDiskDedup        string `json:"on_disk_dedup"`
-	ReplicationFactor  int    `json:"replication_factor"`
-	UsageBytes         int64  `json:"usage_bytes"`
+	ClusterReference   libclient.Ref `json:"cluster_reference"`
+	CompressionEnabled bool          `json:"compression_enabled"`
+	ErasureCode        string        `json:"erasure_code"`
+	MaxCapacityBytes   int64         `json:"max_capacity_bytes"`
+	OnDiskDedup        string        `json:"on_disk_dedup"`
+	ReplicationFactor  int           `json:"replication_factor"`
+	UsageBytes         int64         `json:"usage_bytes"`
 }
 
 func (e storageContainerEntity) clusterUUID() string {
@@ -250,25 +251,8 @@ func (e *storageContainerEntity) ApplyTo(m *model.StorageContainer) {
 	m.ErasureCode = resources.ErasureCode
 }
 
-type imageEntity struct {
-	Metadata metadata `json:"metadata"`
-	Spec     struct {
-		Name string `json:"name"`
-	} `json:"spec"`
-	Status imageStatus `json:"status"`
-}
-
-type imageStatus struct {
-	Name      string         `json:"name"`
-	Resources imageResources `json:"resources"`
-}
-
-type imageResources struct {
-	Architecture string `json:"architecture"`
-	ImageType    string `json:"image_type"`
-	SizeBytes    int64  `json:"size_bytes"`
-	SourceURI    string `json:"source_uri"`
-}
+// imageEntity is a v3 Image Service wire entity mapped into inventory.
+type imageEntity libclient.V3Image
 
 func (e *imageEntity) ApplyTo(m *model.Image) {
 	resources := e.Status.Resources

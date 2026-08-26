@@ -1911,6 +1911,16 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 				"vm",
 				vm.String())
 		}
+		// Nutanix sets a DataVolume owner reference on Prism Central download-cookie
+		// Secrets so they are GC'd with the DV; other providers no-op.
+		if adoptErr := r.Builder.AdoptDownloadCookieSecretOwner(&dv); adoptErr != nil {
+			r.Log.Error(
+				adoptErr,
+				"Failed to set download cookie secret owner reference.",
+				"dv.name", dv.Name,
+				"dv.namespace", dv.Namespace,
+				"vm", vm.String())
+		}
 	}
 	return
 }

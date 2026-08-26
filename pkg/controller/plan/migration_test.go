@@ -2,6 +2,7 @@
 package plan
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -16,7 +17,12 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var _ = ginkgo.Describe("VMStatus", func() {
@@ -495,4 +501,212 @@ func TestResolveCsiPVCs(t *testing.T) {
 			g.Expect(gotNames).To(gomega.Equal(tc.wantNames))
 		})
 	}
+}
+
+func TestIsImportAuthFailure(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	terminatedPod := func(message string, exitCode int32) *core.Pod {
+		return &core.Pod{
+			Status: core.PodStatus{
+				ContainerStatuses: []core.ContainerStatus{{
+					State: core.ContainerState{
+						Terminated: &core.ContainerStateTerminated{
+							ExitCode: exitCode,
+							Message:  message,
+						},
+					},
+				}},
+			},
+		}
+	}
+
+	lastTerminatedPod := func(message string, exitCode int32) *core.Pod {
+		return &core.Pod{
+			Status: core.PodStatus{
+				ContainerStatuses: []core.ContainerStatus{{
+					LastTerminationState: core.ContainerState{
+						Terminated: &core.ContainerStateTerminated{
+							ExitCode: exitCode,
+							Message:  message,
+						},
+					},
+				}},
+			},
+		}
+	}
+
+	g.Expect(isImportAuthFailure(terminatedPod("http: expected status code 200, got 401. Status: 401 Unauthorized", 1))).To(gomega.BeTrue())
+	g.Expect(isImportAuthFailure(terminatedPod("request failed: 401 Unauthorized from endpoint", 1))).To(gomega.BeTrue())
+	g.Expect(isImportAuthFailure(terminatedPod("download failed with status code 401", 1))).To(gomega.BeTrue())
+	g.Expect(isImportAuthFailure(lastTerminatedPod("got 401 from server", 1))).To(gomega.BeTrue())
+
+	g.Expect(isImportAuthFailure(terminatedPod("got 403 Forbidden", 1))).To(gomega.BeFalse())
+	g.Expect(isImportAuthFailure(terminatedPod("connection reset", 1))).To(gomega.BeFalse())
+	g.Expect(isImportAuthFailure(terminatedPod("got 401", 0))).To(gomega.BeFalse())
+	g.Expect(isImportAuthFailure(&core.Pod{})).To(gomega.BeFalse())
+}
+
+func TestMaybeRefreshImportCredentials(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	g.Expect(core.AddToScheme(scheme)).To(gomega.Succeed())
+	g.Expect(cdi.AddToScheme(scheme)).To(gomega.Succeed())
+
+	dv := &cdi.DataVolume{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "test-dv",
+			Namespace: "target-ns",
+		},
+	}
+	importer := authFailureImporterPod()
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(dv, importer).Build()
+
+	refresher := &stubImportCredentialRefresher{refreshed: true}
+	m := &Migration{
+		Context: &plancontext.Context{
+			Destination: plancontext.Destination{Client: client},
+			Log:         logging.WithName("test"),
+		},
+		builder: refresher,
+	}
+	vm := &plan.VMStatus{
+		VM: plan.VM{Ref: ref.Ref{ID: "vm-1", Name: "test-vm"}},
+	}
+
+	m.maybeRefreshImportCredentials(vm, dv, importer)
+
+	g.Expect(refresher.calls).To(gomega.Equal(1))
+	updated := &cdi.DataVolume{}
+	g.Expect(client.Get(context.TODO(), types.NamespacedName{Namespace: dv.Namespace, Name: dv.Name}, updated)).To(gomega.Succeed())
+	g.Expect(updated.Annotations[annCookieRefreshedAt]).NotTo(gomega.BeEmpty())
+	err := client.Get(context.TODO(), types.NamespacedName{Namespace: importer.Namespace, Name: importer.Name}, &core.Pod{})
+	g.Expect(k8serr.IsNotFound(err)).To(gomega.BeTrue())
+
+	// Cooldown: a second refresh within the window must be skipped.
+	refresher.calls = 0
+	importer2 := importer.DeepCopy()
+	importer2.ResourceVersion = ""
+	g.Expect(client.Create(context.TODO(), importer2)).To(gomega.Succeed())
+	m.maybeRefreshImportCredentials(vm, updated, importer2)
+	g.Expect(refresher.calls).To(gomega.Equal(0))
+}
+
+func TestMaybeRefreshImportCredentials_NotRefreshed(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	g.Expect(core.AddToScheme(scheme)).To(gomega.Succeed())
+	g.Expect(cdi.AddToScheme(scheme)).To(gomega.Succeed())
+
+	dv := &cdi.DataVolume{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "test-dv",
+			Namespace: "target-ns",
+		},
+	}
+	importer := authFailureImporterPod()
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(dv, importer).Build()
+
+	refresher := &stubImportCredentialRefresher{refreshed: false}
+	m := &Migration{
+		Context: &plancontext.Context{
+			Destination: plancontext.Destination{Client: client},
+			Log:         logging.WithName("test"),
+		},
+		builder: refresher,
+	}
+	vm := &plan.VMStatus{
+		VM: plan.VM{Ref: ref.Ref{ID: "vm-1", Name: "test-vm"}},
+	}
+
+	m.maybeRefreshImportCredentials(vm, dv, importer)
+
+	g.Expect(refresher.calls).To(gomega.Equal(1))
+	updated := &cdi.DataVolume{}
+	g.Expect(client.Get(context.TODO(), types.NamespacedName{Namespace: dv.Namespace, Name: dv.Name}, updated)).To(gomega.Succeed())
+	g.Expect(updated.Annotations[annCookieRefreshedAt]).To(gomega.BeEmpty())
+	err := client.Get(context.TODO(), types.NamespacedName{Namespace: importer.Namespace, Name: importer.Name}, &core.Pod{})
+	g.Expect(k8serr.IsNotFound(err)).To(gomega.BeFalse())
+}
+
+func TestMaybeRefreshImportCredentials_NonAuthFailure(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	g.Expect(core.AddToScheme(scheme)).To(gomega.Succeed())
+	g.Expect(cdi.AddToScheme(scheme)).To(gomega.Succeed())
+
+	dv := &cdi.DataVolume{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "test-dv",
+			Namespace: "target-ns",
+		},
+	}
+	importer := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "importer-test-dv",
+			Namespace: "target-ns",
+		},
+		Status: core.PodStatus{
+			ContainerStatuses: []core.ContainerStatus{{
+				State: core.ContainerState{
+					Terminated: &core.ContainerStateTerminated{
+						ExitCode: 1,
+						Message:  "connection reset by peer",
+					},
+				},
+			}},
+		},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(dv, importer).Build()
+
+	refresher := &stubImportCredentialRefresher{refreshed: true}
+	m := &Migration{
+		Context: &plancontext.Context{
+			Destination: plancontext.Destination{Client: client},
+			Log:         logging.WithName("test"),
+		},
+		builder: refresher,
+	}
+	vm := &plan.VMStatus{
+		VM: plan.VM{Ref: ref.Ref{ID: "vm-1", Name: "test-vm"}},
+	}
+
+	m.maybeRefreshImportCredentials(vm, dv, importer)
+
+	g.Expect(refresher.calls).To(gomega.Equal(0))
+	err := client.Get(context.TODO(), types.NamespacedName{Namespace: importer.Namespace, Name: importer.Name}, &core.Pod{})
+	g.Expect(k8serr.IsNotFound(err)).To(gomega.BeFalse())
+}
+
+func authFailureImporterPod() *core.Pod {
+	return &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "importer-test-dv",
+			Namespace: "target-ns",
+		},
+		Status: core.PodStatus{
+			ContainerStatuses: []core.ContainerStatus{{
+				State: core.ContainerState{
+					Terminated: &core.ContainerStateTerminated{
+						ExitCode: 1,
+						Message:  "http: expected status code 200, got 401. Status: 401 Unauthorized",
+					},
+				},
+			}},
+		},
+	}
+}
+
+type stubImportCredentialRefresher struct {
+	base.Builder
+	refreshed bool
+	calls     int
+}
+
+func (s *stubImportCredentialRefresher) RefreshImportCredentials(_ *cdi.DataVolume) (bool, error) {
+	s.calls++
+	return s.refreshed, nil
 }

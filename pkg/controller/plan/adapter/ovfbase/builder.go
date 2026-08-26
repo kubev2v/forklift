@@ -584,6 +584,14 @@ func (r *Builder) CsiImportPVCs(_ ref.Ref, _ map[string]string) ([]core.Persiste
 	return nil, nil
 }
 
+func (r *Builder) AdoptDownloadCookieSecretOwner(_ *cdi.DataVolume) error {
+	return nil
+}
+
+func (r *Builder) RefreshImportCredentials(_ *cdi.DataVolume) (bool, error) {
+	return false, nil
+}
+
 func (r *Builder) SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *api.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error) {
 	return
 }

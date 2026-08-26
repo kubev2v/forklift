@@ -53,7 +53,15 @@ const (
 	// moved into base migrators.
 	ImageConversion = "ImageConversion"
 	DiskTransferV2v = "DiskTransferV2v"
+
+	// annCookieRefreshedAt records when import credentials were last
+	// refreshed for a DataVolume so short-lived download cookies are not
+	// rotated on every reconcile while the importer is crash-looping.
+	annCookieRefreshedAt = "forklift.konveyor.io/download-cookie-refreshed-at"
 )
+
+// Minimum time between download-cookie refreshes for the same DataVolume.
+const cookieRefreshCooldown = time.Minute
 
 // Migration.
 type Migration struct {
@@ -2163,6 +2171,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				if r.Plan.IsWarm() && len(importer.Status.ContainerStatuses) > 0 {
 					vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
 				}
+				r.maybeRefreshImportCredentials(vm, dv.DataVolume, importer)
 				if restartLimitExceeded(importer) {
 					task.MarkedCompleted()
 					msg, _ := terminationMessage(importer)
@@ -2523,6 +2532,97 @@ func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 		pod.Status.ContainerStatuses[0].LastTerminationState.Terminated.ExitCode > 0 {
 		msg = pod.Status.ContainerStatuses[0].LastTerminationState.Terminated.Message
 		ok = true
+	}
+	return
+}
+
+// maybeRefreshImportCredentials rotates short-lived download credentials
+// (e.g. Nutanix Prism Central cookies) when the CDI importer fails with an
+// auth error, then deletes the importer pod so CDI recreates it with the
+// updated SecretExtraHeaders Secret mounted — without recreating the DV.
+func (r *Migration) maybeRefreshImportCredentials(vm *plan.VMStatus, dv *cdi.DataVolume, importer *core.Pod) {
+	if !isImportAuthFailure(importer) {
+		return
+	}
+	if dv.Annotations != nil {
+		if last, err := time.Parse(time.RFC3339, dv.Annotations[annCookieRefreshedAt]); err == nil {
+			if time.Since(last) < cookieRefreshCooldown {
+				return
+			}
+		}
+	}
+
+	refreshed, err := r.builder.RefreshImportCredentials(dv)
+	if err != nil {
+		log.Error(err, "Failed to refresh import credentials.",
+			"vm", vm.String(),
+			"dv.name", dv.Name,
+			"dv.namespace", dv.Namespace)
+		return
+	}
+	if !refreshed {
+		return
+	}
+
+	fresh := &cdi.DataVolume{}
+	err = r.Destination.Get(
+		context.TODO(),
+		types.NamespacedName{Namespace: dv.Namespace, Name: dv.Name},
+		fresh,
+	)
+	if err != nil {
+		log.Error(err, "Failed to get DataVolume after credential refresh.",
+			"dv.name", dv.Name,
+			"dv.namespace", dv.Namespace)
+		return
+	}
+	if fresh.Annotations == nil {
+		fresh.Annotations = map[string]string{}
+	}
+	fresh.Annotations[annCookieRefreshedAt] = time.Now().UTC().Format(time.RFC3339)
+	if err = r.Destination.Update(context.TODO(), fresh); err != nil {
+		log.Error(err, "Failed to annotate DataVolume after credential refresh.",
+			"dv.name", dv.Name,
+			"dv.namespace", dv.Namespace)
+		return
+	}
+
+	if err = r.Destination.Delete(context.TODO(), importer); err != nil && !k8serr.IsNotFound(err) {
+		log.Error(err, "Failed to restart importer after credential refresh.",
+			"pod.name", importer.Name,
+			"pod.namespace", importer.Namespace,
+			"dv.name", dv.Name,
+			"dv.namespace", dv.Namespace)
+		return
+	}
+	log.Info("Restarted importer after credential refresh.",
+		"pod.name", importer.Name,
+		"pod.namespace", importer.Namespace,
+		"dv.name", dv.Name,
+		"dv.namespace", dv.Namespace,
+		"vm", vm.String())
+}
+
+func isImportAuthFailure(pod *core.Pod) bool {
+	msg, ok := importFailureMessage(pod)
+	if !ok {
+		return false
+	}
+	return strings.Contains(msg, "got 401") ||
+		strings.Contains(msg, "401 Unauthorized") ||
+		strings.Contains(msg, "status code 401")
+}
+
+func importFailureMessage(pod *core.Pod) (msg string, ok bool) {
+	if msg, ok = terminationMessage(pod); ok {
+		return
+	}
+	if len(pod.Status.ContainerStatuses) == 0 {
+		return
+	}
+	terminated := pod.Status.ContainerStatuses[0].State.Terminated
+	if terminated != nil && terminated.ExitCode > 0 {
+		return terminated.Message, true
 	}
 	return
 }

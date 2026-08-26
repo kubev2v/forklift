@@ -45,27 +45,6 @@ func parsePrismMode(value string) (PrismMode, error) {
 	}
 }
 
-func (r *Client) ensurePrismConfig() error {
-	if r.prismResolved {
-		return nil
-	}
-
-	config, err := r.resolvePrismConfig()
-	if err != nil {
-		return err
-	}
-
-	r.prism = config
-	r.prismResolved = true
-	r.log.Info(
-		"Prism endpoint resolved",
-		"mode", config.Mode,
-		"explicit", config.Explicit,
-		"clusterUuid", config.ClusterUUID)
-
-	return nil
-}
-
 func (r *Client) resolvePrismConfig() (PrismConfig, error) {
 	clusterUUID := ""
 	if r.settings != nil {
@@ -96,20 +75,31 @@ func (r *Client) resolvePrismConfig() (PrismConfig, error) {
 	}, nil
 }
 
+// detectPrismMode probes the API to tell Prism Central and Prism Element
+// apart. It is only reached from resolvePrismConfig() during connect(),
+// after the shared client is connected, and calls the shared client
+// directly rather than through this package's get() wrapper.
 func (r *Client) detectPrismMode() (PrismMode, error) {
+	r.ensureWebClient()
+
 	pcURL := fmt.Sprintf("%s/api/nutanix/v3/prism_central", r.url)
 	var pcBody map[string]interface{}
-	status, err := r.get(pcURL, &pcBody)
-	if err == nil && status == http.StatusOK {
+	pcStatus, pcErr := r.web.Get(pcURL, &pcBody)
+	if pcErr == nil && pcStatus == http.StatusOK {
 		return PrismCentral, nil
 	}
 
 	peURL := fmt.Sprintf("%s%s", r.url, storageContainersV2Path)
 	var peBody map[string]interface{}
-	status, err = r.get(peURL, &peBody)
-	if err == nil && status == http.StatusOK {
+	peStatus, peErr := r.web.Get(peURL, &peBody)
+	if peErr == nil && peStatus == http.StatusOK {
 		return PrismElement, nil
 	}
 
-	return "", liberr.New("unable to detect Prism endpoint type")
+	return "", liberr.New(
+		"unable to detect Prism endpoint type",
+		"prismCentralStatus", pcStatus,
+		"prismCentralError", pcErr,
+		"prismElementStatus", peStatus,
+		"prismElementError", peErr)
 }
