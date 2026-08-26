@@ -2880,32 +2880,44 @@ func (r *Builder) SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *api.Ta
 
 	// Custom attributes to annotations
 	annotationOriginalKeys := make(map[string]string)
+	customDefs := []model.CustomFieldDef{}
+	err = r.Source.Inventory.List(&customDefs, web.Param{
+		Key:   web.DetailParam,
+		Value: "all",
+	})
+	if err != nil {
+		err = liberr.Wrap(err, "custom field definitions")
+		return
+	}
+	customDefByKey := make(map[int32]model.CustomFieldDef, len(customDefs))
+	for _, def := range customDefs {
+		customDefByKey[def.Key] = def
+	}
 	for _, cv := range vm.CustomValues {
-		for _, def := range vm.CustomDef {
-			if def.Key == cv.Key {
-				originalName := def.Name
-				sanitizedName := sanitizeForK8sMetadata(originalName)
-				if sanitizedName == "" {
-					break
-				}
-				if sanitizedName != originalName {
-					sanitizationReport[fmt.Sprintf("customAttribute.name.%s", originalName)] = sanitizedName
-				}
-
-				key := fmt.Sprintf("vsphere.forklift.konveyor.io/%s", sanitizedName)
-				if existingOriginal, exists := annotationOriginalKeys[key]; exists {
-					r.Log.Info("Custom attribute key collision, later attribute overwrites earlier",
-						"sanitizedKey", key,
-						"previousAttribute", existingOriginal,
-						"currentAttribute", originalName)
-					sanitizationReport[fmt.Sprintf("customAttribute.collision.%s", sanitizedName)] = fmt.Sprintf("%s overwrites %s", originalName, existingOriginal)
-				}
-				annotationOriginalKeys[key] = originalName
-
-				annotations[key] = cv.Value
-				break
-			}
+		def, ok := customDefByKey[cv.Key]
+		if !ok {
+			continue
 		}
+		originalName := def.Name
+		sanitizedName := sanitizeForK8sMetadata(originalName)
+		if sanitizedName == "" {
+			continue
+		}
+		if sanitizedName != originalName {
+			sanitizationReport[fmt.Sprintf("customAttribute.name.%s", originalName)] = sanitizedName
+		}
+
+		key := fmt.Sprintf("vsphere.forklift.konveyor.io/%s", sanitizedName)
+		if existingOriginal, exists := annotationOriginalKeys[key]; exists {
+			r.Log.Info("Custom attribute key collision, later attribute overwrites earlier",
+				"sanitizedKey", key,
+				"previousAttribute", existingOriginal,
+				"currentAttribute", originalName)
+			sanitizationReport[fmt.Sprintf("customAttribute.collision.%s", sanitizedName)] = fmt.Sprintf("%s overwrites %s", originalName, existingOriginal)
+		}
+		annotationOriginalKeys[key] = originalName
+
+		annotations[key] = cv.Value
 	}
 
 	return
