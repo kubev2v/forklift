@@ -42,6 +42,7 @@ type HyperVDriver interface {
 	// Failover Cluster queries
 	GetCluster() (*ClusterData, error)
 	GetClusterNodes() ([]ClusterNodeData, error)
+	GetClusterInfo() (*ClusterInfoData, error)
 	GetClusterVMGroups() ([]ClusterGroupData, error)
 	GetComputerInfo() (*ComputerInfoData, error)
 
