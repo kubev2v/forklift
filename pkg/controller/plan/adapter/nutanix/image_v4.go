@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
@@ -25,6 +26,11 @@ const imagesV4Path = "/api/vmm/v4.0/content/images"
 // Image entity has no explicit error state, so this is our only signal that
 // creation failed (e.g. invalid disk reference, quota exceeded).
 const imageV4StallTimeout = 30 * time.Minute
+
+// redirectTokenMaxLen is the upper bound we accept for X-Redirect-Token.
+// Live PC tokens are ~1.5 KiB JWTs prefixed with NTNX_IGW_SESSION=; this
+// leaves headroom without approaching Kubernetes' 1 MiB Secret data limit.
+const redirectTokenMaxLen = 4096
 
 // findImageV4ByName returns the v4 image entity with the given name.
 // entity is nil if no such image exists yet. The v4 Image entity has no
@@ -150,7 +156,24 @@ func (r *Client) resolveImageV4DownloadURL(extID string) (downloadURL, cookie st
 	if location == "" || token == "" {
 		return "", "", liberr.New("missing redirect location or token resolving image download", "image", extID)
 	}
+	if err := validateRedirectToken(token); err != nil {
+		return "", "", liberr.Wrap(err, "image", extID)
+	}
 	return location, token, nil
+}
+
+func validateRedirectToken(token string) error {
+	if len(token) > redirectTokenMaxLen {
+		return liberr.New(
+			"redirect token exceeds maximum length",
+			"length", len(token),
+			"max", redirectTokenMaxLen,
+		)
+	}
+	if strings.ContainsAny(token, "\r\n\x00") {
+		return liberr.New("redirect token contains invalid control characters")
+	}
+	return nil
 }
 
 // preferClusterExternalURL rewrites a PE entity_download Location that
