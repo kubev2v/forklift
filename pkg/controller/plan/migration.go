@@ -2540,16 +2540,8 @@ func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 // (e.g. Nutanix Prism Central cookies) when the CDI importer fails with an
 // auth error, then deletes the importer pod so CDI recreates it with the
 // updated SecretExtraHeaders Secret mounted — without recreating the DV.
-//
-// The refresher interface is defined here (not on adapter.Builder) so
-// providers that need this stay self-contained: only Nutanix implements
-// RefreshImportCredentials today.
 func (r *Migration) maybeRefreshImportCredentials(vm *plan.VMStatus, dv *cdi.DataVolume, importer *core.Pod) {
-	type importCredentialRefresher interface {
-		RefreshImportCredentials(dv *cdi.DataVolume) (refreshed bool, err error)
-	}
-	refresher, ok := r.builder.(importCredentialRefresher)
-	if !ok || !isImportAuthFailure(importer) {
+	if !isImportAuthFailure(importer) {
 		return
 	}
 	if dv.Annotations != nil {
@@ -2560,7 +2552,7 @@ func (r *Migration) maybeRefreshImportCredentials(vm *plan.VMStatus, dv *cdi.Dat
 		}
 	}
 
-	refreshed, err := refresher.RefreshImportCredentials(dv)
+	refreshed, err := r.builder.RefreshImportCredentials(dv)
 	if err != nil {
 		log.Error(err, "Failed to refresh import credentials.",
 			"vm", vm.String(),

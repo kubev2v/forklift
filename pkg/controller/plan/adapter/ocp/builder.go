@@ -718,6 +718,10 @@ func (r *Builder) AdoptDownloadCookieSecretOwner(_ *cdi.DataVolume) error {
 	return nil
 }
 
+func (r *Builder) RefreshImportCredentials(_ *cdi.DataVolume) (bool, error) {
+	return false, nil
+}
+
 // setPVCNameFromTemplate generates a PVC name using the configured template
 // and sets it on the provided ObjectMeta, including DNS1123 validation.
 func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vmRef ref.Ref, sourcePVC *core.PersistentVolumeClaim, diskIndex int, pvcNameTemplate string, useGenerateName bool) error {

@@ -176,6 +176,8 @@ type Builder interface {
 	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error)
 	// Adopt ownership of provider-specific HTTP download cookie Secrets on the DataVolume.
 	AdoptDownloadCookieSecretOwner(dv *cdi.DataVolume) error
+	// Refresh short-lived HTTP import credentials on auth failure (e.g. Nutanix PC cookies).
+	RefreshImportCredentials(dv *cdi.DataVolume) (refreshed bool, err error)
 	// Build tasks.
 	Tasks(vmRef ref.Ref) ([]*planapi.Task, error)
 	// Build template labels.
