@@ -174,6 +174,8 @@ type Builder interface {
 	VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) error
 	// Build DataVolumes.
 	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error)
+	// Adopt ownership of provider-specific HTTP download cookie Secrets on the DataVolume.
+	AdoptDownloadCookieSecretOwner(dv *cdi.DataVolume) error
 	// Build tasks.
 	Tasks(vmRef ref.Ref) ([]*planapi.Task, error)
 	// Build template labels.

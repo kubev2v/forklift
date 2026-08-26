@@ -1911,9 +1911,9 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 				"vm",
 				vm.String())
 		}
-		// Optional provider hook: Nutanix sets a DataVolume owner reference on
-		// Prism Central download-cookie Secrets so they are GC'd with the DV.
-		if adoptErr := r.adoptDownloadCookieSecretOwner(&dv); adoptErr != nil {
+		// Nutanix sets a DataVolume owner reference on Prism Central download-cookie
+		// Secrets so they are GC'd with the DV; other providers no-op.
+		if adoptErr := r.Builder.AdoptDownloadCookieSecretOwner(&dv); adoptErr != nil {
 			r.Log.Error(
 				adoptErr,
 				"Failed to set download cookie secret owner reference.",
@@ -1923,20 +1923,6 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 		}
 	}
 	return
-}
-
-// adoptDownloadCookieSecretOwner delegates to adapter.Builder implementations
-// that create HTTP SecretExtraHeaders Secrets needing DataVolume owner refs.
-// Nutanix is the only implementation today; see nutanix.Builder.
-func (r *KubeVirt) adoptDownloadCookieSecretOwner(dv *cdi.DataVolume) error {
-	type downloadCookieSecretAdopter interface {
-		AdoptDownloadCookieSecretOwner(dv *cdi.DataVolume) error
-	}
-	adopter, ok := r.Builder.(downloadCookieSecretAdopter)
-	if !ok {
-		return nil
-	}
-	return adopter.AdoptDownloadCookieSecretOwner(dv)
 }
 
 // NetAppShiftPVCs builds PVCs for disks mapped to NetApp Shift StorageClasses.

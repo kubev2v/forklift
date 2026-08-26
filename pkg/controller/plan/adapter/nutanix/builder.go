@@ -614,8 +614,8 @@ func (r *Builder) setDownloadCookieSecretOwner(secret *core.Secret, dv *cdi.Data
 
 // AdoptDownloadCookieSecretOwner sets the DataVolume as owner of its
 // download-cookie Secret so Kubernetes GC removes the Secret when the
-// DataVolume is deleted. Called from kubevirt.EnsureDataVolumes via a
-// type assertion once the DataVolume exists in the API.
+// DataVolume is deleted. Called from kubevirt.EnsureDataVolumes once the
+// DataVolume exists in the API.
 func (r *Builder) AdoptDownloadCookieSecretOwner(dv *cdi.DataVolume) error {
 	if dv == nil || dv.Name == "" || dv.Spec.Source == nil || dv.Spec.Source.HTTP == nil {
 		return nil
