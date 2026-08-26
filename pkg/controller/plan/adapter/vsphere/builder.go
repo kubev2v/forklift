@@ -208,6 +208,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
+	r.removeExcludedDisks(vm)
 	macsToIps := ""
 	if r.Plan.Spec.PreserveStaticIPs {
 		macsToIps, err = r.mapMacStaticIps(vm)
@@ -621,6 +622,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
+	r.removeExcludedDisks(vm)
 
 	url := r.Source.Provider.Spec.URL
 	thumbprint := r.Source.Provider.Status.Fingerprint
@@ -825,6 +827,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 				vmRef.String()))
 		return
 	}
+	r.removeExcludedDisks(vm)
 	if !r.shouldMigrateSharedDisks(vm) {
 		sharedPVCs, missingDiskPVCs, err := findSharedPVCs(r.Destination.Client, vm, r.Plan.Spec.TargetNamespace)
 		if err != nil {
@@ -1234,6 +1237,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
+	r.removeExcludedDisks(vm)
 	for _, disk := range vm.Disks {
 		mB := utils.RoundUp(disk.Capacity, 0x100000) / 0x100000
 		list = append(
@@ -1486,6 +1490,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
+	r.removeExcludedDisks(vm)
 	// Get sorted disks to maintain consistent indexing with other parts of the system
 	sortedDisks := vm.SortedDisksAsVmware()
 
@@ -2094,6 +2099,12 @@ func (r *Builder) shouldMigrateSharedDisks(vm *model.VM) bool {
 		return *planVM.MigrateSharedDisks
 	}
 	return r.Context.Plan.Spec.MigrateSharedDisks
+}
+
+func (r *Builder) removeExcludedDisks(vm *model.VM) {
+	if planVM := r.getPlanVM(vm); planVM != nil && len(planVM.ExcludeDisks) > 0 {
+		vm.RemoveExcludedDisks(planVM.ExcludeDisks)
+	}
 }
 
 // shouldRDMAsLun returns whether RDM disks should be mapped as LUN devices for the given VM.
@@ -2788,6 +2799,7 @@ func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) (pvc
 	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
+	r.removeExcludedDisks(vm)
 
 	dsMap, err := r.buildDatastoreMap()
 	if err != nil {
@@ -2834,6 +2846,7 @@ func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) (pvcs
 	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
+	r.removeExcludedDisks(vm)
 
 	dsMap, err := r.buildDatastoreMap()
 	if err != nil {

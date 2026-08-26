@@ -410,6 +410,23 @@ func (r *VM) RemoveSharedDisks() {
 	r.Disks = disks
 }
 
+func (r *VM) RemoveExcludedDisks(ids []string) {
+	if len(ids) == 0 {
+		return
+	}
+	exclude := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		exclude[id] = struct{}{}
+	}
+	var disks []model.Disk
+	for _, disk := range r.Disks {
+		if _, skip := exclude[disk.BusAddress]; !skip {
+			disks = append(disks, disk)
+		}
+	}
+	r.Disks = disks
+}
+
 func (r *VM) RemoveDisk(removeDisk model.Disk) {
 	var disks []model.Disk
 	for _, disk := range r.Disks {
