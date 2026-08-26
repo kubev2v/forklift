@@ -404,7 +404,7 @@ func (r *Client) findImageByName(name string) (entity *libclient.V3Image, err er
 			return &e, nil
 		}
 	}
-	return nil, nil
+	return nil, nil //nolint:nilnil
 }
 
 // createImage submits a v3 image creation request for a DISK_IMAGE sourced

@@ -726,6 +726,7 @@ func TestFindImageByName_Found(t *testing.T) {
 	}
 	if entity == nil {
 		t.Fatal("expected image to be found")
+		return
 	}
 	if entity.Metadata.UUID != "image-1" {
 		t.Fatalf("expected uuid image-1, got %s", entity.Metadata.UUID)
