@@ -769,6 +769,7 @@ func (r *Builder) mapDataVolume(
 	// WaitForFirstConsumer storage class during a cold migration to the
 	// local cluster (unlike vSphere), so request immediate binding here --
 	// otherwise the PVC, and thus the import, would never start.
+	// TODO: remove this when Nutanix has a conversion step.
 	dv.Annotations[planbase.AnnBindImmediate] = "true"
 	return dv
 }
