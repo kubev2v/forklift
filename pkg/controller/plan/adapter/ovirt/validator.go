@@ -89,6 +89,11 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s
 	return
 }
 
+func (r *Validator) ExcludedDisks(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
+	ok = true
+	return
+}
+
 // HasSnapshot - oVirt doesn't currently check for snapshots
 func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
 	ok = true

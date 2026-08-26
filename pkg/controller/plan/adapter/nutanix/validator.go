@@ -60,6 +60,10 @@ func (r *Validator) SharedDisks(_ ref.Ref, _ client.Client) (bool, string, strin
 	return true, "", "", nil
 }
 
+func (r *Validator) ExcludedDisks(_ ref.Ref) (bool, string, string, error) {
+	return true, "", "", nil
+}
+
 func (r *Validator) ChangeTrackingEnabled(_ ref.Ref) (bool, error) {
 	return true, nil
 }

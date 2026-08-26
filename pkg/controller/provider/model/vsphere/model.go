@@ -380,9 +380,10 @@ type GuestApp struct {
 
 // Virtual Controller.
 type Controller struct {
-	Key   int32   `json:"key"`
-	Bus   string  `json:"bus"`
-	Disks []int32 `sql:""`
+	Key       int32   `json:"key"`
+	BusNumber int32   `json:"busNumber"`
+	Bus       string  `json:"bus"`
+	Disks     []int32 `sql:""`
 }
 
 // Virtual Disk.
@@ -390,6 +391,7 @@ type Disk struct {
 	Key                   int32  `json:"key"`
 	UnitNumber            int32  `json:"unitNumber"`
 	ControllerKey         int32  `json:"controllerKey"`
+	BusNumber             int32  `json:"busNumber"`
 	File                  string `json:"file"`
 	Datastore             Ref    `json:"datastore"`
 	Capacity              int64  `json:"capacity"`
@@ -397,6 +399,7 @@ type Disk struct {
 	RDM                   bool   `json:"rdm"`
 	PhysicalMode          bool   `json:"physicalMode,omitempty"`
 	Bus                   string `json:"bus"`
+	BusAddress            string `json:"busAddress,omitempty"` // e.g. scsi0:0
 	Mode                  string `json:"mode,omitempty"`
 	Serial                string `json:"serial,omitempty"`
 	WinDriveLetter        string `json:"winDriveLetter,omitempty"`

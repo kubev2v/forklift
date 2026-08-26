@@ -73,6 +73,7 @@ const (
 	DuplicateVM                     = "DuplicateVM"
 	SharedDisks                     = "SharedDisks"
 	SharedWarnDisks                 = "SharedWarnDisks"
+	ExcludeWarnDisks                = "ExcludeWarnDisks"
 	NameNotValid                    = "TargetNameNotValid"
 	HookNotValid                    = "HookNotValid"
 	HookNotReady                    = "HookNotReady"
@@ -109,6 +110,7 @@ const (
 	VMCriticalConcerns              = "VMCriticalConcerns"
 	RDMDiskWarning                  = "RDMDiskWarning"
 	IndependentDiskWarning          = "IndependentDiskWarning"
+	ExcludeDisks                    = "ExcludeDisks"
 	// NetAppShift (Advisory) reports whether the plan's storage map uses a NetApp Shift/Trident class.
 	NetAppShift = "NetAppShift"
 	// NetAppShiftWarmNotSupported (Critical) blocks warm migration when the storage map uses NetApp Shift.
@@ -989,6 +991,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		Items:    []string{},
 	}
 	var sharedDisksConditions []libcnd.Condition
+	var excludeDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
 
@@ -1267,6 +1270,30 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			sharedDisks.Type = fmt.Sprintf("%s-%s", sharedDisks.Type, ref.ID)
 			sharedDisksConditions = append(sharedDisksConditions, sharedDisks)
 		}
+
+		exOk, exMsg, exCategory, exErr := validator.ExcludedDisks(*ref)
+		if exErr != nil {
+			return exErr
+		}
+		if !exOk {
+			excludeDisks := libcnd.Condition{
+				Type:     ExcludeDisks,
+				Status:   True,
+				Category: exCategory,
+				Message:  "VM excludeDisks configuration is invalid.",
+				Items:    []string{ref.String()},
+			}
+			if exMsg != "" {
+				excludeDisks.Message = exMsg
+			}
+			if exCategory == validation.Warn {
+				excludeDisks.Type = ExcludeWarnDisks
+			} else {
+				excludeDisks.Type = ExcludeDisks
+			}
+			excludeDisks.Type = fmt.Sprintf("%s-%s", excludeDisks.Type, ref.ID)
+			excludeDisksConditions = append(excludeDisksConditions, excludeDisks)
+		}
 		if settings.Settings.StaticUdnIpAddresses && plan.Spec.PreserveStaticIPs && plan.DestinationHasUdnNetwork(r.Client) {
 			ok, err = validator.UdnStaticIPs(*ref, ctx.Destination.Client)
 			if err != nil {
@@ -1396,6 +1423,9 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	}
 	if len(sharedDisksConditions) > 0 {
 		plan.Status.SetCondition(sharedDisksConditions...)
+	}
+	if len(excludeDisksConditions) > 0 {
+		plan.Status.SetCondition(excludeDisksConditions...)
 	}
 	if len(missingCbtForWarm.Items) > 0 {
 		plan.Status.SetCondition(missingCbtForWarm)

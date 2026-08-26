@@ -13,6 +13,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/validation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +25,7 @@ var ErrNotImplemented = errors.New("not implemented")
 // Mock inventory struct and methods for testing
 type mockInventory struct {
 	ds         model.Datastore
+	datastores map[string]model.Datastore // keyed by ID; used when tests need more than one datastore
 	vm         model.VM
 	networks   map[string]model.Network // keyed by ID
 	customDefs []model.CustomFieldDef   // global custom field definitions
@@ -60,6 +62,12 @@ func defaultVM() model.VM {
 func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 	switch res := resource.(type) {
 	case *model.Datastore:
+		if m.datastores != nil {
+			if ds, ok := m.datastores[ref.ID]; ok {
+				*res = ds
+				return nil
+			}
+		}
 		*res = m.ds
 	case *model.Workload:
 		*res = model.Workload{VM: m.vm}
@@ -622,6 +630,38 @@ var _ = Describe("vsphere validation tests", func() {
 		},
 		Entry("should warn on consolidation needed", true),
 		Entry("should not warn when consolidation is not needed", false),
+	)
+
+	DescribeTable("ExcludedDisks",
+		func(exclude []string, rootDisk string, wantOK bool, wantCategory, wantMsg string) {
+			plan := createPlan()
+			plan.Spec.VMs[0].ExcludeDisks = exclude
+			plan.Spec.VMs[0].RootDisk = rootDisk
+			vm := defaultVM()
+			vm.Disks = []vsphere.Disk{
+				{File: "[ds] vm/disk0.vmdk", BusAddress: "scsi0:0", Bus: vsphere.SCSI, ControllerKey: 1000, UnitNumber: 0},
+				{File: "[ds] vm/disk1.vmdk", BusAddress: "scsi0:1", Bus: vsphere.SCSI, ControllerKey: 1000, UnitNumber: 1},
+			}
+			ctx := plancontext.Context{
+				Plan:   plan,
+				Source: plancontext.Source{Inventory: &mockInventory{vm: vm}},
+			}
+			validator := &Validator{Context: &ctx}
+			ok, msg, category, err := validator.ExcludedDisks(ref.Ref{ID: "test-vm-id"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ok).To(Equal(wantOK))
+			Expect(category).To(Equal(wantCategory))
+			if wantMsg != "" {
+				Expect(msg).To(ContainSubstring(wantMsg))
+			}
+		},
+		Entry("empty list is valid", nil, "", true, "", ""),
+		Entry("matching data disk is valid", []string{"scsi0:1"}, "", true, "", ""),
+		Entry("unknown bus is critical", []string{"scsi9:0"}, "", false, validation.Critical, "scsi9:0"),
+		Entry("all disks excluded is critical", []string{"scsi0:0", "scsi0:1"}, "", false, validation.Critical, "every disk"),
+		Entry("root disk excluded is a warning", []string{"scsi0:0"}, "", false, validation.Warn, "root disk scsi0:0"),
+		Entry("explicit root disk excluded is a warning", []string{"scsi0:1"}, "/dev/sdb", false, validation.Warn, "root disk scsi0:1"),
+		Entry("non-root disk with explicit root is valid", []string{"scsi0:0"}, "/dev/sdb", true, "", ""),
 	)
 
 })
