@@ -260,3 +260,14 @@ rules:
     - get
     - list
     - watch
+# The provider inventory serves the destination cluster's Calico
+# resources for migration validation.
+- apiGroups:
+    - projectcalico.org
+  resources:
+    - networks
+    - ippools
+  verbs:
+    - get
+    - list
+    - watch
