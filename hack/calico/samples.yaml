@@ -1,0 +1,35 @@
+# Sample Enterprise-shaped resources for exercising Forklift's Calico
+# validation surface. Calico OSS stores these but does not process them.
+# Shapes satisfy the Enterprise CRDs' validation rules: an l2Bridge Network
+# requires hostConfig; an L2Workload pool must carry that use alone and
+# disable BGP export.
+---
+apiVersion: projectcalico.org/v3
+kind: Network
+metadata:
+  name: mock-l2-net
+spec:
+  l2Bridge:
+    hostConfig:
+      - bridge:
+          existingBridge:
+            name: br-mock
+        hostConnections:
+          - trunkPort:
+              interface:
+                name: eth1
+    vlans:
+      - vlan:
+          id: 100
+        subnets:
+          - cidr: 10.100.0.0/24
+---
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: mock-vlan100-pool
+spec:
+  cidr: 10.100.0.0/24
+  allowedUses:
+    - L2Workload
+  disableBGPExport: true
