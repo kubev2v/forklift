@@ -20,6 +20,7 @@ import (
 	vsphereCollector "github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	providervalidation "github.com/kubev2v/forklift/pkg/controller/provider/validation"
+	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/inventory/model"
@@ -31,6 +32,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -55,7 +57,11 @@ const (
 	SMBCSIDriverNotReady    = "SMBCSIDriverNotReady"
 	SMBMountFailed          = "SMBMountFailed"
 	WaitingForService       = "WaitingForService"
+	ForkliftNotInstalled    = "ForkliftNotInstalled"
 )
+
+// Forklift operator is installed on a remote cluster.
+const forkliftControllerResource = "forkliftcontrollers"
 
 // CSI driver names
 const (
@@ -1418,6 +1424,85 @@ func (r *Reconciler) ValidateHyperVSettings(provider *api.Provider) error {
 
 	provider.Status.DeleteCondition(SettingsNotValid)
 	return nil
+}
+
+// ValidateForkliftInstalled checks whether the Forklift operator is installed
+// on a remote OpenShift cluster by looking up the operator CRD
+func (r *Reconciler) ValidateForkliftInstalled(provider *api.Provider, secret *core.Secret) error {
+	if provider.Type() != api.OpenShift {
+		return nil
+	}
+	// The host provider is the cluster Forklift already runs on.
+	if provider.IsHost() {
+		return nil
+	}
+	// Only meaningful once we know the remote cluster is reachable.
+	if provider.Status.HasBlockerCondition() || !provider.Status.HasCondition(ConnectionTestSucceeded) {
+		return nil
+	}
+
+	dc, err := discoveryClientForProvider(provider, secret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	installed, err := forkliftOperatorInstalled(dc)
+	if err != nil {
+		// The entire API group is absent: operator not installed.
+		if k8serrors.IsNotFound(err) {
+			r.setForkliftNotInstalled(provider)
+			return nil
+		}
+		// Transient/API error: let the reconcile retry.
+		return liberr.Wrap(err)
+	}
+
+	if installed {
+		// Operator CRD present: clear any stale warning.
+		provider.Status.DeleteCondition(ForkliftNotInstalled)
+		return nil
+	}
+
+	r.setForkliftNotInstalled(provider)
+	return nil
+}
+
+// discoveryClientForProvider builds a discovery client for a remote cluster.
+// Declared as a var so it can be overridden in tests.
+var discoveryClientForProvider = func(provider *api.Provider, secret *core.Secret) (discovery.DiscoveryInterface, error) {
+	cfg := ocp.RestCfg(provider, secret)
+	if cfg == nil {
+		return nil, liberr.New("failed to build REST config for remote cluster")
+	}
+	return discovery.NewDiscoveryClientForConfig(cfg)
+}
+
+// forkliftOperatorInstalled reports whether the Forklift operator CRD is served
+// by the cluster behind the given discovery client.
+func forkliftOperatorInstalled(dc discovery.DiscoveryInterface) (bool, error) {
+	resources, err := dc.ServerResourcesForGroupVersion(api.SchemeGroupVersion.String())
+	if err != nil {
+		return false, err
+	}
+	for _, res := range resources.APIResources {
+		if res.Name == forkliftControllerResource {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// setForkliftNotInstalled sets the advisory warning indicating the Forklift
+// operator was not found on the remote cluster.
+func (r *Reconciler) setForkliftNotInstalled(provider *api.Provider) {
+	provider.Status.SetCondition(libcnd.Condition{
+		Type:     ForkliftNotInstalled,
+		Status:   True,
+		Reason:   NotFound,
+		Category: Warn,
+		Message: "The Forklift operator is not installed on the remote cluster " +
+			"(the forkliftcontrollers.forklift.konveyor.io CRD was not found).",
+	})
 }
 
 // setAuthFailureConditions sets ConnectionAuthFailed on the provider.

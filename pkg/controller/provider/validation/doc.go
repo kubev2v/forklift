@@ -15,6 +15,7 @@ type Runner interface {
 	ValidateSSHReadiness(provider *api.Provider, secret *core.Secret) error
 	ValidateSMBCSI(provider *api.Provider) error
 	ValidateHyperVSettings(provider *api.Provider) error
+	ValidateForkliftInstalled(provider *api.Provider, secret *core.Secret) error
 }
 
 // ProviderValidator runs provider-type-specific validation.
@@ -29,6 +30,8 @@ func Build(runner Runner, cl client.Client) *ProviderValidator {
 
 func (v *ProviderValidator) Validate(provider *api.Provider, secret *core.Secret) error {
 	switch provider.Type() {
+	case api.OpenShift:
+		return liberr.Wrap(v.runner.ValidateForkliftInstalled(provider, secret))
 	case api.EC2:
 		(&ec2validation.Validator{}).Validate(provider, secret, v.client)
 		return nil
