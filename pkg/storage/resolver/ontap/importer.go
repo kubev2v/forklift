@@ -96,9 +96,9 @@ func NewOntapImporter(host, user, pass, svm, backendUUID, driverType string, ski
 }
 
 // Resolve returns the PVC annotations Trident needs to import the source array volume.
-func (o *OntapImporter) Resolve(backing *resolver.DiskBacking) (map[string]string, error) {
+func (o *OntapImporter) Resolve(backing *resolver.DiskBacking) (map[string]string, bool, error) {
 	if backing == nil {
-		return nil, fmt.Errorf("nil disk backing")
+		return nil, false, fmt.Errorf("nil disk backing")
 	}
 	switch resolver.DetectDiskType(backing) {
 	case resolver.DiskTypeVVol:
@@ -106,67 +106,71 @@ func (o *OntapImporter) Resolve(backing *resolver.DiskBacking) (map[string]strin
 	case resolver.DiskTypeRDM:
 		return o.resolveRDM(backing.DeviceName)
 	default:
-		return nil, fmt.Errorf("ONTAP CSI import does not support VMDK disks")
+		return nil, false, fmt.Errorf("ONTAP CSI import does not support VMDK disks")
 	}
 }
 
-func (o *OntapImporter) resolveVVol(vvolID string) (map[string]string, error) {
+func (o *OntapImporter) resolveVVol(vvolID string) (map[string]string, bool, error) {
 	klog.V(2).InfoS("ONTAP VVol CSI import not yet supported, deferring to xcopy", "vvolID", vvolID)
-	return nil, nil //nolint:nilnil
+	return nil, false, nil
 }
 
-func (o *OntapImporter) resolveRDM(deviceName string) (map[string]string, error) {
+func (o *OntapImporter) resolveRDM(deviceName string) (map[string]string, bool, error) {
 	serial, err := extractSerialFromNAA(deviceName)
 	if err != nil {
-		return nil, fmt.Errorf("ONTAP RDM resolution failed (DeviceName: %s): %w", deviceName, err)
+		return nil, false, fmt.Errorf("ONTAP RDM resolution failed (DeviceName: %s): %w", deviceName, err)
 	}
 
-	lunPath, err := o.queryLUNBySerial(serial)
+	lunPath, found, err := o.queryLUNBySerial(serial)
 	if err != nil {
-		return nil, fmt.Errorf("ONTAP RDM resolution failed (serial: %s): %w", serial, err)
+		return nil, false, fmt.Errorf("ONTAP RDM resolution failed (serial: %s): %w", serial, err)
+	}
+	if !found {
+		klog.V(2).InfoS("ONTAP queried REST API, LUN not found on this SVM (cross-array), deferring to xcopy", "serial", serial)
+		return nil, false, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	driverType, err := detectDriverType(ctx, o.k8sClient, o.storageClass, o.driverType)
 	if err != nil {
-		return nil, fmt.Errorf("ONTAP RDM resolution failed: %w", err)
+		return nil, false, fmt.Errorf("ONTAP RDM resolution failed: %w", err)
 	}
 
 	importName, err := formatImportName(lunPath, driverType)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	return map[string]string{
 		annImportOriginalName: importName,
 		annImportBackendUUID:  o.backendUUID,
 		annNotManaged:         "true",
-	}, nil
+	}, true, nil
 }
 
-func (o *OntapImporter) queryLUNBySerial(serial string) (string, error) {
+func (o *OntapImporter) queryLUNBySerial(serial string) (string, bool, error) {
 	queryURL := fmt.Sprintf("%s/api/storage/luns?serial_number=%s&svm.name=%s&fields=name",
 		o.baseURL, url.QueryEscape(serial), url.QueryEscape(o.svm))
 
 	req, err := http.NewRequest(http.MethodGet, queryURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to build ONTAP request: %w", err)
+		return "", false, fmt.Errorf("failed to build ONTAP request: %w", err)
 	}
 	req.SetBasicAuth(o.user, o.pass)
 
 	resp, err := o.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("ONTAP REST request failed: %w", err)
+		return "", false, fmt.Errorf("ONTAP REST request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read ONTAP response: %w", err)
+		return "", false, fmt.Errorf("failed to read ONTAP response: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("ONTAP REST returned %d: %s", resp.StatusCode, string(body))
+		return "", false, fmt.Errorf("ONTAP REST returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	var result struct {
@@ -176,15 +180,15 @@ func (o *OntapImporter) queryLUNBySerial(serial string) (string, error) {
 		} `json:"records"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("failed to parse ONTAP response: %w", err)
+		return "", false, fmt.Errorf("failed to parse ONTAP response: %w", err)
 	}
 	if result.NumRecords == 0 || len(result.Records) == 0 {
-		return "", fmt.Errorf("no ONTAP LUN found for serial %s on SVM %s", serial, o.svm)
+		return "", false, nil
 	}
 	if result.NumRecords > 1 {
-		return "", fmt.Errorf("multiple ONTAP LUNs (%d) found for serial %s on SVM %s", result.NumRecords, serial, o.svm)
+		return "", false, fmt.Errorf("multiple ONTAP LUNs (%d) found for serial %s on SVM %s", result.NumRecords, serial, o.svm)
 	}
-	return result.Records[0].Name, nil
+	return result.Records[0].Name, true, nil
 }
 
 // formatImportName builds the Trident importOriginalName from an ONTAP LUN path.

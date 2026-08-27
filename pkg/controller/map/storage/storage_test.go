@@ -476,3 +476,60 @@ var _ = Describe("StorageVendorProducts", func() {
 		Expect(products).To(ContainElement(api.StorageVendorProductInfinibox))
 	})
 })
+
+var _ = Describe("validateOffloadPlugin", func() {
+	csiEntry := api.StoragePair{
+		Source:      ref.Ref{ID: "ds-1"},
+		Destination: api.DestinationStorage{StorageClass: "hpe-sc"},
+		OffloadPlugin: &api.OffloadPlugin{
+			CsiVolumeImport: &api.CsiVolumeImport{SecretRef: "hpe-creds", StorageVendorProduct: api.StorageVendorProductPrimera3Par},
+		},
+	}
+
+	It("flags a csiVolumeImport entry with no xcopy fallback at all", func() {
+		mp := &api.StorageMap{Spec: api.StorageMapSpec{Map: []api.StoragePair{csiEntry}}}
+		r := &Reconciler{}
+		r.validateOffloadPlugin(mp)
+		Expect(mp.Status.HasCondition(OffloadPluginNotValid)).To(BeTrue())
+	})
+
+	It("accepts a sibling entry with the same source and vendor", func() {
+		xcopySibling := api.StoragePair{
+			Source:      ref.Ref{ID: "ds-1"},
+			Destination: api.DestinationStorage{StorageClass: "hpe-sc"},
+			OffloadPlugin: &api.OffloadPlugin{
+				VSphereXcopyPluginConfig: &api.VSphereXcopyPluginConfig{SecretRef: "xcopy-secret", StorageVendorProduct: api.StorageVendorProductPrimera3Par},
+			},
+		}
+		mp := &api.StorageMap{Spec: api.StorageMapSpec{Map: []api.StoragePair{csiEntry, xcopySibling}}}
+		r := &Reconciler{}
+		r.validateOffloadPlugin(mp)
+		Expect(mp.Status.HasCondition(OffloadPluginNotValid)).To(BeFalse())
+	})
+
+	It("flags a sibling entry with the same source but a different vendor", func() {
+		xcopySibling := api.StoragePair{
+			Source:      ref.Ref{ID: "ds-1"},
+			Destination: api.DestinationStorage{StorageClass: "ontap-sc"},
+			OffloadPlugin: &api.OffloadPlugin{
+				VSphereXcopyPluginConfig: &api.VSphereXcopyPluginConfig{SecretRef: "xcopy-secret", StorageVendorProduct: api.StorageVendorProductOntap},
+			},
+		}
+		mp := &api.StorageMap{Spec: api.StorageMapSpec{Map: []api.StoragePair{csiEntry, xcopySibling}}}
+		r := &Reconciler{}
+		r.validateOffloadPlugin(mp)
+		Expect(mp.Status.HasCondition(OffloadPluginNotValid)).To(BeTrue())
+	})
+
+	It("accepts a single entry that bundles both configs for the same vendor", func() {
+		bundled := csiEntry
+		bundled.OffloadPlugin = &api.OffloadPlugin{
+			CsiVolumeImport:          csiEntry.OffloadPlugin.CsiVolumeImport,
+			VSphereXcopyPluginConfig: &api.VSphereXcopyPluginConfig{SecretRef: "xcopy-secret", StorageVendorProduct: api.StorageVendorProductPrimera3Par},
+		}
+		mp := &api.StorageMap{Spec: api.StorageMapSpec{Map: []api.StoragePair{bundled}}}
+		r := &Reconciler{}
+		r.validateOffloadPlugin(mp)
+		Expect(mp.Status.HasCondition(OffloadPluginNotValid)).To(BeFalse())
+	})
+})
