@@ -203,6 +203,13 @@ type VM struct {
 	//
 	// +optional
 	SCSIReservation *bool `json:"scsiReservation,omitempty"`
+	// ExcludeDisks lists vSphere bus addresses to skip during migration (e.g. "scsi0:1").
+	// Empty or omitted: migrate all disks (subject to migrateSharedDisks).
+	// When set, matching disks are not imported and are not attached to the target VM.
+	// Excluding every disk is rejected. Excluding the root/boot disk is allowed with a warning.
+	// vSphere only; other providers ignore this field.
+	// +optional
+	ExcludeDisks []string `json:"excludeDisks,omitempty"`
 }
 
 // Find a Hook for the specified step.

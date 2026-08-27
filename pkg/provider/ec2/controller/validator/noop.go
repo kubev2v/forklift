@@ -57,6 +57,12 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, c client.Client) (ok bool, msg st
 	return
 }
 
+// ExcludedDisks validates excludeDisks (not applicable for EC2).
+func (r *Validator) ExcludedDisks(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
+	ok = true
+	return
+}
+
 // StaticIPs validates static IP configuration.
 func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
 	return true, nil

@@ -322,6 +322,16 @@ spec:
                       - phase
                       - reasons
                       type: object
+                    excludeDisks:
+                      description: |-
+                        ExcludeDisks lists vSphere bus addresses to skip during migration (e.g. "scsi0:1").
+                        Empty or omitted: migrate all disks (subject to migrateSharedDisks).
+                        When set, matching disks are not imported and are not attached to the target VM.
+                        Excluding every disk is rejected. Excluding the root/boot disk is allowed with a warning.
+                        vSphere only; other providers ignore this field.
+                      items:
+                        type: string
+                      type: array
                     firmware:
                       description: The firmware type detected from the OVF file produced
                         by virt-v2v.

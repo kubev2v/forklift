@@ -485,11 +485,16 @@ func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref) (bool, error) {
 		// The virt-v2v transfers all disks attached to the VM. If we want to skip the shared disks so we don't transfer
 		// them multiple times we need to manage the transfer using KubeVirt CDI DataVolumes and v2v-in-place.
 		migrateSharedDisks := p.Spec.MigrateSharedDisks
-		if vm, found := p.Spec.FindVM(vmRef); found && vm.MigrateSharedDisks != nil {
-			migrateSharedDisks = *vm.MigrateSharedDisks
+		planVM, found := p.Spec.FindVM(vmRef)
+		if found && planVM.MigrateSharedDisks != nil {
+			migrateSharedDisks = *planVM.MigrateSharedDisks
 		}
 		if p.IsWarm() || !destination.IsHost() || !migrateSharedDisks ||
 			p.Spec.SkipGuestConversion || p.Spec.Type == MigrationOnlyConversion {
+			return false, nil
+		}
+		if found && len(planVM.ExcludeDisks) > 0 {
+			// virt-v2v copies every attached disk; skip excluded disks via CDI instead.
 			return false, nil
 		}
 		if p.HasNetAppShiftDestination() {

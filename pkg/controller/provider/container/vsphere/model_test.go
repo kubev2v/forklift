@@ -823,3 +823,113 @@ func TestHasDiskPrefix(t *testing.T) {
 		})
 	}
 }
+
+func TestDiskBusAddress(t *testing.T) {
+	tests := []struct {
+		bus        string
+		busNumber  int32
+		unitNumber int32
+		want       string
+	}{
+		{"scsi", 0, 0, "scsi0:0"},
+		{"scsi", 0, 1, "scsi0:1"},
+		{"scsi", 1, 1, "scsi1:1"},
+		{"sata", 0, 1, "sata0:1"},
+		{"nvme", 0, 2, "nvme0:2"},
+		{"ide", 0, 0, "ide0:0"},
+		{"scsi", 2, 0, "scsi2:0"},
+		{"", 0, 0, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			got := diskBusAddress(tt.bus, tt.busNumber, tt.unitNumber)
+			if got != tt.want {
+				t.Errorf("diskBusAddress(%q, %d, %d) = %q, want %q",
+					tt.bus, tt.busNumber, tt.unitNumber, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUpdateDisks_setsBusAddress(t *testing.T) {
+	unit := int32(1)
+	v := &VmAdapter{
+		model: model.VM{
+			Controllers: []model.Controller{{Key: 1000, BusNumber: 0, Bus: SCSI}},
+		},
+	}
+	v.updateDisks(&types.ArrayOfVirtualDevice{VirtualDevice: []types.BaseVirtualDevice{
+		&types.VirtualDisk{
+			VirtualDevice: types.VirtualDevice{
+				Key:           2001,
+				ControllerKey: 1000,
+				UnitNumber:    &unit,
+				Backing: &types.VirtualDiskFlatVer2BackingInfo{
+					VirtualDeviceFileBackingInfo: types.VirtualDeviceFileBackingInfo{
+						FileName: "[ds] vm/disk.vmdk",
+					},
+				},
+			},
+			CapacityInBytes: 1024,
+		},
+	}})
+	if len(v.model.Disks) != 1 {
+		t.Fatalf("got %d disks, want 1", len(v.model.Disks))
+	}
+	if v.model.Disks[0].BusAddress != "scsi0:1" {
+		t.Errorf("BusAddress = %q, want scsi0:1", v.model.Disks[0].BusAddress)
+	}
+	if v.model.Disks[0].Bus != SCSI {
+		t.Errorf("Bus = %q, want %q", v.model.Disks[0].Bus, SCSI)
+	}
+}
+
+func TestUpdateDisks_usesBusNumberWhenKeyDiffers(t *testing.T) {
+	unit := int32(0)
+	v := &VmAdapter{}
+	v.updateControllers(&types.ArrayOfVirtualDevice{VirtualDevice: []types.BaseVirtualDevice{
+		&types.ParaVirtualSCSIController{
+			VirtualSCSIController: types.VirtualSCSIController{
+				VirtualController: types.VirtualController{
+					VirtualDevice: types.VirtualDevice{Key: 1000},
+					BusNumber:     2,
+					Device:        []int32{2000},
+				},
+			},
+		},
+	}})
+	if len(v.model.Controllers) != 1 {
+		t.Fatalf("got %d controllers, want 1", len(v.model.Controllers))
+	}
+	if v.model.Controllers[0].Key != 1000 {
+		t.Errorf("Key = %d, want 1000", v.model.Controllers[0].Key)
+	}
+	if v.model.Controllers[0].BusNumber != 2 {
+		t.Errorf("BusNumber = %d, want 2", v.model.Controllers[0].BusNumber)
+	}
+
+	v.updateDisks(&types.ArrayOfVirtualDevice{VirtualDevice: []types.BaseVirtualDevice{
+		&types.VirtualDisk{
+			VirtualDevice: types.VirtualDevice{
+				Key:           2000,
+				ControllerKey: 1000,
+				UnitNumber:    &unit,
+				Backing: &types.VirtualDiskFlatVer2BackingInfo{
+					VirtualDeviceFileBackingInfo: types.VirtualDeviceFileBackingInfo{
+						FileName: "[ds] vm/disk.vmdk",
+					},
+				},
+			},
+			CapacityInBytes: 1024,
+		},
+	}})
+	if len(v.model.Disks) != 1 {
+		t.Fatalf("got %d disks, want 1", len(v.model.Disks))
+	}
+	if v.model.Disks[0].BusAddress != "scsi2:0" {
+		t.Errorf("BusAddress = %q, want scsi2:0 (from BusNumber, not Key remainder)", v.model.Disks[0].BusAddress)
+	}
+	if v.model.Disks[0].BusNumber != 2 {
+		t.Errorf("Disk.BusNumber = %d, want 2", v.model.Disks[0].BusNumber)
+	}
+}
