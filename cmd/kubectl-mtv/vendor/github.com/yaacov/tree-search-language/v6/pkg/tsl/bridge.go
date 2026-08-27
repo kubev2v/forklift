@@ -2,65 +2,16 @@ package tsl
 
 import "github.com/yaacov/tree-search-language/v6/pkg/parser"
 
-// Type mapping tables for TSL semantic types
-var (
-	nodeKindMap = map[parser.NodeKind]Kind{
-		parser.NodeNumericLiteral:   KindNumericLiteral,
-		parser.NodeStringLiteral:    KindStringLiteral,
-		parser.NodeIdentifier:       KindIdentifier,
-		parser.NodeBinaryExpr:       KindBinaryExpr,
-		parser.NodeUnaryExpr:        KindUnaryExpr,
-		parser.NodeDateLiteral:      KindDateLiteral,
-		parser.NodeTimestampLiteral: KindTimestampLiteral,
-		parser.NodeArrayLiteral:     KindArrayLiteral,
-		parser.NodeBooleanLiteral:   KindBooleanLiteral,
-		parser.NodeNullLiteral:      KindNullLiteral,
-	}
-
-	operatorMap = map[parser.OpType]Operator{
-		parser.OpEQ:      OpEQ,
-		parser.OpNE:      OpNE,
-		parser.OpLT:      OpLT,
-		parser.OpLE:      OpLE,
-		parser.OpGT:      OpGT,
-		parser.OpGE:      OpGE,
-		parser.OpLike:    OpLike,
-		parser.OpILike:   OpILike,
-		parser.OpAnd:     OpAnd,
-		parser.OpOr:      OpOr,
-		parser.OpNot:     OpNot,
-		parser.OpIn:      OpIn,
-		parser.OpBetween: OpBetween,
-		parser.OpIs:      OpIs,
-		parser.OpPlus:    OpPlus,
-		parser.OpMinus:   OpMinus,
-		parser.OpStar:    OpStar,
-		parser.OpSlash:   OpSlash,
-		parser.OpPercent: OpPercent,
-		parser.OpLen:     OpLen,
-		parser.OpAny:     OpAny,
-		parser.OpAll:     OpAll,
-		parser.OpSum:     OpSum,
-		parser.OpREQ:     OpREQ,
-		parser.OpRNE:     OpRNE,
-		parser.OpUMinus:  OpUMinus,
-	}
-)
-
-// convertNodeKind converts parser NodeKind to TSL Kind
+// convertNodeKind converts parser NodeKind to TSL Kind.
+// Both types use matching iota values so this is a direct cast.
 func convertNodeKind(parserKind parser.NodeKind) Kind {
-	if kind, ok := nodeKindMap[parserKind]; ok {
-		return kind
-	}
-	return KindStringLiteral // fallback
+	return Kind(parserKind)
 }
 
-// convertOpType converts parser OpType to TSL Operator
+// convertOpType converts parser OpType to TSL Operator.
+// Both types use matching iota+100 values so this is a direct cast.
 func convertOpType(parserOp parser.OpType) Operator {
-	if op, ok := operatorMap[parserOp]; ok {
-		return op
-	}
-	return OpEQ // fallback
+	return Operator(parserOp)
 }
 
 // wrapParserNode creates a TSL node from a parser node
@@ -91,7 +42,9 @@ func wrapParserNode(parserNode *parser.Node) *Node {
 
 // Node represents a TSL AST node with semantic type information
 type Node struct {
-	Kind     Kind
+	Kind Kind
+	// Value must be an immutable type (string, float64, bool, time.Time, or nil).
+	// Clone performs a shallow copy of this field.
 	Value    interface{}
 	Operator Operator
 	Left     *Node
