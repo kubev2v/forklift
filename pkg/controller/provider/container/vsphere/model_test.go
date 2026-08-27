@@ -3,6 +3,7 @@ package vsphere
 import (
 	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
@@ -723,8 +724,15 @@ func newTestInventoryDB(t *testing.T) libmodel.DB {
 	return db
 }
 
+func newTestCollector() *Collector {
+	return &Collector{
+		customFieldDefs:   map[int32]model.CustomFieldDef{},
+		customFieldDefsMu: &sync.RWMutex{},
+	}
+}
+
 func TestUpsertCustomFieldDefs(t *testing.T) {
-	adapter := Collector{}
+	adapter := newTestCollector()
 	db := newTestInventoryDB(t)
 	defs := []types.CustomFieldDef{
 		{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
@@ -780,7 +788,7 @@ func TestUpsertCustomFieldDefs(t *testing.T) {
 }
 
 func TestUpsertCustomFieldDefsSkipsNonVM(t *testing.T) {
-	adapter := Collector{}
+	adapter := newTestCollector()
 	db := newTestInventoryDB(t)
 
 	err := db.With(func(tx *libmodel.Tx) error {
@@ -799,6 +807,129 @@ func TestUpsertCustomFieldDefsSkipsNonVM(t *testing.T) {
 	}
 	if len(list) != 0 {
 		t.Errorf("expected no defs for non-VM object, got %d", len(list))
+	}
+}
+
+func TestUpsertCustomFieldDefsCaches(t *testing.T) {
+	adapter := newTestCollector()
+	db := newTestInventoryDB(t)
+
+	defs := []types.CustomFieldDef{
+		{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
+		{Name: "env", Key: 200, ManagedObjectType: ""},
+	}
+	update := func(defs []types.CustomFieldDef) types.ObjectUpdate {
+		return types.ObjectUpdate{
+			Obj: types.ManagedObjectReference{Type: "VirtualMachine", Value: "vm-1"},
+			ChangeSet: []types.PropertyChange{
+				{
+					Op:   Assign,
+					Name: fAvailableField,
+					Val:  types.ArrayOfCustomFieldDef{CustomFieldDef: defs},
+				},
+			},
+		}
+	}
+
+	countRows := func() int {
+		t.Helper()
+		list := []model.CustomFieldDef{}
+		if err := db.List(&list, libmodel.ListOptions{Detail: libmodel.MaxDetail}); err != nil {
+			t.Fatalf("List returned error: %v", err)
+		}
+		return len(list)
+	}
+
+	if err := db.With(func(tx *libmodel.Tx) error {
+		return adapter.upsertCustomFieldDefs(tx, update(defs))
+	}); err != nil {
+		t.Fatalf("first upsert returned error: %v", err)
+	}
+	if got := countRows(); got != len(defs) {
+		t.Fatalf("expected %d rows after first upsert, got %d", len(defs), got)
+	}
+
+	// The same provider-global def set reported by a second VM should be
+	// skipped via the in-memory cache (no additional DB writes, no dup rows).
+	if err := db.With(func(tx *libmodel.Tx) error {
+		return adapter.upsertCustomFieldDefs(tx, update(defs))
+	}); err != nil {
+		t.Fatalf("repeated upsert returned error: %v", err)
+	}
+	if got := countRows(); got != len(defs) {
+		t.Fatalf("expected %d rows after repeated upsert, got %d", len(defs), got)
+	}
+
+	// A changed def set should be reflected in the DB.
+	changed := []types.CustomFieldDef{
+		{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
+		{Name: "env-renamed", Key: 200, ManagedObjectType: ""},
+		{Name: "team", Key: 300, ManagedObjectType: "VirtualMachine"},
+	}
+	if err := db.With(func(tx *libmodel.Tx) error {
+		return adapter.upsertCustomFieldDefs(tx, update(changed))
+	}); err != nil {
+		t.Fatalf("changed upsert returned error: %v", err)
+	}
+	if got := countRows(); got != len(changed) {
+		t.Fatalf("expected %d rows after changed upsert, got %d", len(changed), got)
+	}
+}
+
+func TestUpsertCustomFieldDefsRollbackRetriesIdentical(t *testing.T) {
+	adapter := newTestCollector()
+	db := newTestInventoryDB(t)
+
+	defs := []types.CustomFieldDef{
+		{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
+		{Name: "env", Key: 200, ManagedObjectType: ""},
+	}
+	u := types.ObjectUpdate{
+		Obj: types.ManagedObjectReference{Type: "VirtualMachine", Value: "vm-1"},
+		ChangeSet: []types.PropertyChange{
+			{
+				Op:   Assign,
+				Name: fAvailableField,
+				Val:  types.ArrayOfCustomFieldDef{CustomFieldDef: defs},
+			},
+		},
+	}
+
+	countRows := func() int {
+		t.Helper()
+		list := []model.CustomFieldDef{}
+		if err := db.List(&list, libmodel.ListOptions{Detail: libmodel.MaxDetail}); err != nil {
+			t.Fatalf("List returned error: %v", err)
+		}
+		return len(list)
+	}
+
+	// Stage the defs inside a transaction that is then rolled back.
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("Begin returned error: %v", err)
+	}
+	if err := adapter.upsertCustomFieldDefs(tx, u); err != nil {
+		t.Fatalf("upsertCustomFieldDefs returned error: %v", err)
+	}
+	if err := tx.End(); err != nil {
+		t.Fatalf("rollback returned error: %v", err)
+	}
+	// The cache must not retain defs from the rolled-back transaction.
+	adapter.resetCustomFieldDefs()
+
+	if got := countRows(); got != 0 {
+		t.Fatalf("expected 0 rows after rollback, got %d", got)
+	}
+
+	// Retrying identical definitions after the rollback must reinsert them.
+	if err := db.With(func(tx *libmodel.Tx) error {
+		return adapter.upsertCustomFieldDefs(tx, u)
+	}); err != nil {
+		t.Fatalf("retry upsert returned error: %v", err)
+	}
+	if got := countRows(); got != len(defs) {
+		t.Fatalf("expected %d rows after retry, got %d", len(defs), got)
 	}
 }
 
