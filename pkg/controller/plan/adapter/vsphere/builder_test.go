@@ -1671,6 +1671,102 @@ var _ = DescribeTable("instance UUID check", func(cdiVersion string, expected bo
 	Entry("should not use instance UUIDs on 4.18.5", "4.18.5", false),
 )
 
+var _ = Describe("buildDatastoreMap", func() {
+	It("does not error when two entries of the same copy method map to the same datastore", func() {
+		builder := createBuilder()
+		builder.Source.Inventory = &mockInventory{ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}}}
+		builder.Map.Storage = &v1beta1.StorageMap{
+			Spec: v1beta1.StorageMapSpec{
+				Map: []v1beta1.StoragePair{
+					{
+						Source:      ref.Ref{ID: "ds-1"},
+						Destination: v1beta1.DestinationStorage{StorageClass: "sc-a"},
+						OffloadPlugin: &v1beta1.OffloadPlugin{
+							VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{StorageVendorProduct: "vendor-a", SecretRef: "secret-a"},
+						},
+					},
+					{
+						Source:      ref.Ref{ID: "ds-1"},
+						Destination: v1beta1.DestinationStorage{StorageClass: "sc-b"},
+						OffloadPlugin: &v1beta1.OffloadPlugin{
+							VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{StorageVendorProduct: "vendor-b", SecretRef: "secret-b"},
+						},
+					},
+				},
+			},
+		}
+
+		xcopyMap, err := builder.buildDatastoreMap(copyMethodXcopy)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(xcopyMap).To(HaveLen(1))
+	})
+
+	It("does not error when different copy methods map to the same datastore", func() {
+		builder := createBuilder()
+		builder.Source.Inventory = &mockInventory{ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}}}
+		builder.Map.Storage = &v1beta1.StorageMap{
+			Spec: v1beta1.StorageMapSpec{
+				Map: []v1beta1.StoragePair{
+					{
+						Source:      ref.Ref{ID: "ds-1"},
+						Destination: v1beta1.DestinationStorage{StorageClass: "sc-xcopy"},
+						OffloadPlugin: &v1beta1.OffloadPlugin{
+							VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{StorageVendorProduct: "vendor-a", SecretRef: "secret-a"},
+						},
+					},
+					{
+						Source:      ref.Ref{ID: "ds-1"},
+						Destination: v1beta1.DestinationStorage{StorageClass: "sc-csi"},
+						OffloadPlugin: &v1beta1.OffloadPlugin{
+							CsiVolumeImport: &v1beta1.CsiVolumeImport{StorageVendorProduct: "vendor-a", SecretRef: "secret-a"},
+						},
+					},
+				},
+			},
+		}
+
+		xcopyMap, err := builder.buildDatastoreMap(copyMethodXcopy)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(xcopyMap).To(HaveLen(1))
+
+		csiMap, err := builder.buildDatastoreMap(copyMethodCsi)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(csiMap).To(HaveLen(1))
+	})
+})
+
+var _ = Describe("CsiImportPVCs", func() {
+	It("defers an RDM disk with an unrecognized vendor instead of guessing via datastore matching", func() {
+		builder := createBuilder()
+		vm := model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "vm"},
+				Disks: []vsphere.Disk{
+					{Key: 4000, RDM: true, DeviceName: "naa.6999999999999999", Datastore: vsphere.Ref{ID: "ds-1"}},
+				},
+			},
+		}
+		builder.Source.Inventory = &mockInventory{ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}}, vm: vm}
+		builder.Map.Storage = &v1beta1.StorageMap{
+			Spec: v1beta1.StorageMapSpec{
+				Map: []v1beta1.StoragePair{
+					{
+						Source:      ref.Ref{ID: "ds-1"},
+						Destination: v1beta1.DestinationStorage{StorageClass: "ontap-sc"},
+						OffloadPlugin: &v1beta1.OffloadPlugin{
+							CsiVolumeImport: &v1beta1.CsiVolumeImport{StorageVendorProduct: v1beta1.StorageVendorProductOntap, SecretRef: "ontap-secret"},
+						},
+					},
+				},
+			},
+		}
+
+		pvcs, err := builder.CsiImportPVCs(ref.Ref{ID: "vm-1"}, map[string]string{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvcs).To(BeEmpty())
+	})
+})
+
 //nolint:errcheck
 func createBuilder(objs ...runtime.Object) *Builder {
 	scheme := runtime.NewScheme()
