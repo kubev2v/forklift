@@ -165,13 +165,15 @@ func isThrottled(recorder *record.FakeRecorder) bool {
 	}
 }
 
-// createdPrimePVCLabels returns the labels of the prime PVC created via the fake kubeClient, or nil if none was created.
-func createdPrimePVCLabels(fakeClient *fake.Clientset) map[string]string {
+// createdPrimePVCLabels returns the labels of the named prime PVC create action, or nil if not found.
+func createdPrimePVCLabels(fakeClient *fake.Clientset, namespace, name string) map[string]string {
 	for _, action := range fakeClient.Actions() {
 		if action.GetVerb() == "create" && action.GetResource().Resource == "persistentvolumeclaims" {
 			obj := action.(interface{ GetObject() runtime.Object }).GetObject()
 			pvc := obj.(*corev1.PersistentVolumeClaim)
-			return pvc.Labels
+			if pvc.Namespace == namespace && pvc.Name == name {
+				return pvc.Labels
+			}
 		}
 	}
 	return nil
@@ -323,8 +325,8 @@ func TestThrottle_Mixed_WithMigrationHost_ThrottlesOnMigrationHost(t *testing.T)
 	}
 }
 
-// Prime PVC inherits all labels from the source PVC (e.g. CSI affinity-source-naa).
-func TestPrimePVC_InheritsSourceLabels(t *testing.T) {
+// Prime PVC inherits plan/migration labels and CSI affinity labels from the source PVC.
+func TestPrimePVC_InheritsCSIAffinityAndPlanLabels(t *testing.T) {
 	const naaLabel = "volume.csi.k8s.io/affinity-source-naa"
 	pvc := makePVC("pvc-1", "test-ns", "cr-1", "test-sc")
 	pvc.Labels = map[string]string{
@@ -342,14 +344,19 @@ func TestPrimePVC_InheritsSourceLabels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	labels := createdPrimePVCLabels(fakeClient)
+	primeName := "prime-" + string(pvc.UID)
+	labels := createdPrimePVCLabels(fakeClient, "test-ns", primeName)
 	if labels == nil {
-		t.Fatal("expected prime PVC to be created")
+		t.Fatalf("expected prime PVC %q to be created in namespace %q", primeName, "test-ns")
 	}
-	for key, want := range pvc.Labels {
+	for _, key := range []string{"migration", "plan", "vmID", naaLabel} {
+		want := pvc.Labels[key]
 		if got := labels[key]; got != want {
 			t.Errorf("prime PVC label %q = %q, want %q", key, got, want)
 		}
+	}
+	if _, ok := labels["vmdkKey"]; ok {
+		t.Errorf("prime PVC should not inherit provider identity label %q", "vmdkKey")
 	}
 }
 
