@@ -175,6 +175,10 @@ const (
 	// Run on the CNO / entry node connection.
 	GetClusterNodes = `Get-ClusterNode | Select-Object Name, @{N='State';E={[int]$_.State}}, Id | ConvertTo-Json`
 
+	// GetClusterInfo returns the cluster identity and node list in a single
+	// WinRM call. Output: {"Cluster": {...}, "Nodes": [...]}
+	GetClusterInfo = `$c = Get-Cluster | Select-Object Name, Domain; $n = @(Get-ClusterNode | Select-Object Name, @{N='State';E={[int]$_.State}}, Id); @{Cluster=$c; Nodes=$n} | ConvertTo-Json -Depth 3`
+
 	// GetClusterVMGroups returns all VM roles in the cluster with their owner node.
 	// GroupType 'VirtualMachine' filters to only Hyper-V VM cluster roles.
 	// OwnerNode indicates which node currently runs the VM (real-time).
@@ -184,23 +188,47 @@ const (
 
 const (
 	// GetComputerInfo returns hardware information for a cluster node.
-	// CsNumberOfProcessors = physical CPU sockets,
-	// CsNumberOfLogicalProcessors = total logical CPUs (cores x threads),
-	// OsTotalVisibleMemorySize = total RAM in KB,
-	// CsDNSHostName = node hostname, CsDomain = AD domain.
-	// Run on a direct per-node WinRM connection.
-	GetComputerInfo = `Get-ComputerInfo | Select-Object CsDNSHostName, CsDomain, CsNumberOfProcessors, CsNumberOfLogicalProcessors, OsTotalVisibleMemorySize | ConvertTo-Json`
+	// Uses targeted WMI queries (Win32_ComputerSystem + Win32_OperatingSystem)
+	// instead of Get-ComputerInfo which is extremely slow (~3-5s) because it
+	// collects hundreds of unneeded WMI classes.
+	// Output JSON field names match the old Get-ComputerInfo property names
+	// so that ComputerInfoData unmarshalling is unchanged.
+	GetComputerInfo = `$cs=Get-CimInstance Win32_ComputerSystem;$os=Get-CimInstance Win32_OperatingSystem;@{CsDNSHostName=$cs.DNSHostName;CsDomain=$cs.Domain;CsNumberOfProcessors=[int]$cs.NumberOfProcessors;CsNumberOfLogicalProcessors=[int]$cs.NumberOfLogicalProcessors;OsTotalVisibleMemorySize=[int64]$os.TotalVisibleMemorySize}|ConvertTo-Json`
 )
 
-// Batch VM detail scripts — split into two to fit WinRM's command-line limit.
-// Each returns JSON keyed by VM name.
+// Batch VM detail scripts.
+// BatchGetVMDetails is the primary one-shot script that collects hardware
+// details AND guest info in a single Get-VM pass, saving one WinRM round-trip.
+// BatchGetVMHardware / BatchGetVMGuest are kept as split fallbacks in case the
+// combined script exceeds a host's WinRM command-size limit (unlikely — the
+// merged script is ~1.8 KB, well under the 8 KB encoded limit).
 const (
-	// BatchGetVMHardware collects security info, checkpoint status, disk
-	// topology+capacity+RCT, and NIC info for all VMs on the host.
-	// Disk entries include controller type/number/location so the caller
-	// can build full Disk objects without per-VM WinRM round-trips.
+	// BatchGetVMDetails collects security, checkpoint, disk topology+capacity+RCT,
+	// NIC info for every VM, plus guest OS and guest networks for running VMs.
+	// Returns JSON keyed by VM name. ~1.8 KB raw — fits inside WinRM's limit
+	// even after RunOnNode wrapping + UTF-16LE + base64 encoding.
+	BatchGetVMDetails = `$r=@{};foreach($vm in(Get-VM)){$n=$vm.Name;$e=@{};if($vm.Generation-eq 2){$s=Get-VMSecurity -VMName $n -EA 0;$f=Get-VMFirmware -VMName $n -EA 0;$t=$false;$b=$false;if($s){$t=$s.TpmEnabled};if($f-and$f.SecureBoot-eq'On'){$b=$true};$e['Security']=@{TpmEnabled=$t;SecureBoot=$b}}else{$e['Security']=@{TpmEnabled=$false;SecureBoot=$false}};$e['HasCheckpoint']=[bool](Get-VMSnapshot -VMName $n -EA 0);$dd=@();foreach($d in(Get-VMHardDiskDrive -VMName $n -EA 0)){if(-not$d.Path){continue};$v=Get-VHD -Path $d.Path -EA 0;$c=0;$rc=$false;if($v){$c=$v.Size;if($v.RctId){$rc=$true}};$dd+=@{Path=$d.Path;Capacity=$c;RCTEnabled=$rc;CT=[int]$d.ControllerType;CN=$d.ControllerNumber;CL=$d.ControllerLocation}};$e['Disks']=$dd;$nn=@();foreach($a in(Get-VMNetworkAdapter -VMName $n -EA 0)){$vl=0;$vi=$a|Get-VMNetworkAdapterVlan -EA 0;if($vi-and$vi.AccessVlanId){$vl=$vi.AccessVlanId};$nn+=@{Name=$a.Name;MAC=$a.MacAddress;Switch=$a.SwitchName;Vlan=$vl}};$e['NICs']=$nn;if($vm.State-eq'Running'){$ci=Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_ComputerSystem -Filter "ElementName='$n'" -EA 0;if($ci){$kv=Get-CimAssociatedInstance -InputObject $ci -ResultClassName Msvm_KvpExchangeComponent -EA 0;if($kv-and$kv.GuestIntrinsicExchangeItems){$os='';$om='';foreach($i in $kv.GuestIntrinsicExchangeItems){$x=[xml]$i;$pn=$x.INSTANCE.PROPERTY|?{$_.NAME-eq'Name'}|Select -Exp VALUE;$pv=$x.INSTANCE.PROPERTY|?{$_.NAME-eq'Data'}|Select -Exp VALUE;if($pn-eq'OSName'){$os=$pv}elseif($pn-eq'OSMajorVersion'){$om=$pv}};if($os-and$om-and$os-notmatch'\d'){$os="$os $om"};$e['GuestOS']=$os};$vs=Get-CimAssociatedInstance -InputObject $ci -ResultClassName Msvm_VirtualSystemSettingData|?{$_.VirtualSystemType-eq'Microsoft:Hyper-V:System:Realized'};if($vs){$ps=Get-CimAssociatedInstance -InputObject $vs -ResultClassName Msvm_SyntheticEthernetPortSettingData;$nc=@();foreach($p in $ps){$gc=Get-CimAssociatedInstance -InputObject $p -ResultClassName Msvm_GuestNetworkAdapterConfiguration;if($gc){$nc+=[PSCustomObject]@{MAC=$p.Address;IPs=$gc.IPAddresses;Subnets=$gc.Subnets;DHCP=$gc.DHCPEnabled;GW=$gc.DefaultGateways;DNS=$gc.DNSServers}}};if($nc.Count-gt 0){$e['GuestNetworks']=$nc}}}};$r[$n]=$e};$r|ConvertTo-Json -Depth 4 -Compress`
+
+	// BatchGetVMDetailsLight is the fast variant for initial staging: it collects
+	// disk topology (paths, controller info), NIC info, and checkpoint status.
+	// Security, guest OS, guest network, disk capacity, and RCT are deferred.
+	BatchGetVMDetailsLight = `$r=@{};foreach($vm in(Get-VM)){$n=$vm.Name;$e=@{};$e['Security']=@{TpmEnabled=$false;SecureBoot=$false};$e['HasCheckpoint']=[bool](Get-VMSnapshot -VMName $n -EA 0);$dd=@();foreach($d in(Get-VMHardDiskDrive -VMName $n -EA 0)){if(-not$d.Path){continue};$dd+=@{Path=$d.Path;Capacity=0;RCTEnabled=$false;CT=[int]$d.ControllerType;CN=$d.ControllerNumber;CL=$d.ControllerLocation}};$e['Disks']=$dd;$nn=@();foreach($a in(Get-VMNetworkAdapter -VMName $n -EA 0)){$vl=0;$vi=$a|Get-VMNetworkAdapterVlan -EA 0;if($vi-and$vi.AccessVlanId){$vl=$vi.AccessVlanId};$nn+=@{Name=$a.Name;MAC=$a.MacAddress;Switch=$a.SwitchName;Vlan=$vl}};$e['NICs']=$nn;$r[$n]=$e};$r|ConvertTo-Json -Depth 4 -Compress`
+
+	// ListVMsWithDetailsLight combines Get-VM (basic properties) and the light
+	// detail collection (disks + NICs) in a single script to eliminate one WinRM
+	// round trip per node. Get-VM is called exactly once, and the foreach loop
+	// iterates over the captured $vms array.
+	// Output: {"VMs": [...], "Details": {name: {...}}}
+	ListVMsWithDetailsLight = `$vms=@(Get-VM|Select-Object Id,Name,@{N='State';E={[int]$_.State}},ProcessorCount,MemoryStartup,Generation);$r=@{};foreach($vm in $vms){$n=$vm.Name;$e=@{};$e['Security']=@{TpmEnabled=$false;SecureBoot=$false};$e['HasCheckpoint']=[bool](Get-VMSnapshot -VMName $n -EA 0);$dd=@();foreach($d in(Get-VMHardDiskDrive -VMName $n -EA 0)){if(-not$d.Path){continue};$dd+=@{Path=$d.Path;Capacity=0;RCTEnabled=$false;CT=[int]$d.ControllerType;CN=$d.ControllerNumber;CL=$d.ControllerLocation}};$e['Disks']=$dd;$nn=@();foreach($a in(Get-VMNetworkAdapter -VMName $n -EA 0)){$vl=0;$vi=$a|Get-VMNetworkAdapterVlan -EA 0;if($vi-and$vi.AccessVlanId){$vl=$vi.AccessVlanId};$nn+=@{Name=$a.Name;MAC=$a.MacAddress;Switch=$a.SwitchName;Vlan=$vl}};$e['NICs']=$nn;$r[$n]=$e};@{VMs=$vms;Details=$r}|ConvertTo-Json -Depth 4 -Compress`
+
+	// BatchGetVHDCapacity runs Get-VHD for every disk attached to every VM and
+	// returns a path→{S:size, R:rctEnabled} map. Used after the LightMode initial
+	// load to fill disk capacity without re-running the full VM enumeration.
+	BatchGetVHDCapacity = `$r=@{};Get-VM|Get-VMHardDiskDrive -EA 0|%{if($_.Path){$v=Get-VHD -Path $_.Path -EA 0;if($v){$r[$_.Path]=@{S=$v.Size;R=[bool]$v.RctId}}}};$r|ConvertTo-Json -Compress`
+
+	// BatchGetVMHardware is the split fallback — hardware-only, no guest info.
 	BatchGetVMHardware = `$r=@{};foreach($vm in(Get-VM)){$n=$vm.Name;$e=@{};if($vm.Generation-eq 2){$s=Get-VMSecurity -VMName $n -EA 0;$f=Get-VMFirmware -VMName $n -EA 0;$t=$false;$b=$false;if($s){$t=$s.TpmEnabled};if($f-and$f.SecureBoot-eq'On'){$b=$true};$e['Security']=@{TpmEnabled=$t;SecureBoot=$b}}else{$e['Security']=@{TpmEnabled=$false;SecureBoot=$false}};$e['HasCheckpoint']=[bool](Get-VMSnapshot -VMName $n -EA 0);$dd=@();foreach($d in(Get-VMHardDiskDrive -VMName $n -EA 0)){if(-not$d.Path){continue};$v=Get-VHD -Path $d.Path -EA 0;$c=0;$rc=$false;if($v){$c=$v.Size;if($v.RctId){$rc=$true}};$dd+=@{Path=$d.Path;Capacity=$c;RCTEnabled=$rc;CT=[int]$d.ControllerType;CN=$d.ControllerNumber;CL=$d.ControllerLocation}};$e['Disks']=$dd;$nn=@();foreach($a in(Get-VMNetworkAdapter -VMName $n -EA 0)){$vl=0;$vi=$a|Get-VMNetworkAdapterVlan -EA 0;if($vi-and$vi.AccessVlanId){$vl=$vi.AccessVlanId};$nn+=@{Name=$a.Name;MAC=$a.MacAddress;Switch=$a.SwitchName;Vlan=$vl}};$e['NICs']=$nn;$r[$n]=$e};$r|ConvertTo-Json -Depth 4 -Compress`
 
-	// BatchGetVMGuest collects guest OS and guest network config for running VMs.
+	// BatchGetVMGuest is the split fallback — guest OS + networks for running VMs only.
 	BatchGetVMGuest = `$r=@{};foreach($vm in(Get-VM|?{$_.State-eq'Running'})){$n=$vm.Name;$e=@{};$ci=Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_ComputerSystem -Filter "ElementName='$n'" -EA 0;if($ci){$kv=Get-CimAssociatedInstance -InputObject $ci -ResultClassName Msvm_KvpExchangeComponent -EA 0;if($kv-and$kv.GuestIntrinsicExchangeItems){$os='';$om='';foreach($i in $kv.GuestIntrinsicExchangeItems){$x=[xml]$i;$pn=$x.INSTANCE.PROPERTY|?{$_.NAME-eq'Name'}|Select -Exp VALUE;$pv=$x.INSTANCE.PROPERTY|?{$_.NAME-eq'Data'}|Select -Exp VALUE;if($pn-eq'OSName'){$os=$pv}elseif($pn-eq'OSMajorVersion'){$om=$pv}};if($os-and$om-and$os-notmatch'\d'){$os="$os $om"};$e['GuestOS']=$os};$vs=Get-CimAssociatedInstance -InputObject $ci -ResultClassName Msvm_VirtualSystemSettingData|?{$_.VirtualSystemType-eq'Microsoft:Hyper-V:System:Realized'};if($vs){$ps=Get-CimAssociatedInstance -InputObject $vs -ResultClassName Msvm_SyntheticEthernetPortSettingData;$nc=@();foreach($p in $ps){$gc=Get-CimAssociatedInstance -InputObject $p -ResultClassName Msvm_GuestNetworkAdapterConfiguration;if($gc){$nc+=[PSCustomObject]@{MAC=$p.Address;IPs=$gc.IPAddresses;Subnets=$gc.Subnets;DHCP=$gc.DHCPEnabled;GW=$gc.DefaultGateways;DNS=$gc.DNSServers}}};if($nc.Count-gt 0){$e['GuestNetworks']=$nc}}};if($e.Count-gt 0){$r[$n]=$e}};$r|ConvertTo-Json -Depth 4 -Compress`
 )

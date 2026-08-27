@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/dustin/go-humanize"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -97,6 +98,33 @@ type Client struct {
 	vmCache          []types.VM
 	netCached        bool
 	netCache         []types.Network
+	// LightMode skips expensive per-disk Get-VHD calls during initial staging.
+	// Disk capacity and RCT are populated on the first refresh cycle.
+	LightMode bool
+	// localInfoOnce guards lazy initialization of localInfo so that concurrent
+	// goroutines (VM prefetch, Phase 2 adapters) don't race.
+	localInfoOnce sync.Once
+	localInfo     *driver.ComputerInfoData
+	localInfoErr  error
+	// vmPrefetch holds pre-fetched VM + detail data from a background goroutine.
+	// Set by StartVMPrefetch, consumed by ListVMs.
+	vmPrefetch     chan vmPrefetchResult
+	vmPrefetchDone bool
+	// netLocalPrefetch holds pre-fetched local network data from a background
+	// goroutine. Started before Phase 1 so it overlaps with ClusterAdapter.
+	netLocalPrefetch     chan netLocalPrefetchResult
+	netLocalPrefetchDone bool
+}
+
+type netLocalPrefetchResult struct {
+	networks []driver.Network
+	err      error
+}
+
+// vmPrefetchResult holds the result of a background VM pre-fetch.
+type vmPrefetchResult struct {
+	results []nodeResult
+	err     error
 }
 
 // Connect establishes a WinRM connection to the HyperV host using Secret credentials.
@@ -135,29 +163,86 @@ func (r *Client) Connect(provider *api.Provider) (err error) {
 }
 
 // getClusterCache returns cached cluster+node data, fetching on first call per cycle.
+// Uses the combined GetClusterInfo call to save a WinRM round trip.
 func (r *Client) getClusterCache() (*clusterCache, error) {
 	if r.cache != nil {
 		return r.cache, nil
 	}
-	clusterData, err := r.driver.GetCluster()
+	info, err := r.driver.GetClusterInfo()
 	if err != nil {
-		return nil, fmt.Errorf("GetCluster failed: %w", err)
+		// Fall back to separate calls if the combined script isn't supported.
+		clusterData, cErr := r.driver.GetCluster()
+		if cErr != nil {
+			return nil, fmt.Errorf("GetCluster failed: %w", cErr)
+		}
+		nodesData, nErr := r.driver.GetClusterNodes()
+		if nErr != nil {
+			return nil, fmt.Errorf("GetClusterNodes failed: %w", nErr)
+		}
+		r.cache = &clusterCache{cluster: clusterData, nodes: nodesData}
+		return r.cache, nil
 	}
-	nodesData, err := r.driver.GetClusterNodes()
-	if err != nil {
-		return nil, fmt.Errorf("GetClusterNodes failed: %w", err)
-	}
-	r.cache = &clusterCache{cluster: clusterData, nodes: nodesData}
+	r.cache = &clusterCache{cluster: &info.Cluster, nodes: info.Nodes}
 	return r.cache, nil
 }
 
 // InvalidateCycleCache clears all per-cycle caches so the next call re-fetches.
 func (r *Client) InvalidateCycleCache() {
 	r.cache = nil
+	r.localInfoOnce = sync.Once{}
+	r.localInfo = nil
+	r.localInfoErr = nil
 	r.vmCached = false
 	r.vmCache = nil
 	r.netCached = false
+	r.vmPrefetch = nil
+	r.vmPrefetchDone = false
+	r.netLocalPrefetch = nil
+	r.netLocalPrefetchDone = false
 	r.netCache = nil
+}
+
+// StartVMPrefetch kicks off the combined VM+details script on all cluster nodes
+// in background goroutines. Call this after the cluster cache is populated
+// (Phase 1) so it can overlap with Phase 2 adapters. The results are consumed
+// by ListVMs when it runs in the DiskAdapter phase.
+func (r *Client) StartVMPrefetch() {
+	if r.vmPrefetchDone || r.vmPrefetch != nil {
+		return
+	}
+	if r.provider == nil || !r.provider.IsHyperVCluster() || !r.LightMode {
+		return
+	}
+
+	ch := make(chan vmPrefetchResult, 1)
+	r.vmPrefetch = ch
+
+	go func() {
+		results, err := r.fetchAllNodesVMsAndDetails()
+		ch <- vmPrefetchResult{results: results, err: err}
+	}()
+}
+
+// PrewarmClusterCache fetches and caches the cluster identity + node list.
+// Call this early so that subsequent phases can start background prefetches
+// that depend on knowing the cluster topology.
+func (r *Client) PrewarmClusterCache() (*clusterCache, error) {
+	return r.getClusterCache()
+}
+
+// StartNetworkPrefetch kicks off ListAllNetworks (local switches) in the
+// background. This doesn't need the cluster cache, so it can overlap with
+// Phase 1's ClusterAdapter. The result is consumed by ListNetworks.
+func (r *Client) StartNetworkPrefetch() {
+	if r.netLocalPrefetchDone || r.netLocalPrefetch != nil || r.netCached {
+		return
+	}
+	ch := make(chan netLocalPrefetchResult, 1)
+	r.netLocalPrefetch = ch
+	go func() {
+		nets, err := r.driver.ListAllNetworks()
+		ch <- netLocalPrefetchResult{networks: nets, err: err}
+	}()
 }
 
 // ListCluster returns the cluster info when in cluster mode, nil for standalone.
@@ -189,25 +274,49 @@ func (r *Client) ListHosts() ([]types.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	var hosts []types.Host
-	for _, n := range cc.nodes {
-		host := types.Host{
+
+	type hostResult struct {
+		index int
+		info  *driver.ComputerInfoData
+	}
+	hosts := make([]types.Host, len(cc.nodes))
+	ch := make(chan hostResult, len(cc.nodes))
+
+	for i, n := range cc.nodes {
+		hosts[i] = types.Host{
 			ID:          n.Id,
 			Name:        n.Name,
 			State:       driver.ClusterNodeStateName(n.State),
 			ClusterName: cc.cluster.Name,
 		}
-		info, err := r.getNodeComputerInfo(n.Name)
-		if err != nil {
-			r.Log.V(1).Info("Failed to get hardware info for node", "node", n.Name, "error", err)
-		} else if info != nil {
-			host.CpuCount = info.NumberOfProcessors
-			host.CpuCores = info.NumberOfLogicalProcessors
-			host.MemoryMB = info.TotalVisibleMemoryKB / 1024
+		go func(idx int, name string) {
+			info, err := r.getNodeComputerInfo(name)
+			if err != nil {
+				r.Log.V(1).Info("Failed to get hardware info for node", "node", name, "error", err)
+			}
+			ch <- hostResult{index: idx, info: info}
+		}(i, n.Name)
+	}
+
+	for range cc.nodes {
+		res := <-ch
+		if res.info != nil {
+			hosts[res.index].CpuCount = res.info.NumberOfProcessors
+			hosts[res.index].CpuCores = res.info.NumberOfLogicalProcessors
+			hosts[res.index].MemoryMB = res.info.TotalVisibleMemoryKB / 1024
 		}
-		hosts = append(hosts, host)
 	}
 	return hosts, nil
+}
+
+// getLocalComputerInfo returns the entry-point host's ComputerInfo, cached per
+// cycle. Safe for concurrent use — sync.Once ensures the WinRM call runs
+// exactly once even when called from parallel goroutines.
+func (r *Client) getLocalComputerInfo() (*driver.ComputerInfoData, error) {
+	r.localInfoOnce.Do(func() {
+		r.localInfo, r.localInfoErr = r.driver.GetComputerInfo()
+	})
+	return r.localInfo, r.localInfoErr
 }
 
 // getNodeComputerInfo fetches hardware info from a specific cluster node.
@@ -226,9 +335,172 @@ func (r *Client) getNodeComputerInfo(nodeName string) (*driver.ComputerInfoData,
 	return &info, nil
 }
 
+// nodeResult holds the combined VM list + detail map from a single node.
+type nodeResult struct {
+	nodeName string
+	vms      []driver.VMData
+	details  map[string]*batchVMDetail
+	err      error
+}
+
+// listAndEnrichClusterVMs assembles VM data from per-node results, applies
+// owner-node enrichment, and maps disk/NIC details. If a pre-fetch was
+// started with StartVMPrefetch, its results are consumed here. Otherwise
+// the combined script is run on-demand.
+func (r *Client) listAndEnrichClusterVMs(networks []types.Network) ([]types.VM, error) {
+	var nodeResults []nodeResult
+
+	if r.vmPrefetch != nil && !r.vmPrefetchDone {
+		// Consume pre-fetched results (blocks until prefetch completes).
+		pf := <-r.vmPrefetch
+		r.vmPrefetchDone = true
+		if pf.err != nil {
+			return nil, pf.err
+		}
+		nodeResults = pf.results
+	} else {
+		// No pre-fetch available — run synchronously.
+		results, err := r.fetchAllNodesVMsAndDetails()
+		if err != nil {
+			return nil, err
+		}
+		nodeResults = results
+	}
+
+	var allVMs []types.VM
+	allDetails := make(map[string]*batchVMDetail)
+	for _, res := range nodeResults {
+		for j := range res.vms {
+			res.vms[j].ComputerName = res.nodeName
+			dom := &driver.WinRMDomain{VMDataPtr: &res.vms[j]}
+			vm, err := r.getVMBaseFromDomain(dom)
+			if err != nil {
+				r.Log.Error(err, "Failed to process domain")
+				continue
+			}
+			allVMs = append(allVMs, *vm)
+		}
+		for k, v := range res.details {
+			allDetails[k] = v
+		}
+	}
+
+	r.enrichVMsWithOwnerNode(allVMs)
+
+	if len(allDetails) > 0 {
+		allIdx := make([]int, len(allVMs))
+		for i := range allVMs {
+			allIdx[i] = i
+		}
+		r.applyBatchDetails(allVMs, allIdx, allDetails, networks)
+	}
+
+	return allVMs, nil
+}
+
+// fetchAllNodesVMsAndDetails runs the combined script on all cluster nodes
+// concurrently and returns the per-node results. Used both by StartVMPrefetch
+// (background) and listAndEnrichClusterVMs (synchronous fallback).
+func (r *Client) fetchAllNodesVMsAndDetails() ([]nodeResult, error) {
+	cc, err := r.getClusterCache()
+	if err != nil {
+		return nil, fmt.Errorf("cluster cache unavailable: %w", err)
+	}
+
+	localInfo, err := r.getLocalComputerInfo()
+	if err != nil {
+		return nil, fmt.Errorf("cannot determine local hostname: %w", err)
+	}
+	localName := localInfo.DNSHostName
+
+	light := r.LightMode
+	script := ps.ListVMsWithDetailsLight
+	if !light {
+		script = ps.ListAllVMs
+	}
+
+	ch := make(chan nodeResult, len(cc.nodes)+1)
+
+	go func() {
+		r.fetchNodeVMsAndDetails(ch, localName, "", script, light)
+	}()
+
+	remoteCount := 0
+	for _, node := range cc.nodes {
+		if strings.EqualFold(node.Name, localName) || node.State != driver.ClusterNodeStateUp {
+			continue
+		}
+		remoteCount++
+		go func(name string) {
+			r.fetchNodeVMsAndDetails(ch, name, name, script, light)
+		}(node.Name)
+	}
+
+	var results []nodeResult
+	for i := 0; i < 1+remoteCount; i++ {
+		res := <-ch
+		if res.err != nil {
+			return nil, fmt.Errorf("failed to list VMs on %s: %w", res.nodeName, res.err)
+		}
+		results = append(results, res)
+	}
+	return results, nil
+}
+
+// fetchNodeVMsAndDetails runs the combined or list-only script on a node and
+// sends the parsed result to the channel. If remoteName is empty, runs locally.
+// The light parameter controls output parsing, captured by the caller to
+// avoid reading r.LightMode from a concurrent goroutine.
+func (r *Client) fetchNodeVMsAndDetails(ch chan<- nodeResult, nodeName, remoteName, script string, light bool) {
+	var stdout string
+	var err error
+	if remoteName == "" {
+		stdout, err = r.driver.ExecuteCommand(script)
+	} else {
+		stdout, err = r.driver.RunOnNode(script, remoteName)
+	}
+	if err != nil {
+		ch <- nodeResult{nodeName: nodeName, err: err}
+		return
+	}
+	if stdout == "" {
+		ch <- nodeResult{nodeName: nodeName}
+		return
+	}
+
+	if light {
+		// Combined output: {"VMs":[...],"Details":{...}}
+		var combined driver.VMsWithDetailsData
+		if err := json.Unmarshal([]byte(stdout), &combined); err != nil {
+			ch <- nodeResult{nodeName: nodeName, err: fmt.Errorf("parse combined output: %w", err)}
+			return
+		}
+		vms, err := driver.UnmarshalArrayOrSingle[driver.VMData](combined.VMs)
+		if err != nil {
+			ch <- nodeResult{nodeName: nodeName, err: fmt.Errorf("parse VMs: %w", err)}
+			return
+		}
+		var details map[string]*batchVMDetail
+		if len(combined.Details) > 0 {
+			if err := json.Unmarshal(combined.Details, &details); err != nil {
+				r.Log.V(1).Info("Failed to parse combined details, will enrich later", "node", nodeName, "error", err)
+			}
+		}
+		ch <- nodeResult{nodeName: nodeName, vms: vms, details: details}
+	} else {
+		// List-only output: [...]
+		vms, err := driver.UnmarshalArrayOrSingle[driver.VMData]([]byte(stdout))
+		if err != nil {
+			ch <- nodeResult{nodeName: nodeName, err: fmt.Errorf("parse VMs: %w", err)}
+			return
+		}
+		ch <- nodeResult{nodeName: nodeName, vms: vms}
+	}
+}
+
 // ListVMs collects all VMs from the HyperV host via WinRM.
-// In cluster mode, VMs are enriched with OwnerNode from cluster group data.
-// Uses batch PowerShell to minimize WinRM round trips.
+// In cluster mode, VMs are collected from all nodes concurrently using a
+// combined script (list + details in one WinRM call per node).
 func (r *Client) ListVMs() ([]types.VM, error) {
 	if r.vmCached {
 		return r.vmCache, nil
@@ -241,33 +513,50 @@ func (r *Client) ListVMs() ([]types.VM, error) {
 
 	isCluster := r.provider != nil && r.provider.IsHyperVCluster()
 
-	var domains []driver.Domain
-	if isCluster {
-		domains, err = r.driver.ListAllClusterDomains()
-	} else {
-		domains, err = r.driver.ListAllDomains()
-	}
-	if err != nil {
-		return nil, err
-	}
-
 	var vms []types.VM
-	for _, domain := range domains {
-		vm, err := r.getVMBaseFromDomain(domain)
+	if isCluster && r.LightMode {
+		// Combined path: list + light details in one call per node
+		vms, err = r.listAndEnrichClusterVMs(networks)
 		if err != nil {
-			r.Log.Error(err, "Failed to process domain")
-			_ = domain.Free()
-			continue
+			return nil, err
 		}
-		vms = append(vms, *vm)
-		_ = domain.Free()
-	}
-
-	if isCluster {
+	} else if isCluster {
+		// Full mode: separate list + enrich
+		var domains []driver.Domain
+		domains, err = r.listClusterDomainsParallel()
+		if err != nil {
+			return nil, err
+		}
+		for _, domain := range domains {
+			vm, vmErr := r.getVMBaseFromDomain(domain)
+			if vmErr != nil {
+				r.Log.Error(vmErr, "Failed to process domain")
+				_ = domain.Free()
+				continue
+			}
+			vms = append(vms, *vm)
+			_ = domain.Free()
+		}
 		r.enrichVMsWithOwnerNode(vms)
+		r.enrichVMDetails(vms, networks)
+	} else {
+		var domains []driver.Domain
+		domains, err = r.driver.ListAllDomains()
+		if err != nil {
+			return nil, err
+		}
+		for _, domain := range domains {
+			vm, vmErr := r.getVMBaseFromDomain(domain)
+			if vmErr != nil {
+				r.Log.Error(vmErr, "Failed to process domain")
+				_ = domain.Free()
+				continue
+			}
+			vms = append(vms, *vm)
+			_ = domain.Free()
+		}
+		r.enrichVMDetails(vms, networks)
 	}
-
-	r.enrichVMDetails(vms, networks)
 
 	r.validateDisksOnSMB(vms)
 
@@ -277,27 +566,86 @@ func (r *Client) ListVMs() ([]types.VM, error) {
 	return vms, nil
 }
 
+// listClusterDomainsParallel runs Get-VM on every cluster node concurrently.
+// Used in full (non-light) mode where details are collected separately.
+func (r *Client) listClusterDomainsParallel() ([]driver.Domain, error) {
+	cc, err := r.getClusterCache()
+	if err != nil {
+		return nil, fmt.Errorf("cluster cache unavailable for parallel VM list: %w", err)
+	}
+
+	localInfo, err := r.getLocalComputerInfo()
+	if err != nil {
+		return nil, fmt.Errorf("cannot determine local hostname: %w", err)
+	}
+	localName := localInfo.DNSHostName
+
+	ch := make(chan nodeResult, len(cc.nodes)+1)
+
+	go func() {
+		r.fetchNodeVMsAndDetails(ch, localName, "", ps.ListAllVMs, false)
+	}()
+
+	remoteCount := 0
+	for _, node := range cc.nodes {
+		if strings.EqualFold(node.Name, localName) || node.State != driver.ClusterNodeStateUp {
+			continue
+		}
+		remoteCount++
+		go func(name string) {
+			r.fetchNodeVMsAndDetails(ch, name, name, ps.ListAllVMs, false)
+		}(node.Name)
+	}
+
+	var allDomains []driver.Domain
+	for i := 0; i < 1+remoteCount; i++ {
+		res := <-ch
+		if res.err != nil {
+			return nil, fmt.Errorf("failed to list VMs on %s: %w", res.nodeName, res.err)
+		}
+		for j := range res.vms {
+			res.vms[j].ComputerName = res.nodeName
+			allDomains = append(allDomains, &driver.WinRMDomain{VMDataPtr: &res.vms[j]})
+		}
+	}
+	return allDomains, nil
+}
+
 // enrichVMDetails populates VM security, checkpoints, disk capacity/RCT, guest OS,
 // and guest networks using batch PowerShell (per-node in cluster mode, local otherwise).
+// In cluster mode, per-node batch calls run concurrently (the WinRM client is safe
+// for parallel use because each call opens its own shell over HTTP).
 func (r *Client) enrichVMDetails(vms []types.VM, networks []types.Network) {
 	if r.provider != nil && r.provider.IsHyperVCluster() {
-		// Group VMs by OwnerNode for per-node batch calls.
 		nodeVMs := make(map[string][]int)
 		for i := range vms {
 			node := vms[i].OwnerNode
 			nodeVMs[node] = append(nodeVMs[node], i)
 		}
+
+		type nodeResult struct {
+			node     string
+			indices  []int
+			batchMap map[string]*batchVMDetail
+			err      error
+		}
+		results := make(chan nodeResult, len(nodeVMs))
 		for node, indices := range nodeVMs {
-			batchMap, err := r.collectBatchVMDetails(node)
-			if err != nil {
-				r.Log.Error(err, "Batch detail collection failed for node, falling back to per-VM", "node", node)
-				r.fallbackPerVMDetails(vms, indices, networks)
+			go func(n string, idx []int) {
+				bm, err := r.collectBatchVMDetails(n)
+				results <- nodeResult{node: n, indices: idx, batchMap: bm, err: err}
+			}(node, indices)
+		}
+		for range nodeVMs {
+			res := <-results
+			if res.err != nil {
+				r.Log.Error(res.err, "Batch detail collection failed for node, falling back to per-VM", "node", res.node)
+				r.fallbackPerVMDetails(vms, res.indices, networks)
 				continue
 			}
-			r.applyBatchDetails(vms, indices, batchMap, networks)
+			r.applyBatchDetails(vms, res.indices, res.batchMap, networks)
 		}
 	} else {
-		// Standalone: single batch call for all VMs on this host.
 		allIndices := make([]int, len(vms))
 		for i := range vms {
 			allIndices[i] = i
@@ -387,10 +735,33 @@ func (r *Client) enrichVMsWithOwnerNode(vms []types.VM) {
 	}
 }
 
-// collectBatchVMDetails runs the two batch PowerShell scripts (hardware + guest)
-// on the given node and returns a merged map of VM name -> details.
+// collectBatchVMDetails runs batch PowerShell on the given node.
+// In LightMode (initial staging), it uses BatchGetVMDetailsLight which skips
+// the expensive Get-VHD per disk. The full script is used during refresh.
 func (r *Client) collectBatchVMDetails(computerName string) (map[string]*batchVMDetail, error) {
-	// Part 1: Security, checkpoints, disk capacity/RCT
+	script := ps.BatchGetVMDetails
+	if r.LightMode {
+		script = ps.BatchGetVMDetailsLight
+	}
+	out, err := r.driver.RunOnNode(script, computerName)
+	if err != nil {
+		r.Log.V(1).Info("Merged batch script failed, trying split fallback", "node", computerName, "error", err)
+		return r.collectBatchVMDetailsSplit(computerName)
+	}
+	out = strings.TrimSpace(out)
+	result := make(map[string]*batchVMDetail)
+	if out != "" && out != "{}" && out != "null" {
+		if err := json.Unmarshal([]byte(out), &result); err != nil {
+			r.Log.V(1).Info("Parse merged batch failed, trying split fallback", "node", computerName, "error", err)
+			return r.collectBatchVMDetailsSplit(computerName)
+		}
+	}
+	return result, nil
+}
+
+// collectBatchVMDetailsSplit is the legacy two-call path: hardware first, then guest.
+// Used as a fallback if the merged script exceeds the host's WinRM command limit.
+func (r *Client) collectBatchVMDetailsSplit(computerName string) (map[string]*batchVMDetail, error) {
 	hwOut, err := r.driver.RunOnNode(ps.BatchGetVMHardware, computerName)
 	if err != nil {
 		return nil, fmt.Errorf("batch hardware details failed: %w", err)
@@ -403,7 +774,6 @@ func (r *Client) collectBatchVMDetails(computerName string) (map[string]*batchVM
 		}
 	}
 
-	// Part 2: Guest OS and guest networks (only running VMs)
 	guestOut, err := r.driver.RunOnNode(ps.BatchGetVMGuest, computerName)
 	if err != nil {
 		r.Log.V(1).Info("Batch guest details failed, hardware details still usable", "node", computerName, "error", err)
@@ -419,7 +789,6 @@ func (r *Client) collectBatchVMDetails(computerName string) (map[string]*batchVM
 		return result, nil
 	}
 
-	// Merge guest info into hardware results
 	for vmName, guest := range guestMap {
 		if hw, exists := result[vmName]; exists {
 			hw.GuestOS = guest.GuestOS
@@ -668,14 +1037,22 @@ func (r *Client) ListNetworks() ([]types.Network, error) {
 		return r.netCache, nil
 	}
 
-	netDomains, err := r.driver.ListAllNetworks()
+	var netDomains []driver.Network
+	var err error
+	if r.netLocalPrefetch != nil && !r.netLocalPrefetchDone {
+		pf := <-r.netLocalPrefetch
+		r.netLocalPrefetchDone = true
+		netDomains, err = pf.networks, pf.err
+	} else {
+		netDomains, err = r.driver.ListAllNetworks()
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	localName := ""
 	if r.provider != nil && r.provider.IsHyperVCluster() {
-		if info, err := r.driver.GetComputerInfo(); err == nil {
+		if info, err := r.getLocalComputerInfo(); err == nil {
 			localName = info.DNSHostName
 		}
 	}
@@ -721,9 +1098,9 @@ func (r *Client) ListNetworks() ([]types.Network, error) {
 	return result, nil
 }
 
-// mergeRemoteNodeNetworks queries Get-VMSwitch on each remote cluster node.
-// New switches are appended to result; switches whose UUID was already seen
-// get the remote node appended to their OwnerNodes list.
+// mergeRemoteNodeNetworks queries Get-VMSwitch on each remote cluster node
+// concurrently and merges the results. New switches are appended to result,
+// switches whose UUID was already seen get the remote node appended to OwnerNodes.
 func (r *Client) mergeRemoteNodeNetworks(result *[]types.Network, seen map[string]bool) {
 	cc, err := r.getClusterCache()
 	if err != nil {
@@ -731,36 +1108,53 @@ func (r *Client) mergeRemoteNodeNetworks(result *[]types.Network, seen map[strin
 		return
 	}
 
-	localInfo, err := r.driver.GetComputerInfo()
+	localInfo, err := r.getLocalComputerInfo()
 	if err != nil {
 		r.Log.V(1).Info("Cannot determine local hostname for network dedup", "error", err)
 		return
 	}
 	localName := strings.ToUpper(localInfo.DNSHostName)
 
+	type nodeSwitches struct {
+		nodeName string
+		switches []driver.SwitchData
+	}
+	ch := make(chan nodeSwitches, len(cc.nodes))
+	count := 0
 	for _, node := range cc.nodes {
 		if strings.EqualFold(node.Name, localName) || node.State != driver.ClusterNodeStateUp {
 			continue
 		}
-		stdout, err := r.driver.RunOnNode(ps.ListAllSwitches, node.Name)
-		if err != nil {
-			r.Log.Info("Failed to collect switches from remote node", "node", node.Name, "error", err)
-			continue
-		}
-		stdout = strings.TrimSpace(stdout)
-		if stdout == "" {
-			continue
-		}
-		switchesData, err := driver.UnmarshalArrayOrSingle[driver.SwitchData]([]byte(stdout))
-		if err != nil {
-			r.Log.Info("Failed to parse remote node switches", "node", node.Name, "error", err)
-			continue
-		}
-		for _, sw := range switchesData {
+		count++
+		go func(name string) {
+			stdout, err := r.driver.RunOnNode(ps.ListAllSwitches, name)
+			if err != nil {
+				r.Log.Info("Failed to collect switches from remote node", "node", name, "error", err)
+				ch <- nodeSwitches{nodeName: name}
+				return
+			}
+			stdout = strings.TrimSpace(stdout)
+			if stdout == "" {
+				ch <- nodeSwitches{nodeName: name}
+				return
+			}
+			data, err := driver.UnmarshalArrayOrSingle[driver.SwitchData]([]byte(stdout))
+			if err != nil {
+				r.Log.Info("Failed to parse remote node switches", "node", name, "error", err)
+				ch <- nodeSwitches{nodeName: name}
+				return
+			}
+			ch <- nodeSwitches{nodeName: name, switches: data}
+		}(node.Name)
+	}
+
+	for i := 0; i < count; i++ {
+		ns := <-ch
+		for _, sw := range ns.switches {
 			if seen[sw.Id] {
-				for i := range *result {
-					if (*result)[i].UUID == sw.Id {
-						(*result)[i].OwnerNodes = append((*result)[i].OwnerNodes, node.Name)
+				for j := range *result {
+					if (*result)[j].UUID == sw.Id {
+						(*result)[j].OwnerNodes = append((*result)[j].OwnerNodes, ns.nodeName)
 						break
 					}
 				}
@@ -771,9 +1165,9 @@ func (r *Client) mergeRemoteNodeNetworks(result *[]types.Network, seen map[strin
 				UUID:       sw.Id,
 				Name:       sw.Name,
 				SwitchType: mapSwitchType(sw.SwitchType),
-				OwnerNodes: []string{node.Name},
+				OwnerNodes: []string{ns.nodeName},
 			})
-			r.Log.Info("Discovered remote-only switch", "node", node.Name, "name", sw.Name, "id", sw.Id)
+			r.Log.Info("Discovered remote-only switch", "node", ns.nodeName, "name", sw.Name, "id", sw.Id)
 		}
 	}
 }
@@ -810,6 +1204,82 @@ func (r *Client) ListStorages() ([]types.Storage, error) {
 		"smbUrl", r.smbUrl)
 
 	return []types.Storage{storage}, nil
+}
+
+// vhdCapacity holds the Get-VHD output for a single disk path.
+type vhdCapacity struct {
+	Size       int64 `json:"S"`
+	RCTEnabled bool  `json:"R"`
+}
+
+// EnrichDiskCapacity runs Get-VHD in parallel across cluster nodes and
+// updates cached VMs' Capacity and RCTEnabled in place. Standalone VMs
+// (OwnerNode == "") are queried on the entry-point host ("__local__").
+func (r *Client) EnrichDiskCapacity() error {
+	if !r.vmCached || len(r.vmCache) == 0 {
+		return nil
+	}
+
+	// Build a per-node list of VMs for disk enrichment.
+	nodeVMs := make(map[string][]int) // node → indices into vmCache
+	for i, vm := range r.vmCache {
+		node := vm.OwnerNode
+		if node == "" {
+			node = "__local__"
+		}
+		nodeVMs[node] = append(nodeVMs[node], i)
+	}
+
+	type nodeCapResult struct {
+		node string
+		caps map[string]vhdCapacity
+	}
+	ch := make(chan nodeCapResult, len(nodeVMs))
+	for node := range nodeVMs {
+		go func(n string) {
+			var out string
+			var err error
+			if n == "__local__" {
+				out, err = r.driver.ExecuteCommand(ps.BatchGetVHDCapacity)
+			} else {
+				out, err = r.driver.RunOnNode(ps.BatchGetVHDCapacity, n)
+			}
+			if err != nil {
+				r.Log.Info("VHD capacity enrichment failed, will be filled on next refresh",
+					"node", n, "error", err)
+				ch <- nodeCapResult{node: n}
+				return
+			}
+			out = strings.TrimSpace(out)
+			if out == "" || out == "{}" || out == "null" {
+				ch <- nodeCapResult{node: n}
+				return
+			}
+			var caps map[string]vhdCapacity
+			if err := json.Unmarshal([]byte(out), &caps); err != nil {
+				r.Log.Info("Parse VHD capacity failed", "node", n, "error", err)
+				ch <- nodeCapResult{node: n}
+				return
+			}
+			ch <- nodeCapResult{node: n, caps: caps}
+		}(node)
+	}
+
+	for range nodeVMs {
+		res := <-ch
+		if res.caps == nil {
+			continue
+		}
+		for _, idx := range nodeVMs[res.node] {
+			for d := range r.vmCache[idx].Disks {
+				if c, ok := res.caps[r.vmCache[idx].Disks[d].WindowsPath]; ok {
+					r.vmCache[idx].Disks[d].Capacity = c.Size
+					r.vmCache[idx].Disks[d].RCTEnabled = c.RCTEnabled
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // ListDisks returns all disks from all VMs.

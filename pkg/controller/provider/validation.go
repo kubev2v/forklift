@@ -16,6 +16,7 @@ import (
 	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/ova"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
+	hypervCollector "github.com/kubev2v/forklift/pkg/controller/provider/container/hyperv"
 	vsphereCollector "github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	providervalidation "github.com/kubev2v/forklift/pkg/controller/provider/validation"
@@ -469,6 +470,13 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 	if err == nil {
 		log.Info(
 			"Connection test succeeded.")
+		if provider.Type() == api.HyperV {
+			if c, found := r.container.Get(provider); found {
+				if hv, ok := c.(*hypervCollector.Collector); ok {
+					hv.ConnTestSucceeded()
+				}
+			}
+		}
 		provider.Status.SetCondition(
 			libcnd.Condition{
 				Type:     ConnectionTestSucceeded,
@@ -484,6 +492,27 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 			setAuthFailureConditions(provider, err)
 			return nil
 		}
+
+		// Tolerate transient WinRM failures while the collector has parity,
+		// up to maxConnTestFailures consecutive attempts.
+		if provider.Type() == api.HyperV {
+			if c, found := r.container.Get(provider); found {
+				if hv, ok := c.(*hypervCollector.Collector); ok && hv.ConnTestFailed() {
+					log.Info("WinRM connection test failed, suppressing (has parity)",
+						"reason", err.Error())
+					provider.Status.SetCondition(
+						libcnd.Condition{
+							Type:     ConnectionTestSucceeded,
+							Status:   True,
+							Reason:   Tested,
+							Category: Required,
+							Message:  "Connection test, succeeded (transient failure ignored — collector has parity).",
+						})
+					return nil
+				}
+			}
+		}
+
 		log.Info(
 			"Connection test failed.",
 			"reason",
