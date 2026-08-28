@@ -231,11 +231,7 @@ func (c *Conversion) addVirtV2vVsphereArgs(cmd utils.CommandBuilder) (err error)
 		return err
 	}
 	c.addConversionExtraArgs(cmd)
-	if info, err := os.Stat(c.VddkLibDir); err == nil && info.IsDir() {
-		cmd.AddArg("-it", "vddk")
-		cmd.AddArg("-io", fmt.Sprintf("vddk-libdir=%s", c.VddkLibDir))
-		cmd.AddArg("-io", fmt.Sprintf("vddk-thumbprint=%s", c.Fingerprint))
-		// Check if the config file exists but still allow the extra args to override the vddk-config for testing
+	if c.addVsphereInputTransport(cmd) == vsphereTransportVddk {
 		var extraArgs = c.ExtraArgs
 		if _, err := os.Stat(c.VddkConfFile); !errors.Is(err, os.ErrNotExist) && len(extraArgs) == 0 {
 			cmd.AddArg("-io", fmt.Sprintf("vddk-config=%s", c.VddkConfFile))
@@ -258,12 +254,7 @@ func (c *Conversion) addVirtV2vVsphereArgsForInspection(cmd utils.CommandBuilder
 	if err != nil {
 		return err
 	}
-	// Note: NO addConversionExtraArgs here - this is for inspection
-	if info, err := os.Stat(c.VddkLibDir); err == nil && info.IsDir() {
-		cmd.AddArg("-it", "vddk")
-		cmd.AddArg("-io", fmt.Sprintf("vddk-libdir=%s", c.VddkLibDir))
-		cmd.AddArg("-io", fmt.Sprintf("vddk-thumbprint=%s", c.Fingerprint))
-		// Always use vddk-config for inspection if it exists (no extra args override)
+	if c.addVsphereInputTransport(cmd) == vsphereTransportVddk {
 		if _, err := os.Stat(c.VddkConfFile); !errors.Is(err, os.ErrNotExist) {
 			cmd.AddArg("-io", fmt.Sprintf("vddk-config=%s", c.VddkConfFile))
 		}
@@ -370,12 +361,54 @@ func (c *Conversion) RunRemoteV2vInspection() (err error) {
 	return v2vCmd.Run()
 }
 
+type vsphereTransport string
+
+const (
+	vsphereTransportVddk vsphereTransport = "vddk"
+	vsphereTransportNfc  vsphereTransport = "nfc"
+)
+
+func (t vsphereTransport) String() string { return string(t) }
+
+func (c *Conversion) vsphereInputTransport() vsphereTransport {
+	if info, err := os.Stat(c.VddkLibDir); err == nil && info.IsDir() {
+		return vsphereTransportVddk
+	}
+	if c.NfcPluginPath != "" {
+		if _, err := os.Stat(c.NfcPluginPath); err == nil {
+			return vsphereTransportNfc
+		}
+	}
+	if _, err := os.Stat(config.NfcPluginBuiltin); err == nil {
+		return vsphereTransportNfc
+	}
+	return ""
+}
+
+func (c *Conversion) addVsphereInputTransport(cmd utils.CommandBuilder) vsphereTransport {
+	t := c.vsphereInputTransport()
+	switch t {
+	case vsphereTransportVddk:
+		cmd.AddArg("-it", t.String())
+		cmd.AddArg("-io", fmt.Sprintf("vddk-libdir=%s", c.VddkLibDir))
+		cmd.AddArg("-io", fmt.Sprintf("vddk-thumbprint=%s", c.Fingerprint))
+	case vsphereTransportNfc:
+		cmd.AddArg("-it", t.String())
+		cmd.AddArg("-io", fmt.Sprintf("nfc-thumbprint=%s", c.Fingerprint))
+	}
+	return t
+}
+
 func (c *Conversion) addVirtV2vRemoteInspectionArgs(cmd utils.CommandBuilder) (err error) {
 	if len(c.RemoteInspectionDisks) == 0 {
 		return fmt.Errorf("No remote disks were supplied")
 	}
+	fileKey := "vddk-file"
+	if c.vsphereInputTransport() == vsphereTransportNfc {
+		fileKey = "nfc-file"
+	}
 	for _, disk := range c.RemoteInspectionDisks {
-		cmd.AddArg("-io", fmt.Sprintf("vddk-file=%s", disk))
+		cmd.AddArg("-io", fmt.Sprintf("%s=%s", fileKey, disk))
 	}
 	return
 }

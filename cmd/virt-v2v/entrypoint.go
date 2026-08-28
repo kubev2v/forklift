@@ -132,6 +132,13 @@ func linkCertificates(env *config.AppConfig) (err error) {
 				os.Exit(1)
 			}
 		}
+		if _, err := os.Stat(config.NfcPlugin); err == nil {
+			err = os.Symlink(config.NfcPlugin, config.NfcPluginBuiltin)
+			if err != nil {
+				fmt.Println("Error creating nfc plugin link ", err)
+				os.Exit(1)
+			}
+		}
 	}
 	return nil
 }

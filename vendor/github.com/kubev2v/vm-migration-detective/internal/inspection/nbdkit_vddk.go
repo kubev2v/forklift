@@ -3,9 +3,8 @@ package inspection
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
+	"crypto/sha1"
 	"crypto/tls"
-	"encoding/hex"
 	"fmt"
 	"net"
 	"net/url"
@@ -83,28 +82,32 @@ func OpenWithNBDKitVDDK(
 		return nil, fmt.Errorf("failed to create password file: %w", err)
 	}
 
-	// Get VDDK library directory from common configuration
 	vddkLibDir := vddk.GetLibDir()
-	if vddkLibDir == "" {
-		return nil, fmt.Errorf("VDDK library directory not found - ensure VDDK is installed or configured")
+	nbdkitPlugin := "vddk"
+	if info, err := os.Stat(vddkLibDir); err != nil || !info.IsDir() {
+		nbdkitPlugin = "/usr/lib64/nbdkit/plugins/nbdkit-nfc-plugin.so"
+		if _, err := os.Stat("/opt/nbdkit-nfc-plugin.so"); err == nil {
+			nbdkitPlugin = "/opt/nbdkit-nfc-plugin.so"
+		} else if _, err := os.Stat(nbdkitPlugin); err != nil {
+			return nil, fmt.Errorf("VDDK library directory or nbdkit-nfc plugin not found")
+		}
 	}
 
-	// password=+file keeps the password out of the process list.
 	nbdkitCmd := cmdbuilder.New().
 		WithLogger(logger).
 		Flag("-U", socketPath).
 		Add("--foreground").
 		Add("--exit-with-parent").
 		Add("-r").
-		Add("vddk").
+		Add(nbdkitPlugin).
 		Add(fmt.Sprintf("server=%s", vcenterHost)).
 		Add(fmt.Sprintf("user=%s", username)).
 		SensitiveArg(fmt.Sprintf("password=+%s", passwordFile), "password=+***").
 		Add(fmt.Sprintf("vm=moref=%s", vmMoref)).
 		Add(fmt.Sprintf("snapshot=%s", snapshotMoref)).
 		Add(fmt.Sprintf("file=%s", baseDiskPath)).
-		Add(fmt.Sprintf("libdir=%s", vddkLibDir)).
-		AddIf(thumbprint != "", fmt.Sprintf("thumbprint=%s", thumbprint)) // Add thumbprint if available (for SSL verification)
+		AddIf(nbdkitPlugin == "vddk", fmt.Sprintf("libdir=%s", vddkLibDir)).
+		AddIf(thumbprint != "", fmt.Sprintf("thumbprint=%s", thumbprint))
 
 	if logger != nil {
 		logger.WithFields(logrus.Fields{
@@ -112,7 +115,8 @@ func OpenWithNBDKitVDDK(
 			"vm_moref":       vmMoref,
 			"snapshot_moref": snapshotMoref,
 			"disk_path":      baseDiskPath,
-		}).Info("Starting nbdkit with VDDK plugin")
+			"plugin":         nbdkitPlugin,
+		}).Info("Starting nbdkit")
 	}
 
 	// nbdkit is a long-lived server process; Start() not Run().
@@ -353,20 +357,13 @@ func getVCenterThumbprint(vcenterHost string) (string, error) {
 	// Use the first certificate (server certificate)
 	cert := certs[0]
 
-	// Calculate SHA-256 thumbprint
-	thumbprint := sha256.Sum256(cert.Raw)
-
-	// Format as colon-separated hex string (VMware format)
-	hexThumbprint := hex.EncodeToString(thumbprint[:])
-	formatted := ""
-	for i := 0; i < len(hexThumbprint); i += 2 {
-		if i > 0 {
-			formatted += ":"
-		}
-		formatted += hexThumbprint[i : i+2]
+	// VMware/govmomi compare SHA-1 thumbprints case-sensitively as AA:BB:...
+	sum := sha1.Sum(cert.Raw)
+	parts := make([]string, len(sum))
+	for i, b := range sum {
+		parts[i] = fmt.Sprintf("%02X", b)
 	}
-
-	return formatted, nil
+	return strings.Join(parts, ":"), nil
 }
 
 // createNBDKitPasswordFile creates a temporary file with the password for nbdkit

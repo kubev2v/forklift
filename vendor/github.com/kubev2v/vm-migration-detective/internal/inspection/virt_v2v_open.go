@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+
+	"github.com/kubev2v/vm-migration-detective/internal/vddk"
 )
 
 type V2VSession struct {
@@ -40,8 +42,12 @@ func OpenWithVirtV2V(
 		password,
 	)
 
+	nbdkitPlugin := "vddk"
+	if info, err := os.Stat(vddk.GetLibDir()); err != nil || !info.IsDir() {
+		nbdkitPlugin = "nfc"
+	}
 	args := []string{
-		"-it", "vddk",
+		"-it", nbdkitPlugin,
 		vpxURL,
 		"-o", "nbd",
 	}

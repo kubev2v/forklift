@@ -61,6 +61,8 @@ const (
 	V2vOutputDir            = "/var/tmp/v2v"
 	InspectionOutputFile    = V2vOutputDir + "/inspection.xml"
 	VddkLib                 = "/opt/vmware-vix-disklib-distrib"
+	NfcPlugin               = "/opt/nbdkit-nfc-plugin.so"
+	NfcPluginBuiltin        = "/usr/lib64/nbdkit/plugins/nbdkit-nfc-plugin.so"
 	Luksdir                 = "/etc/luks"
 	VddkConfFile            = "/mnt/vddk-conf/vddk-config-file"
 	DynamicScriptsMountPath = "/mnt/dynamic_scripts"
@@ -135,6 +137,7 @@ type AppConfig struct {
 	DynamicScriptsDir    string
 	Workdir              string
 	VddkLibDir           string
+	NfcPluginPath        string
 	LibvirtDomainFile    string
 }
 
@@ -158,6 +161,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.DynamicScriptsDir, "dynamic-scripts-dir", DynamicScriptsMountPath, "Directory path to specify dynamic scripts which will edit the guest")
 	flag.StringVar(&s.Workdir, "work-dir", V2vOutputDir, "Directory path to which the virt-v2v will output the disks and data")
 	flag.StringVar(&s.VddkLibDir, "vddk-lib-dir", VddkLib, "Directory path containing the vddk library")
+	flag.StringVar(&s.NfcPluginPath, "nfc-plugin", NfcPlugin, "Path to nbdkit-nfc-plugin.so from the init image sidecar")
 	flag.StringVar(&s.VddkConfFile, "vddk-conf-file", VddkConfFile, "Path for additional vddk configuration")
 	flag.StringVar(&s.InspectionOutputFile, "inspection-output-file", InspectionOutputFile, "Path where the virt-v2v-inspector will output the metadata")
 	flag.StringVar(&s.LibvirtDomainFile, "libvirt-domain-file", V2vInPlaceLibvirtDomain, "Path to the libvirt domain used in the in-place conversion")
