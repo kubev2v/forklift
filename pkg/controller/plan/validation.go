@@ -2175,7 +2175,10 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 								},
 							},
 							VolumeMounts: []core.VolumeMount{mount},
-							Command:      []string{"file", "-E", "/opt/vmware-vix-disklib-distrib/lib64/libvixDiskLib.so"},
+							Command: []string{"/bin/sh", "-c",
+								"file -E /opt/vmware-vix-disklib-distrib/lib64/libvixDiskLib.so" +
+									" || file -E /opt/nbdkit-nfc-plugin.so" +
+									" || file -E /usr/lib64/nbdkit/plugins/nbdkit-nfc-plugin.so"},
 						},
 					},
 					Volumes: volumes,
