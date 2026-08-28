@@ -1,0 +1,86 @@
+# Puts the virt-v2v profiles on every node that can run a conversion, for
+# clusters with no other delivery mechanism. Prefer the Security Profiles
+# Operator where it is already in use. Nothing applies this, and the controller
+# ignores the profiles until VIRT_V2V_{SECCOMP,APPARMOR}_PROFILE_TYPE name them.
+#
+#   kubectl -n konveyor-forklift create configmap forklift-virt-v2v-profiles \
+#     --from-file=hack/seccomp/unshare.json \
+#     --from-file=hack/seccomp/apparmor-unshare.profile
+#   kubectl apply -f hack/seccomp/profile-installer.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: forklift-virt-v2v-profile-installer
+  namespace: konveyor-forklift
+  labels:
+    app: forklift
+    service: forklift-virt-v2v-profile-installer
+spec:
+  selector:
+    matchLabels:
+      service: forklift-virt-v2v-profile-installer
+  template:
+    metadata:
+      labels:
+        app: forklift
+        service: forklift-virt-v2v-profile-installer
+    spec:
+      tolerations:
+        - operator: Exists
+      initContainers:
+        - name: install
+          image: registry.k8s.io/busybox:1.27.2
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              mkdir -p /host-seccomp/profiles
+              install -m 0644 /profiles/unshare.json /host-seccomp/profiles/unshare.json
+              install -m 0644 /profiles/apparmor-unshare.profile \
+                /host-seccomp/profiles/apparmor-unshare.profile
+              echo "installed seccomp profile"
+              # AppArmor is optional: nodes that do not enforce it have no
+              # apparmor_parser and need only the seccomp profile.
+              if [ -x /host-usr-sbin/apparmor_parser ]; then
+                chroot /host /usr/sbin/apparmor_parser -r -W \
+                  /var/lib/kubelet/seccomp/profiles/apparmor-unshare.profile
+                echo "loaded AppArmor profile"
+              else
+                echo "no apparmor_parser on this node, skipping AppArmor"
+              fi
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          volumeMounts:
+            - name: profiles
+              mountPath: /profiles
+            - name: host-seccomp
+              mountPath: /host-seccomp
+            - name: host
+              mountPath: /host
+            - name: host-usr-sbin
+              mountPath: /host-usr-sbin
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: 1m
+              memory: 8Mi
+      volumes:
+        - name: profiles
+          configMap:
+            name: forklift-virt-v2v-profiles
+        - name: host-seccomp
+          hostPath:
+            path: /var/lib/kubelet/seccomp
+            type: DirectoryOrCreate
+        - name: host
+          hostPath:
+            path: /
+            type: Directory
+        - name: host-usr-sbin
+          hostPath:
+            path: /usr/sbin
+            type: Directory
