@@ -419,6 +419,34 @@ var _ = Describe("Conversion", func() {
 		)
 	})
 
+	Describe("addVirtV2vVsphereArgs", func() {
+		It("uses -it nfc when nbdkit-nfc plugin is present", func() {
+			plugin, err := os.CreateTemp("", "nbdkit-nfc-plugin-*.so")
+			Expect(err).ToNot(HaveOccurred())
+			defer func() { _ = os.Remove(plugin.Name()) }()
+			Expect(plugin.Close()).To(Succeed())
+			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
+			appConfig.SecretKey = "/etc/secret/secretKey"
+			appConfig.HostName = "vcenter.example.com"
+			appConfig.VmName = "test-vm"
+			appConfig.Fingerprint = "AA:BB:CC"
+			appConfig.NfcPluginPath = plugin.Name()
+
+			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-it", "nfc").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-io", "nfc-thumbprint=AA:BB:CC").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
+
+			err = conversion.addVirtV2vVsphereArgs(mockCommandBuilder)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
 	Describe("addVirtV2vRemoteInspectionArgs", func() {
 		It("adds remote inspection disk args",
 			func() {
@@ -674,6 +702,22 @@ var _ = Describe("Conversion", func() {
 			err := conversion.addVirtV2vRemoteInspectionArgs(mockCommandBuilder)
 			Expect(err).ToNot(HaveOccurred())
 		})
+
+		It("uses nfc-file when nbdkit-nfc plugin is present",
+			func() {
+				plugin, err := os.CreateTemp("", "nbdkit-nfc-plugin-*.so")
+				Expect(err).ToNot(HaveOccurred())
+				defer func() { _ = os.Remove(plugin.Name()) }()
+				Expect(plugin.Close()).To(Succeed())
+				appConfig.NfcPluginPath = plugin.Name()
+				appConfig.RemoteInspectionDisks = []string{"[datastore1] vm/disk1.vmdk"}
+
+				mockCommandBuilder.EXPECT().AddArg("-io", "nfc-file=[datastore1] vm/disk1.vmdk").Return(mockCommandBuilder)
+
+				err = conversion.addVirtV2vRemoteInspectionArgs(mockCommandBuilder)
+				Expect(err).ToNot(HaveOccurred())
+			},
+		)
 	})
 
 	Describe("updateDiskPaths", func() {
@@ -1165,6 +1209,33 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
 
 			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("uses -it nfc when nbdkit-nfc plugin is present", func() {
+			plugin, err := os.CreateTemp("", "nbdkit-nfc-plugin-*.so")
+			Expect(err).ToNot(HaveOccurred())
+			defer func() { _ = os.Remove(plugin.Name()) }()
+			Expect(plugin.Close()).To(Succeed())
+			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
+			appConfig.SecretKey = "/etc/secret/secretKey"
+			appConfig.HostName = "vcenter.example.com"
+			appConfig.VmName = "test-vm"
+			appConfig.Fingerprint = "AA:BB:CC"
+			appConfig.NfcPluginPath = plugin.Name()
+
+			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-it", "nfc").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-io", "nfc-thumbprint=AA:BB:CC").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
+
+			err = conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
