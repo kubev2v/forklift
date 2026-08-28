@@ -4159,6 +4159,20 @@ spec:
                 default: forklift-virt-customize
                 description: ConfigMap name for virt-customize configuration.
                 type: string
+              virt_v2v_apparmor_profile_path:
+                description: Name of an AppArmor profile loaded on the nodes, used
+                  only with the Localhost type. Optional. Defaults to forklift-virt-v2v-unshare.
+                type: string
+              virt_v2v_apparmor_profile_type:
+                description: AppArmor profile type for the virt-v2v pods. Optional.
+                  Leave empty to leave the pod spec untouched. Needed on nodes whose
+                  default AppArmor profile denies the mounts the libguestfs appliance
+                  sandbox performs.
+                enum:
+                - RuntimeDefault
+                - Localhost
+                - Unconfined
+                type: string
               virt_v2v_container_limits_cpu:
                 default: 4000m
                 description: Virt-v2v CPU limit.
@@ -4213,6 +4227,19 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
+              virt_v2v_seccomp_profile_path:
+                description: Seccomp profile path relative to the kubelet seccomp
+                  root, used only with the Localhost type. Optional. Defaults to profiles/unshare.json.
+                type: string
+              virt_v2v_seccomp_profile_type:
+                description: 'Seccomp profile type for the virt-v2v pods. Optional.
+                  Leave empty to keep the platform default: a profile permitting unshare(2)
+                  on OpenShift, the runtime default elsewhere.'
+                enum:
+                - RuntimeDefault
+                - Localhost
+                - Unconfined
+                type: string
               virt_v2v_smp:
                 description: Number of virtual CPUs for the virt-v2v conversion appliance.
                 format: int32
@@ -4231,6 +4258,17 @@ spec:
                 - "false"
                 type: string
             type: object
+            x-kubernetes-validations:
+            - message: 'virt_v2v_seccomp_profile_path requires virt_v2v_seccomp_profile_type:
+                Localhost'
+              rule: '!has(self.virt_v2v_seccomp_profile_path) || size(self.virt_v2v_seccomp_profile_path)
+                == 0 || (has(self.virt_v2v_seccomp_profile_type) && self.virt_v2v_seccomp_profile_type
+                == ''Localhost'')'
+            - message: 'virt_v2v_apparmor_profile_path requires virt_v2v_apparmor_profile_type:
+                Localhost'
+              rule: '!has(self.virt_v2v_apparmor_profile_path) || size(self.virt_v2v_apparmor_profile_path)
+                == 0 || (has(self.virt_v2v_apparmor_profile_type) && self.virt_v2v_apparmor_profile_type
+                == ''Localhost'')'
           status:
             description: |-
               ForkliftControllerStatus defines the observed state of ForkliftController.

@@ -21,6 +21,8 @@ import (
 )
 
 // ForkliftControllerSpec defines the desired state of ForkliftController.
+// +kubebuilder:validation:XValidation:rule="!has(self.virt_v2v_seccomp_profile_path) || size(self.virt_v2v_seccomp_profile_path) == 0 || (has(self.virt_v2v_seccomp_profile_type) && self.virt_v2v_seccomp_profile_type == 'Localhost')",message="virt_v2v_seccomp_profile_path requires virt_v2v_seccomp_profile_type: Localhost"
+// +kubebuilder:validation:XValidation:rule="!has(self.virt_v2v_apparmor_profile_path) || size(self.virt_v2v_apparmor_profile_path) == 0 || (has(self.virt_v2v_apparmor_profile_type) && self.virt_v2v_apparmor_profile_type == 'Localhost')",message="virt_v2v_apparmor_profile_path requires virt_v2v_apparmor_profile_type: Localhost"
 type ForkliftControllerSpec struct {
 
 	// Feature Gates
@@ -737,6 +739,24 @@ type ForkliftControllerSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	VirtV2VSMP *int32 `json:"virt_v2v_smp,omitempty"`
+	// Seccomp profile type for the virt-v2v pods. Optional. Leave empty to keep the platform default: a profile permitting unshare(2) on OpenShift, the runtime default elsewhere.
+	// +optional
+	// +kubebuilder:validation:Enum="RuntimeDefault";"Localhost";"Unconfined"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	VirtV2VSeccompProfileType string `json:"virt_v2v_seccomp_profile_type,omitempty"`
+	// Seccomp profile path relative to the kubelet seccomp root, used only with the Localhost type. Optional. Defaults to profiles/unshare.json.
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	VirtV2VSeccompProfilePath string `json:"virt_v2v_seccomp_profile_path,omitempty"`
+	// AppArmor profile type for the virt-v2v pods. Optional. Leave empty to leave the pod spec untouched. Needed on nodes whose default AppArmor profile denies the mounts the libguestfs appliance sandbox performs.
+	// +optional
+	// +kubebuilder:validation:Enum="RuntimeDefault";"Localhost";"Unconfined"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	VirtV2VAppArmorProfileType string `json:"virt_v2v_apparmor_profile_type,omitempty"`
+	// Name of an AppArmor profile loaded on the nodes, used only with the Localhost type. Optional. Defaults to forklift-virt-v2v-unshare.
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	VirtV2VAppArmorProfilePath string `json:"virt_v2v_apparmor_profile_path,omitempty"`
 
 	// Hooks Settings
 
