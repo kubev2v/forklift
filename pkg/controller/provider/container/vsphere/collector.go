@@ -304,6 +304,10 @@ type Collector struct {
 	// Cached missing privileges from the last check.
 	missingPrivs   *privilegeCheckResult
 	missingPrivsMu *sync.RWMutex
+	// Committed provider-global custom field definitions (keyed by field key)
+	// so repeated per-VM upserts can be skipped via in-memory comparison.
+	customFieldDefs   map[int32]model.CustomFieldDef
+	customFieldDefsMu *sync.RWMutex
 }
 
 // New collector.
@@ -314,12 +318,14 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Collector
 			provider.GetNamespace(),
 			provider.GetName()))
 	return &Collector{
-		url:            provider.Spec.URL,
-		provider:       provider,
-		secret:         secret,
-		db:             db,
-		log:            nlog,
-		missingPrivsMu: &sync.RWMutex{},
+		url:               provider.Spec.URL,
+		provider:          provider,
+		secret:            secret,
+		db:                db,
+		log:               nlog,
+		missingPrivsMu:    &sync.RWMutex{},
+		customFieldDefs:   map[int32]model.CustomFieldDef{},
+		customFieldDefsMu: &sync.RWMutex{},
 	}
 }
 
@@ -551,11 +557,13 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 			err = tx.Commit()
 			if err != nil {
 				r.log.Error(err, "tx commit failed.")
+				r.resetCustomFieldDefs()
 			}
 		} else {
 			if endErr := tx.End(); endErr != nil {
 				r.log.Error(endErr, "tx rollback failed.")
 			}
+			r.resetCustomFieldDefs()
 		}
 		if err == nil && (updateSet.Truncated == nil || !*updateSet.Truncated) {
 			if !r.parity {
@@ -1271,7 +1279,7 @@ func (r *Collector) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 }
 
 // Object created.
-func (r Collector) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
+func (r *Collector) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	adapter, selected := r.selectAdapter(u)
 	if !selected {
 		return nil
@@ -1291,7 +1299,7 @@ func (r Collector) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
 }
 
 // Object modified.
-func (r Collector) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
+func (r *Collector) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	adapter, selected := r.selectAdapter(u)
 	if !selected {
 		return nil
@@ -1317,31 +1325,88 @@ func (r Collector) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
 // Upsert the custom field definitions reported on a VirtualMachine update
 // into the provider-global CustomFieldDef table. The same global definition
 // set is reported per-VM, so inserting by key naturally de-duplicates it.
-func (r Collector) upsertCustomFieldDefs(tx *libmodel.Tx, u types.ObjectUpdate) (err error) {
+//
+// The set of definitions is provider-global and identical for every VM, so it
+// is cached in memory. When the reported set matches the cache, the DB
+// upserts are skipped entirely, avoiding repeated inserts on every VM update.
+func (r *Collector) upsertCustomFieldDefs(tx *libmodel.Tx, u types.ObjectUpdate) (err error) {
 	if u.Obj.Type != VirtualMachine {
 		return nil
 	}
+	var reported []types.CustomFieldDef
 	for _, p := range u.ChangeSet {
 		if p.Name != fAvailableField {
 			continue
 		}
 		customFields, ok := p.Val.(types.ArrayOfCustomFieldDef)
 		if !ok {
-			continue
+			return nil
 		}
-		for _, f := range customFields.CustomFieldDef {
-			def := &model.CustomFieldDef{
-				Name:              f.Name,
-				Key:               f.Key,
-				ManagedObjectType: f.ManagedObjectType,
-			}
-			if err = tx.Insert(def); err != nil {
-				return liberr.Wrap(err)
-			}
+		reported = customFields.CustomFieldDef
+	}
+	if len(reported) == 0 {
+		return nil
+	}
+
+	incoming := make(map[int32]model.CustomFieldDef, len(reported))
+	for _, f := range reported {
+		incoming[f.Key] = model.CustomFieldDef{
+			Name:              f.Name,
+			Key:               f.Key,
+			ManagedObjectType: f.ManagedObjectType,
 		}
 	}
 
+	r.customFieldDefsMu.RLock()
+	equal := equalCustomFieldDefs(r.customFieldDefs, incoming)
+	r.customFieldDefsMu.RUnlock()
+	if equal {
+		return nil
+	}
+
+	for _, f := range reported {
+		def := &model.CustomFieldDef{
+			Name:              f.Name,
+			Key:               f.Key,
+			ManagedObjectType: f.ManagedObjectType,
+		}
+		if err = tx.Insert(def); err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+
+	// The cache is updated in place. If the surrounding transaction is rolled
+	// back, resetCustomFieldDefs drops it so a later retry reinserts the defs
+	// rather than skipping them on a stale cache.
+	r.customFieldDefsMu.Lock()
+	r.customFieldDefs = incoming
+	r.customFieldDefsMu.Unlock()
+
 	return nil
+}
+
+// resetCustomFieldDefs drops the cached custom field definitions. It is called
+// when the transaction that updated them is rolled back, so that the cache
+// never reflects definitions that were not committed to the DB.
+func (r *Collector) resetCustomFieldDefs() {
+	r.customFieldDefsMu.Lock()
+	r.customFieldDefs = map[int32]model.CustomFieldDef{}
+	r.customFieldDefsMu.Unlock()
+}
+
+// equalCustomFieldDefs reports whether the two provider-global custom field
+// definition sets are identical.
+func equalCustomFieldDefs(a, b map[int32]model.CustomFieldDef) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, av := range a {
+		bv, ok := b[k]
+		if !ok || av != bv {
+			return false
+		}
+	}
+	return true
 }
 
 // Object deleted.
