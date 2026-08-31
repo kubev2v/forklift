@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dustin/go-humanize"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -37,6 +38,11 @@ const (
 	StorageNamePrefixSMB  = "SMB: "
 	StorageNameDefaultSMB = "hyperv-storage"
 )
+
+// longCommandTimeout is used for scripts that iterate all VMs on a node
+// (combined list+details, batch detail collection). With 80-100 VMs per
+// node, the default 60s is insufficient for WinRM to return the output.
+const longCommandTimeout = 5 * time.Minute
 
 const (
 	VMGenerationGen1 = 1
@@ -437,12 +443,18 @@ func (r *Client) fetchAllNodesVMsAndDetails() ([]nodeResult, error) {
 	}
 
 	var results []nodeResult
+	succeeded := 0
 	for i := 0; i < 1+remoteCount; i++ {
 		res := <-ch
 		if res.err != nil {
-			return nil, fmt.Errorf("failed to list VMs on %s: %w", res.nodeName, res.err)
+			r.Log.Error(res.err, "Failed to list VMs on node, skipping", "node", res.nodeName)
+			continue
 		}
+		succeeded++
 		results = append(results, res)
+	}
+	if succeeded == 0 {
+		return nil, fmt.Errorf("all cluster nodes failed to list VMs")
 	}
 	return results, nil
 }
@@ -455,9 +467,9 @@ func (r *Client) fetchNodeVMsAndDetails(ch chan<- nodeResult, nodeName, remoteNa
 	var stdout string
 	var err error
 	if remoteName == "" {
-		stdout, err = r.driver.ExecuteCommand(script)
+		stdout, err = r.driver.ExecuteCommandWithTimeout(script, longCommandTimeout)
 	} else {
-		stdout, err = r.driver.RunOnNode(script, remoteName)
+		stdout, err = r.driver.RunOnNodeWithTimeout(script, remoteName, longCommandTimeout)
 	}
 	if err != nil {
 		ch <- nodeResult{nodeName: nodeName, err: err}
@@ -598,15 +610,21 @@ func (r *Client) listClusterDomainsParallel() ([]driver.Domain, error) {
 	}
 
 	var allDomains []driver.Domain
+	succeeded := 0
 	for i := 0; i < 1+remoteCount; i++ {
 		res := <-ch
 		if res.err != nil {
-			return nil, fmt.Errorf("failed to list VMs on %s: %w", res.nodeName, res.err)
+			r.Log.Error(res.err, "Failed to list VMs on node, skipping", "node", res.nodeName)
+			continue
 		}
+		succeeded++
 		for j := range res.vms {
 			res.vms[j].ComputerName = res.nodeName
 			allDomains = append(allDomains, &driver.WinRMDomain{VMDataPtr: &res.vms[j]})
 		}
+	}
+	if succeeded == 0 {
+		return nil, fmt.Errorf("all cluster nodes failed to list VMs")
 	}
 	return allDomains, nil
 }
@@ -743,7 +761,7 @@ func (r *Client) collectBatchVMDetails(computerName string) (map[string]*batchVM
 	if r.LightMode {
 		script = ps.BatchGetVMDetailsLight
 	}
-	out, err := r.driver.RunOnNode(script, computerName)
+	out, err := r.driver.RunOnNodeWithTimeout(script, computerName, longCommandTimeout)
 	if err != nil {
 		r.Log.V(1).Info("Merged batch script failed, trying split fallback", "node", computerName, "error", err)
 		return r.collectBatchVMDetailsSplit(computerName)
@@ -762,7 +780,7 @@ func (r *Client) collectBatchVMDetails(computerName string) (map[string]*batchVM
 // collectBatchVMDetailsSplit is the legacy two-call path: hardware first, then guest.
 // Used as a fallback if the merged script exceeds the host's WinRM command limit.
 func (r *Client) collectBatchVMDetailsSplit(computerName string) (map[string]*batchVMDetail, error) {
-	hwOut, err := r.driver.RunOnNode(ps.BatchGetVMHardware, computerName)
+	hwOut, err := r.driver.RunOnNodeWithTimeout(ps.BatchGetVMHardware, computerName, longCommandTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("batch hardware details failed: %w", err)
 	}
@@ -774,7 +792,7 @@ func (r *Client) collectBatchVMDetailsSplit(computerName string) (map[string]*ba
 		}
 	}
 
-	guestOut, err := r.driver.RunOnNode(ps.BatchGetVMGuest, computerName)
+	guestOut, err := r.driver.RunOnNodeWithTimeout(ps.BatchGetVMGuest, computerName, longCommandTimeout)
 	if err != nil {
 		r.Log.V(1).Info("Batch guest details failed, hardware details still usable", "node", computerName, "error", err)
 		return result, nil
@@ -1240,9 +1258,9 @@ func (r *Client) EnrichDiskCapacity() error {
 			var out string
 			var err error
 			if n == "__local__" {
-				out, err = r.driver.ExecuteCommand(ps.BatchGetVHDCapacity)
+				out, err = r.driver.ExecuteCommandWithTimeout(ps.BatchGetVHDCapacity, longCommandTimeout)
 			} else {
-				out, err = r.driver.RunOnNode(ps.BatchGetVHDCapacity, n)
+				out, err = r.driver.RunOnNodeWithTimeout(ps.BatchGetVHDCapacity, n, longCommandTimeout)
 			}
 			if err != nil {
 				r.Log.Info("VHD capacity enrichment failed, will be filled on next refresh",

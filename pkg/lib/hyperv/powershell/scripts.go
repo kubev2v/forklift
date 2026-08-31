@@ -18,12 +18,17 @@ func BuildCommand(template string, args ...string) string {
 
 // RunOnNode wraps cmd to run on a remote node via Invoke-Command -Credential.
 // If computerName is empty, returns cmd unchanged (runs on the connected host).
+// Bare usernames are auto-qualified with ".\" for PSCredential on remote nodes.
 func RunOnNode(cmd, computerName, password, username string) string {
 	if computerName == "" {
 		return cmd
 	}
+	credUser := username
+	if !strings.Contains(credUser, `\`) && !strings.Contains(credUser, "@") {
+		credUser = `.\` + credUser
+	}
 	escPass := strings.ReplaceAll(password, "'", "''")
-	escUser := strings.ReplaceAll(username, "'", "''")
+	escUser := strings.ReplaceAll(credUser, "'", "''")
 	escNode := strings.ReplaceAll(computerName, "'", "''")
 	return fmt.Sprintf(
 		"$pw = ConvertTo-SecureString '%s' -AsPlainText -Force; "+
@@ -60,7 +65,7 @@ const (
 	// Parameters: vmName
 	GetVMState = `Get-VM -Name '%s' | Select-Object -ExpandProperty State`
 
-	// StopVM forcefully stops a VM
+	// StopVM forcefully stops a VM.
 	// Parameters: vmName
 	StopVM = `Stop-VM -Name '%s' -Force -Confirm:$false`
 )

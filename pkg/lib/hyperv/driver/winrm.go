@@ -195,6 +195,11 @@ func (d *WinRMDriver) RunOnNode(command, computerName string) (string, error) {
 	return d.ExecuteCommand(cmd)
 }
 
+func (d *WinRMDriver) RunOnNodeWithTimeout(command, computerName string, timeout time.Duration) (string, error) {
+	cmd := ps.RunOnNode(command, computerName, d.password, d.username)
+	return d.ExecuteCommandWithTimeout(cmd, timeout)
+}
+
 func utf16LEEncode(s string) []byte {
 	u16 := utf16.Encode([]rune(s))
 	encoded := make([]byte, len(u16)*2)
