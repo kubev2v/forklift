@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
@@ -48,8 +49,11 @@ func (m *mockDriver) ListAllNetworks() ([]driver.Network, error) {
 }
 func (m *mockDriver) LookupNetworkByUUIDString(string) (driver.Network, error) { return nil, nil } //nolint:nilnil
 func (m *mockDriver) ExecuteCommand(string) (string, error)                    { return "", nil }
-func (m *mockDriver) GetCluster() (*driver.ClusterData, error)                 { return m.clusterData, nil }
-func (m *mockDriver) GetClusterNodes() ([]driver.ClusterNodeData, error)       { return m.clusterNodes, nil }
+func (m *mockDriver) ExecuteCommandWithTimeout(cmd string, _ time.Duration) (string, error) {
+	return m.ExecuteCommand(cmd)
+}
+func (m *mockDriver) GetCluster() (*driver.ClusterData, error)           { return m.clusterData, nil }
+func (m *mockDriver) GetClusterNodes() ([]driver.ClusterNodeData, error) { return m.clusterNodes, nil }
 func (m *mockDriver) GetClusterInfo() (*driver.ClusterInfoData, error) {
 	if m.clusterData == nil {
 		return nil, fmt.Errorf("no cluster data")
@@ -74,6 +78,9 @@ func (m *mockDriver) RunOnNode(command, computerName string) (string, error) {
 		return m.runOnNodeFn(command, computerName)
 	}
 	return "", nil
+}
+func (m *mockDriver) RunOnNodeWithTimeout(command, computerName string, _ time.Duration) (string, error) {
+	return m.RunOnNode(command, computerName)
 }
 
 func newClusterProvider() *api.Provider {
