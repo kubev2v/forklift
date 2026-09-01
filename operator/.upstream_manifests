@@ -5562,6 +5562,20 @@ spec:
                         When explicitly set to true, shared RDM LUNs for this VM get lun.reservation=true.
                         When explicitly set to false, shared RDM LUNs for this VM get lun.reservation=false.
                       type: boolean
+                    selinuxRelabelAtBoot:
+                      description: |-
+                        SelinuxRelabelAtBoot overrides the plan-level selinuxRelabelAtBoot for this VM.
+                        When nil (default), the plan-level value is used.
+                      type: boolean
+                    selinuxRelabelExclude:
+                      description: |-
+                        SelinuxRelabelExclude overrides the plan-level selinuxRelabelExclude for this VM.
+                        When nil (default), the plan-level value is used.
+                        Use carefully: changes made inside excluded directories during customization may retain incorrect
+                        SELinux labels and cause failures later. Only exclude directories that are known not to need relabeling.
+                      items:
+                        type: string
+                      type: array
                     started:
                       description: Started timestamp.
                       format: date-time
@@ -7801,6 +7815,20 @@ spec:
                   which is required for workloads that use SCSI PR-based fencing (e.g. shared-disk clusters).
                   Can be overridden per VM via spec.vms[].scsiReservation.
                 type: boolean
+              selinuxRelabelAtBoot:
+                description: |-
+                  SelinuxRelabelAtBoot defers SELinux relabeling until the guest's first boot after conversion.
+                  Passed to virt-v2v as --selinux-relabel-at-boot. Can be overridden per VM via spec.vms[].selinuxRelabelAtBoot.
+                type: boolean
+              selinuxRelabelExclude:
+                description: |-
+                  SelinuxRelabelExclude lists guest directories excluded from SELinux relabeling during conversion.
+                  Passed to virt-v2v as --selinux-relabel-exclude. Can be overridden per VM via spec.vms[].selinuxRelabelExclude.
+                  Use carefully: changes made inside excluded directories during customization may retain incorrect
+                  SELinux labels and cause failures later. Only exclude directories that are known not to need relabeling.
+                items:
+                  type: string
+                type: array
               serviceAccount:
                 description: |-
                   ServiceAccount is the name of the ServiceAccount to use for migration
@@ -9141,6 +9169,20 @@ spec:
                         When explicitly set to true, shared RDM LUNs for this VM get lun.reservation=true.
                         When explicitly set to false, shared RDM LUNs for this VM get lun.reservation=false.
                       type: boolean
+                    selinuxRelabelAtBoot:
+                      description: |-
+                        SelinuxRelabelAtBoot overrides the plan-level selinuxRelabelAtBoot for this VM.
+                        When nil (default), the plan-level value is used.
+                      type: boolean
+                    selinuxRelabelExclude:
+                      description: |-
+                        SelinuxRelabelExclude overrides the plan-level selinuxRelabelExclude for this VM.
+                        When nil (default), the plan-level value is used.
+                        Use carefully: changes made inside excluded directories during customization may retain incorrect
+                        SELinux labels and cause failures later. Only exclude directories that are known not to need relabeling.
+                      items:
+                        type: string
+                      type: array
                     targetName:
                       description: |-
                         TargetName specifies a custom name for the VM in the target cluster.
@@ -9977,6 +10019,20 @@ spec:
                             When explicitly set to true, shared RDM LUNs for this VM get lun.reservation=true.
                             When explicitly set to false, shared RDM LUNs for this VM get lun.reservation=false.
                           type: boolean
+                        selinuxRelabelAtBoot:
+                          description: |-
+                            SelinuxRelabelAtBoot overrides the plan-level selinuxRelabelAtBoot for this VM.
+                            When nil (default), the plan-level value is used.
+                          type: boolean
+                        selinuxRelabelExclude:
+                          description: |-
+                            SelinuxRelabelExclude overrides the plan-level selinuxRelabelExclude for this VM.
+                            When nil (default), the plan-level value is used.
+                            Use carefully: changes made inside excluded directories during customization may retain incorrect
+                            SELinux labels and cause failures later. Only exclude directories that are known not to need relabeling.
+                          items:
+                            type: string
+                          type: array
                         started:
                           description: Started timestamp.
                           format: date-time

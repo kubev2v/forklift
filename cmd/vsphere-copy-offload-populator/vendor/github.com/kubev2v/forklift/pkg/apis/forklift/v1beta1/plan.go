@@ -281,6 +281,16 @@ type PlanSpec struct {
 	// Can be overridden per VM via spec.vms[].scsiReservation.
 	// +optional
 	SCSIReservation bool `json:"scsiReservation,omitempty"`
+	// SelinuxRelabelAtBoot defers SELinux relabeling until the guest's first boot after conversion.
+	// Passed to virt-v2v as --selinux-relabel-at-boot. Can be overridden per VM via spec.vms[].selinuxRelabelAtBoot.
+	// +optional
+	SelinuxRelabelAtBoot bool `json:"selinuxRelabelAtBoot,omitempty"`
+	// SelinuxRelabelExclude lists guest directories excluded from SELinux relabeling during conversion.
+	// Passed to virt-v2v as --selinux-relabel-exclude. Can be overridden per VM via spec.vms[].selinuxRelabelExclude.
+	// Use carefully: changes made inside excluded directories during customization may retain incorrect
+	// SELinux labels and cause failures later. Only exclude directories that are known not to need relabeling.
+	// +optional
+	SelinuxRelabelExclude []string `json:"selinuxRelabelExclude,omitempty"`
 	// DeleteGuestConversionPod determines if the guest conversion pod should be deleted after successful migration.
 	// Note:
 	//   - If this option is enabled and migration succeeds then the pod will get deleted. However the VM could still not boot and the virt-v2v logs, with additional information, will be deleted alongside guest conversion pod.
