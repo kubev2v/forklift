@@ -1367,6 +1367,11 @@ func (in *PlanSpec) DeepCopyInto(out *PlanSpec) {
 		*out = new(v1.ObjectReference)
 		**out = **in
 	}
+	if in.SelinuxRelabelExclude != nil {
+		in, out := &in.SelinuxRelabelExclude, &out.SelinuxRelabelExclude
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.InstallLegacyDrivers != nil {
 		in, out := &in.InstallLegacyDrivers, &out.InstallLegacyDrivers
 		*out = new(bool)
