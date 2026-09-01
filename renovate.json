@@ -40,6 +40,11 @@
       "matchManagers": ["dockerfile"],
       "matchUpdateTypes": ["major"],
       "groupName": "all dockerfile major dependencies"
+    },
+    {
+      "description": "Disable all updates for EOL branches",
+      "matchBaseBranches": ["release-2.8", "release-2.9", "release-2.10"],
+      "enabled": false
     }
   ],
   "autoApprove": true,
