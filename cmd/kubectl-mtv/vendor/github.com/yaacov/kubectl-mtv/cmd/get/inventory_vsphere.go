@@ -67,59 +67,6 @@ func NewInventoryDatastoreCmd(kubeConfigFlags *genericclioptions.ConfigFlags, gl
 	return cmd
 }
 
-// NewInventoryResourcePoolCmd creates the get inventory resource-pool command
-func NewInventoryResourcePoolCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
-	outputFormatFlag := flags.NewOutputFormatTypeFlag()
-	var query string
-	var watch bool
-	var provider string
-
-	cmd := &cobra.Command{
-		Use:          "resource-pool",
-		Short:        "Get resource pools from a provider",
-		Long:         `Get resource pools from a vSphere provider's inventory.`,
-		Args:         cobra.NoArgs,
-		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-			if !watch {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, 280*time.Second)
-				defer cancel()
-			}
-
-			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
-
-			logNamespaceOperation("Getting resource pools from provider", namespace, globalConfig.GetAllNamespaces())
-			logOutputFormat(outputFormatFlag.GetValue())
-
-			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
-			inventoryURL := globalConfig.GetInventoryURL()
-			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
-
-			return inventory.ListResourcePoolsWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
-		},
-	}
-	cmd.Flags().StringVarP(&provider, "provider", "p", "", "Provider name")
-	_ = cmd.MarkFlagRequired("provider")
-	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
-	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
-	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
-	help.MarkMCPHidden(cmd, "watch")
-
-	// Add completion for provider and output format flags
-	if err := cmd.RegisterFlagCompletionFunc("provider", completion.ProviderNameCompletion(kubeConfigFlags)); err != nil {
-		panic(err)
-	}
-	if err := cmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return outputFormatFlag.GetValidValues(), cobra.ShellCompDirectiveNoFileComp
-	}); err != nil {
-		panic(err)
-	}
-
-	return cmd
-}
-
 // NewInventoryFolderCmd creates the get inventory folder command
 func NewInventoryFolderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()

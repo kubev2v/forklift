@@ -160,6 +160,9 @@ func CreateProvider(configFlags *genericclioptions.ConfigFlags, options provider
 	providerTypeValue := forkliftv1beta1.ProviderType(providerType)
 	provider.Spec.Type = &providerTypeValue
 	provider.Spec.URL = options.URL
+	if len(options.Settings) > 0 {
+		provider.Spec.Settings = options.Settings
+	}
 
 	// Create and set the Secret
 	var createdSecret *corev1.Secret

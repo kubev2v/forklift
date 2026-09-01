@@ -114,6 +114,9 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	cmd.Flags().StringVar(&opts.AzureSnapshotSku, "azure-snapshot-sku", "", "Snapshot SKU (Standard_LRS, Standard_ZRS, Premium_LRS)")
 	cmd.Flags().StringVar(&opts.AzureSnapshotResourceGroup, "azure-snapshot-resource-group", "", "Resource group for snapshots")
 
+	cmd.Flags().StringVar(&opts.NutanixPrismType, "nutanix-prism-type", "", "Nutanix Prism endpoint type (central or element)")
+	cmd.Flags().StringVar(&opts.NutanixClusterUUID, "nutanix-cluster-uuid", "", "Nutanix cluster UUID (used with Prism Central)")
+
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.ProviderNameCompletion(kubeConfigFlags))
 	_ = cmd.RegisterFlagCompletionFunc("esxi-clone-method", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return esxiCloneMethod.GetValidValues(), cobra.ShellCompDirectiveNoFileComp

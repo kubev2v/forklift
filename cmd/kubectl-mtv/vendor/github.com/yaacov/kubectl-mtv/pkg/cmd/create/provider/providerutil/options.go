@@ -44,6 +44,11 @@ type ProviderOptions struct {
 	AzureTargetRegion          string
 	AzureSnapshotSku           string
 	AzureSnapshotResourceGroup string
+	// Nutanix specific options
+	NutanixPrismType   string
+	NutanixClusterUUID string
+	// Settings is applied to ProviderSpec.Settings when non-empty
+	Settings map[string]string
 	// DryRun when true builds Provider (and Secret if applicable) without calling the API
 	DryRun bool
 	// OutputFormat is the serialization format for dry-run output ("yaml" or "json")

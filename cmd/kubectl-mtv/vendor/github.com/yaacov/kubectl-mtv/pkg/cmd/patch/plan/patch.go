@@ -617,7 +617,8 @@ func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, n
 	targetName, rootDisk, instanceType, pvcNameTemplate, volumeNameTemplate, networkNameTemplate, luksSecret, targetPowerState string,
 	addPreHook, addPostHook, removeHook string, clearHooks bool, deleteVmOnFailMigration string, deleteVmOnFailMigrationChanged bool,
 	nbdeClevis bool, nbdeClevisChanged bool, enableNestedVirtualization string, enableNestedVirtualizationChanged bool,
-	migrateSharedDisks string, migrateSharedDisksChanged bool, rdmAsLun string, rdmAsLunChanged bool) error {
+	migrateSharedDisks string, migrateSharedDisksChanged bool, rdmAsLun string, rdmAsLunChanged bool,
+	excludeDisks string, excludeDisksChanged bool) error {
 
 	klog.V(2).Infof("Patching VM '%s' in plan '%s'", vmName, planName)
 
@@ -873,6 +874,21 @@ func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, n
 		}
 	}
 
+	if excludeDisksChanged {
+		disks := parseCommaSeparated(excludeDisks)
+		if len(disks) == 0 {
+			unstructured.RemoveNestedField(vmCopy, "excludeDisks")
+			klog.V(2).Infof("Cleared VM excludeDisks")
+		} else {
+			err = unstructured.SetNestedStringSlice(vmCopy, disks, "excludeDisks")
+			if err != nil {
+				return fmt.Errorf("failed to set excludeDisks: %v", err)
+			}
+			klog.V(2).Infof("Updated VM excludeDisks to %v", disks)
+		}
+		vmUpdated = true
+	}
+
 	// Handle hook operations
 	hooksUpdated, err := updateVMHooksUnstructured(vmCopy, namespace, addPreHook, addPostHook, removeHook, clearHooks)
 	if err != nil {
@@ -1074,4 +1090,18 @@ func updateVMHooksUnstructured(vm map[string]interface{}, namespace, addPreHook,
 	}
 
 	return updated, nil
+}
+
+func parseCommaSeparated(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if s := strings.TrimSpace(part); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }

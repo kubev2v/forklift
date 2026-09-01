@@ -68,8 +68,8 @@ func newPatchNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Network mapping name")
 	flags.MarkRequiredForMCP(cmd, "name")
-	cmd.Flags().StringVar(&addPairs, "add-pairs", "", "Network pairs to add in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated)")
-	cmd.Flags().StringVar(&updatePairs, "update-pairs", "", "Network pairs to update in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated)")
+	cmd.Flags().StringVar(&addPairs, "add-pairs", "", "Network pairs to add in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated). Append ';networkIPMode=preserve|dhcp|none' to override plan-level preserveStaticIPs")
+	cmd.Flags().StringVar(&updatePairs, "update-pairs", "", "Network pairs to update in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated). Append ';networkIPMode=preserve|dhcp|none' to override plan-level preserveStaticIPs")
 	cmd.Flags().StringVar(&removePairs, "remove-pairs", "", "Source network names to remove from mapping (comma-separated)")
 
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.MappingNameCompletion(kubeConfigFlags, "network"))
