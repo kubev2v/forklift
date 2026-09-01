@@ -32,6 +32,15 @@ func snapshotOwnedByController(conv *api.Conversion) bool {
 	return strings.TrimSpace(conv.Spec.Settings[api.SpecSettingsSnapshotMorefKey]) == ""
 }
 
+// snapshotRequired returns true when snapshot stages should execute.
+// Hyper-V DeepInspection uses local disk access via SMB, no snapshot needed.
+func snapshotRequired(conv *api.Conversion) bool {
+	if conv.Spec.Settings["V2V_SOURCE"] == "hyperv" {
+		return false
+	}
+	return snapshotOwnedByController(conv)
+}
+
 // VirtV2vPipelineStages is the ordered list of stages for Inspection / InPlace / Remote workloads.
 var VirtV2vPipelineStages = []PipelineStage{
 	{Stage: api.StageCreatePod},
@@ -42,13 +51,13 @@ var VirtV2vPipelineStages = []PipelineStage{
 // DeepInspectionPipelineStages is the ordered list of stages for DeepInspection workloads.
 // Stages that have a Predicate are skipped when the predicate returns false
 var DeepInspectionPipelineStages = []PipelineStage{
-	{Stage: api.StageCreateSnapshot, Predicate: snapshotOwnedByController},
-	{Stage: api.StageWaitForSnapshot, Predicate: snapshotOwnedByController},
+	{Stage: api.StageCreateSnapshot, Predicate: snapshotRequired},
+	{Stage: api.StageWaitForSnapshot, Predicate: snapshotRequired},
 	{Stage: api.StageCreatePod},
 	{Stage: api.StagePodRunning},
 	{Stage: api.StageFetchingResults},
-	{Stage: api.StageRemoveSnapshot, Predicate: snapshotOwnedByController},
-	{Stage: api.StageWaitForSnapshotRemoval, Predicate: snapshotOwnedByController},
+	{Stage: api.StageRemoveSnapshot, Predicate: snapshotRequired},
+	{Stage: api.StageWaitForSnapshotRemoval, Predicate: snapshotRequired},
 	{Stage: api.StageFinished},
 }
 
@@ -173,26 +182,31 @@ func (p *ConversionPipeline) Run() (succeeded bool, err error) {
 // in spec.settings means the controller does not own the snapshot
 func (p *ConversionPipeline) runPhasePending() error {
 	if p.conv.Spec.Type == api.DeepInspection {
-		snapshotMoref := strings.TrimSpace(p.conv.Spec.Settings[api.SpecSettingsSnapshotMorefKey])
-		p.r.Log.Info("Pending phase: resolving snapshot ownership.",
-			"snapshotMorefProvided", snapshotMoref != "")
-		if snapshotMoref != "" {
-			p.r.Log.Info("Using supplied snapshot MoRef; controller will not own the snapshot.",
-				"snapshotMoref", snapshotMoref)
-			p.conv.Status.Snapshot = &api.SnapshotStatus{Moref: snapshotMoref, Owned: false}
+		source := p.conv.Spec.Settings["V2V_SOURCE"]
+		if source == "hyperv" {
+			p.r.Log.Info("Hyper-V deep inspection: no snapshot needed, disks accessed via SMB.")
 		} else {
-			if p.conv.Spec.Connection.Secret.Name == "" {
-				p.r.Log.Info("Connection secret not set; cannot own snapshot.")
-				p.setPhase(api.PhaseFailed)
-				p.conv.Status.SetCondition(libcnd.Condition{
-					Type:     "ConnectionSecretNotSet",
-					Status:   True,
-					Category: Critical,
-					Message:  "DeepInspection requires a Connection secret when the controller owns snapshots.",
-				})
-				return nil
+			snapshotMoref := strings.TrimSpace(p.conv.Spec.Settings[api.SpecSettingsSnapshotMorefKey])
+			p.r.Log.Info("Pending phase: resolving snapshot ownership.",
+				"snapshotMorefProvided", snapshotMoref != "")
+			if snapshotMoref != "" {
+				p.r.Log.Info("Using supplied snapshot MoRef; controller will not own the snapshot.",
+					"snapshotMoref", snapshotMoref)
+				p.conv.Status.Snapshot = &api.SnapshotStatus{Moref: snapshotMoref, Owned: false}
+			} else {
+				if p.conv.Spec.Connection.Secret.Name == "" {
+					p.r.Log.Info("Connection secret not set; cannot own snapshot.")
+					p.setPhase(api.PhaseFailed)
+					p.conv.Status.SetCondition(libcnd.Condition{
+						Type:     "ConnectionSecretNotSet",
+						Status:   True,
+						Category: Critical,
+						Message:  "DeepInspection requires a Connection secret when the controller owns snapshots.",
+					})
+					return nil
+				}
+				p.conv.Status.Snapshot = &api.SnapshotStatus{Owned: true}
 			}
-			p.conv.Status.Snapshot = &api.SnapshotStatus{Owned: true}
 		}
 	}
 
@@ -406,7 +420,7 @@ func (p *ConversionPipeline) runStageDeepInspectionPod() (stageDone bool, err er
 	}
 
 	p.conv.Status.Pod = core.ObjectReference{Namespace: pod.Namespace, Name: pod.Name}
-	p.r.Log.V(3).Info("Deep inspection pod status.", "pod", pod.Name, "phase", pod.Status.Phase, "podIP", pod.Status.PodIP)
+	p.r.Log.V(3).Info("Deep inspection pod status.", "pod", pod.Name, "phase", pod.Status.Phase)
 
 	switch pod.Status.Phase {
 	case core.PodPending:
@@ -418,7 +432,7 @@ func (p *ConversionPipeline) runStageDeepInspectionPod() (stageDone bool, err er
 	case core.PodRunning:
 		p.setStage(api.StagePodRunning)
 		// Advance early when the pod signals that detection is complete.
-		if p.isResultReady(pod.Status.PodIP) {
+		if p.isResultReady(pod) {
 			p.r.Log.Info("Deep inspection pod is ready; advancing to FetchingResults.")
 			return true, nil
 		}
@@ -432,20 +446,22 @@ func (p *ConversionPipeline) runStageDeepInspectionPod() (stageDone bool, err er
 	return true, nil
 }
 
-// isResultReady probes GET /ready on the deep-inspection pod.  Returns true only
-// when the pod responds with 200 OK, indicating that vmdetect.Detect has
+// isResultReady probes GET /ready on the deep-inspection pod via the
+// destination API server's pods/proxy subresource. Returns true only when
+// the pod responds with 200 OK, indicating that vmdetect.Detect has
 // completed and results are ready to be served.
-func (p *ConversionPipeline) isResultReady(podIP string) bool {
-	if podIP == "" {
-		return false
-	}
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("http://%s:%d/ready", podIP, inspectionResultPort))
+func (p *ConversionPipeline) isResultReady(pod *core.Pod) bool {
+	status, _, err := p.inspectionRequest(http.MethodGet, pod, "/ready")
 	if err != nil {
 		return false
 	}
-	_ = resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
+	return status == http.StatusOK
+}
+
+// inspectionRequest issues an HTTP method against the inspection pod through
+// the destination cluster API proxy. It never dials the pod IP.
+func (p *ConversionPipeline) inspectionRequest(method string, pod *core.Pod, path string) (int, []byte, error) {
+	return inspectionPodDo(p.ctx, p.r.Client, p.conv.Spec, method, pod.Namespace, pod.Name, path)
 }
 
 // runStageFetchingResults fetches the DetectResult JSON from the deep-inspection
@@ -459,8 +475,13 @@ func (p *ConversionPipeline) runStageFetchingResults() (stageDone bool, err erro
 		return true, nil
 	}
 
+	ensurer, err := NewEnsurer(p.r.Client, p.r.Log, p.conv.Spec)
+	if err != nil {
+		p.r.Log.Error(err, "Failed to create ensurer for result fetch.")
+		return
+	}
 	pod := &core.Pod{}
-	err = p.r.Get(p.ctx, types.NamespacedName{
+	err = ensurer.DestinationClient.Get(p.ctx, types.NamespacedName{
 		Namespace: podRef.Namespace,
 		Name:      podRef.Name,
 	}, pod)
@@ -469,22 +490,19 @@ func (p *ConversionPipeline) runStageFetchingResults() (stageDone bool, err erro
 		return
 	}
 
-	p.r.Log.V(3).Info("Fetching results: pod status.", "pod", pod.Name, "phase", pod.Status.Phase, "podIP", pod.Status.PodIP)
+	p.r.Log.V(3).Info("Fetching results: pod status.", "pod", pod.Name, "phase", pod.Status.Phase)
 
 	switch pod.Status.Phase {
 	case core.PodFailed:
 		return false, fmt.Errorf("pod %s failed before /results could be fetched", pod.Name)
 	case core.PodRunning:
-		if pod.Status.PodIP == "" {
-			p.r.Log.V(3).Info("Pod has no IP yet; retrying.")
-			return
-		}
+		// Reach the pod through the destination API proxy; do not wait for PodIP.
 	default:
 		p.r.Log.V(3).Info("Pod not yet running; retrying.", "phase", pod.Status.Phase)
 		return
 	}
 
-	result, fetchErr := p.fetchInspectionResults(pod.Status.PodIP)
+	result, fetchErr := p.fetchInspectionResults(pod)
 	if fetchErr != nil {
 		p.r.Log.V(3).Info("Transient error fetching results; retrying.", "error", fetchErr.Error())
 		return
@@ -496,39 +514,34 @@ func (p *ConversionPipeline) runStageFetchingResults() (stageDone bool, err erro
 
 	p.r.Log.Info("Inspection results fetched.", "allChecksPassed", result.AllChecksPassed, "concerns", len(result.Concerns))
 	p.conv.Status.InspectionResult = result
-	p.signalPodShutdown(pod.Status.PodIP)
+	p.signalPodShutdown(pod)
 	return true, nil
 }
 
 // signalPodShutdown calls POST /shutdown on the deep-inspection pod so it can
 // exit cleanly after results have been stored. Errors are logged and ignored —
 // the pod will eventually be deleted by the controller.
-func (p *ConversionPipeline) signalPodShutdown(podIP string) {
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Post(fmt.Sprintf("http://%s:%d/shutdown", podIP, inspectionResultPort), "", nil)
+func (p *ConversionPipeline) signalPodShutdown(pod *core.Pod) {
+	_, _, err := p.inspectionRequest(http.MethodPost, pod, "/shutdown")
 	if err != nil {
 		p.r.Log.V(3).Info("Could not signal pod shutdown; it will be deleted by the controller.", "error", err.Error())
-		return
 	}
-	resp.Body.Close()
 }
 
 // fetchInspectionResults calls GET /results on the deep-inspection pod and
 // maps the response into the API InspectionResult type.
 // Returns (nil, nil) when the pod responds with 503 (not ready).
-func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.InspectionResult, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("http://%s:%d/results", podIP, inspectionResultPort))
+func (p *ConversionPipeline) fetchInspectionResults(pod *core.Pod) (*api.InspectionResult, error) {
+	status, body, err := p.inspectionRequest(http.MethodGet, pod, "/results")
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusServiceUnavailable {
+	if status == http.StatusServiceUnavailable {
 		return nil, nil //nolint:nilnil
 	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status %d from deep-inspection /results", resp.StatusCode)
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d from deep-inspection /results", status)
 	}
 
 	// Decode only the subset of fields we persist on the CR.
@@ -556,7 +569,7 @@ func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.Inspecti
 			MountPoint string `json:"mount_point"`
 		} `json:"mountpoints"`
 	}
-	if err = json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+	if err = json.Unmarshal(body, &raw); err != nil {
 		return nil, err
 	}
 

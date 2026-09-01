@@ -9,7 +9,7 @@ You may obtain a copy of the License at
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OF ANY KIND, either express or implied.
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
@@ -28,7 +28,6 @@ import (
 )
 
 const (
-	// secretDir is where the connection Secret is mounted in the deep-inspection pod.
 	secretDir = "/etc/secret"
 )
 
@@ -37,10 +36,30 @@ func main() {
 	log.SetLevel(logrus.DebugLevel)
 	log.SetOutput(os.Stdout)
 
+	srv := newResultServer()
+
+	source := strings.TrimSpace(os.Getenv("V2V_SOURCE"))
+
+	go func() {
+		var result *vmdetect.DetectResult
+		var detectErr error
+
+		switch source {
+		case "hyperv":
+			result, detectErr = detectLocalDisks(log)
+		default:
+			result, detectErr = detectVSphere(log)
+		}
+		srv.setResult(result, detectErr)
+	}()
+
+	os.Exit(srv.run())
+}
+
+func detectVSphere(log *logrus.Logger) (*vmdetect.DetectResult, error) {
 	creds, err := loadProviderCredentials()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return nil, err
 	}
 
 	detector, err := vmdetect.NewDetector(vmdetect.DetectorConfig{
@@ -50,28 +69,49 @@ func main() {
 		DB:          nil,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return nil, err
 	}
 
 	vmMoref, snapshotMoref, err := vmAndSnapshotFromEnv()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return nil, err
 	}
 
-	srv := newResultServer()
+	return detector.Detect(vmdetect.DetectParams{
+		Ctx:           context.Background(),
+		VMMoref:       vmMoref,
+		SnapshotMoref: snapshotMoref,
+	})
+}
 
-	go func() {
-		result, detectErr := detector.Detect(vmdetect.DetectParams{
-			Ctx:           context.Background(),
-			VMMoref:       vmMoref,
-			SnapshotMoref: snapshotMoref,
-		})
-		srv.setResult(result, detectErr)
-	}()
+// detectLocalDisks runs virt-inspector directly on locally-mounted disk files
+// (Hyper-V VHD/VHDX over SMB mount at /hyperv).
+func detectLocalDisks(log *logrus.Logger) (*vmdetect.DetectResult, error) {
+	diskPath := strings.TrimSpace(os.Getenv("V2V_DISK_PATH"))
+	if diskPath == "" {
+		return nil, fmt.Errorf("V2V_DISK_PATH must be set for hyperv deep inspection")
+	}
 
-	os.Exit(srv.run())
+	format := "vhdx"
+	if strings.HasSuffix(strings.ToLower(diskPath), ".vhd") {
+		format = "vpc"
+	}
+
+	log.Infof("Running local deep inspection on %s (format=%s)", diskPath, format)
+
+	detector, err := vmdetect.NewDetector(vmdetect.DetectorConfig{
+		Logger: log,
+		DB:     nil,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return detector.DetectLocal(vmdetect.DetectLocalParams{
+		Ctx:       context.Background(),
+		DiskPaths: []string{diskPath},
+		Formats:   []string{format},
+	})
 }
 
 func loadProviderCredentials() (vmdetect.Credentials, error) {
