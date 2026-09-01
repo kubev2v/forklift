@@ -203,6 +203,16 @@ type VM struct {
 	//
 	// +optional
 	SCSIReservation *bool `json:"scsiReservation,omitempty"`
+	// SelinuxRelabelAtBoot overrides the plan-level selinuxRelabelAtBoot for this VM.
+	// When nil (default), the plan-level value is used.
+	// +optional
+	SelinuxRelabelAtBoot *bool `json:"selinuxRelabelAtBoot,omitempty"`
+	// SelinuxRelabelExclude overrides the plan-level selinuxRelabelExclude for this VM.
+	// When nil (default), the plan-level value is used.
+	// Use carefully: changes made inside excluded directories during customization may retain incorrect
+	// SELinux labels and cause failures later. Only exclude directories that are known not to need relabeling.
+	// +optional
+	SelinuxRelabelExclude []string `json:"selinuxRelabelExclude,omitempty"`
 	// ExcludeDisks lists vSphere bus addresses to skip during migration (e.g. "scsi0:1").
 	// Empty or omitted: migrate all disks (subject to migrateSharedDisks).
 	// When set, matching disks are not imported and are not attached to the target VM.
