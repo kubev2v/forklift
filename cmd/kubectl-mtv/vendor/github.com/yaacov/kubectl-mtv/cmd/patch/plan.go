@@ -344,6 +344,8 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 	var migrateSharedDisksChanged bool
 	var rdmAsLunVM string
 	var rdmAsLunVMChanged bool
+	var excludeDisks string
+	var excludeDisksChanged bool
 
 	cmd := &cobra.Command{
 		Use:          "planvm",
@@ -369,12 +371,14 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 			enableNestedVirtualizationChanged = cmd.Flags().Changed("enable-nested-virtualization")
 			migrateSharedDisksChanged = cmd.Flags().Changed("migrate-shared-disks")
 			rdmAsLunVMChanged = cmd.Flags().Changed("rdm-as-lun")
+			excludeDisksChanged = cmd.Flags().Changed("exclude-disks")
 
 			return plan.PatchPlanVM(kubeConfigFlags, planName, vmName, namespace,
 				targetName, rootDisk, instanceType, pvcNameTemplate, volumeNameTemplate, networkNameTemplate, luksSecret, targetPowerState,
 				addPreHook, addPostHook, removeHook, clearHooks, deleteVmOnFailMigration, deleteVmOnFailMigrationChanged,
 				nbdeClevis, nbdeClevisChanged, enableNestedVirtualization, enableNestedVirtualizationChanged,
-				migrateSharedDisks, migrateSharedDisksChanged, rdmAsLunVM, rdmAsLunVMChanged)
+				migrateSharedDisks, migrateSharedDisksChanged, rdmAsLunVM, rdmAsLunVMChanged,
+				excludeDisks, excludeDisksChanged)
 		},
 	}
 
@@ -405,6 +409,7 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 	cmd.Flags().StringVar(&enableNestedVirtualization, "enable-nested-virtualization", "", "Enable nested virtualization for this VM (true/false/auto)")
 	cmd.Flags().StringVar(&migrateSharedDisks, "migrate-shared-disks", "", "Migrate shared disks for this VM, overrides plan-level setting (true/false/auto)")
 	cmd.Flags().StringVar(&rdmAsLunVM, "rdm-as-lun", "", "Map VMware RDM disks as LUN devices for this VM, overrides plan-level setting (vSphere only, true/false/auto)")
+	cmd.Flags().StringVar(&excludeDisks, "exclude-disks", "", "vSphere bus addresses to skip during migration (comma-separated, e.g. scsi0:1,scsi0:2). Empty value clears the list. vSphere only.")
 
 	// Add completion for hook flags
 	if err := cmd.RegisterFlagCompletionFunc("add-pre-hook", completion.HookResourceNameCompletion(kubeConfigFlags)); err != nil {

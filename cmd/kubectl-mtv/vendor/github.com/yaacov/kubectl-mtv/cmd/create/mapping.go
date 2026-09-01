@@ -51,7 +51,8 @@ Pair formats:
   - source:target-namespace/target-network - Map to specific NAD
   - source:target-network - Map to NAD in same namespace
   - source:default - Map to pod networking
-  - source:ignored - Skip this network`,
+  - source:ignored - Skip this network
+  - Append ;networkIPMode=preserve|dhcp|none to override plan-level preserveStaticIPs`,
 		Example: `  # Create a network mapping to pod networking
   kubectl-mtv create mapping network --name my-net-map \
     --source vsphere-prod \
@@ -62,7 +63,13 @@ Pair formats:
   kubectl-mtv create mapping network --name my-net-map \
     --source vsphere-prod \
     --target host \
-    --network-pairs "VM Network:openshift-cnv/br-external,Management:default"`,
+    --network-pairs "VM Network:openshift-cnv/br-external,Management:default"
+
+  # Preserve static IPs on one network and use DHCP on another
+  kubectl-mtv create mapping network --name my-net-map \
+    --source vsphere-prod \
+    --target host \
+    --network-pairs "VM Network:default;networkIPMode=preserve,Guest:ignored;networkIPMode=dhcp"`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -97,7 +104,7 @@ Pair formats:
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Network mapping name")
 	cmd.Flags().StringVarP(&sourceProvider, "source", "S", "", "Source provider name")
 	cmd.Flags().StringVarP(&targetProvider, "target", "T", "", "Target provider name")
-	cmd.Flags().StringVar(&networkPairs, "network-pairs", "", "Network mapping pairs in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated)")
+	cmd.Flags().StringVar(&networkPairs, "network-pairs", "", "Network mapping pairs in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated). Append ';networkIPMode=preserve|dhcp|none' to override plan-level preserveStaticIPs")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output mapping CR to stdout instead of creating it")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format for dry-run (json, yaml). Defaults to yaml when --dry-run is used")
 

@@ -39,10 +39,10 @@ instead of the whole plan. All listed VMs get the same cutover time.`,
   kubectl-mtv cutover plan --name my-warm-migration --cutover 2026-12-31T23:00:00Z
 
   # Schedule cutover for specific VMs only
-  kubectl-mtv cutover plan --name my-warm-migration --cutover 2026-12-31T23:00:00Z --vms vm-1
+  kubectl-mtv cutover plan --name my-warm-migration --cutover 2026-12-31T23:00:00Z --vm vm-1
 
   # Trigger immediate cutover for specific VMs only
-  kubectl-mtv cutover plan --name my-warm-migration --vms vm-1,vm-2
+  kubectl-mtv cutover plan --name my-warm-migration --vm vm-1,vm-2
 
   # Cutover all warm migration plans
   kubectl-mtv cutover plans --all

@@ -297,6 +297,7 @@ func buildVMsSection(b *describe.Builder, plan *unstructured.Unstructured, migra
 		targetName, _, _ := unstructured.NestedString(vm, "targetName")
 		instanceType, _, _ := unstructured.NestedString(vm, "instanceType")
 		rootDisk, _, _ := unstructured.NestedString(vm, "rootDisk")
+		excludeDisks, _, _ := unstructured.NestedStringSlice(vm, "excludeDisks")
 		targetPowerState, _, _ := unstructured.NestedString(vm, "targetPowerState")
 		pvcNameTemplate, _, _ := unstructured.NestedString(vm, "pvcNameTemplate")
 		volumeNameTemplate, _, _ := unstructured.NestedString(vm, "volumeNameTemplate")
@@ -326,6 +327,9 @@ func buildVMsSection(b *describe.Builder, plan *unstructured.Unstructured, migra
 		}
 		if rootDisk != "" {
 			b.FieldC("Root Disk", rootDisk, output.Blue)
+		}
+		if len(excludeDisks) > 0 {
+			b.FieldC("Exclude Disks", strings.Join(excludeDisks, ", "), output.Yellow)
 		}
 		if targetPowerState != "" {
 			b.FieldC("Target Power State", targetPowerState, output.ColorizePowerState)

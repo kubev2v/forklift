@@ -17,8 +17,8 @@ import (
 
 const defaultInventoryTimeout = 280 * time.Second
 
-// ec2CommandConfig holds the configuration for creating an EC2 inventory command
-type ec2CommandConfig struct {
+// typedInventoryCmdConfig holds the configuration for a provider-specific inventory command.
+type typedInventoryCmdConfig struct {
 	use        string
 	short      string
 	long       string
@@ -26,8 +26,8 @@ type ec2CommandConfig struct {
 	listFunc   func(ctx context.Context, flags *genericclioptions.ConfigFlags, provider, namespace, inventoryURL, outputFormat, query string, watch, insecure bool) error
 }
 
-// newEC2InventoryCmd creates a new EC2 inventory command with the given configuration
-func newEC2InventoryCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter, cfg ec2CommandConfig) *cobra.Command {
+// newTypedInventoryCmd creates a provider-specific inventory command (e.g. ec2-instance, nutanix-image).
+func newTypedInventoryCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter, cfg typedInventoryCmdConfig) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
@@ -52,7 +52,6 @@ func newEC2InventoryCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalCo
 			logNamespaceOperation(cfg.logMessage, namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
 			inventoryURL := globalConfig.GetInventoryURL()
 			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
@@ -66,11 +65,9 @@ func newEC2InventoryCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalCo
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 
-	// Add completion for provider and output format flags
 	if err := cmd.RegisterFlagCompletionFunc("provider", completion.ProviderNameCompletion(kubeConfigFlags)); err != nil {
 		klog.V(2).Infof("Failed to register provider flag completion: %v", err)
 	}
-	// Add completion for output format flag
 	if err := cmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return outputFormatFlag.GetValidValues(), cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
@@ -82,7 +79,7 @@ func newEC2InventoryCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalCo
 
 // NewInventoryEC2InstanceCmd creates the get inventory instance command for EC2
 func NewInventoryEC2InstanceCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
-	return newEC2InventoryCmd(kubeConfigFlags, globalConfig, ec2CommandConfig{
+	return newTypedInventoryCmd(kubeConfigFlags, globalConfig, typedInventoryCmdConfig{
 		use:        "ec2-instance",
 		short:      "Get EC2 instances from a provider",
 		long:       `Get EC2 instances from an AWS provider's inventory.`,
@@ -93,7 +90,7 @@ func NewInventoryEC2InstanceCmd(kubeConfigFlags *genericclioptions.ConfigFlags, 
 
 // NewInventoryEC2VolumeCmd creates the get inventory volume command for EC2 EBS volumes
 func NewInventoryEC2VolumeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
-	return newEC2InventoryCmd(kubeConfigFlags, globalConfig, ec2CommandConfig{
+	return newTypedInventoryCmd(kubeConfigFlags, globalConfig, typedInventoryCmdConfig{
 		use:        "ec2-volume",
 		short:      "Get EC2 EBS volumes from a provider",
 		long:       `Get EC2 EBS volumes (disks) from an AWS provider's inventory.`,
@@ -104,7 +101,7 @@ func NewInventoryEC2VolumeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, gl
 
 // NewInventoryEC2VolumeTypeCmd creates the get inventory volume-type command for EC2 storage classes
 func NewInventoryEC2VolumeTypeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
-	return newEC2InventoryCmd(kubeConfigFlags, globalConfig, ec2CommandConfig{
+	return newTypedInventoryCmd(kubeConfigFlags, globalConfig, typedInventoryCmdConfig{
 		use:        "ec2-volume-type",
 		short:      "Get EC2 EBS volume types from a provider",
 		long:       `Get EC2 EBS volume types (storage classes like gp3, io2, etc.) from an AWS provider's inventory.`,
@@ -115,7 +112,7 @@ func NewInventoryEC2VolumeTypeCmd(kubeConfigFlags *genericclioptions.ConfigFlags
 
 // NewInventoryEC2NetworkCmd creates the get inventory network command for EC2 (VPCs and Subnets)
 func NewInventoryEC2NetworkCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
-	return newEC2InventoryCmd(kubeConfigFlags, globalConfig, ec2CommandConfig{
+	return newTypedInventoryCmd(kubeConfigFlags, globalConfig, typedInventoryCmdConfig{
 		use:        "ec2-network",
 		short:      "Get EC2 networks (VPCs and Subnets) from a provider",
 		long:       `Get EC2 networks (VPCs and Subnets) from an AWS provider's inventory.`,
@@ -126,7 +123,7 @@ func NewInventoryEC2NetworkCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
 
 // NewInventoryEC2SnapshotCmd creates the get inventory snapshot command for EC2 EBS snapshots
 func NewInventoryEC2SnapshotCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
-	return newEC2InventoryCmd(kubeConfigFlags, globalConfig, ec2CommandConfig{
+	return newTypedInventoryCmd(kubeConfigFlags, globalConfig, typedInventoryCmdConfig{
 		use:        "ec2-snapshot",
 		short:      "Get EC2 EBS snapshots from a provider",
 		long:       `Get EC2 EBS snapshots from an AWS provider's inventory.`,

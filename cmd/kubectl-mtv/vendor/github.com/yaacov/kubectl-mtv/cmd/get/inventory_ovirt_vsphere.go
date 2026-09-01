@@ -154,7 +154,7 @@ func NewInventoryClusterCmd(kubeConfigFlags *genericclioptions.ConfigFlags, glob
 		Short: "Get clusters from a provider",
 		Long: `Get clusters from a provider's inventory.
 
-Lists compute clusters from vSphere or oVirt providers. Clusters group hosts
+Lists compute clusters from vSphere, oVirt, Nutanix, or Hyper-V providers. Clusters group hosts
 together and define resource pools for VMs.`,
 		Example: `  # Filter clusters by datacenter
   kubectl-mtv get inventory clusters --provider vsphere-prod --query "where datacenter = 'DC1'"

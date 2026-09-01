@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -71,6 +72,9 @@ type PatchProviderOptions struct {
 	AzureTargetRegion          string
 	AzureSnapshotSku           string
 	AzureSnapshotResourceGroup string
+	// Nutanix settings
+	NutanixPrismType   string
+	NutanixClusterUUID string
 }
 
 // PatchProvider patches an existing provider
@@ -237,6 +241,25 @@ func PatchProvider(opts PatchProviderOptions) error {
 		}
 	}
 
+	if providerType == "nutanix" {
+		if opts.NutanixPrismType != "" {
+			switch opts.NutanixPrismType {
+			case string(forkliftv1beta1.NutanixPrismCentral), string(forkliftv1beta1.NutanixPrismElement):
+			default:
+				return fmt.Errorf("invalid --nutanix-prism-type %q: must be %s or %s",
+					opts.NutanixPrismType, forkliftv1beta1.NutanixPrismCentral, forkliftv1beta1.NutanixPrismElement)
+			}
+			klog.V(2).Infof("Updating Nutanix prismType to '%s'", opts.NutanixPrismType)
+			currentSettings["prismType"] = opts.NutanixPrismType
+			providerUpdated = true
+		}
+		if opts.NutanixClusterUUID != "" {
+			klog.V(2).Infof("Updating Nutanix clusterUuid to '%s'", opts.NutanixClusterUUID)
+			currentSettings["clusterUuid"] = opts.NutanixClusterUUID
+			providerUpdated = true
+		}
+	}
+
 	// Add settings to patch if any were modified
 	if providerUpdated && len(currentSettings) > 0 {
 		patchSpec["settings"] = currentSettings
@@ -362,7 +385,7 @@ func updateSecretCredentials(configFlags *genericclioptions.ConfigFlags, secret 
 			klog.V(2).Infof("Updated OpenShift token")
 			updated = true
 		}
-	case "vsphere", "ovirt", "ova":
+	case "vsphere", "ovirt", "ova", "nutanix":
 		if opts.Username != "" {
 			secret.Data["user"] = []byte(opts.Username)
 			klog.V(2).Infof("Updated username")

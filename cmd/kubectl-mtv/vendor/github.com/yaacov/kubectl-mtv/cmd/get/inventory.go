@@ -19,12 +19,14 @@ cached and can be queried using TSL (Tree Search Language) filters.
 Available resource types vary by provider:
   - All providers: vm, network, storage
   - vSphere/oVirt: host, datacenter, cluster, disk
-  - vSphere: datastore, folder, resourcepool
-  - oVirt: diskprofile, nicprofile
-  - OpenStack: instance, image, flavor, project, volume, volumetype, snapshot, subnet
-  - OpenShift: namespace, pvc, datavolume
-  - EC2: ec2instance, ec2volume, ec2volumetype, ec2network
-  - Azure: vm, network, storage`,
+  - vSphere: datastore, folder, vsphere-custom-field-def
+  - oVirt: disk-profile, nic-profile, ovirt-server-cpu
+  - OpenStack: instance, image, flavor, project, volume, volume-type, snapshot, subnet, openstack-region
+  - OpenShift: namespace, pvc, data-volume, openshift-instance-type, openshift-cluster-instance-type, openshift-kubevirt
+  - EC2: ec2-instance, ec2-volume, ec2-volume-type, ec2-network, ec2-snapshot
+  - Azure: vm, network, storage
+  - Nutanix: vm, network, storage, host, cluster, nutanix-image
+  - Hyper-V: vm, network, storage, host, cluster, disk`,
 		SilenceUsage: true,
 	}
 
@@ -108,10 +110,6 @@ Available resource types vary by provider:
 	datastoreCmd.Aliases = []string{"datastores"}
 	cmd.AddCommand(datastoreCmd)
 
-	resourcePoolCmd := NewInventoryResourcePoolCmd(kubeConfigFlags, globalConfig)
-	resourcePoolCmd.Aliases = []string{"resourcepools", "resource-pools"}
-	cmd.AddCommand(resourcePoolCmd)
-
 	folderCmd := NewInventoryFolderCmd(kubeConfigFlags, globalConfig)
 	folderCmd.Aliases = []string{"folders"}
 	cmd.AddCommand(folderCmd)
@@ -150,6 +148,34 @@ Available resource types vary by provider:
 	ec2SnapshotCmd := NewInventoryEC2SnapshotCmd(kubeConfigFlags, globalConfig)
 	ec2SnapshotCmd.Aliases = []string{"ec2-snapshots"}
 	cmd.AddCommand(ec2SnapshotCmd)
+
+	vsphereCustomFieldDefCmd := NewInventoryVSphereCustomFieldDefCmd(kubeConfigFlags, globalConfig)
+	vsphereCustomFieldDefCmd.Aliases = []string{"vsphere-custom-field-defs", "vsphere-customfielddefs"}
+	cmd.AddCommand(vsphereCustomFieldDefCmd)
+
+	ovirtServerCpuCmd := NewInventoryOVirtServerCpuCmd(kubeConfigFlags, globalConfig)
+	ovirtServerCpuCmd.Aliases = []string{"ovirt-server-cpus", "ovirt-servercpus"}
+	cmd.AddCommand(ovirtServerCpuCmd)
+
+	openstackRegionCmd := NewInventoryOpenStackRegionCmd(kubeConfigFlags, globalConfig)
+	openstackRegionCmd.Aliases = []string{"openstack-regions"}
+	cmd.AddCommand(openstackRegionCmd)
+
+	openshiftInstanceTypeCmd := NewInventoryOpenShiftInstanceTypeCmd(kubeConfigFlags, globalConfig)
+	openshiftInstanceTypeCmd.Aliases = []string{"openshift-instance-types", "openshift-instancetypes"}
+	cmd.AddCommand(openshiftInstanceTypeCmd)
+
+	openshiftClusterInstanceTypeCmd := NewInventoryOpenShiftClusterInstanceTypeCmd(kubeConfigFlags, globalConfig)
+	openshiftClusterInstanceTypeCmd.Aliases = []string{"openshift-cluster-instance-types", "openshift-clusterinstancetypes"}
+	cmd.AddCommand(openshiftClusterInstanceTypeCmd)
+
+	openshiftKubeVirtCmd := NewInventoryOpenShiftKubeVirtCmd(kubeConfigFlags, globalConfig)
+	openshiftKubeVirtCmd.Aliases = []string{"openshift-kubevirts"}
+	cmd.AddCommand(openshiftKubeVirtCmd)
+
+	nutanixImageCmd := NewInventoryNutanixImageCmd(kubeConfigFlags, globalConfig)
+	nutanixImageCmd.Aliases = []string{"nutanix-images"}
+	cmd.AddCommand(nutanixImageCmd)
 
 	// Add AAP resources
 	jobTemplateCmd := NewInventoryJobTemplateCmd(kubeConfigFlags, globalConfig)

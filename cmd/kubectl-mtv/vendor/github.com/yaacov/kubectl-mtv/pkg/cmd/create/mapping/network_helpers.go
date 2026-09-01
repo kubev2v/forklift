@@ -149,7 +149,7 @@ func resolveNetworkNameToIDWithInsecure(ctx context.Context, configFlags *generi
 		return resolveEC2NetworkNameToIDWithInsecure(ctx, configFlags, inventoryURL, provider, networkName, insecureSkipTLS)
 	case "azure":
 		return resolveAzureNetworkNameToIDWithInsecure(ctx, configFlags, inventoryURL, provider, networkName, insecureSkipTLS)
-	case "vsphere", "ovirt", "openstack", "ova":
+	case "vsphere", "ovirt", "openstack", "ova", "nutanix":
 		return resolveVirtualizationNetworkNameToIDWithInsecure(ctx, configFlags, inventoryURL, provider, networkName, insecureSkipTLS)
 	default:
 		return resolveVirtualizationNetworkNameToIDWithInsecure(ctx, configFlags, inventoryURL, provider, networkName, insecureSkipTLS)
