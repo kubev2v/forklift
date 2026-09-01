@@ -217,8 +217,8 @@ func TestMapHypervGuestOS(t *testing.T) {
 		{name: "Generic Linux", guestOS: "Some Linux Distribution", expected: defaultTemplateOS},
 
 		// Fallback
-		{name: "Unknown OS", guestOS: "FreeBSD 13", expected: defaultTemplateOS},
-		{name: "Empty string", guestOS: "", expected: defaultTemplateOS},
+		{name: "Unknown OS", guestOS: "FreeBSD 13", expected: ""},
+		{name: "Empty string", guestOS: "", expected: ""},
 	}
 
 	for _, tc := range tests {
@@ -226,6 +226,47 @@ func TestMapHypervGuestOS(t *testing.T) {
 			result := mapHypervGuestOS(tc.guestOS)
 			if result != tc.expected {
 				t.Errorf("mapHypervGuestOS(%q) = %q, want %q", tc.guestOS, result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestMapOperatingSystemToTemplate(t *testing.T) {
+	tests := []struct {
+		name     string
+		os       string
+		expected string
+	}{
+		// virt-v2v inspection maps osinfo IDs through osV2VMap to these vSphere-style guest IDs.
+		// VMware naming: "Next" suffix = successor (2019srvNext → 2022, 2022srvNext → 2025).
+		{name: "Windows 2019", os: "windows2019srv_64Guest", expected: "win2k19"},
+		{name: "Windows 2022 (2019srvNext)", os: "windows2019srvNext_64Guest", expected: "win2k22"},
+		{name: "Windows 2025 (2022srvNext)", os: "windows2022srvNext_64Guest", expected: "win2k25"},
+		{name: "Windows 2016 (9Server)", os: "windows9Server64Guest", expected: "win2k16"},
+		{name: "Windows 2012 R2 (8Server)", os: "windows8Server64Guest", expected: "win2k12r2"},
+		{name: "Windows 2008 R2 (7Server)", os: "windows7Server64Guest", expected: "win2k8r2"},
+		{name: "Windows 10", os: "windows9_64Guest", expected: "win10"},
+		{name: "Windows 11", os: "windows11_64Guest", expected: "win11"},
+		{name: "RHEL 9", os: "rhel9_64Guest", expected: "rhel9.4"},
+		{name: "RHEL 8", os: "rhel8_64Guest", expected: defaultTemplateOS},
+		{name: "RHEL 7", os: "rhel7_64Guest", expected: "rhel7.7"},
+		{name: "RHEL 10", os: "rhel10_64Guest", expected: "rhel10.0"},
+		{name: "CentOS 9", os: "centos9_64Guest", expected: "centos-stream9"},
+		{name: "CentOS 8", os: "centos8_64Guest", expected: "centos8"},
+		{name: "Ubuntu", os: "ubuntu64Guest", expected: "ubuntu18.04"},
+		{name: "Debian", os: "debian10_64Guest", expected: "debian10"},
+		{name: "Fedora", os: "fedora64Guest", expected: "fedora31"},
+		{name: "SLES", os: "sles15_64Guest", expected: "opensuse15.0"},
+		{name: "Generic Linux", os: "genericLinuxGuest", expected: defaultTemplateOS},
+		{name: "Empty string", os: "", expected: ""},
+		{name: "Unknown OS", os: "otherGuest64", expected: ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := mapOperatingSystemToTemplate(tc.os)
+			if result != tc.expected {
+				t.Errorf("mapOperatingSystemToTemplate(%q) = %q, want %q", tc.os, result, tc.expected)
 			}
 		})
 	}
