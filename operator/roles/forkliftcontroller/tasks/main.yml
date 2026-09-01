@@ -30,6 +30,17 @@
     set_fact:
       api_groups: "{{ lookup('k8s', cluster_info='api_groups') }}"
 
+  # k8s_info recurses to a RecursionError on an unqualified kind the cluster cannot
+  # resolve, and the opaque MODULE FAILURE that follows pins the CR at Failure=True
+  # despite the rescue in cleanup.yml. Route is the only listed kind that does not
+  # resolve everywhere.
+  - name: "Drop Route from disabled-feature cleanup when the Route API is absent"
+    set_fact:
+      cleanup_resources: >-
+        {{ forklift_resources
+           if 'route.openshift.io' in api_groups
+           else forklift_resources | reject('equalto', 'Route') | list }}
+
   - when: "'route.openshift.io' not in api_groups"
     block:
     - name: "Enable k8s cluster environment"
@@ -513,7 +524,7 @@
   - when: not feature_ui_plugin|bool
     name: "Cleanup {{ ui_plugin_service_name }} if disabled"
     include_tasks: cleanup.yml
-    loop: "{{ forklift_resources }}"
+    loop: "{{ cleanup_resources }}"
     loop_control:
       loop_var: resource_kind
     vars:
@@ -522,7 +533,7 @@
   - when: not feature_cli_download|bool
     name: "Cleanup {{ cli_download_service_name }} if disabled"
     include_tasks: cleanup.yml
-    loop: "{{ forklift_resources }}"
+    loop: "{{ cleanup_resources }}"
     loop_control:
       loop_var: resource_kind
     vars:
@@ -531,7 +542,7 @@
   - when: not feature_mcp_server|bool
     name: "Cleanup {{ mcp_server_service_name }} if disabled"
     include_tasks: cleanup.yml
-    loop: "{{ forklift_resources }}"
+    loop: "{{ cleanup_resources }}"
     loop_control:
       loop_var: resource_kind
     vars:
@@ -540,7 +551,7 @@
   - when: not feature_validation|bool
     name: "Cleanup {{ validation_service_name }} if disabled"
     include_tasks: cleanup.yml
-    loop: "{{ forklift_resources }}"
+    loop: "{{ cleanup_resources }}"
     loop_control:
       loop_var: resource_kind
     vars:
