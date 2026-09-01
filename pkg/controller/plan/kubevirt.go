@@ -2432,12 +2432,17 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (*core.Pod, error) {
 	return r.GetConversionPod(vm.Ref, convctx.VirtV2vConversionPod, false)
 }
 
+// v2vHTTPClient is used for all requests to the virt-v2v pod HTTP server.
+// A 2-minute timeout prevents the controller from hanging indefinitely if the
+// pod accepts a connection but never responds.
+var v2vHTTPClient = &http.Client{Timeout: 2 * time.Minute}
+
 func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 	if pod == nil {
 		return "", liberr.New("no pod found to get the inspection")
 	}
 	inspectionUrl := fmt.Sprintf("http://%s:8080/inspection", pod.Status.PodIP)
-	resp, err := http.Get(inspectionUrl)
+	resp, err := v2vHTTPClient.Get(inspectionUrl)
 	if err != nil {
 		return "", liberr.Wrap(err)
 	}
@@ -2464,7 +2469,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	Once the VM server is running, we can make a single call to obtain the OVF configuration,
 	followed by a shutdown request. This will complete the pod process, allowing us to move to the next phase.
 	*/
-	resp, err := http.Get(url)
+	resp, err := v2vHTTPClient.Get(url)
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
 			return nil
@@ -2479,9 +2484,23 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	}
 
 	switch r.Source.Provider.Type() {
-	case api.Ova, api.HyperV:
+	case api.Ova:
 		if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
 			return liberr.Wrap(err)
+		}
+	case api.HyperV:
+		if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
+			return liberr.Wrap(err)
+		}
+		inspectionXML, err := r.getInspectionXml(pod)
+		if err != nil {
+			r.Log.Error(err, "Failed to get inspection XML for Hyper-V VM", "vmId", vm.ID)
+		} else {
+			if vm.OperatingSystem, err = inspectionparser.GetOperationSystemFromConfig(inspectionXML); err != nil {
+				r.Log.Error(err, "Failed to parse OS from inspection XML", "vmId", vm.ID)
+			} else {
+				r.Log.Info("Setting the vm OS from inspection", "os", vm.OperatingSystem, "vmId", vm.ID)
+			}
 		}
 	case api.VSphere:
 		inspectionXML, err := r.getInspectionXml(pod)
@@ -2503,7 +2522,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 
 	// Fetch warnings before shutting down
 	warningsURL := fmt.Sprintf("http://%s:8080/warnings", pod.Status.PodIP)
-	if resp, err = http.Get(warningsURL); err == nil {
+	if resp, err = v2vHTTPClient.Get(warningsURL); err == nil {
 		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusOK {
 			var body []byte
@@ -2538,7 +2557,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	}
 
 	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
-	resp, err = http.Post(shutdownURL, "application/json", nil)
+	resp, err = v2vHTTPClient.Post(shutdownURL, "application/json", nil)
 	if err == nil {
 		defer resp.Body.Close()
 	} else {

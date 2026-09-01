@@ -94,7 +94,7 @@ func mapHypervGuestOS(guestOS string) string {
 	case strings.Contains(os, "linux"):
 		return defaultTemplateOS
 	default:
-		return defaultTemplateOS
+		return ""
 	}
 }
 
@@ -448,14 +448,33 @@ func (r *Builder) Tasks(vmRef ref.Ref) (tasks []*plan.Task, err error) {
 }
 
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
-	vm := &model.VM{}
-	err = r.Source.Inventory.Find(vm, vmRef)
-	if err != nil {
-		err = liberr.Wrap(err, "vm", vmRef.String())
-		return
+	// Prefer the OS detected by virt-v2v inspection (set during conversion).
+	var os string
+	for _, vmConf := range r.Migration.Status.VMs {
+		if vmConf.ID == vmRef.ID {
+			os = mapOperatingSystemToTemplate(vmConf.OperatingSystem)
+			break
+		}
 	}
 
-	os := mapHypervGuestOS(vm.GuestOS)
+	// Fall back to inventory GuestOS from KVP Exchange (only available when
+	// the VM was running with Integration Services).
+	if os == "" {
+		vm := &model.VM{}
+		err = r.Source.Inventory.Find(vm, vmRef)
+		if err != nil {
+			err = liberr.Wrap(err, "vm", vmRef.String())
+			return
+		}
+		if vm.GuestOS != "" {
+			os = mapHypervGuestOS(vm.GuestOS)
+		}
+	}
+
+	if os == "" {
+		err = liberr.New("guest OS not detected, cannot determine template")
+		return
+	}
 
 	labels = make(map[string]string)
 	labels[fmt.Sprintf(templateOSLabel, os)] = "true"
@@ -463,6 +482,64 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 	labels[templateFlavorLabel] = "true"
 
 	return
+}
+
+func mapOperatingSystemToTemplate(operatingSystem string) string {
+	if operatingSystem == "" {
+		return ""
+	}
+	os := strings.ToLower(operatingSystem)
+	switch {
+	// Windows Server
+	case strings.Contains(os, "2022srvnext"):
+		return "win2k25"
+	case strings.Contains(os, "2019srvnext"):
+		return "win2k22"
+	case strings.Contains(os, "2019"):
+		return "win2k19"
+	case strings.Contains(os, "windows9server"):
+		return "win2k16"
+	case strings.Contains(os, "windows8server"):
+		return "win2k12r2"
+	case strings.Contains(os, "windows7server"):
+		return "win2k8r2"
+	// Windows desktop
+	case strings.Contains(os, "windows12"):
+		return "win11"
+	case strings.Contains(os, "windows11"):
+		return "win11"
+	case strings.Contains(os, "windows9") || strings.Contains(os, "windows10"):
+		return "win10"
+	case strings.Contains(os, "windows"):
+		return "win10"
+	// Linux distributions
+	case strings.Contains(os, "rhel10"):
+		return "rhel10.0"
+	case strings.Contains(os, "rhel9"):
+		return "rhel9.4"
+	case strings.Contains(os, "rhel8"):
+		return defaultTemplateOS
+	case strings.Contains(os, "rhel7"):
+		return "rhel7.7"
+	case strings.Contains(os, "centos9") || strings.Contains(os, "centosstream9"):
+		return "centos-stream9"
+	case strings.Contains(os, "centos8"):
+		return "centos8"
+	case strings.Contains(os, "centos"):
+		return "centos7.0"
+	case strings.Contains(os, "ubuntu"):
+		return "ubuntu18.04"
+	case strings.Contains(os, "debian"):
+		return "debian10"
+	case strings.Contains(os, "fedora"):
+		return "fedora31"
+	case strings.Contains(os, "sles") || strings.Contains(os, "suse") || strings.Contains(os, "opensuse"):
+		return "opensuse15.0"
+	case strings.Contains(os, "linux"):
+		return defaultTemplateOS
+	default:
+		return ""
+	}
 }
 
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
