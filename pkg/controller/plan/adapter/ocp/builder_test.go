@@ -362,6 +362,13 @@ func TestTlsCertForExport(t *testing.T) {
 		}
 	})
 
+	t.Run("missing export URL", func(t *testing.T) {
+		_, err := tlsCertForExport("", string(caPEM))
+		if err == nil {
+			t.Fatal("expected error for missing export URL")
+		}
+	})
+
 	t.Run("wrong CA when system also untrusted", func(t *testing.T) {
 		wrongCAPEM, _, _ := newTestTLSCredentials(t)
 		_, err := tlsCertForExport(exportURL, string(wrongCAPEM))
