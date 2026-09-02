@@ -57,6 +57,11 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
+	case *CustomFieldDef:
+		r := CustomFieldDef{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
 	case *VM:
 		r := VM{}
 		r.ID = id

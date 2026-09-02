@@ -22,9 +22,10 @@ var ErrNotImplemented = errors.New("not implemented")
 
 // Mock inventory struct and methods for testing
 type mockInventory struct {
-	ds       model.Datastore
-	vm       model.VM
-	networks map[string]model.Network // keyed by ID
+	ds         model.Datastore
+	vm         model.VM
+	networks   map[string]model.Network // keyed by ID
+	customDefs []model.CustomFieldDef   // global custom field definitions
 }
 
 // defaultVM returns a VM with sensible defaults for testing
@@ -130,6 +131,10 @@ func (m *mockInventory) Host(ref *ref.Ref) (interface{}, error) {
 }
 
 func (m *mockInventory) List(list interface{}, param ...web.Param) error {
+	switch v := list.(type) {
+	case *[]model.CustomFieldDef:
+		*v = m.customDefs
+	}
 	return nil
 }
 

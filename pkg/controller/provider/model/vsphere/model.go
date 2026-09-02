@@ -1,6 +1,8 @@
 package vsphere
 
 import (
+	"strconv"
+
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/base"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 )
@@ -348,7 +350,6 @@ type VM struct {
 	ToolsVersionStatus       string             `sql:""`
 	DiskEnableUuid           bool               `sql:""`
 	NestedHVEnabled          bool               `sql:""`
-	CustomDef                []CustomFieldDef   `sql:""`
 	CustomValues             []CustomFieldValue `sql:""`
 	Tags                     []Tag              `sql:""`
 	ConsolidationNeeded      bool               `sql:""`
@@ -460,8 +461,13 @@ type DiskMountPoint struct {
 
 type CustomFieldDef struct {
 	Name              string `json:"name"`
-	Key               int32  `json:"key"`
+	Key               int32  `json:"key" sql:"pk"`
 	ManagedObjectType string `json:"managedObjectType,omitempty"`
+}
+
+// Get the primary key.
+func (m *CustomFieldDef) Pk() string {
+	return strconv.Itoa(int(m.Key))
 }
 
 type CustomFieldValue struct {
