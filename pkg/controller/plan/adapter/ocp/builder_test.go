@@ -1,7 +1,18 @@
 package ocp
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
+	"net"
+	"net/http"
 	"testing"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -222,7 +233,7 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 			Status: &export.VirtualMachineExportStatus{
 				Links: &export.VirtualMachineExportLinks{
 					External: &export.VirtualMachineExportLink{
-						Cert: "cert",
+						Cert: "",
 						Volumes: []export.VirtualMachineExportVolume{{
 							Name: volumeName,
 							Formats: []export.VirtualMachineExportVolumeFormat{
@@ -324,4 +335,112 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 			t.Errorf("expected Name %q, got Name=%q GenerateName=%q", "ocpglob-0", dvs[0].Name, dvs[0].GenerateName)
 		}
 	})
+}
+
+func TestTlsCertForExport(t *testing.T) {
+	caPEM, serverCert, _ := newTestTLSCredentials(t)
+	listener := startTestTLSServer(t, serverCert)
+	exportURL := "https://" + listener.Addr().String()
+
+	t.Run("empty cert", func(t *testing.T) {
+		got, err := tlsCertForExport(exportURL, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "" {
+			t.Fatalf("expected empty cert, got %q", got)
+		}
+	})
+
+	t.Run("matching CA", func(t *testing.T) {
+		got, err := tlsCertForExport(exportURL, string(caPEM))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != string(caPEM) {
+			t.Fatalf("expected provided CA, got %q", got)
+		}
+	})
+
+	t.Run("wrong CA when system also untrusted", func(t *testing.T) {
+		wrongCAPEM, _, _ := newTestTLSCredentials(t)
+		_, err := tlsCertForExport(exportURL, string(wrongCAPEM))
+		if err == nil {
+			t.Fatal("expected error when neither VMExport cert nor system CA verifies")
+		}
+	})
+}
+
+func TestCreateDataVolumeSpec_OmitsCertConfigMap(t *testing.T) {
+	spec := createDataVolumeSpec(resource.MustParse("1Gi"), "sc", "https://example/disk", "", "secret")
+	if spec.Source.HTTP.CertConfigMap != "" {
+		t.Fatalf("expected empty CertConfigMap, got %q", spec.Source.HTTP.CertConfigMap)
+	}
+
+	spec = createDataVolumeSpec(resource.MustParse("1Gi"), "sc", "https://example/disk", "ca-cm", "secret")
+	if spec.Source.HTTP.CertConfigMap != "ca-cm" {
+		t.Fatalf("expected CertConfigMap ca-cm, got %q", spec.Source.HTTP.CertConfigMap)
+	}
+}
+
+func newTestTLSCredentials(t *testing.T) (caPEM []byte, serverCert tls.Certificate, serverKey *ecdsa.PrivateKey) {
+	t.Helper()
+
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate CA key: %v", err)
+	}
+	caTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "test-ca"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatalf("create CA cert: %v", err)
+	}
+	caPEM = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER})
+
+	serverKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate server key: %v", err)
+	}
+	serverTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject:      pkix.Name{CommonName: "localhost"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		DNSNames:     []string{"localhost"},
+		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1)},
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+	serverDER, err := x509.CreateCertificate(rand.Reader, serverTemplate, caTemplate, &serverKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatalf("create server cert: %v", err)
+	}
+	serverCert = tls.Certificate{
+		Certificate: [][]byte{serverDER, caDER},
+		PrivateKey:  serverKey,
+	}
+	return caPEM, serverCert, serverKey
+}
+
+func startTestTLSServer(t *testing.T, serverCert tls.Certificate) net.Listener {
+	t.Helper()
+
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+	})
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { listener.Close() })
+
+	go http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	return listener
 }
