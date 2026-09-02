@@ -18,7 +18,9 @@ import (
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	ocpclient "github.com/kubev2v/forklift/pkg/lib/client/openshift"
-	"github.com/kubev2v/forklift/pkg/templateutil"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -838,13 +840,15 @@ func (r *Builder) SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *v1beta
 
 const exportTLSTimeout = 10 * time.Second
 
+var builderLog = logging.WithName("ocp|builder")
+
 // tlsCertForExport returns providedCert if it verifies exportURL, "" if system CA works instead, or an error if neither works.
 func tlsCertForExport(exportURL, providedCert string) (string, error) {
 	if providedCert == "" {
 		return "", nil
 	}
 	if exportURL == "" {
-		return providedCert, nil
+		return "", fmt.Errorf("export URL is required to verify VMExport certificate")
 	}
 	if err := verifyExportTLS(exportURL, providedCert); err == nil {
 		return providedCert, nil
@@ -860,10 +864,11 @@ func verifyExportTLS(exportURL, caPEM string) error {
 	if err != nil {
 		return err
 	}
-	addr := u.Host
-	if _, _, err := net.SplitHostPort(addr); err != nil {
-		addr = net.JoinHostPort(addr, "443")
+	port := u.Port()
+	if port == "" {
+		port = "443"
 	}
+	addr := net.JoinHostPort(u.Hostname(), port)
 	var roots *x509.CertPool
 	if caPEM != "" {
 		roots = x509.NewCertPool()
@@ -881,7 +886,9 @@ func verifyExportTLS(exportURL, caPEM string) error {
 		RootCAs:    roots,
 	})
 	if conn != nil {
-		conn.Close()
+		if closeErr := conn.Close(); closeErr != nil {
+			builderLog.Info("Failed to close TLS probe connection", "error", closeErr)
+		}
 	}
 	return err
 }
