@@ -124,12 +124,12 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 		dataVolume.Annotations[planbase.AnnDiskSource] = fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name)
 		dataVolume.Annotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
 
-		url := getExportURL(volume.Formats)
-		if url == "" {
+		url, contentType, ok := selectExportFormat(volume.Formats)
+		if !ok {
 			return nil, liberr.Wrap(fmt.Errorf("failed to get export URL, available formats: %v", volume.Formats))
 		}
-		storageClassName := storageMap[*pvc.Spec.StorageClassName].StorageClass
-		dataVolume.Spec = *createDataVolumeSpec(size, storageClassName, url, configMap.Name, secret.Name)
+		destStorage := storageMap[*pvc.Spec.StorageClassName]
+		dataVolume.Spec = *createDataVolumeSpec(size, destStorage, url, configMap.Name, secret.Name, contentType, pvc)
 
 		err = r.Destination.Client.Create(context.TODO(), dataVolume, &client.CreateOptions{})
 		if err != nil {
@@ -145,14 +145,24 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 	return dataVolumes, nil
 }
 
-func getExportURL(virtualMachineExportVolumeFormat []export.VirtualMachineExportVolumeFormat) (url string) {
-	for _, format := range virtualMachineExportVolumeFormat {
-		if format.Format == export.KubeVirtGz || format.Format == export.ArchiveGz {
-			return format.Url
+// selectExportFormat prefers a kubevirt disk image export when available.
+// Virtiofs / filesystem PVC volumes only expose ArchiveGz (tar.gz); those must be
+// imported with CDI contentType=archive so the destination PVC gets extracted files
+// rather than a disk.img.
+func selectExportFormat(formats []export.VirtualMachineExportVolumeFormat) (url string, contentType cdi.DataVolumeContentType, ok bool) {
+	var archiveURL string
+	for _, format := range formats {
+		switch format.Format {
+		case export.KubeVirtGz:
+			return format.Url, cdi.DataVolumeKubeVirt, true
+		case export.ArchiveGz:
+			archiveURL = format.Url
 		}
 	}
-
-	return ""
+	if archiveURL != "" {
+		return archiveURL, cdi.DataVolumeArchive, true
+	}
+	return "", "", false
 }
 
 // PodEnvironment implements base.Builder
@@ -640,8 +650,15 @@ func (r *Builder) getSourceVmFromDefinition(vmRef ref.Ref) (*cnv.VirtualMachine,
 	return nil, liberr.New("failed to find vm in manifest")
 }
 
-func createDataVolumeSpec(size resource.Quantity, storageClassName, url, configMap, secret string) *cdi.DataVolumeSpec {
-	return &cdi.DataVolumeSpec{
+func createDataVolumeSpec(
+	size resource.Quantity,
+	destStorage v1beta1.DestinationStorage,
+	url, configMap, secret string,
+	contentType cdi.DataVolumeContentType,
+	sourcePVC *core.PersistentVolumeClaim,
+) *cdi.DataVolumeSpec {
+	storageClassName := destStorage.StorageClass
+	spec := &cdi.DataVolumeSpec{
 		Source: &cdi.DataVolumeSource{
 			HTTP: &cdi.DataVolumeSourceHTTP{
 				URL:                url,
@@ -658,6 +675,27 @@ func createDataVolumeSpec(size resource.Quantity, storageClassName, url, configM
 			StorageClassName: &storageClassName,
 		},
 	}
+
+	if contentType == cdi.DataVolumeArchive {
+		// Archive imports expand a tar.gz into a Filesystem PVC (virtiofs / shared FS volumes).
+		spec.ContentType = cdi.DataVolumeArchive
+		fsMode := core.PersistentVolumeFilesystem
+		spec.Storage.VolumeMode = &fsMode
+	} else if destStorage.VolumeMode != "" {
+		volumeMode := destStorage.VolumeMode
+		spec.Storage.VolumeMode = &volumeMode
+	} else if sourcePVC != nil && sourcePVC.Spec.VolumeMode != nil {
+		volumeMode := *sourcePVC.Spec.VolumeMode
+		spec.Storage.VolumeMode = &volumeMode
+	}
+
+	if destStorage.AccessMode != "" {
+		spec.Storage.AccessModes = []core.PersistentVolumeAccessMode{destStorage.AccessMode}
+	} else if sourcePVC != nil && len(sourcePVC.Spec.AccessModes) > 0 {
+		spec.Storage.AccessModes = append([]core.PersistentVolumeAccessMode(nil), sourcePVC.Spec.AccessModes...)
+	}
+
+	return spec
 }
 
 func (r *Builder) SupportsVolumePopulators() bool {
