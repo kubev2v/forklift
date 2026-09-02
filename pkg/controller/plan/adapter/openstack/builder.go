@@ -922,6 +922,13 @@ func (r *Builder) SupportsVolumePopulators() bool {
 	return true
 }
 
+// populatorImage pairs an image with its disk index, taken from the source
+// volume's stable position in workload.Volumes (deterministic across reconciles).
+type populatorImage struct {
+	image     model.Image
+	diskIndex int
+}
+
 func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
 	workload := &model.Workload{}
 	err = r.Source.Inventory.Find(workload, vmRef)
@@ -941,11 +948,12 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			err = liberr.Wrap(err)
 			return
 		}
-		images = append(images, image)
+		// Snapshot image has no volume; index it after all volume disks.
+		images = append(images, populatorImage{image: image, diskIndex: len(workload.Volumes)})
 	}
 
-	diskIndex := 0
-	for _, image := range images {
+	for _, img := range images {
+		image := img.image
 		if imageID, ok := image.Properties[forkliftPropertyOriginalImageID]; ok && imageID == workload.ImageID {
 			if image.DiskFormat != "raw" {
 				r.Log.Info("this image will require conversion as it's not raw", "image", image.Name, "diskFormat", image.DiskFormat)
@@ -957,13 +965,12 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			r.Log.Info("the image is not ready yet", "image", image.Name, "status", image.Status)
 			continue
 		}
-		if pvc, pvcErr := r.getCorrespondingPvc(image, workload, annotations, secretName, vmRef, diskIndex); pvcErr == nil {
+		if pvc, pvcErr := r.getCorrespondingPvc(image, workload, annotations, secretName, vmRef, img.diskIndex); pvcErr == nil {
 			pvcs = append(pvcs, pvc)
 		} else {
 			err = pvcErr
 			return
 		}
-		diskIndex++
 	}
 	return
 }
@@ -1054,9 +1061,9 @@ func (r *Builder) getVMSnapshotImage(workload *model.Workload) (image model.Imag
 	return
 }
 
-func (r *Builder) getImagesFromVolumes(workload *model.Workload) (images []model.Image, err error) {
-	images = []model.Image{}
-	for _, volume := range workload.Volumes {
+func (r *Builder) getImagesFromVolumes(workload *model.Workload) (images []populatorImage, err error) {
+	images = []populatorImage{}
+	for i, volume := range workload.Volumes {
 		image := model.Image{}
 		imageName := getImageFromVolumeName(r.Context, workload.ID, volume.ID)
 		err = r.Source.Inventory.Find(&image, ref.Ref{Name: imageName})
@@ -1074,7 +1081,8 @@ func (r *Builder) getImagesFromVolumes(workload *model.Workload) (images []model
 			continue
 		}
 		r.Log.Info("appending image from volume", "imageName", imageName)
-		images = append(images, image)
+		// Index by volume position, not by position in the filtered result.
+		images = append(images, populatorImage{image: image, diskIndex: i})
 	}
 	return
 }

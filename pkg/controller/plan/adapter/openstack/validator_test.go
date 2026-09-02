@@ -29,6 +29,7 @@ var ErrNotImplemented = errors.New("not implemented")
 type mockOpenstackInventory struct {
 	workloads map[string]*model.Workload
 	networks  map[string]*model.Network
+	images    map[string]*model.Image
 }
 
 func (m *mockOpenstackInventory) Find(resource interface{}, ref ref.Ref) error {
@@ -46,6 +47,16 @@ func (m *mockOpenstackInventory) Find(resource interface{}, ref ref.Ref) error {
 	case *model.Network:
 		if net, ok := m.networks[ref.ID]; ok {
 			*res = *net
+			return nil
+		}
+		return base.NotFoundError{}
+	case *model.Image:
+		if img, ok := m.images[ref.ID]; ok {
+			*res = *img
+			return nil
+		}
+		if img, ok := m.images[ref.Name]; ok {
+			*res = *img
 			return nil
 		}
 		return base.NotFoundError{}
