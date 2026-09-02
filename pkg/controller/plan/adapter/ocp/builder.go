@@ -6,13 +6,10 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
-	"strings"
-
-	liberr "github.com/kubev2v/forklift/pkg/lib/error"
-	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
-	"k8s.io/apimachinery/pkg/types"
-	export "kubevirt.io/api/export/v1alpha1"
+	"net/url"
+	"time"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -104,6 +101,19 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 		storageMap[storage.Source.Name] = storage.Destination
 	}
 
+	certConfigMap := configMap.Name
+	if len(vmExport.Status.Links.External.Volumes) > 0 {
+		probeURL := getExportURL(vmExport.Status.Links.External.Volumes[0].Formats)
+		caCert, certErr := tlsCertForExport(probeURL, vmExport.Status.Links.External.Cert)
+		if certErr != nil {
+			return nil, liberr.Wrap(certErr)
+		}
+		if caCert == "" {
+			r.Log.Info("VMExport cert does not verify export endpoint, using system CA certificates")
+			certConfigMap = ""
+		}
+	}
+
 	dataVolumes := []cdi.DataVolume{}
 	for diskIndex, volume := range vmExport.Status.Links.External.Volumes {
 		// Get PVC
@@ -141,7 +151,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 			return nil, liberr.Wrap(fmt.Errorf("failed to get export URL, available formats: %v", volume.Formats))
 		}
 		storageClassName := storageMap[*pvc.Spec.StorageClassName].StorageClass
-		dataVolume.Spec = *createDataVolumeSpec(size, storageClassName, url, configMap.Name, secret.Name)
+		dataVolume.Spec = *createDataVolumeSpec(size, storageClassName, url, certConfigMap, secret.Name)
 
 		err = r.Destination.Client.Create(context.TODO(), dataVolume, &client.CreateOptions{})
 		if err != nil {
@@ -571,21 +581,17 @@ func (r *Builder) getSourceVmFromDefinition(vmRef ref.Ref) (*cnv.VirtualMachine,
 		}
 	}
 
-	caCert := vme.Status.Links.External.Cert
+	caCert, err := tlsCertForExport(vmManifestUrl, vme.Status.Links.External.Cert)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
 	var transport *http.Transport
-
 	if caCert != "" {
 		caCertPool := x509.NewCertPool()
 		if !caCertPool.AppendCertsFromPEM([]byte(caCert)) {
 			return nil, liberr.New("failed to parse CA certificate")
 		}
-
-		tlsConfig := &tls.Config{
-			RootCAs: caCertPool,
-		}
-
-		transport = &http.Transport{TLSClientConfig: tlsConfig}
-
+		transport = &http.Transport{TLSClientConfig: &tls.Config{RootCAs: caCertPool}}
 	} else {
 		r.Log.Info("Certificate from VM export is empty, using system CA certificates")
 		transport = &http.Transport{}
@@ -652,14 +658,17 @@ func (r *Builder) getSourceVmFromDefinition(vmRef ref.Ref) (*cnv.VirtualMachine,
 	return nil, liberr.New("failed to find vm in manifest")
 }
 
-func createDataVolumeSpec(size resource.Quantity, storageClassName, url, configMap, secret string) *cdi.DataVolumeSpec {
+func createDataVolumeSpec(size resource.Quantity, storageClassName, url, certConfigMap, secret string) *cdi.DataVolumeSpec {
+	httpSource := &cdi.DataVolumeSourceHTTP{
+		URL:                url,
+		SecretExtraHeaders: []string{secret},
+	}
+	if certConfigMap != "" {
+		httpSource.CertConfigMap = certConfigMap
+	}
 	return &cdi.DataVolumeSpec{
 		Source: &cdi.DataVolumeSource{
-			HTTP: &cdi.DataVolumeSourceHTTP{
-				URL:                url,
-				CertConfigMap:      configMap,
-				SecretExtraHeaders: []string{secret},
-			},
+			HTTP: httpSource,
 		},
 		Storage: &cdi.StorageSpec{
 			Resources: core.VolumeResourceRequirements{
@@ -825,4 +834,54 @@ func (r *Builder) setPVCNameFromTemplate(vmRef ref.Ref, sourcePVC *core.Persiste
 // NO-OP
 func (r *Builder) SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *v1beta1.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error) {
 	return
+}
+
+const exportTLSTimeout = 10 * time.Second
+
+// tlsCertForExport returns providedCert if it verifies exportURL, "" if system CA works instead, or an error if neither works.
+func tlsCertForExport(exportURL, providedCert string) (string, error) {
+	if providedCert == "" {
+		return "", nil
+	}
+	if exportURL == "" {
+		return providedCert, nil
+	}
+	if err := verifyExportTLS(exportURL, providedCert); err == nil {
+		return providedCert, nil
+	}
+	if err := verifyExportTLS(exportURL, ""); err == nil {
+		return "", nil
+	}
+	return "", fmt.Errorf("export endpoint TLS verification failed with VMExport cert and system CA")
+}
+
+func verifyExportTLS(exportURL, caPEM string) error {
+	u, err := url.Parse(exportURL)
+	if err != nil {
+		return err
+	}
+	addr := u.Host
+	if _, _, err := net.SplitHostPort(addr); err != nil {
+		addr = net.JoinHostPort(addr, "443")
+	}
+	var roots *x509.CertPool
+	if caPEM != "" {
+		roots = x509.NewCertPool()
+		if !roots.AppendCertsFromPEM([]byte(caPEM)) {
+			return fmt.Errorf("failed to parse CA certificate")
+		}
+	} else {
+		roots, err = x509.SystemCertPool()
+		if err != nil {
+			roots = x509.NewCertPool()
+		}
+	}
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: exportTLSTimeout}, "tcp", addr, &tls.Config{
+		ServerName: u.Hostname(),
+		RootCAs:    roots,
+	})
+	if conn != nil {
+		conn.Close()
+	}
+	return err
 }
