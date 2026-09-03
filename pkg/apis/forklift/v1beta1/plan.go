@@ -353,6 +353,13 @@ type PlanSpec struct {
 	// +optional
 	// +kubebuilder:validation:Enum=on;off;auto
 	TargetPowerState plan.TargetPowerState `json:"targetPowerState,omitempty"`
+	// Timezone specifies the IANA timezone (e.g., "America/New_York", "Europe/Rome") to set
+	// on the target VM's clock. When set, this overrides any timezone detected from the source
+	// provider. When empty, the timezone is determined by the source provider's inventory data
+	// (vSphere uses the ESXi host timezone, oVirt uses the VM timezone, others leave it unset).
+	// Uses standard tz database names: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+	// +optional
+	Timezone string `json:"timezone,omitempty"`
 	// RunPreflightInspection controls whether an inspection step on VM base disks is performed before starting the first disk transfer. Applies only to warm migrations from VMWare.
 	// - true (default): Inspection step runs before transferring any disks and may fail if it detects the migration would fail.
 	// - false: No inspection is performed before disk transfer.

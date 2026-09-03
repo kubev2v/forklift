@@ -2456,6 +2456,10 @@ spec:
                 - "off"
                 - auto
                 type: string
+              timezone:
+                description: Timezone specifies the IANA timezone (e.g., "America/New_York")
+                  to set on target VMs. Overrides the auto-detected guest timezone.
+                type: string
               transferNetwork:
                 description: The network attachment definition that should be used
                   for disk transfer.
