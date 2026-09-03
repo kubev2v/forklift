@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net"
 	"net/http"
@@ -446,8 +447,22 @@ func startTestTLSServer(t *testing.T, serverCert tls.Certificate) net.Listener {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	t.Cleanup(func() { listener.Close() })
+	t.Cleanup(func() {
+		if closeErr := listener.Close(); closeErr != nil && !errors.Is(closeErr, net.ErrClosed) {
+			t.Errorf("listener.Close: %v", closeErr)
+		}
+	})
 
-	go http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	go func() {
+		serveErr := http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+		if serveErr == nil || errors.Is(serveErr, http.ErrServerClosed) {
+			return
+		}
+		var opErr *net.OpError
+		if errors.As(serveErr, &opErr) && errors.Is(opErr.Err, net.ErrClosed) {
+			return
+		}
+		t.Errorf("http.Serve: %v", serveErr)
+	}()
 	return listener
 }
