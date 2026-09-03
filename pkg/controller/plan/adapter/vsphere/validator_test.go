@@ -24,11 +24,12 @@ var ErrNotImplemented = errors.New("not implemented")
 
 // Mock inventory struct and methods for testing
 type mockInventory struct {
-	ds         model.Datastore
-	datastores map[string]model.Datastore // keyed by ID; used when tests need more than one datastore
-	vm         model.VM
-	networks   map[string]model.Network // keyed by ID
-	customDefs []model.CustomFieldDef   // global custom field definitions
+	ds             model.Datastore
+	datastores     map[string]model.Datastore // keyed by ID; used when tests need more than one datastore
+	vm             model.VM
+	networks       map[string]model.Network // keyed by ID
+	networksByName map[string]model.Network // keyed by name; used for name-based NetworkMap sources
+	customDefs     []model.CustomFieldDef   // global custom field definitions
 }
 
 // defaultVM returns a VM with sensible defaults for testing
@@ -86,6 +87,12 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 	case *model.Network:
 		if m.networks != nil {
 			if net, ok := m.networks[ref.ID]; ok {
+				*res = net
+				return nil
+			}
+		}
+		if ref.ID == "" && m.networksByName != nil {
+			if net, ok := m.networksByName[ref.Name]; ok {
 				*res = net
 				return nil
 			}

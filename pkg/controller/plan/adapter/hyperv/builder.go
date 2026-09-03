@@ -568,12 +568,6 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 	return pvc.Name
 }
 
-func nicRefsFromVM(vm *model.VM) []planbase.NICRef {
-	return planbase.NICRefsFrom(vm.NICs, func(n hyperv.NIC) planbase.NICRef {
-		return planbase.NICRef{MAC: n.MAC, NetworkID: n.Network.ID}
-	})
-}
-
 func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
@@ -595,19 +589,30 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		core.EnvVar{Name: "V2V_diskPath", Value: strings.Join(diskPaths, ",")},
 	)
 
-	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
-	if planbase.HasPreserveMode(modeByMAC) || planbase.HasDHCPMode(modeByMAC) {
+	nicKeys, pairsBySource := r.buildNICResolver(vm.NICs)
+	macs := make([]string, len(vm.NICs))
+	for i, nic := range vm.NICs {
+		macs[i] = nic.MAC
+	}
+	modeByMAC := planbase.ResolveNICModes(planbase.NICRefsFromKeys(macs, nicKeys), pairsBySource, r.Plan.Spec.PreserveStaticIPs)
+	// Honor resolved preserve modes. Fall back to the plan-level flag only when
+	// matching produced no modes (empty map), so a dhcp/none override still wins.
+	// DHCP is also mapped on Linux so virt-v2v can write udev naming rules.
+	shouldPreserve := planbase.HasPreserveMode(modeByMAC) ||
+		(r.Plan.Spec.PreserveStaticIPs && len(modeByMAC) == 0)
+	if shouldPreserve || planbase.HasDHCPMode(modeByMAC) {
 		macsToIps, mapErr := r.mapMacStaticIps(vm, modeByMAC)
 		if mapErr != nil {
 			err = mapErr
 			return
 		}
 		if macsToIps != "" {
-			env = append(env,
-				core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps},
-			)
+			if shouldPreserve {
+				env = append(env, core.EnvVar{Name: "V2V_preserveStaticIPs", Value: "true"})
+			}
+			env = append(env, core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps})
 		}
-		if planbase.HasPreserveMode(modeByMAC) && hasMultipleStaticIPsPerNIC(vm, modeByMAC) {
+		if shouldPreserve && hasMultipleStaticIPsPerNIC(vm, modeByMAC) {
 			env = append(env, core.EnvVar{
 				Name:  "V2V_multipleIPsPerNic",
 				Value: "true",
@@ -632,7 +637,6 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		if !hasIPv6 {
 			return
 		}
-		nicKeys, pairsBySource := r.buildNICResolver(vm.NICs)
 		podMacs := planbase.CollectPodNetworkMACs(nicKeys, pairsBySource, vm.NICs, func(nic hyperv.NIC) string {
 			return nic.MAC
 		})

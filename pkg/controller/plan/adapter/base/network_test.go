@@ -305,6 +305,21 @@ func TestValidateNetworkDuplicates_1toN_MixedNetworks(t *testing.T) {
 
 // --- ResolveNICModes ---
 
+// pairsBySourceFromMap groups a NetworkMap's pairs by Source.ID, mimicking the
+// resolved-ID-keyed map each adapter's buildNICResolver builds from inventory
+// lookups. Tests that exercise name/type-based sources build pairsBySource
+// directly, keyed by the NIC's own resolved network ID instead.
+func pairsBySourceFromMap(nm *api.NetworkMap) map[string][]api.NetworkPair {
+	if nm == nil {
+		return nil
+	}
+	pairs := map[string][]api.NetworkPair{}
+	for _, pair := range nm.Spec.Map {
+		pairs[pair.Source.ID] = append(pairs[pair.Source.ID], pair)
+	}
+	return pairs
+}
+
 func TestResolveNICModes_NilNetworkMap_PreserveTrue(t *testing.T) {
 	nics := []NICRef{{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"}}
 	modes := ResolveNICModes(nics, nil, true)
@@ -326,7 +341,7 @@ func TestResolveNICModes_EmptyNetworkIPMode_PreserveTrue(t *testing.T) {
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Pod}},
 	}}}
 	nics := []NICRef{{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"}}
-	modes := ResolveNICModes(nics, nm, true)
+	modes := ResolveNICModes(nics, pairsBySourceFromMap(nm), true)
 	if modes["aa:bb:cc:dd:ee:01"] != "preserve" {
 		t.Errorf("expected 'preserve', got %q", modes["aa:bb:cc:dd:ee:01"])
 	}
@@ -337,7 +352,7 @@ func TestResolveNICModes_EmptyNetworkIPMode_PreserveFalse(t *testing.T) {
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Pod}},
 	}}}
 	nics := []NICRef{{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"}}
-	modes := ResolveNICModes(nics, nm, false)
+	modes := ResolveNICModes(nics, pairsBySourceFromMap(nm), false)
 	if modes["aa:bb:cc:dd:ee:01"] != "none" {
 		t.Errorf("expected 'none', got %q", modes["aa:bb:cc:dd:ee:01"])
 	}
@@ -348,7 +363,7 @@ func TestResolveNICModes_NetworkIPModeOverridesPlanLevel(t *testing.T) {
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Pod}, NetworkIPMode: api.NetworkIPModeDHCP},
 	}}}
 	nics := []NICRef{{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"}}
-	modes := ResolveNICModes(nics, nm, true)
+	modes := ResolveNICModes(nics, pairsBySourceFromMap(nm), true)
 	if modes["aa:bb:cc:dd:ee:01"] != "dhcp" {
 		t.Errorf("networkIPMode should override plan-level, expected 'dhcp', got %q", modes["aa:bb:cc:dd:ee:01"])
 	}
@@ -359,7 +374,7 @@ func TestResolveNICModes_PreserveOverridesPreserveFalse(t *testing.T) {
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Pod}, NetworkIPMode: api.NetworkIPModePreserve},
 	}}}
 	nics := []NICRef{{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"}}
-	modes := ResolveNICModes(nics, nm, false)
+	modes := ResolveNICModes(nics, pairsBySourceFromMap(nm), false)
 	if modes["aa:bb:cc:dd:ee:01"] != "preserve" {
 		t.Errorf("networkIPMode=preserve should override preserveStaticIPs=false, got %q", modes["aa:bb:cc:dd:ee:01"])
 	}
@@ -373,7 +388,7 @@ func TestResolveNICModes_UnmappedNICSkipped(t *testing.T) {
 		{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"},
 		{MAC: "aa:bb:cc:dd:ee:02", NetworkID: "net-unmapped"},
 	}
-	modes := ResolveNICModes(nics, nm, true)
+	modes := ResolveNICModes(nics, pairsBySourceFromMap(nm), true)
 	if len(modes) != 1 {
 		t.Errorf("expected 1 entry, got %d", len(modes))
 	}
@@ -395,7 +410,7 @@ func TestResolveNICModes_MixedModes(t *testing.T) {
 		{MAC: "mac-3", NetworkID: "net-3"},
 		{MAC: "mac-4", NetworkID: "net-4"},
 	}
-	modes := ResolveNICModes(nics, nm, true)
+	modes := ResolveNICModes(nics, pairsBySourceFromMap(nm), true)
 	if modes["mac-1"] != "preserve" {
 		t.Errorf("mac-1: expected 'preserve', got %q", modes["mac-1"])
 	}
@@ -407,6 +422,29 @@ func TestResolveNICModes_MixedModes(t *testing.T) {
 	}
 	if modes["mac-4"] != "preserve" {
 		t.Errorf("mac-4: expected 'preserve' (plan-level fallback), got %q", modes["mac-4"])
+	}
+}
+
+// TestResolveNICModes_NameBasedSource_HonorsOverride is the Defect B regression test:
+// a NetworkMap source specified by Name (Source.ID empty, as buildNICResolver
+// produces for name/type-based sources) must still resolve mode overrides once
+// the caller has resolved it to the NIC's actual (inventory) network ID — exactly
+// how vsphere/hyperv's buildNICResolver key their pairsBySource maps.
+func TestResolveNICModes_NameBasedSource_HonorsOverride(t *testing.T) {
+	nameBasedPair := api.NetworkPair{
+		Source:        api.NetworkSourceRef{Ref: ref.Ref{Name: "vlan100"}},
+		Destination:   api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"},
+		NetworkIPMode: api.NetworkIPModeNone,
+	}
+	// buildNICResolver resolves the name-based source via inventory and keys
+	// pairsBySource by the resolved network ID, not the (empty) Source.ID.
+	pairsBySource := map[string][]api.NetworkPair{
+		"network-52": {nameBasedPair},
+	}
+	nics := []NICRef{{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "network-52"}}
+	modes := ResolveNICModes(nics, pairsBySource, true)
+	if mode, ok := modes["aa:bb:cc:dd:ee:01"]; !ok || mode != "none" {
+		t.Errorf("expected name-based source's 'none' override to apply, got %q (ok=%v)", mode, ok)
 	}
 }
 
@@ -423,7 +461,7 @@ func TestResolveNICModes_1toN_DifferentNetworkIPMode(t *testing.T) {
 		{MAC: "mac-1", NetworkID: "net-1"},
 		{MAC: "mac-2", NetworkID: "net-1"},
 	}
-	modes := ResolveNICModes(nics, nm, true)
+	modes := ResolveNICModes(nics, pairsBySourceFromMap(nm), true)
 	if modes["mac-1"] != "preserve" {
 		t.Errorf("mac-1: expected 'preserve' (from row 0), got %q", modes["mac-1"])
 	}
@@ -443,7 +481,7 @@ func TestResolveNICModes_1toN_PoolExhausted(t *testing.T) {
 		{MAC: "mac-2", NetworkID: "net-1"},
 		{MAC: "mac-3", NetworkID: "net-1"},
 	}
-	modes := ResolveNICModes(nics, nm, true)
+	modes := ResolveNICModes(nics, pairsBySourceFromMap(nm), true)
 	if modes["mac-1"] != "preserve" {
 		t.Errorf("mac-1: expected 'preserve', got %q", modes["mac-1"])
 	}
@@ -467,7 +505,7 @@ func TestResolveNICModes_1toN_MixedNetworks(t *testing.T) {
 		{MAC: "mac-2", NetworkID: "net-1"},
 		{MAC: "mac-3", NetworkID: "net-2"},
 	}
-	modes := ResolveNICModes(nics, nm, false)
+	modes := ResolveNICModes(nics, pairsBySourceFromMap(nm), false)
 	if modes["mac-1"] != "preserve" {
 		t.Errorf("mac-1: expected 'preserve', got %q", modes["mac-1"])
 	}
