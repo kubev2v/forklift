@@ -1665,8 +1665,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 
-			switch r.Source.Provider.Type() {
-			case api.Ova, api.VSphere, api.HyperV, api.EC2, api.Azure:
+			if r.Source.Provider.RequiresConversion() {
 				// fetch config from the conversion pod
 				pod, err := r.kubevirt.GetGuestConversionPod(vm)
 				if err != nil {
