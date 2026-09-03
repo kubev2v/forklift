@@ -560,12 +560,6 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 	return pvc.Name
 }
 
-func nicRefsFromVM(vm *model.VM) []planbase.NICRef {
-	return planbase.NICRefsFrom(vm.NICs, func(n hyperv.NIC) planbase.NICRef {
-		return planbase.NICRef{MAC: n.MAC, NetworkID: n.Network.ID}
-	})
-}
-
 func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
@@ -587,11 +581,18 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		core.EnvVar{Name: "V2V_diskPath", Value: strings.Join(diskPaths, ",")},
 	)
 
-	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
-	if planbase.HasPreserveMode(modeByMAC) {
+	nicKeys, pairsBySource := r.buildNICResolver(vm.NICs)
+	macs := make([]string, len(vm.NICs))
+	for i, nic := range vm.NICs {
+		macs[i] = nic.MAC
+	}
+	modeByMAC := planbase.ResolveNICModes(planbase.NICRefsFromKeys(macs, nicKeys), pairsBySource, r.Plan.Spec.PreserveStaticIPs)
+	// A per-network "preserve" override applies even when the plan-level flag is false.
+	if r.Plan.Spec.PreserveStaticIPs || planbase.HasPreserveMode(modeByMAC) {
 		macsToIps := r.mapMacStaticIps(vm, modeByMAC)
 		if macsToIps != "" {
 			env = append(env,
+				core.EnvVar{Name: "V2V_preserveStaticIPs", Value: "true"},
 				core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps},
 			)
 		}
