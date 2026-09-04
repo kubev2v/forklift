@@ -67,6 +67,7 @@ const (
 	populatorPodPrefix      = "populate"
 	populatorPodVolumeName  = "target"
 	populatorPvcPrefix      = "prime"
+	csiLabelPrefix          = "volume.csi.k8s.io/"
 	populatedFromAnnoSuffix = "populated-from"
 	annSelectedNode         = "volume.kubernetes.io/selected-node"
 	controllerNameSuffix    = "populator"
@@ -85,6 +86,8 @@ const (
 
 	labelSourceHost = api.LabelSourceHost
 )
+
+var primePVCMigrationLabelKeys = []string{"migration", "plan", "vmID"}
 
 type empty struct{}
 
@@ -485,6 +488,26 @@ func (c *controller) runWorker() {
 	}
 }
 
+// primePVCLabelsFromSource returns labels to apply to the prime PVC: plan/migration
+// metadata plus CSI affinity labels required for co-located provisioning.
+func primePVCLabelsFromSource(source map[string]string) map[string]string {
+	if len(source) == 0 {
+		return nil
+	}
+	labels := make(map[string]string)
+	for _, key := range primePVCMigrationLabelKeys {
+		if val, ok := source[key]; ok {
+			labels[key] = val
+		}
+	}
+	for key, val := range source {
+		if strings.HasPrefix(key, csiLabelPrefix) {
+			labels[key] = val
+		}
+	}
+	return labels
+}
+
 func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName string) error {
 	var err error
 
@@ -717,12 +740,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 			// If PVC' doesn't exist yet, create it
 			if pvcPrime == nil {
-				pvcPrimeLabels := make(map[string]string)
-				for _, key := range []string{"migration", "plan", "vmID"} {
-					if val, ok := pvc.Labels[key]; ok {
-						pvcPrimeLabels[key] = val
-					}
-				}
+				// Copy plan/migration labels and CSI affinity labels (e.g. affinity-source-naa)
+				// so drivers co-locate the prime volume without duplicating provider identity labels.
+				pvcPrimeLabels := primePVCLabelsFromSource(pvc.Labels)
 				pvcPrime = &corev1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      pvcPrimeName,
