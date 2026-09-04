@@ -576,12 +576,6 @@ func (d *WinRMDomain) GetNICs() ([]NICInfo, error) {
 	return nics, nil
 }
 
-func (d *WinRMDomain) Shutdown(_ context.Context) error {
-	cmd := ps.BuildCommand(ps.StopVM, d.data().Name)
-	_, err := d.driver.ExecuteCommand(cmd)
-	return err
-}
-
 func (d *WinRMDomain) Free() error {
 	return nil // No resources to free for WinRM
 }

@@ -1,7 +1,6 @@
 package driver
 
 import (
-	"context"
 	"time"
 )
 
@@ -70,7 +69,6 @@ type Domain interface {
 	GetNICs() ([]NICInfo, error)
 	// GetComputerName returns the cluster node hosting this VM, or "" for local VMs.
 	GetComputerName() string
-	Shutdown(ctx context.Context) error
 	Free() error
 }
 
