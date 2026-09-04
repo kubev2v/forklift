@@ -14,12 +14,15 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/settings"
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/fault"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vapi/rest"
+	"github.com/vmware/govmomi/vapi/tags"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -271,7 +274,197 @@ func (r *Client) Close() {
 	r.hostClients = nil
 }
 
+// Finalize is called in a goroutine after all VMs in the plan have completed.
+// If tagging is enabled, it attaches a vSphere tag to every successfully migrated source VM.
+// All errors are logged only; they must not affect the already-completed migration.
 func (c *Client) Finalize(vms []*planapi.VMStatus, planName string) {
+	defer func() {
+		if r := recover(); r != nil {
+			c.Log.Info("Recovered from panic in Finalize", "err", r)
+		}
+	}()
+
+	// Skip for standalone ESXi — tagging requires vCenter.
+	if c.Source.Provider.Spec.Settings[v1beta1.SDK] == v1beta1.ESXI {
+		c.Log.V(1).Info("Skipping post-migration tagging for standalone ESXi provider")
+		return
+	}
+
+	// Early filter — before opening any connection, check if there's work to do.
+	var succeeded []*planapi.VMStatus
+	for _, vm := range vms {
+		if vm.HasCondition(v1beta1.ConditionSucceeded) {
+			succeeded = append(succeeded, vm)
+		}
+	}
+
+	if len(succeeded) == 0 {
+		c.Log.V(1).Info("No VMs succeeded — skipping post-migration tagging")
+		return
+	}
+
+	if !settings.Settings.PostMigrationTaggingEnabled {
+		c.Log.V(1).Info("Post-migration tagging is disabled")
+		return
+	}
+
+	// Open a fresh REST session local to this goroutine.
+	restClient, err := c.connectREST()
+	if err != nil {
+		c.Log.Error(err, "Failed to connect to vSphere REST API for post-migration tagging")
+		return
+	}
+	defer func() { _ = restClient.Logout(context.TODO()) }()
+
+	c.finalizeTagMigrated(context.TODO(), restClient, succeeded)
+}
+
+// connectREST opens a fresh vSphere VAPI REST session using provider credentials.
+// Returns a REST client owned by the caller. Does not mutate c.client.
+func (c *Client) connectREST() (*rest.Client, error) {
+	url, err := liburl.Parse(c.Source.Provider.Spec.URL)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	url.User = liburl.UserPassword(c.user(), c.password())
+	soapClient := soap.NewClient(url, base.GetInsecureSkipVerifyFlag(c.Source.Secret))
+	soapClient.SetThumbprint(url.Host, c.thumbprint())
+	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	restClient := rest.NewClient(vimClient)
+	if err := restClient.Login(context.TODO(), url.User); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	return restClient, nil
+}
+
+// finalizeTagMigrated idempotently ensures the configured category and tag exist,
+// then attaches the tag to all succeeded VMs in a batch API call.
+// Assumes vms contains only succeeded VMs (filtered by Finalize).
+func (c *Client) finalizeTagMigrated(ctx context.Context, restClient *rest.Client, vms []*planapi.VMStatus) {
+	if len(vms) == 0 {
+		return
+	}
+
+	tagManager := tags.NewManager(restClient)
+	tagID, err := c.ensureTag(ctx, tagManager)
+	if err != nil {
+		c.Log.Error(err, "Failed to ensure post-migration tag exists")
+		return
+	}
+
+	// Build the list of VM morefs.
+	var refs []types.ManagedObjectReference
+	for _, vm := range vms {
+		refs = append(refs, types.ManagedObjectReference{
+			Type:  "VirtualMachine",
+			Value: vm.ID,
+		})
+	}
+
+	// Batch-attach the tag. This is idempotent: if a VM is already tagged, it's a no-op.
+	// AttachTagToMultipleObjects was added in vSphere 6.5.
+	err = tagManager.AttachTagToMultipleObjects(ctx, tagID, refsToMoReferences(refs))
+	if err != nil {
+		c.Log.Error(err, "Failed to batch-attach post-migration tag", "count", len(refs))
+		return
+	}
+
+	c.Log.Info("Attached post-migration tag to migrated VMs",
+		"category", settings.Settings.PostMigrationTagCategory,
+		"tag", settings.Settings.PostMigrationTagName,
+		"count", len(refs))
+}
+
+// ensureTag guarantees the configured category and tag exist in vSphere and
+// returns the tag URN. Creates category/tag if absent.
+// Safe to call concurrently — handles create races via list-after-create-failure.
+func (c *Client) ensureTag(ctx context.Context, tagManager *tags.Manager) (string, error) {
+	categoryName := settings.Settings.PostMigrationTagCategory
+	tagName := settings.Settings.PostMigrationTagName
+
+	categoryID, err := c.resolveOrCreateTagCategory(ctx, tagManager, categoryName)
+	if err != nil {
+		return "", err
+	}
+
+	return c.resolveOrCreateTag(ctx, tagManager, categoryID, tagName)
+}
+
+// resolveOrCreateTagCategory ensures the tag category exists and returns its ID.
+// Safe to call concurrently — handles create races via get-after-create-failure.
+func (c *Client) resolveOrCreateTagCategory(ctx context.Context, tagManager *tags.Manager, categoryName string) (string, error) {
+	cat, err := tagManager.GetCategory(ctx, categoryName)
+	if err != nil {
+		if !rest.IsStatusError(err, 404) {
+			return "", liberr.Wrap(err, "category", categoryName)
+		}
+		// Category doesn't exist — create it.
+		categoryID, err := tagManager.CreateCategory(ctx, &tags.Category{
+			Name:            categoryName,
+			Cardinality:     "MULTIPLE",
+			AssociableTypes: []string{"VirtualMachine"},
+		})
+		if err != nil {
+			// Create can fail with 400 if another caller created it concurrently.
+			cat, getErr := tagManager.GetCategory(ctx, categoryName)
+			if getErr != nil {
+				return "", liberr.Wrap(err, "category", categoryName)
+			}
+			return cat.ID, nil
+		}
+		return categoryID, nil
+	}
+	return cat.ID, nil
+}
+
+// resolveOrCreateTag ensures the tag exists in the category and returns its ID.
+// Safe to call concurrently — handles create races via list-after-create-failure.
+func (c *Client) resolveOrCreateTag(ctx context.Context, tagManager *tags.Manager, categoryID, tagName string) (string, error) {
+	// Only create after successful list confirms absence.
+	existingTags, err := tagManager.GetTagsForCategory(ctx, categoryID)
+	if err != nil {
+		// List failure is fatal — cannot determine if tag exists.
+		return "", liberr.Wrap(err, "category", categoryID)
+	}
+	for _, t := range existingTags {
+		if t.Name == tagName {
+			return t.ID, nil
+		}
+	}
+
+	// Tag confirmed absent — create it.
+	tagID, err := tagManager.CreateTag(ctx, &tags.Tag{
+		Name:       tagName,
+		CategoryID: categoryID,
+	})
+	if err != nil {
+		// Create can fail with 400 if another caller created it concurrently.
+		existingTags, getErr := tagManager.GetTagsForCategory(ctx, categoryID)
+		if getErr != nil {
+			return "", liberr.Wrap(err, "tag", tagName)
+		}
+		for _, t := range existingTags {
+			if t.Name == tagName {
+				return t.ID, nil
+			}
+		}
+		return "", liberr.Wrap(err, "tag", tagName)
+	}
+
+	return tagID, nil
+}
+
+// refsToMoReferences converts []ManagedObjectReference to []mo.Reference.
+// ManagedObjectReference implements mo.Reference via its Reference() method.
+func refsToMoReferences(refs []types.ManagedObjectReference) []mo.Reference {
+	result := make([]mo.Reference, len(refs))
+	for i := range refs {
+		result[i] = refs[i]
+	}
+	return result
 }
 
 func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
