@@ -35,6 +35,7 @@ import (
 	migbase "github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	hvwebmodel "github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	ctrlutil "github.com/kubev2v/forklift/pkg/controller/util"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
@@ -242,6 +243,11 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 			return
 		}
 		res.inPlace = !useV2v || r.IsCopyOffload(res.pvcs)
+		if r.Source.Provider.Type() == api.HyperV && r.Plan.Spec.PreCopySourceDisks {
+			// The init container converts the VHDX to raw on the target block
+			// device, so virt-v2v only needs in-place guest customization.
+			res.inPlace = true
+		}
 	}
 
 	var vddkConfigMap *core.ConfigMap
@@ -321,6 +327,16 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 		res.podConfig.Environment = append(res.podConfig.Environment, core.EnvVar{Name: "V2V_NewName", Value: r.getNewVMName(vm)})
 	}
 
+	if r.Source.Provider.Type() == api.HyperV && r.Plan.Spec.PreCopySourceDisks {
+		var initContainer core.Container
+		initContainer, err = r.buildHyperVPreCopyInitContainer(&res)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		res.podConfig.ExtraInitContainers = append(res.podConfig.ExtraInitContainers, initContainer)
+	}
+
 	res.ready = true
 	if podType == convctx.VirtV2vInspectionPod && step != nil {
 		var inspEnv []core.EnvVar
@@ -355,6 +371,9 @@ func (r *KubeVirt) checkProviderReady(vmID string) (ready bool, err error) {
 // should use InPlace or Remote conversion based on the plan transfer mode
 // and PVC copy-offload annotations.
 func (r *KubeVirt) ResolveConversionType(vm *plan.VMStatus) (api.ConversionType, error) {
+	if r.Source.Provider.Type() == api.HyperV && r.Plan.Spec.PreCopySourceDisks {
+		return api.InPlace, nil
+	}
 	useV2v, err := r.Plan.ShouldUseV2vForTransfer(vm.Ref)
 	if err != nil {
 		return "", err
@@ -475,8 +494,9 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 				NodeSelector:               resources.podConfig.PodNodeSelector,
 				RequestKVM:                 resources.podConfig.RequestKVM,
 			},
-			ExtraVolumes: resources.extraVolumes,
-			ExtraMounts:  resources.extraMounts,
+			ExtraVolumes:        resources.extraVolumes,
+			ExtraMounts:         resources.extraMounts,
+			ExtraInitContainers: resources.podConfig.ExtraInitContainers,
 		},
 	}
 
@@ -696,6 +716,123 @@ func (r *KubeVirt) GetDeepInspectionConversion(vm *plan.VMStatus) (*api.Conversi
 	return r.getConversion(labels)
 }
 
+// getHyperVDiskPaths returns the disk paths for a Hyper-V VM. The source
+// inventory exposes disk details in different shapes depending on the provider
+// implementation, so inspect the VM status generically for path-bearing values.
+func (r *KubeVirt) getHyperVDiskPaths(vm *plan.VMStatus) ([]string, error) {
+	if vm == nil {
+		return nil, liberr.New("Hyper-V VM is nil")
+	}
+	srcVM, err := r.Source.Inventory.VM(&vm.Ref)
+	if err != nil {
+		return nil, liberr.Wrap(err, "vm", vm.String())
+	}
+	hvVM, ok := srcVM.(*hvwebmodel.VM)
+	if !ok {
+		return nil, liberr.New("unexpected VM type for Hyper-V provider")
+	}
+	var paths []string
+	for _, disk := range hvVM.Disks {
+		if disk.SMBPath != "" {
+			paths = append(paths, disk.SMBPath)
+		}
+	}
+	if len(paths) == 0 {
+		return nil, liberr.New("no Hyper-V disk SMB paths found for VM")
+	}
+	return paths, nil
+}
+
+// CreateDeepInspectionConversionHyperV creates a DeepInspection Conversion CR
+// for a Hyper-V VM. disks are accessed directly via SMB after power-off.
+func (r *KubeVirt) CreateDeepInspectionConversionHyperV(
+	vm *plan.VMStatus, planName, planID string,
+) (*api.Conversion, error) {
+	// Build SMB PV/PVC (same as virt-v2v pod uses)
+	pv := r.BuildPVForSMB(vm)
+	pv, err := r.EnsurePVForSMB(pv)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	pvc := r.BuildPVCForSMB(pv, vm)
+	pvc, err = r.EnsureProviderStoragePVC(pvc, api.HyperV)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	// Get disk paths from inventory (system disk only for performance)
+	diskPaths, err := r.getHyperVDiskPaths(vm)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	// Inspect only the first/system disk to avoid slow SMB random I/O
+	systemDiskPath := diskPaths[0]
+
+	// Connection secret must live next to the inspection pod so the
+	// conversion ensurer can mount it via DestinationClient.
+	connSecretData := map[string][]byte{
+		"smbUrl": []byte(hvutil.SMBUrl(r.Source.Secret)),
+	}
+	connLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID,
+		map[string]string{kConnection: "true"})
+	connSecretSpec := r.buildConversionSecret(
+		r.Plan.Spec.TargetNamespace,
+		planName+"-"+vm.ID+"-di-",
+		connLabels,
+		connSecretData,
+	)
+	connSecret, err := r.ensureConversionSecret(r.Destination.Client, connSecretSpec)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	crLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID, nil)
+	spec := api.ConversionSpec{
+		Type:            api.DeepInspection,
+		TargetNamespace: r.Plan.Spec.TargetNamespace,
+		Destination: core.ObjectReference{
+			Namespace: r.Destination.Provider.Namespace,
+			Name:      r.Destination.Provider.Name,
+		},
+		VM: vm.Ref,
+		Connection: api.Connection{
+			Secret: core.ObjectReference{
+				Namespace: connSecret.Namespace,
+				Name:      connSecret.Name,
+			},
+		},
+		Settings: map[string]string{
+			"V2V_SOURCE":    "hyperv",
+			"V2V_DISK_PATH": systemDiskPath,
+		},
+		XfsCompatibility: r.Plan.Spec.XfsCompatibility,
+		// No VDDKImage for Hyper-V
+		ExtraVolumes: []core.Volume{
+			{
+				Name: "hyperv-storage",
+				VolumeSource: core.VolumeSource{
+					PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+						ClaimName: pvc.Name,
+						ReadOnly:  true,
+					},
+				},
+			},
+		},
+		ExtraMounts: []core.VolumeMount{
+			{
+				Name:      "hyperv-storage",
+				MountPath: "/hyperv",
+				ReadOnly:  true,
+			},
+		},
+		PodSettings: api.PodSettings{
+			ServiceAccount: resolveServiceAccount(r.Plan),
+		},
+	}
+	cr := r.buildConversion(planName, vm.ID, crLabels, spec)
+	return r.ensureConversion(cr)
+}
+
 // CreateDeepInspectionConversion creates a new DeepInspection Conversion CR and
 // returns it.
 func (r *KubeVirt) CreateDeepInspectionConversion(
@@ -826,14 +963,19 @@ func (r *KubeVirt) DeleteAllConversions(vm *plan.VMStatus) error {
 	return nil
 }
 
-// deleteConversionPod finds the pod that was created for the given Conversion
-// CR and deletes it. For DeepInspection the pod lives on the management cluster
-// for all other types it lives on the destination cluster.
-func (r *KubeVirt) deleteConversionPod(cr *api.Conversion) error {
-	cl := r.Destination.Client
-	if cr.Spec.Type == api.DeepInspection {
-		cl = r.Client
+// conversionWorkloadClient returns the client for Conversion pods and secrets.
+// Empty Destination uses the management cluster, otherwise the destination.
+func (r *KubeVirt) conversionWorkloadClient(cr *api.Conversion) client.Client {
+	if cr.Spec.Destination.Name == "" {
+		return r.Client
 	}
+	return r.Destination.Client
+}
+
+// deleteConversionPod finds the pod that was created for the given Conversion
+// CR and deletes it.
+func (r *KubeVirt) deleteConversionPod(cr *api.Conversion) error {
+	cl := r.conversionWorkloadClient(cr)
 	matchLabels := map[string]string{
 		convctx.LabelVM:             cr.Labels[convctx.LabelVM],
 		convctx.LabelConversionType: string(cr.Spec.Type),
@@ -879,11 +1021,7 @@ func (r *KubeVirt) deleteConversionSecrets(cr *api.Conversion) error {
 		return nil
 	}
 
-	// DeepInspection secrets live on the management cluster.
-	cl := r.Destination.Client
-	if cr.Spec.Type == api.DeepInspection {
-		cl = r.Client
-	}
+	cl := r.conversionWorkloadClient(cr)
 	matchLabels := map[string]string{
 		convctx.LabelVM:             vmID,
 		convctx.LabelConversionType: string(cr.Spec.Type),
@@ -2603,28 +2741,43 @@ func (r *KubeVirt) DeletePreflightInspectionPod(vm *plan.VMStatus) (err error) {
 	return
 }
 
-// DeleteDeepInspectionPods deletes any deep inspection pods for the given VM
-// that live on the management cluster.
+// DeleteDeepInspectionPods deletes deep inspection pods for the given VM.
+// vSphere pods run on the management cluster in the plan namespace, Hyper-V
+// pods run on the destination cluster in the target namespace. Both locations
+// are searched so leftover pods from either placement are removed.
 func (r *KubeVirt) DeleteDeepInspectionPods(vm *plan.VMStatus) error {
 	matchLabels := map[string]string{
 		convctx.LabelPlan:           string(r.Plan.UID),
 		convctx.LabelVM:             vm.ID,
 		convctx.LabelConversionType: string(api.DeepInspection),
 	}
-	list := &core.PodList{}
-	if err := r.List(context.TODO(), list,
-		client.InNamespace(r.Plan.Namespace),
-		client.MatchingLabels(matchLabels),
-	); err != nil {
-		return liberr.Wrap(err)
+	locations := []struct {
+		cl client.Client
+		ns string
+	}{
+		{r.Client, r.Plan.Namespace},
+		{r.Destination.Client, r.Plan.Spec.TargetNamespace},
 	}
-	r.Log.Info("Found deep inspection pods to delete.", "count", len(list.Items), "vm", vm.String())
-	for i := range list.Items {
-		pod := &list.Items[i]
-		if err := r.Delete(context.TODO(), pod); err != nil && !k8serr.IsNotFound(err) {
+	for _, loc := range locations {
+		if loc.cl == nil || loc.ns == "" {
+			continue
+		}
+		list := &core.PodList{}
+		if err := loc.cl.List(context.TODO(), list,
+			client.InNamespace(loc.ns),
+			client.MatchingLabels(matchLabels),
+		); err != nil {
 			return liberr.Wrap(err)
 		}
-		r.Log.Info("Deleted deep inspection pod.", "pod", pod.Name, "vm", vm.String())
+		r.Log.Info("Found deep inspection pods to delete.",
+			"count", len(list.Items), "namespace", loc.ns, "vm", vm.String())
+		for i := range list.Items {
+			pod := &list.Items[i]
+			if err := loc.cl.Delete(context.TODO(), pod); err != nil && !k8serr.IsNotFound(err) {
+				return liberr.Wrap(err)
+			}
+			r.Log.Info("Deleted deep inspection pod.", "pod", pod.Name, "vm", vm.String())
+		}
 	}
 	return nil
 }
@@ -3625,14 +3778,20 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 				},
 			},
 		}
-		providerMount := core.VolumeMount{
-			Name:      volumeName,
-			MountPath: mountPath,
+
+		if r.Source.Provider.Type() == api.HyperV && r.Plan.Spec.PreCopySourceDisks {
+			volumes = append(volumes, providerVol)
+			extraVolumes = append(extraVolumes, providerVol)
+		} else {
+			providerMount := core.VolumeMount{
+				Name:      volumeName,
+				MountPath: mountPath,
+			}
+			volumes = append(volumes, providerVol)
+			mounts = append(mounts, providerMount)
+			extraVolumes = append(extraVolumes, providerVol)
+			extraMounts = append(extraMounts, providerMount)
 		}
-		volumes = append(volumes, providerVol)
-		mounts = append(mounts, providerMount)
-		extraVolumes = append(extraVolumes, providerVol)
-		extraMounts = append(extraMounts, providerMount)
 	case api.VSphere:
 		mounts = append(mounts,
 			core.VolumeMount{
@@ -4511,6 +4670,7 @@ func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 			AccessModes: []core.PersistentVolumeAccessMode{
 				core.ReadOnlyMany,
 			},
+			MountOptions: hvutil.SMBMountOptions(sourceProvider.Spec.Settings),
 			PersistentVolumeSource: core.PersistentVolumeSource{
 				CSI: &core.CSIPersistentVolumeSource{
 					Driver:       SMBCSIDriver,
@@ -4582,6 +4742,124 @@ func (r *KubeVirt) BuildPVCForSMB(pv *core.PersistentVolume, vm *plan.VMStatus) 
 		},
 	}
 	return
+}
+
+// buildHyperVPreCopyInitContainer builds an init container that converts
+// each VHDX from the SMB share directly to the target block device using
+// qemu-img convert. Disk paths and target devices must be non-empty and
+// aligned by index, a mismatch would write a source disk onto the wrong
+// block device.
+func (r *KubeVirt) buildHyperVPreCopyInitContainer(res *conversionResources) (core.Container, error) {
+	var diskPaths string
+	for _, env := range res.podConfig.Environment {
+		if env.Name == "V2V_diskPath" {
+			diskPaths = env.Value
+			break
+		}
+	}
+	srcPaths := splitCSV(diskPaths)
+
+	// Build a comma-separated list of target block device paths that
+	// correspond 1:1 with the VHDX paths in V2V_diskPath.
+	var devicePaths []string
+	for _, dev := range res.devices {
+		devicePaths = append(devicePaths, dev.DevicePath)
+	}
+
+	if err := validatePreCopyLists(srcPaths, devicePaths); err != nil {
+		return core.Container{}, err
+	}
+
+	allowPrivilegeEscalation := false
+	return core.Container{
+		Name:            "hyperv-disk-copy",
+		Image:           convctx.GetVirtV2vImage(&res.podConfig),
+		ImagePullPolicy: core.PullAlways,
+		Command:         []string{"bash", "-c"},
+		Args: []string{
+			`set -eo pipefail
+IFS=',' read -ra SRCS <<< "$DISK_PATHS"
+IFS=',' read -ra DEVS <<< "$TARGET_DEVICES"
+if [ ${#SRCS[@]} -eq 0 ] || [ ${#DEVS[@]} -eq 0 ] || [ ${#SRCS[@]} -ne ${#DEVS[@]} ]; then
+  echo "pre-copy: DISK_PATHS and TARGET_DEVICES must be non-empty and the same length (got ${#SRCS[@]} sources, ${#DEVS[@]} devices)" >&2
+  exit 1
+fi
+for i in "${!SRCS[@]}"; do
+  src="${SRCS[$i]}"
+  dev="${DEVS[$i]}"
+  if [ -z "$src" ] || [ -z "$dev" ]; then
+    echo "pre-copy: empty path at index $i" >&2
+    exit 1
+  fi
+  fmt="vhdx"
+  lower_src="${src,,}"
+  case "$lower_src" in *.vhd) fmt="vpc" ;; esac
+  echo "Pre-copy: converting $src -> $dev (qemu-img convert $fmt->raw)"
+  qemu-img convert -p -f "$fmt" -O raw -t writeback -W "$src" "$dev"
+  sync "$dev"
+  echo "Pre-copy done: $dev"
+done`,
+		},
+		Env: []core.EnvVar{
+			{Name: "DISK_PATHS", Value: strings.Join(srcPaths, ",")},
+			{Name: "TARGET_DEVICES", Value: strings.Join(devicePaths, ",")},
+		},
+		VolumeMounts: []core.VolumeMount{
+			{
+				Name:      "hyperv-storage",
+				MountPath: "/hyperv",
+				ReadOnly:  true,
+			},
+		},
+		VolumeDevices: res.devices,
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("100m"),
+				core.ResourceMemory: resource.MustParse("128Mi"),
+			},
+			Limits: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("2"),
+				core.ResourceMemory: resource.MustParse("512Mi"),
+			},
+		},
+		SecurityContext: &core.SecurityContext{
+			AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+			Capabilities:             &core.Capabilities{Drop: []core.Capability{"ALL"}},
+		},
+	}, nil
+}
+
+// splitCSV splits a comma-separated list, preserving empty entries so a
+// missing disk path cannot silently shift later devices left.
+func splitCSV(s string) []string {
+	if s == "" {
+		return nil
+	}
+	return strings.Split(s, ",")
+}
+
+// validatePreCopyLists ensures qemu-img will receive a 1:1 source-to-target
+// pairing before the init container is created.
+func validatePreCopyLists(diskPaths, devicePaths []string) error {
+	if len(diskPaths) == 0 {
+		return fmt.Errorf("hyperv pre-copy: DISK_PATHS is empty")
+	}
+	if len(devicePaths) == 0 {
+		return fmt.Errorf("hyperv pre-copy: TARGET_DEVICES is empty")
+	}
+	if len(diskPaths) != len(devicePaths) {
+		return fmt.Errorf("hyperv pre-copy: %d disk paths vs %d target devices",
+			len(diskPaths), len(devicePaths))
+	}
+	for i := range diskPaths {
+		if strings.TrimSpace(diskPaths[i]) == "" {
+			return fmt.Errorf("hyperv pre-copy: empty disk path at index %d", i)
+		}
+		if strings.TrimSpace(devicePaths[i]) == "" {
+			return fmt.Errorf("hyperv pre-copy: empty target device at index %d", i)
+		}
+	}
+	return nil
 }
 
 // smbPVLabels returns labels for HyperV SMB PV.

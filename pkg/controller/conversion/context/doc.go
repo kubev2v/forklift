@@ -125,6 +125,7 @@ func PodConfigFromSpec(conversion *api.Conversion) PodConfig {
 		env = append(env, core.EnvVar{Name: k, Value: v})
 	}
 	podConfig.Environment = env
+	podConfig.ExtraInitContainers = conversion.Spec.ExtraInitContainers
 
 	return podConfig
 }

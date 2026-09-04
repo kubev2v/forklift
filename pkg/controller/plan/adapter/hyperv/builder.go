@@ -381,16 +381,21 @@ func (r *Builder) mapDataVolume(vm *model.VM, disk hyperv.Disk, diskIndex int, d
 	dvSource := cdi.DataVolumeSource{
 		Blank: &cdi.DataVolumeBlankImage{},
 	}
-	dvSpec := cdi.DataVolumeSpec{
-		Source: &dvSource,
-		Storage: &cdi.StorageSpec{
-			Resources: core.VolumeResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
-				},
+	storageSpec := &cdi.StorageSpec{
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
 			},
-			StorageClassName: &storageClass,
 		},
+		StorageClassName: &storageClass,
+	}
+	if r.Plan.Spec.PreCopySourceDisks {
+		blockMode := core.PersistentVolumeBlock
+		storageSpec.VolumeMode = &blockMode
+	}
+	dvSpec := cdi.DataVolumeSpec{
+		Source:  &dvSource,
+		Storage: storageSpec,
 	}
 
 	dv := dvTemplate.DeepCopy()

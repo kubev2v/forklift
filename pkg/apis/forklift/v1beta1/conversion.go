@@ -201,6 +201,9 @@ type ConversionSpec struct {
 	// Extra volume mounts to add to the conversion pod container.
 	// +optional
 	ExtraMounts []core.VolumeMount `json:"extraMounts,omitempty"`
+	// Extra init containers to prepend to the pod's init container list.
+	// +optional
+	ExtraInitContainers []core.Container `json:"extraInitContainers,omitempty"`
 }
 
 // InspectionConcern is a single issue reported by the deep-inspection process.

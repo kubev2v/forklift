@@ -144,6 +144,12 @@ type PlanSpec struct {
 	// Preserve static IPs of VMs in vSphere
 	// +kubebuilder:default:=true
 	PreserveStaticIPs bool `json:"preserveStaticIPs,omitempty"`
+	// PreCopySourceDisks enables two-phase disk transfer for Hyper-V migrations.
+	// When true, an init container converts the source VHDX files to raw format
+	// directly on the target block device using qemu-img, then virt-v2v performs
+	// only in-place guest customization.
+	// +optional
+	PreCopySourceDisks bool `json:"preCopySourceDisks,omitempty"`
 	// SkipZoneNodeSelector controls whether to skip adding a zone-based node selector to
 	// migrated VMs. By default, the migration automatically reads the availability zone from
 	// the source provider's spec.settings.target-az configuration and adds a node selector
@@ -571,11 +577,23 @@ func (r *Plan) IsSourceProviderOCP() bool {
 
 func (r *Plan) IsSourceProviderVSphere() bool { return r.Provider.Source.Type() == VSphere }
 
+func (r *Plan) IsSourceProviderHyperV() bool {
+	return r.Provider.Source.Type() == HyperV
+}
+
 func (r *Plan) ShouldRunPreflightInspection() bool {
-	return r.IsSourceProviderVSphere() &&
-		r.IsWarm() &&
-		!r.Spec.SkipGuestConversion &&
-		r.Spec.RunPreflightInspection
+	if r.Spec.SkipGuestConversion || !r.Spec.RunPreflightInspection {
+		return false
+	}
+	// VMware: warm only (requires snapshot for disk access)
+	if r.IsSourceProviderVSphere() {
+		return r.IsWarm()
+	}
+	// Hyper-V: only with preCopySourceDisks (SMB mount after power-off)
+	if r.IsSourceProviderHyperV() {
+		return r.Spec.PreCopySourceDisks
+	}
+	return false
 }
 
 // IsUsingOffloadPlugin determines if any of the mappings is using storage offload

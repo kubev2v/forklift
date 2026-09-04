@@ -86,6 +86,10 @@ func (r *Reconciler) validateVDDKImage(conversion *api.Conversion) (err error) {
 	if conversion.Spec.Type != api.DeepInspection {
 		return
 	}
+	// Hyper-V deep inspection uses local disk access via SMB, no VDDK needed
+	if conversion.Spec.Settings["V2V_SOURCE"] == "hyperv" {
+		return
+	}
 	if conversion.Spec.VDDKImage == "" {
 		conversion.Status.SetCondition(libcnd.Condition{
 			Type:     VDDKImageNotSet,
