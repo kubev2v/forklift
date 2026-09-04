@@ -2,7 +2,6 @@ package model
 
 import (
 	"database/sql"
-	"os"
 	"time"
 
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -63,7 +62,7 @@ type Client struct {
 // See: Pool.Open().
 func (r *Client) Open(delete bool) (err error) {
 	if delete {
-		_ = os.Remove(r.path)
+		removeDBFiles(r.path)
 		r.log.V(3).Info("DB file deleted.")
 	}
 	err = r.pool.Open(1, 10, r.path, &r.journal)
@@ -74,7 +73,7 @@ func (r *Client) Open(delete bool) (err error) {
 	defer func() {
 		if err != nil {
 			_ = r.pool.Close()
-			_ = os.Remove(r.path)
+			removeDBFiles(r.path)
 		}
 	}()
 	err = r.build()
@@ -103,7 +102,7 @@ func (r *Client) Close(delete bool) (err error) {
 			"Error closing the session pool.")
 	}
 	if delete {
-		_ = os.Remove(r.path)
+		removeDBFiles(r.path)
 		r.log.V(3).Info("DB file deleted.")
 	}
 
@@ -348,7 +347,9 @@ func (r *Client) EndWatch(watch *Watch) {
 
 // Build the data model.
 func (r *Client) build() (err error) {
-	r.models = append(r.models, &Label{})
+	if !hasLabelModel(r.models) {
+		r.models = append(r.models, &Label{})
+	}
 	r.dm, err = NewModel(r.models)
 	if err != nil {
 		return err
@@ -376,6 +377,15 @@ func (r *Client) build() (err error) {
 	}
 
 	return nil
+}
+
+func hasLabelModel(models []interface{}) bool {
+	for _, m := range models {
+		if _, ok := m.(*Label); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // Database transaction.

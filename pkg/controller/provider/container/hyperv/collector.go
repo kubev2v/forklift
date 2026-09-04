@@ -268,11 +268,14 @@ func (r *Collector) Start() error {
 			r.endWatch()
 			r.log.Info("Stopped.")
 		}()
+		healer := &libmodel.IOErrHealer{DB: r.db, Log: r.log}
 		for {
 			if ctx.canceled() {
 				return
 			}
-			if err := r.run(&ctx); err != nil {
+			err := r.run(&ctx)
+			healer.Observe(err)
+			if err != nil {
 				r.log.Error(err, "Run failed.", "retry", RetryInterval)
 				select {
 				case <-ctx.ctx.Done():
