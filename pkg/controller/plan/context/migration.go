@@ -134,6 +134,20 @@ func (r *Context) NestedVirtualizationSetting(vmRef ref.Ref, sourceDefault bool)
 	return nil
 }
 
+func (r *Context) SelinuxRelabelAtBoot(vmRef ref.Ref) bool {
+	if vm, found := r.Plan.Spec.FindVM(vmRef); found && vm.SelinuxRelabelAtBoot != nil {
+		return *vm.SelinuxRelabelAtBoot
+	}
+	return r.Plan.Spec.SelinuxRelabelAtBoot
+}
+
+func (r *Context) SelinuxRelabelExclude(vmRef ref.Ref) []string {
+	if vm, found := r.Plan.Spec.FindVM(vmRef); found && vm.SelinuxRelabelExclude != nil {
+		return vm.SelinuxRelabelExclude
+	}
+	return r.Plan.Spec.SelinuxRelabelExclude
+}
+
 // Source.
 type Source struct {
 	// Provider
