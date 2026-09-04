@@ -569,20 +569,28 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	return
 }
 
-// buildDatastoreMap builds a map of storage mappings keyed by source datastore ID
+// buildDatastoreMap builds a map of storage mappings keyed by source datastore ID.
+// Duplicate entries for the same datastore are merged so split offload plugins
+// (xcopy in one entry, CSI import in another) work regardless of list order.
 func (r *Builder) buildDatastoreMap() (map[string]*api.StoragePair, error) {
 	dsMap := make(map[string]*api.StoragePair)
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 
 	for i := range dsMapIn {
-		mapped := &dsMapIn[i]
+		mapped := dsMapIn[i]
 		ref := mapped.Source
 		ds := &model.Datastore{}
 		err := r.Source.Inventory.Find(ds, ref)
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
-		dsMap[ds.ID] = mapped
+		if existing, ok := dsMap[ds.ID]; ok {
+			merged := api.MergeStoragePair(*existing, mapped)
+			dsMap[ds.ID] = &merged
+		} else {
+			copy := mapped
+			dsMap[ds.ID] = &copy
+		}
 	}
 
 	return dsMap, nil
