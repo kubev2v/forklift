@@ -209,6 +209,8 @@ func resolveStorageNameToID(ctx context.Context, configFlags *genericclioptions.
 		return resolveOpenStackStorageNameToID(ctx, configFlags, inventoryURL, provider, storageName, insecureSkipTLS)
 	case "ova":
 		return resolveOVAStorageNameToID(ctx, configFlags, inventoryURL, provider, storageName, insecureSkipTLS)
+	case "nutanix":
+		return resolveNutanixStorageNameToID(ctx, configFlags, inventoryURL, provider, storageName, insecureSkipTLS)
 	default:
 		// Default to generic storage endpoint for unknown providers
 		storageInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "storages?detail=4", insecureSkipTLS)
@@ -334,6 +336,42 @@ func resolveAzureStorageNameToID(ctx context.Context, configFlags *genericcliopt
 
 	if len(matchingRefs) == 0 {
 		return nil, fmt.Errorf("disk type '%s' not found in Azure provider inventory", storageName)
+	}
+
+	return matchingRefs, nil
+}
+
+func resolveNutanixStorageNameToID(ctx context.Context, configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, storageName string, insecureSkipTLS bool) ([]ref.Ref, error) {
+	storageInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "storagecontainers?detail=4", insecureSkipTLS)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch storage inventory: %v", err)
+	}
+
+	storageArray, ok := storageInventory.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected data format: expected array for storage inventory")
+	}
+
+	var matchingRefs []ref.Ref
+	for _, item := range storageArray {
+		storage, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, _ := storage["name"].(string)
+		id, _ := storage["id"].(string)
+
+		if name == storageName || id == storageName {
+			matchingRefs = append(matchingRefs, ref.Ref{
+				ID:   id,
+				Name: name,
+			})
+		}
+	}
+
+	if len(matchingRefs) == 0 {
+		return nil, fmt.Errorf("storage container '%s' not found in Nutanix provider inventory", storageName)
 	}
 
 	return matchingRefs, nil

@@ -24,9 +24,10 @@ type ProviderOptions struct {
 	ProjectName string
 	RegionName  string
 	// HyperV specific options
-	SMBUrl      string
-	SMBUser     string
-	SMBPassword string
+	SMBUrl         string
+	SMBUser        string
+	SMBPassword    string
+	HyperVMgmtType string
 	// EC2 specific options
 	EC2Region             string
 	EC2TargetRegion       string
@@ -43,6 +44,11 @@ type ProviderOptions struct {
 	AzureTargetRegion          string
 	AzureSnapshotSku           string
 	AzureSnapshotResourceGroup string
+	// Nutanix specific options
+	NutanixPrismType   string
+	NutanixClusterUUID string
+	// Settings is applied to ProviderSpec.Settings when non-empty
+	Settings map[string]string
 	// DryRun when true builds Provider (and Secret if applicable) without calling the API
 	DryRun bool
 	// OutputFormat is the serialization format for dry-run output ("yaml" or "json")

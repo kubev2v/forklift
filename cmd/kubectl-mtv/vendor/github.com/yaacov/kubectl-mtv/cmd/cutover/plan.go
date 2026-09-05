@@ -19,6 +19,7 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var cutoverTimeStr string
 	var all bool
 	var planNames []string
+	var vmRefs []string
 
 	cmd := &cobra.Command{
 		Use:   "plan",
@@ -27,12 +28,21 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 
 Cutover stops the source VMs and performs the final sync to complete the migration.
 Use this to manually trigger cutover for warm migrations, or to reschedule
-a cutover time. If no cutover time is specified, it defaults to immediately.`,
+a cutover time. If no cutover time is specified, it defaults to immediately.
+
+Use --vm to limit the cutover to specific VMs in the plan (by name or ID)
+instead of the whole plan. All listed VMs get the same cutover time.`,
 		Example: `  # Trigger immediate cutover
   kubectl-mtv cutover plan --name my-warm-migration
 
   # Schedule cutover for a specific time
   kubectl-mtv cutover plan --name my-warm-migration --cutover 2026-12-31T23:00:00Z
+
+  # Schedule cutover for specific VMs only
+  kubectl-mtv cutover plan --name my-warm-migration --cutover 2026-12-31T23:00:00Z --vm vm-1
+
+  # Trigger immediate cutover for specific VMs only
+  kubectl-mtv cutover plan --name my-warm-migration --vm vm-1,vm-2
 
   # Cutover all warm migration plans
   kubectl-mtv cutover plans --all
@@ -52,6 +62,17 @@ a cutover time. If no cutover time is specified, it defaults to immediately.`,
 			}
 			if !all && len(planNames) == 0 {
 				return errors.New("must specify --name or --all")
+			}
+
+			// --vm targets a single plan's VMs, so it can't be combined with --all
+			// or with multiple plan names.
+			if len(vmRefs) > 0 {
+				if all {
+					return errors.New("cannot use --vm with --all")
+				}
+				if len(planNames) > 1 {
+					return errors.New("cannot use --vm with multiple plans")
+				}
 			}
 
 			// Resolve the appropriate namespace based on context and flags
@@ -82,7 +103,7 @@ a cutover time. If no cutover time is specified, it defaults to immediately.`,
 
 			// Loop over each plan name and set cutover time
 			for _, planName := range planNames {
-				err := plan.Cutover(kubeConfigFlags, planName, namespace, cutoverTime)
+				err := plan.Cutover(kubeConfigFlags, planName, namespace, cutoverTime, vmRefs)
 				if err != nil {
 					return err
 				}
@@ -96,6 +117,9 @@ a cutover time. If no cutover time is specified, it defaults to immediately.`,
 	_ = cmd.Flags().MarkHidden("names")
 	cmd.Flags().StringVarP(&cutoverTimeStr, "cutover", "c", "", "Cutover time in ISO8601 format (e.g., 2023-12-31T15:30:00Z, '$(date --iso-8601=sec)'). If not specified, defaults to current time.")
 	cmd.Flags().BoolVar(&all, "all", false, "Set cutover time for all migration plans in the namespace")
+	cmd.Flags().StringSliceVar(&vmRefs, "vm", nil, "VM name(s) or ID(s) to limit the cutover to (comma-separated). Requires a single --name. If omitted, the cutover applies to the whole plan.")
+	cmd.Flags().StringSliceVar(&vmRefs, "vms", nil, "Alias for --vm")
+	_ = cmd.Flags().MarkHidden("vms")
 
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.PlanNameCompletion(kubeConfigFlags))
 

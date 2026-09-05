@@ -19,6 +19,7 @@ import (
 	azureFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/azure"
 	ec2Fetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/ec2"
 	hypervFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/hyperv"
+	nutanixFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/nutanix"
 	openshiftFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/openshift"
 	openstackFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/openstack"
 	ovaFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/ova"
@@ -28,6 +29,7 @@ import (
 	azureMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/azure"
 	ec2Mapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/ec2"
 	hypervMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/hyperv"
+	nutanixMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/nutanix"
 	openshiftMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/openshift"
 	openstackMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/openstack"
 	ovaMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/ova"
@@ -112,6 +114,9 @@ func GetSourceNetworkFetcher(ctx context.Context, configFlags *genericclioptions
 	case "azure":
 		klog.V(4).Infof("DEBUG: Using Azure source network fetcher for %s", providerName)
 		return azureFetcher.NewAzureNetworkFetcher(), nil
+	case "nutanix":
+		klog.V(4).Infof("DEBUG: Using Nutanix source network fetcher for %s", providerName)
+		return nutanixFetcher.NewNetworkFetcher(), nil
 	default:
 		return nil, fmt.Errorf("unsupported source provider type: %s", providerType)
 	}
@@ -158,6 +163,9 @@ func GetTargetNetworkFetcher(ctx context.Context, configFlags *genericclioptions
 	case "azure":
 		klog.V(4).Infof("DEBUG: Using Azure target network fetcher for %s", providerName)
 		return azureFetcher.NewAzureNetworkFetcher(), nil
+	case "nutanix":
+		klog.V(4).Infof("DEBUG: Using Nutanix target network fetcher for %s", providerName)
+		return nutanixFetcher.NewNetworkFetcher(), nil
 	default:
 		return nil, fmt.Errorf("unsupported target provider type: %s", providerType)
 	}
@@ -219,6 +227,9 @@ func GetNetworkMapper(ctx context.Context, configFlags *genericclioptions.Config
 	case "azure":
 		klog.V(4).Infof("DEBUG: Using Azure network mapper for source %s", sourceProviderName)
 		return azureMapper.NewAzureNetworkMapper(), sourceProviderType, targetProviderType, nil
+	case "nutanix":
+		klog.V(4).Infof("DEBUG: Using Nutanix network mapper for source %s", sourceProviderName)
+		return nutanixMapper.NewNetworkMapper(), sourceProviderType, targetProviderType, nil
 	default:
 		return nil, "", "", fmt.Errorf("unsupported source provider type: %s", sourceProviderType)
 	}

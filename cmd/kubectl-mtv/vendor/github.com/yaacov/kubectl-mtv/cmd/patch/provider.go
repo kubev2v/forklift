@@ -94,6 +94,7 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	cmd.Flags().StringVar(&opts.SMBUrl, "smb-url", "", "SMB share URL for HyperV (e.g., //server/share)")
 	cmd.Flags().StringVar(&opts.SMBUser, "smb-user", "", "SMB username (defaults to HyperV username)")
 	cmd.Flags().StringVar(&opts.SMBPassword, "smb-password", "", "SMB password (defaults to HyperV password)")
+	cmd.Flags().StringVar(&opts.HyperVMgmtType, "hyperv-management-type", "", "HyperV management type (e.g., cluster)")
 
 	// EC2 specific flags
 	cmd.Flags().StringVar(&opts.EC2Region, "ec2-region", "", "AWS region where source EC2 instances are located")
@@ -112,6 +113,9 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	cmd.Flags().StringVar(&opts.AzureTargetRegion, "azure-target-region", "", "Target region for cross-region migrations")
 	cmd.Flags().StringVar(&opts.AzureSnapshotSku, "azure-snapshot-sku", "", "Snapshot SKU (Standard_LRS, Standard_ZRS, Premium_LRS)")
 	cmd.Flags().StringVar(&opts.AzureSnapshotResourceGroup, "azure-snapshot-resource-group", "", "Resource group for snapshots")
+
+	cmd.Flags().StringVar(&opts.NutanixPrismType, "nutanix-prism-type", "", "Nutanix Prism endpoint type (central or element)")
+	cmd.Flags().StringVar(&opts.NutanixClusterUUID, "nutanix-cluster-uuid", "", "Nutanix cluster UUID (used with Prism Central)")
 
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.ProviderNameCompletion(kubeConfigFlags))
 	_ = cmd.RegisterFlagCompletionFunc("esxi-clone-method", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {

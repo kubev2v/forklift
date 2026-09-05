@@ -51,7 +51,8 @@ Pair formats:
   - source:target-namespace/target-network - Map to specific NAD
   - source:target-network - Map to NAD in same namespace
   - source:default - Map to pod networking
-  - source:ignored - Skip this network`,
+  - source:ignored - Skip this network
+  - Append ;networkIPMode=preserve|dhcp|none to override plan-level preserveStaticIPs`,
 		Example: `  # Create a network mapping to pod networking
   kubectl-mtv create mapping network --name my-net-map \
     --source vsphere-prod \
@@ -62,7 +63,13 @@ Pair formats:
   kubectl-mtv create mapping network --name my-net-map \
     --source vsphere-prod \
     --target host \
-    --network-pairs "VM Network:openshift-cnv/br-external,Management:default"`,
+    --network-pairs "VM Network:openshift-cnv/br-external,Management:default"
+
+  # Preserve static IPs on one network and use DHCP on another
+  kubectl-mtv create mapping network --name my-net-map \
+    --source vsphere-prod \
+    --target host \
+    --network-pairs "VM Network:default;networkIPMode=preserve,Guest:ignored;networkIPMode=dhcp"`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -97,7 +104,7 @@ Pair formats:
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Network mapping name")
 	cmd.Flags().StringVarP(&sourceProvider, "source", "S", "", "Source provider name")
 	cmd.Flags().StringVarP(&targetProvider, "target", "T", "", "Target provider name")
-	cmd.Flags().StringVar(&networkPairs, "network-pairs", "", "Network mapping pairs in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated)")
+	cmd.Flags().StringVar(&networkPairs, "network-pairs", "", "Network mapping pairs in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated). Append ';networkIPMode=preserve|dhcp|none' to override plan-level preserveStaticIPs")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output mapping CR to stdout instead of creating it")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format for dry-run (json, yaml). Defaults to yaml when --dry-run is used")
 
@@ -153,7 +160,13 @@ plugin configuration for optimized data transfer.`,
   kubectl-mtv create mapping storage --name my-storage-map \
     --source vsphere-prod \
     --target host \
-    --storage-pairs "datastore1:ocs-storagecluster-ceph-rbd;offloadPlugin=vsphere;offloadVendor=ontap"`,
+    --storage-pairs "datastore1:ocs-storagecluster-ceph-rbd;offloadPlugin=vsphere;offloadVendor=ontap"
+
+  # Create a storage mapping with CSI volume import offload
+  kubectl-mtv create mapping storage --name my-csi-map \
+    --source vsphere-prod \
+    --target host \
+    --storage-pairs "datastore1:hpe-sc;offloadPlugin=csiVolumeImport;offloadVendor=primera3par"`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -214,12 +227,12 @@ plugin configuration for optimized data transfer.`,
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Storage mapping name")
 	cmd.Flags().StringVarP(&sourceProvider, "source", "S", "", "Source provider name")
 	cmd.Flags().StringVarP(&targetProvider, "target", "T", "", "Target provider name")
-	cmd.Flags().StringVar(&storagePairs, "storage-pairs", "", "Storage mapping pairs in format 'source:storage-class[;volumeMode=Block|Filesystem][;accessMode=ReadWriteOnce|ReadWriteMany|ReadOnlyMany][;offloadPlugin=vsphere][;offloadSecret=secret-name][;offloadVendor=vantara|ontap|...]' (comma-separated pairs, semicolon-separated parameters)")
+	cmd.Flags().StringVar(&storagePairs, "storage-pairs", "", "Storage mapping pairs in format 'source:storage-class[;volumeMode=Block|Filesystem][;accessMode=ReadWriteOnce|ReadWriteMany|ReadOnlyMany][;offloadPlugin=vsphere|csiVolumeImport][;offloadSecret=secret-name][;offloadVendor=vantara|ontap|...]' (comma-separated pairs, semicolon-separated parameters)")
 	cmd.Flags().StringVar(&defaultVolumeMode, "default-volume-mode", "", "Default volume mode for all storage pairs (Filesystem|Block)")
 	cmd.Flags().StringVar(&defaultAccessMode, "default-access-mode", "", "Default access mode for all storage pairs (ReadWriteOnce|ReadWriteMany|ReadOnlyMany)")
-	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", "Default offload plugin type for all storage pairs (vsphere)")
+	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", flags.OffloadPluginHelp)
 	cmd.Flags().StringVar(&defaultOffloadSecret, "default-offload-secret", "", "Existing offload secret name to use (creates new secret if not provided and offload credentials given)")
-	cmd.Flags().StringVar(&defaultOffloadVendor, "default-offload-vendor", "", "Default offload plugin vendor for all storage pairs (flashsystem|vantara|ontap|primera3par|pureFlashArray|powerflex|powermax|powerstore|infinibox)")
+	cmd.Flags().StringVar(&defaultOffloadVendor, "default-offload-vendor", "", flags.OffloadVendorHelp)
 	cmd.Flags().StringVar(&defaultOffloadMigrationHosts, "default-offload-migration-hosts", "", "Default dedicated ESXi host IDs for XCOPY migrations (+-separated, e.g. host-10+host-11)")
 
 	// Offload secret creation flags
@@ -252,14 +265,14 @@ plugin configuration for optimized data transfer.`,
 
 	// Add completion for offload plugin flag
 	if err := cmd.RegisterFlagCompletionFunc("default-offload-plugin", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"vsphere"}, cobra.ShellCompDirectiveNoFileComp
+		return flags.OffloadPlugins, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		panic(err)
 	}
 
 	// Add completion for offload vendor flag
 	if err := cmd.RegisterFlagCompletionFunc("default-offload-vendor", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"flashsystem", "vantara", "ontap", "primera3par", "pureFlashArray", "powerflex", "powermax", "powerstore", "infinibox"}, cobra.ShellCompDirectiveNoFileComp
+		return flags.OffloadVendors, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		panic(err)
 	}

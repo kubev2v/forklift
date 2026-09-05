@@ -55,6 +55,19 @@ func listClustersOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 			{Title: "DRS", Key: "drsEnabled"},
 			{Title: "HA", Key: "haEnabled"},
 		}
+	case "hyperv":
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "DOMAIN", Key: "domain"},
+		}
+	case "nutanix":
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "VERSION", Key: "version"},
+			{Title: "NODES", Key: "numNodes"},
+		}
 	default:
 		defaultHeaders = []output.Column{
 			{Title: "NAME", Key: "name"},
@@ -66,7 +79,7 @@ func listClustersOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 	// Fetch clusters inventory from the provider based on provider type
 	var data interface{}
 	switch providerType {
-	case "ovirt", "vsphere":
+	case "ovirt", "vsphere", "nutanix", "hyperv":
 		data, err = providerClient.GetClusters(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support cluster inventory", providerType)
