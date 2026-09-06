@@ -148,7 +148,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 		storageClassName := storageMap[*pvc.Spec.StorageClassName].StorageClass
 		dataVolume.Spec = *createDataVolumeSpec(size, storageClassName, url, certConfigMap, secret.Name)
 
-		err = r.Destination.Client.Create(context.TODO(), dataVolume, &client.CreateOptions{})
+		err = r.Destination.Create(context.TODO(), dataVolume, &client.CreateOptions{})
 		if err != nil {
 			if !errors.IsAlreadyExists(err) {
 				r.Log.Error(err, "Failed to create DataVolume")
@@ -179,7 +179,7 @@ func (*Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []
 
 // ResolveDataVolumeIdentifier implements base.Builder
 func (*Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	return dv.ObjectMeta.Annotations[planbase.AnnDiskSource]
+	return dv.Annotations[planbase.AnnDiskSource]
 }
 
 // ResolvePersistentVolumeClaimIdentifier implements base.Builder

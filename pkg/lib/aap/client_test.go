@@ -29,15 +29,15 @@ func TestClientResolveAPIPrefixFromGetAPI(t *testing.T) {
 	apiRootHits := 0
 	jtHits := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/api/" || r.URL.Path == "/api":
+		switch r.URL.Path {
+		case "/api/", "/api":
 			if r.Method != http.MethodGet {
 				t.Fatalf("expected GET, got %s", r.Method)
 			}
 			apiRootHits++
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"current_version": "/api/v2/"}`))
-		case r.URL.Path == "/api/v2/job_templates/":
+		case "/api/v2/job_templates/":
 			jtHits++
 			if r.Method != http.MethodGet {
 				t.Fatalf("expected GET, got %s", r.Method)

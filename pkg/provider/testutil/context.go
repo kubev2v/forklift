@@ -114,17 +114,17 @@ func (b *ContextBuilder) Build() *plancontext.Context {
 
 	// Set up provider reference in plan
 	if b.provider != nil {
-		plan.Referenced.Provider.Source = b.provider
+		plan.Provider.Source = b.provider
 	}
 
 	// Set up network map reference in plan
 	if b.networkMap != nil {
-		plan.Referenced.Map.Network = b.networkMap
+		plan.Map.Network = b.networkMap
 	}
 
 	// Set up storage map reference in plan
 	if b.storageMap != nil {
-		plan.Referenced.Map.Storage = b.storageMap
+		plan.Map.Storage = b.storageMap
 	}
 
 	// Build the context

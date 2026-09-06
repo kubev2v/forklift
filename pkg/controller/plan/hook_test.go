@@ -41,26 +41,26 @@ func hookTestScheme(t *testing.T) *runtime.Scheme {
 
 func savedHookRunnerSettings(t *testing.T) func() {
 	t.Helper()
-	savedServiceAccount := Settings.Migration.ServiceAccount
-	savedRequestsCPU := Settings.Migration.HooksContainerRequestsCpu
-	savedRequestsMemory := Settings.Migration.HooksContainerRequestsMemory
-	savedLimitsCPU := Settings.Migration.HooksContainerLimitsCpu
-	savedLimitsMemory := Settings.Migration.HooksContainerLimitsMemory
-	Settings.Migration.HooksContainerRequestsCpu = "100m"
-	Settings.Migration.HooksContainerRequestsMemory = "128Mi"
-	Settings.Migration.HooksContainerLimitsCpu = "1"
-	Settings.Migration.HooksContainerLimitsMemory = "512Mi"
+	savedServiceAccount := Settings.ServiceAccount
+	savedRequestsCPU := Settings.HooksContainerRequestsCpu
+	savedRequestsMemory := Settings.HooksContainerRequestsMemory
+	savedLimitsCPU := Settings.HooksContainerLimitsCpu
+	savedLimitsMemory := Settings.HooksContainerLimitsMemory
+	Settings.HooksContainerRequestsCpu = "100m"
+	Settings.HooksContainerRequestsMemory = "128Mi"
+	Settings.HooksContainerLimitsCpu = "1"
+	Settings.HooksContainerLimitsMemory = "512Mi"
 	return func() {
-		Settings.Migration.ServiceAccount = savedServiceAccount
-		Settings.Migration.HooksContainerRequestsCpu = savedRequestsCPU
-		Settings.Migration.HooksContainerRequestsMemory = savedRequestsMemory
-		Settings.Migration.HooksContainerLimitsCpu = savedLimitsCPU
-		Settings.Migration.HooksContainerLimitsMemory = savedLimitsMemory
+		Settings.ServiceAccount = savedServiceAccount
+		Settings.HooksContainerRequestsCpu = savedRequestsCPU
+		Settings.HooksContainerRequestsMemory = savedRequestsMemory
+		Settings.HooksContainerLimitsCpu = savedLimitsCPU
+		Settings.HooksContainerLimitsMemory = savedLimitsMemory
 	}
 }
 
 func newHookRunnerForTemplateTest(hookSA, planSA, globalSA string) *HookRunner {
-	Settings.Migration.ServiceAccount = globalSA
+	Settings.ServiceAccount = globalSA
 	return &HookRunner{
 		Context: &plancontext.Context{
 			Plan: &api.Plan{

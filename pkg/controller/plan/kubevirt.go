@@ -407,7 +407,7 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 	maps.Copy(labels, resources.podConfig.PodLabels)
 
 	list := &api.ConversionList{}
-	err = r.Client.List(context.TODO(), list,
+	err = r.List(context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
 		client.MatchingLabels(labels),
 	)
@@ -493,7 +493,7 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 			sourceNS = r.Plan.Namespace
 		}
 		source := &core.Secret{}
-		if err = r.Client.Get(context.TODO(),
+		if err = r.Get(context.TODO(),
 			types.NamespacedName{Namespace: sourceNS, Name: vm.LUKS.Name}, source,
 		); err != nil {
 			err = liberr.Wrap(err)
@@ -522,7 +522,7 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 		}
 	}
 
-	err = r.Client.Create(context.TODO(), conversion)
+	err = r.Create(context.TODO(), conversion)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -557,7 +557,7 @@ func (r *KubeVirt) getConversionLabels(convType api.ConversionType, vmID, planID
 // all supplied labels. Returns nil (no error) when no match is found.
 func (r *KubeVirt) getConversion(labels map[string]string) (*api.Conversion, error) {
 	list := &api.ConversionList{}
-	if err := r.Client.List(context.TODO(), list,
+	if err := r.List(context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
 		client.MatchingLabels(labels),
 	); err != nil {
@@ -586,7 +586,7 @@ func (r *KubeVirt) buildConversion(planName, vmID string, labels map[string]stri
 // found its Spec is refreshed; otherwise the provided CR is created verbatim.
 func (r *KubeVirt) ensureConversion(cr *api.Conversion) (*api.Conversion, error) {
 	list := &api.ConversionList{}
-	if err := r.Client.List(context.TODO(), list,
+	if err := r.List(context.TODO(), list,
 		client.InNamespace(cr.Namespace),
 		client.MatchingLabels(cr.Labels),
 	); err != nil {
@@ -595,7 +595,7 @@ func (r *KubeVirt) ensureConversion(cr *api.Conversion) (*api.Conversion, error)
 	if len(list.Items) > 0 {
 		existing := &list.Items[0]
 		existing.Spec = cr.Spec
-		if err := r.Client.Update(context.TODO(), existing); err != nil {
+		if err := r.Update(context.TODO(), existing); err != nil {
 			return nil, liberr.Wrap(err)
 		}
 		r.Log.Info("Conversion CR updated.",
@@ -603,7 +603,7 @@ func (r *KubeVirt) ensureConversion(cr *api.Conversion) (*api.Conversion, error)
 			"type", string(existing.Spec.Type))
 		return existing, nil
 	}
-	if err := r.Client.Create(context.TODO(), cr); err != nil {
+	if err := r.Create(context.TODO(), cr); err != nil {
 		return nil, liberr.Wrap(err)
 	}
 	r.Log.Info("Conversion CR created.",
@@ -704,11 +704,11 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 	// Connection secret goes to Plan.Namespace on the management cluster
 	// (DeepInspection pods run there, not on the destination cluster).
 	connSecretData := r.buildDeepInspectionConnectionSecretData()
-	connLabels := r.getConversionLabels(api.DeepInspection, vm.Ref.ID, planID,
+	connLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID,
 		map[string]string{kConnection: "true"})
 	connSecretSpec := r.buildConversionSecret(
 		r.Plan.Namespace,
-		planName+"-"+vm.Ref.ID+"-di-",
+		planName+"-"+vm.ID+"-di-",
 		connLabels,
 		connSecretData,
 	)
@@ -728,16 +728,16 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 			sourceNS = r.Plan.Namespace
 		}
 		source := &core.Secret{}
-		if err = r.Client.Get(context.TODO(),
+		if err = r.Get(context.TODO(),
 			types.NamespacedName{Namespace: sourceNS, Name: vm.LUKS.Name}, source,
 		); err != nil {
 			return nil, liberr.Wrap(err)
 		}
-		luksLabels := r.getConversionLabels(api.DeepInspection, vm.Ref.ID, planID,
+		luksLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID,
 			map[string]string{kLUKS: "true"})
 		luksSecretSpec := r.buildConversionSecret(
 			r.Plan.Namespace,
-			planName+"-"+vm.Ref.ID+"-di-luks-",
+			planName+"-"+vm.ID+"-di-luks-",
 			luksLabels,
 			source.Data,
 		)
@@ -795,7 +795,7 @@ func (r *KubeVirt) DeleteConversion(cr *api.Conversion) error {
 			return err
 		}
 	}
-	if err := r.Client.Delete(context.TODO(), cr); err != nil && !k8serr.IsNotFound(err) {
+	if err := r.Delete(context.TODO(), cr); err != nil && !k8serr.IsNotFound(err) {
 		return liberr.Wrap(err)
 	}
 	r.Log.Info("Conversion CR deleted.",
@@ -809,10 +809,10 @@ func (r *KubeVirt) DeleteConversion(cr *api.Conversion) error {
 func (r *KubeVirt) DeleteAllConversions(vm *plan.VMStatus) error {
 	labels := map[string]string{
 		convctx.LabelPlan: string(r.Plan.UID),
-		convctx.LabelVM:   vm.Ref.ID,
+		convctx.LabelVM:   vm.ID,
 	}
 	list := &api.ConversionList{}
-	if err := r.Client.List(context.TODO(), list,
+	if err := r.List(context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
 		client.MatchingLabels(labels),
 	); err != nil {
@@ -911,7 +911,7 @@ func (r *KubeVirt) deleteConversionSecrets(cr *api.Conversion) error {
 		return nil
 	}
 	v2vList := &core.SecretList{}
-	if err := r.Destination.Client.List(context.TODO(), v2vList,
+	if err := r.Destination.List(context.TODO(), v2vList,
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(map[string]string{
 				convctx.LabelVM: vmID,
@@ -924,7 +924,7 @@ func (r *KubeVirt) deleteConversionSecrets(cr *api.Conversion) error {
 	}
 	for i := range v2vList.Items {
 		s := &v2vList.Items[i]
-		if err := r.Destination.Client.Delete(context.TODO(), s); err != nil && !k8serr.IsNotFound(err) {
+		if err := r.Destination.Delete(context.TODO(), s); err != nil && !k8serr.IsNotFound(err) {
 			return liberr.Wrap(err)
 		}
 		r.Log.V(1).Info("Conversion v2v secret deleted.",
@@ -955,10 +955,10 @@ func (r *KubeVirt) buildDeepInspectionConnectionSecretData() map[string][]byte {
 func (r *KubeVirt) CancelConversion(vm *plan.VMStatus) error {
 	labels := map[string]string{
 		convctx.LabelPlan: string(r.Plan.UID),
-		convctx.LabelVM:   vm.Ref.ID,
+		convctx.LabelVM:   vm.ID,
 	}
 	list := &api.ConversionList{}
-	err := r.Client.List(context.TODO(), list,
+	err := r.List(context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
 		client.MatchingLabels(labels),
 	)
@@ -1264,7 +1264,7 @@ func (r *KubeVirt) getVMVolumes(vm *plan.VMStatus) ([]cnv.Volume, error) {
 // resolveServiceAccount resolves the ServiceAccount for migration pods.
 // Priority: Plan.Spec.ServiceAccount > Settings.Migration.ServiceAccount > "" (namespace default).
 func resolveServiceAccount(plan *api.Plan) string {
-	return cmp.Or(plan.Spec.ServiceAccount, Settings.Migration.ServiceAccount)
+	return cmp.Or(plan.Spec.ServiceAccount, Settings.ServiceAccount)
 }
 
 // CNINetworkConfig represents a CNI network configuration parsed from a NetworkAttachmentDefinition.
@@ -1304,7 +1304,7 @@ func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
 	planLabels := r.planLabels()
 	delete(planLabels, kMigration)
 	vList := &cnv.VirtualMachineList{}
-	err := r.Destination.Client.List(
+	err := r.Destination.List(
 		context.TODO(),
 		vList,
 		&client.ListOptions{
@@ -1325,7 +1325,7 @@ func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
 			})
 	}
 	dvList := &cdi.DataVolumeList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		dvList,
 		r.getListOptionsNamespaced(),
@@ -1339,7 +1339,7 @@ func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
 			dv := &dvList.Items[i]
 			if vm.Owner(dv) {
 				pvc := &core.PersistentVolumeClaim{}
-				err = r.Destination.Client.Get(
+				err = r.Destination.Get(
 					context.TODO(),
 					types.NamespacedName{Namespace: r.Plan.Spec.TargetNamespace, Name: dv.Name},
 					pvc,
@@ -1374,14 +1374,14 @@ func (r *KubeVirt) EnsureNamespace() error {
 
 // Ensure the config map that contains extra configuration for virt-v2v exists on the destination.
 func (r *KubeVirt) EnsureExtraV2vConfConfigMap() error {
-	if len(Settings.Migration.VirtV2vExtraConfConfigMap) == 0 {
+	if len(Settings.VirtV2vExtraConfConfigMap) == 0 {
 		return nil
 	}
 	configMap := &core.ConfigMap{}
-	err := r.Client.Get(
+	err := r.Get(
 		context.TODO(),
 		client.ObjectKey{
-			Name:      Settings.Migration.VirtV2vExtraConfConfigMap,
+			Name:      Settings.VirtV2vExtraConfConfigMap,
 			Namespace: r.Plan.Namespace,
 		},
 		configMap,
@@ -1501,7 +1501,7 @@ func (r *KubeVirt) GetImporterPod(pvc core.PersistentVolumeClaim) (pod *core.Pod
 		return
 	}
 
-	err = r.Destination.Client.Get(
+	err = r.Destination.Get(
 		context.TODO(),
 		types.NamespacedName{
 			Name:      pvc.Annotations[AnnImporterPodName],
@@ -1529,7 +1529,7 @@ func (r *KubeVirt) getImporterPods(pvc *core.PersistentVolumeClaim) (pods []core
 	}
 
 	podList := &core.PodList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		podList,
 		&client.ListOptions{
@@ -1564,7 +1564,7 @@ func (r *KubeVirt) DeleteDataVolumes(vm *plan.VMStatus) (err error) {
 			path.Join(dv.Namespace, dv.Name),
 			"vm",
 			vm.String())
-		err = r.Destination.Client.Delete(context.TODO(), dv.DataVolume)
+		err = r.Destination.Delete(context.TODO(), dv.DataVolume)
 		if err != nil {
 			return
 		}
@@ -1579,7 +1579,7 @@ func (r *KubeVirt) DeleteImporterPods(pvc *core.PersistentVolumeClaim) (err erro
 		return
 	}
 	for _, pod := range pods {
-		err = r.Destination.Client.Delete(context.TODO(), &pod)
+		err = r.Destination.Delete(context.TODO(), &pod)
 		if err != nil {
 			err = liberr.Wrap(err)
 			r.Log.Error(
@@ -1608,7 +1608,7 @@ func (r *KubeVirt) DeleteImporterPods(pvc *core.PersistentVolumeClaim) (err erro
 func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
 	vmLabels := r.vmAllButMigrationLabels(vm.Ref)
 	list := &batch.JobList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -1643,7 +1643,7 @@ func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
 	// One day we'll figure out why client.PropagationPolicy(meta.DeletePropagationBackground) doesn't remove the pods
 	for _, job := range jobNames {
 		podList := &core.PodList{}
-		err = r.Destination.Client.List(
+		err = r.Destination.List(
 			context.TODO(),
 			podList,
 			&client.ListOptions{
@@ -1678,7 +1678,7 @@ func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
 // Ensure the kubevirt VirtualMachine exists on the destination.
 func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 	vms := &cnv.VirtualMachineList{}
-	err := r.Destination.Client.List(
+	err := r.Destination.List(
 		context.TODO(),
 		vms,
 		&client.ListOptions{
@@ -1695,7 +1695,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 		if virtualMachine, err = r.virtualMachine(vm, false); err != nil {
 			return liberr.Wrap(err)
 		}
-		if err = r.Destination.Client.Create(context.TODO(), virtualMachine); err != nil {
+		if err = r.Destination.Create(context.TODO(), virtualMachine); err != nil {
 			return liberr.Wrap(err)
 		}
 		r.Log.Info(
@@ -1713,7 +1713,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 	// set DataVolume owner references so that they'll be cleaned up
 	// when the VirtualMachine is removed.
 	dvs := &cdi.DataVolumeList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		dvs,
 		&client.ListOptions{
@@ -1733,7 +1733,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 		pvcCopy := pvc.DeepCopy()
 		pvc.OwnerReferences = ownerRefs
 		patch := client.MergeFrom(pvcCopy)
-		err = r.Destination.Client.Patch(context.TODO(), pvc, patch)
+		err = r.Destination.Patch(context.TODO(), pvc, patch)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -1746,7 +1746,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 func (r *KubeVirt) DeleteSecret(vm *plan.VMStatus) (err error) {
 	vmLabels := r.vmAllButMigrationLabels(vm.Ref)
 	list := &core.SecretList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -1772,7 +1772,7 @@ func (r *KubeVirt) DeleteSecret(vm *plan.VMStatus) (err error) {
 func (r *KubeVirt) DeleteConfigMap(vm *plan.VMStatus) (err error) {
 	vmLabels := r.vmAllButMigrationLabels(vm.Ref)
 	list := &core.ConfigMapList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -1798,7 +1798,7 @@ func (r *KubeVirt) DeleteConfigMap(vm *plan.VMStatus) (err error) {
 func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
 	vmLabels := r.vmAllButMigrationLabels(vm.Ref)
 	list := &cnv.VirtualMachineList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -1814,7 +1814,7 @@ func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
 	for _, object := range list.Items {
 		foreground := meta.DeletePropagationForeground
 		opts := &client.DeleteOptions{PropagationPolicy: &foreground}
-		err = r.Destination.Client.Delete(context.TODO(), &object, opts)
+		err = r.Destination.Delete(context.TODO(), &object, opts)
 		if err != nil {
 			if k8serr.IsNotFound(err) {
 				err = nil
@@ -1884,7 +1884,7 @@ func (r *KubeVirt) PopulatorVolumes(vmRef ref.Ref) (pvcs []*core.PersistentVolum
 // Ensure the DataVolumes exist on the destination.
 func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVolume) (err error) {
 	dataVolumeList := &cdi.DataVolumeList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		dataVolumeList,
 		&client.ListOptions{
@@ -1898,7 +1898,7 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 
 	for _, dv := range dataVolumes {
 		if !r.isDataVolumeExistsInList(&dv, dataVolumeList) {
-			err = r.Destination.Client.Create(context.TODO(), &dv)
+			err = r.Destination.Create(context.TODO(), &dv)
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
@@ -1979,7 +1979,7 @@ func (r *KubeVirt) ensureVddkConfigMap() (configMap *core.ConfigMap, err error) 
 	}
 
 	list := &core.ConfigMapList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -1994,7 +1994,7 @@ func (r *KubeVirt) ensureVddkConfigMap() (configMap *core.ConfigMap, err error) 
 	if len(list.Items) > 0 {
 		configMap = &list.Items[0]
 		configMap.Data = newConfigMap.Data
-		err = r.Destination.Client.Update(context.TODO(), configMap)
+		err = r.Destination.Update(context.TODO(), configMap)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -2007,7 +2007,7 @@ func (r *KubeVirt) ensureVddkConfigMap() (configMap *core.ConfigMap, err error) 
 				configMap.Name))
 	} else {
 		configMap = newConfigMap
-		err = r.Destination.Client.Create(context.TODO(), configMap)
+		err = r.Destination.Create(context.TODO(), configMap)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -2050,7 +2050,7 @@ func (r *KubeVirt) isDataVolumeExistsInList(dv *cdi.DataVolume, dataVolumeList *
 // Return DataVolumes associated with a VM.
 func (r *KubeVirt) getDVs(vm *plan.VMStatus) (edvs []ExtendedDataVolume, err error) {
 	dvsList := &cdi.DataVolumeList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		dvsList,
 		&client.ListOptions{
@@ -2096,7 +2096,7 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 		kMigration: string(r.Migration.UID),
 	}
 	pvcsList := &core.PersistentVolumeClaimList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		pvcsList,
 		&client.ListOptions{
@@ -2299,12 +2299,12 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 					Command: []string{"/bin/sh", "-c", "exit 0"},
 					Resources: core.ResourceRequirements{
 						Requests: core.ResourceList{
-							core.ResourceCPU:    resource.MustParse(Settings.Migration.VirtV2vContainerRequestsCpu),
-							core.ResourceMemory: resource.MustParse(Settings.Migration.VirtV2vContainerRequestsMemory),
+							core.ResourceCPU:    resource.MustParse(Settings.VirtV2vContainerRequestsCpu),
+							core.ResourceMemory: resource.MustParse(Settings.VirtV2vContainerRequestsMemory),
 						},
 						Limits: core.ResourceList{
-							core.ResourceCPU:    resource.MustParse(Settings.Migration.VirtV2vContainerLimitsCpu),
-							core.ResourceMemory: resource.MustParse(Settings.Migration.VirtV2vContainerLimitsMemory),
+							core.ResourceCPU:    resource.MustParse(Settings.VirtV2vContainerLimitsCpu),
+							core.ResourceMemory: resource.MustParse(Settings.VirtV2vContainerLimitsMemory),
 						},
 					},
 					SecurityContext: &core.SecurityContext{
@@ -2330,7 +2330,7 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 	}
 	convbuilder.SetKvmOnPodSpec(&pod.Spec, shouldRequestKVM(r.Plan.Provider.Source))
 
-	err = r.Client.Create(context.TODO(), pod, &client.CreateOptions{})
+	err = r.Create(context.TODO(), pod, &client.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -2382,7 +2382,7 @@ func (r *KubeVirt) EnsureProviderVirtV2VPVCStatus(vmID string) (ready bool, err 
 		return false, nil
 	}
 
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		pvcs,
 		&client.ListOptions{
@@ -2400,7 +2400,7 @@ func (r *KubeVirt) EnsureProviderVirtV2VPVCStatus(vmID string) (ready bool, err 
 	if len(pvcs.Items) > 1 {
 		for i := range pvcs.Items {
 			pvcVirtV2v := &pvcs.Items[i]
-			if pvcVirtV2v.CreationTimestamp.Time.After(r.Migration.CreationTimestamp.Time) {
+			if pvcVirtV2v.CreationTimestamp.After(r.Migration.CreationTimestamp.Time) {
 				pvc = pvcVirtV2v
 			}
 		}
@@ -2653,7 +2653,7 @@ func (r *KubeVirt) GetPods(vm *plan.VMStatus) (pods *core.PodList, err error) {
 // Gets pods associated with the VM.
 func (r *KubeVirt) GetPodsWithLabels(podLabels map[string]string) (pods *core.PodList, err error) {
 	pods = &core.PodList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		pods,
 		&client.ListOptions{
@@ -2670,7 +2670,7 @@ func (r *KubeVirt) GetPodsWithLabels(podLabels map[string]string) (pods *core.Po
 
 // Deletes an object from destination cluster associated with the VM.
 func (r *KubeVirt) DeleteObject(object client.Object, vm *plan.VMStatus, message, objType string, options ...client.DeleteOption) (err error) {
-	err = r.Destination.Client.Delete(context.TODO(), object, options...)
+	err = r.Destination.Delete(context.TODO(), object, options...)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			err = nil
@@ -2695,12 +2695,12 @@ func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
 	// Build labels that match hook jobs (plan + vmID + resource:hook-config)
 	labels := map[string]string{
 		kPlan:     string(r.Plan.UID),
-		kVM:       vm.Ref.ID,
+		kVM:       vm.ID,
 		kResource: ResourceHookConfig,
 	}
 
 	list := &batch.JobList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -2743,7 +2743,7 @@ func (r *KubeVirt) DeletePopulatedPVCs(vm *plan.VMStatus) error {
 
 func (r *KubeVirt) deleteCorrespondingPrimePVC(pvc *core.PersistentVolumeClaim, vm *plan.VMStatus) error {
 	primePVC := core.PersistentVolumeClaim{}
-	err := r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: fmt.Sprintf("prime-%s", string(pvc.UID))}, &primePVC)
+	err := r.Destination.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: fmt.Sprintf("prime-%s", string(pvc.UID))}, &primePVC)
 	switch {
 	case err != nil && !k8serr.IsNotFound(err):
 		return err
@@ -2765,7 +2765,7 @@ func (r *KubeVirt) deletePopulatedPVC(pvc *core.PersistentVolumeClaim, vm *plan.
 		pvcCopy := pvc.DeepCopy()
 		pvc.Finalizers = nil
 		patch := client.MergeFrom(pvcCopy)
-		if err = r.Destination.Client.Patch(context.TODO(), pvc, patch); err != nil {
+		if err = r.Destination.Patch(context.TODO(), pvc, patch); err != nil {
 			return err
 		}
 	}
@@ -3000,25 +3000,25 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 
 	// Add the original name and ID info to the VM annotations
 	if len(vm.NewName) > 0 {
-		if object.ObjectMeta.Annotations == nil {
-			object.ObjectMeta.Annotations = make(map[string]string)
+		if object.Annotations == nil {
+			object.Annotations = make(map[string]string)
 		}
-		object.ObjectMeta.Annotations[AnnDisplayName] = vm.Name
-		object.ObjectMeta.Annotations[AnnOriginalID] = vm.ID
+		object.Annotations[AnnDisplayName] = vm.Name
+		object.Annotations[AnnOriginalID] = vm.ID
 	}
 
 	sourceLabels, sourceAnnotations, sanitizationReport, tagErr := r.Builder.SourceVMLabelsAndAnnotations(vm.Ref, r.Plan.Spec.TagMapping)
 	if tagErr != nil {
 		r.Log.Error(tagErr, "Failed to get source VM labels/annotations", "vm", vm.String())
 	} else {
-		if object.ObjectMeta.Labels == nil {
-			object.ObjectMeta.Labels = make(map[string]string)
+		if object.Labels == nil {
+			object.Labels = make(map[string]string)
 		}
-		maps.Copy(object.ObjectMeta.Labels, sourceLabels)
-		if object.ObjectMeta.Annotations == nil {
-			object.ObjectMeta.Annotations = make(map[string]string)
+		maps.Copy(object.Labels, sourceLabels)
+		if object.Annotations == nil {
+			object.Annotations = make(map[string]string)
 		}
-		maps.Copy(object.ObjectMeta.Annotations, sourceAnnotations)
+		maps.Copy(object.Annotations, sourceAnnotations)
 		if len(sanitizationReport) > 0 {
 			reportJSON, jsonErr := json.Marshal(sanitizationReport)
 			if jsonErr != nil {
@@ -3027,7 +3027,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 					"namespace", object.Namespace,
 					"annotation", planbase.AnnSanitizedMetadata)
 			} else {
-				object.ObjectMeta.Annotations[planbase.AnnSanitizedMetadata] = string(reportJSON)
+				object.Annotations[planbase.AnnSanitizedMetadata] = string(reportJSON)
 			}
 		}
 	}
@@ -3118,11 +3118,11 @@ func (r *KubeVirt) setInstanceType(vm *plan.VMStatus, object *cnv.VirtualMachine
 }
 
 func (r *KubeVirt) setVmLabels(object *cnv.VirtualMachine) (err error) {
-	if object.ObjectMeta.Labels == nil {
-		object.ObjectMeta.Labels = make(map[string]string)
+	if object.Labels == nil {
+		object.Labels = make(map[string]string)
 	}
 	if r.Plan.Provider.Source.RequiresConversion() {
-		object.ObjectMeta.Labels["guestConverted"] = strconv.FormatBool(!r.Plan.Spec.SkipGuestConversion)
+		object.Labels["guestConverted"] = strconv.FormatBool(!r.Plan.Spec.SkipGuestConversion)
 	}
 	return
 }
@@ -3148,7 +3148,7 @@ func (r *KubeVirt) getInstanceType(vm *plan.VMStatus, instanceTypeName string) (
 
 func (r *KubeVirt) getVirtualMachineInstanceType(instanceTypeName string) (kind string, err error) {
 	virtualMachineInstancetype := &instancetype.VirtualMachineInstancetype{}
-	err = r.Destination.Client.Get(
+	err = r.Destination.Get(
 		context.TODO(),
 		client.ObjectKey{Name: instanceTypeName, Namespace: r.Plan.Spec.TargetNamespace},
 		virtualMachineInstancetype)
@@ -3161,7 +3161,7 @@ func (r *KubeVirt) getVirtualMachineInstanceType(instanceTypeName string) (kind 
 
 func (r *KubeVirt) getVirtualMachineClusterInstanceType(vm *plan.VMStatus, instanceTypeName string) (kind string, err error) {
 	virtualMachineClusterInstancetype := &instancetype.VirtualMachineClusterInstancetype{}
-	err = r.Destination.Client.Get(
+	err = r.Destination.Get(
 		context.TODO(),
 		client.ObjectKey{Name: instanceTypeName},
 		virtualMachineClusterInstancetype)
@@ -3189,7 +3189,7 @@ func (r *KubeVirt) getOsMapConfig(providerType api.ProviderType) (configMap *cor
 	default:
 		return
 	}
-	err = r.Client.Get(
+	err = r.Get(
 		context.TODO(),
 		client.ObjectKey{Name: configMapName, Namespace: os.Getenv("POD_NAMESPACE")},
 		configMap,
@@ -3220,7 +3220,7 @@ func (r *KubeVirt) getPreference(vm *plan.VMStatus, preferenceName string) (name
 
 func (r *KubeVirt) getVirtualMachinePreference(preferenceName string) (name, kind string, err error) {
 	virtualMachinePreference := &instancetype.VirtualMachinePreference{}
-	err = r.Destination.Client.Get(
+	err = r.Destination.Get(
 		context.TODO(),
 		client.ObjectKey{Name: preferenceName, Namespace: r.Plan.Spec.TargetNamespace},
 		virtualMachinePreference)
@@ -3232,7 +3232,7 @@ func (r *KubeVirt) getVirtualMachinePreference(preferenceName string) (name, kin
 
 func (r *KubeVirt) getVirtualMachineClusterPreference(vm *plan.VMStatus, preferenceName string) (name, kind string, err error) {
 	virtualMachineClusterPreference := &instancetype.VirtualMachineClusterPreference{}
-	err = r.Destination.Client.Get(
+	err = r.Destination.Get(
 		context.TODO(),
 		client.ObjectKey{Name: preferenceName},
 		virtualMachineClusterPreference)
@@ -3394,7 +3394,7 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 	}
 
 	templateList := &template.TemplateList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		templateList,
 		&client.ListOptions{
@@ -3470,9 +3470,9 @@ func (r *KubeVirt) buildInspectionPodEnvironment(env []core.EnvVar, vm *plan.VMS
 
 	// Get VM model and data from inventory
 	virtualMachine := &model.VM{}
-	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 
@@ -3505,14 +3505,14 @@ func (r *KubeVirt) buildInspectionPodEnvironment(env []core.EnvVar, vm *plan.VMS
 			errMsg := fmt.Sprintf("Parent disk of %s was not found. This is possibly an environment issue. Please investigate if a precopy snapshot has a parent backing.", disk.File)
 			step.AddError(errMsg)
 			err = liberr.New(errMsg)
-			r.Log.Error(err, "Failed to get parent backing of VM disk.", "vm", vm.Ref.String())
+			r.Log.Error(err, "Failed to get parent backing of VM disk.", "vm", vm.String())
 		} else {
 			// Retry on the next run and log the missing parent disk
 			retries += 1
 			step.Annotations[ParentBackingRetriesAnnotation] = strconv.Itoa(retries)
 			errMsg := fmt.Sprintf("Parent disk of %s was not found, will retry on next attempt", disk.File)
 			r.Log.Info(errMsg,
-				"vm", vm.Ref.String())
+				"vm", vm.String())
 			return
 		}
 	}
@@ -3562,7 +3562,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 		}
 	}
 
-	extraConfigMapExists := len(Settings.Migration.VirtV2vExtraConfConfigMap) > 0
+	extraConfigMapExists := len(Settings.VirtV2vExtraConfConfigMap) > 0
 	if extraConfigMapExists {
 		extraV2vConfVol := core.Volume{
 			Name: ExtraV2vConf,
@@ -3763,7 +3763,7 @@ func (r *KubeVirt) DiskRefsFromPodVolumeMounts(vmVolumes []cnv.Volume, pvcs []*c
 
 func (r *KubeVirt) findConfigMapInNamespace(name string, namespace string) (configMap *core.ConfigMap, exists bool, err error) {
 	configmap := &core.ConfigMap{}
-	err = r.Destination.Client.Get(
+	err = r.Destination.Get(
 		context.TODO(),
 		types.NamespacedName{Namespace: namespace, Name: name},
 		configmap,
@@ -3785,7 +3785,7 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 	}
 
 	list := &core.ConfigMapList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -3804,7 +3804,7 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 		if err != nil {
 			return
 		}
-		err = r.Destination.Client.Create(context.TODO(), configMap)
+		err = r.Destination.Create(context.TODO(), configMap)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -3856,7 +3856,7 @@ func (r *KubeVirt) secretDataSetterForCDI(vmRef ref.Ref) func(*core.Secret) erro
 func (r *KubeVirt) secretLUKS(name, namespace string) func(*core.Secret) error {
 	return func(secret *core.Secret) error {
 		sourceSecret := &core.Secret{}
-		err := r.Client.Get(context.TODO(), client.ObjectKey{Name: name, Namespace: namespace}, sourceSecret)
+		err := r.Get(context.TODO(), client.ObjectKey{Name: name, Namespace: namespace}, sourceSecret)
 		if err != nil {
 			return err
 		}
@@ -3878,7 +3878,7 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) 
 	}
 
 	list := &core.SecretList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -3895,7 +3895,7 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) 
 		// Copy Data because Builder.Secret() puts credentials (accessKeyId, secretKey) there, not in StringData.
 		secret.Data = newSecret.Data
 		secret.StringData = newSecret.StringData
-		err = r.Destination.Client.Update(context.TODO(), secret)
+		err = r.Destination.Update(context.TODO(), secret)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -3910,7 +3910,7 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) 
 			vmRef.String())
 	} else {
 		secret = newSecret
-		err = r.Destination.Client.Create(context.TODO(), secret)
+		err = r.Destination.Create(context.TODO(), secret)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -4211,14 +4211,14 @@ func (r *KubeVirt) setPopulatorPodLabels(pod core.Pod, migrationId string) (err 
 	pod.Labels[kMigration] = migrationId
 	pod.Labels[kPlan] = string(r.Plan.GetUID())
 	patch := client.MergeFrom(podCopy)
-	err = r.Destination.Client.Patch(context.TODO(), &pod, patch)
+	err = r.Destination.Patch(context.TODO(), &pod, patch)
 	return
 }
 
 // Ensure the PV exist on the destination.
 func (r *KubeVirt) EnsurePersistentVolume(vmRef ref.Ref, persistentVolumes []core.PersistentVolume) (err error) {
 	list := &core.PersistentVolumeList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -4241,7 +4241,7 @@ func (r *KubeVirt) EnsurePersistentVolume(vmRef ref.Ref, persistentVolumes []cor
 		}
 
 		if !exists {
-			err = r.Destination.Client.Create(context.TODO(), &pv)
+			err = r.Destination.Create(context.TODO(), &pv)
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
@@ -4335,7 +4335,7 @@ func GetHyperVPvListSmb(dClient client.Client, planID string) (pvs *core.Persist
 
 func (r *KubeVirt) EnsurePVForNFS(pv *core.PersistentVolume) (out *core.PersistentVolume, err error) {
 	list := &core.PersistentVolumeList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -4349,7 +4349,7 @@ func (r *KubeVirt) EnsurePVForNFS(pv *core.PersistentVolume) (out *core.Persiste
 	if len(list.Items) > 0 {
 		out = &list.Items[0]
 	} else {
-		err = r.Destination.Client.Create(context.TODO(), pv)
+		err = r.Destination.Create(context.TODO(), pv)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -4394,7 +4394,7 @@ func (r *KubeVirt) BuildPVForNFS(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 func (r *KubeVirt) EnsureProviderStoragePVC(pvc *core.PersistentVolumeClaim, providerType api.ProviderType) (out *core.PersistentVolumeClaim, err error) {
 	// Query k8s for existing PVC matching labels (plan, migration, vmID)
 	list := &core.PersistentVolumeClaimList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -4412,7 +4412,7 @@ func (r *KubeVirt) EnsureProviderStoragePVC(pvc *core.PersistentVolumeClaim, pro
 		out = &list.Items[0]
 	} else {
 		// Create PVC in k8s (triggers CSI provisioning for SMB)
-		err = r.Destination.Client.Create(context.TODO(), pvc)
+		err = r.Destination.Create(context.TODO(), pvc)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -4532,7 +4532,7 @@ func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 // EnsurePVForSMB ensures the static PV exists for HyperV SMB.
 func (r *KubeVirt) EnsurePVForSMB(pv *core.PersistentVolume) (out *core.PersistentVolume, err error) {
 	list := &core.PersistentVolumeList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -4547,7 +4547,7 @@ func (r *KubeVirt) EnsurePVForSMB(pv *core.PersistentVolume) (out *core.Persiste
 	if len(list.Items) > 0 {
 		out = &list.Items[0]
 	} else {
-		err = r.Destination.Client.Create(context.TODO(), pv)
+		err = r.Destination.Create(context.TODO(), pv)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -4631,7 +4631,7 @@ func (r *KubeVirt) EnsurePersistentVolumeClaim(vmRef ref.Ref, persistentVolumeCl
 		}
 
 		if !exists {
-			err = r.Destination.Client.Create(context.TODO(), &pvc)
+			err = r.Destination.Create(context.TODO(), &pvc)
 			if err != nil {
 				err = liberr.Wrap(err)
 				return

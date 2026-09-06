@@ -41,7 +41,7 @@ func (r *KubeVirt) checkIfVmNameExistsInNamespace(name string, namespace string)
 			namespaceField: namespace,
 		}),
 	}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		listOptions,

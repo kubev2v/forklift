@@ -34,22 +34,22 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 		})
 	case *VM:
 		path = base.Link(VMRoot, base.Params{
-			base.ProviderParam: string(r.Provider.UID),
+			base.ProviderParam: string(r.UID),
 			VMParam:            id,
 		})
 	case *Network:
 		path = base.Link(NetworkRoot, base.Params{
-			base.ProviderParam: string(r.Provider.UID),
+			base.ProviderParam: string(r.UID),
 			NetworkParam:       id,
 		})
 	case *Storage:
 		path = base.Link(StorageRoot, base.Params{
-			base.ProviderParam: string(r.Provider.UID),
+			base.ProviderParam: string(r.UID),
 			StorageParam:       id,
 		})
 	case *Disk:
 		path = base.Link(DiskRoot, base.Params{
-			base.ProviderParam: string(r.Provider.UID),
+			base.ProviderParam: string(r.UID),
 			DiskParam:          id,
 		})
 	default:

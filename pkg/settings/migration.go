@@ -230,7 +230,7 @@ func (r *Migration) Load() (err error) {
 	}
 	if virtCustomizeConfigMap, ok := os.LookupEnv(VirtCustomizeConfigMap); ok {
 		r.VirtCustomizeConfigMap = virtCustomizeConfigMap
-	} else if Settings.Role.Has(MainRole) {
+	} else if Settings.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtCustomizeConfigMap))
 	}
 	if val, found := os.LookupEnv(NAAOUIMapConfigMap); found {
@@ -244,15 +244,15 @@ func (r *Migration) Load() (err error) {
 	}
 	if virtV2vImage, ok := os.LookupEnv(VirtV2vImage); ok {
 		r.VirtV2vImage = virtV2vImage
-	} else if Settings.Role.Has(MainRole) {
+	} else if Settings.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtV2vImage))
 	}
 	if virtV2vImageXFS, ok := os.LookupEnv(VirtV2vImageXFS); ok {
 		r.VirtV2vImageXFS = virtV2vImageXFS
-	} else if Settings.Role.Has(MainRole) {
+	} else if Settings.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtV2vImageXFS))
 	}
-	if r.VirtV2vImageXFS == "" && Settings.Role.Has(MainRole) {
+	if r.VirtV2vImageXFS == "" && Settings.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("environment variable %s was empty", VirtV2vImageXFS))
 	}
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
@@ -278,12 +278,12 @@ func (r *Migration) Load() (err error) {
 	}
 	if val, found := os.LookupEnv(OvirtOsConfigMap); found {
 		r.OvirtOsConfigMap = val
-	} else if Settings.Role.Has(MainRole) {
+	} else if Settings.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", OvirtOsConfigMap))
 	}
 	if val, found := os.LookupEnv(VsphereOsConfigMap); found {
 		r.VsphereOsConfigMap = val
-	} else if Settings.Role.Has(MainRole) {
+	} else if Settings.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VsphereOsConfigMap))
 	}
 	if r.VddkJobActiveDeadline, err = getPositiveEnvLimit(VddkJobActiveDeadline, 300); err != nil {

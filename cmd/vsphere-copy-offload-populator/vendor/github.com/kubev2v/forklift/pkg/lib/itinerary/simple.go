@@ -154,12 +154,12 @@ func (r *Itinerary) hasAny(step Step) (pTrue bool, err error) {
 		pTrue = true
 		return
 	}
-	for i := 0; i < r.Predicate.Count(); i++ {
+	for i := 0; i < r.Count(); i++ {
 		flag := Flag(1 << i)
 		if (step.Any & flag) == 0 {
 			continue
 		}
-		pTrue, err = r.Predicate.Evaluate(flag)
+		pTrue, err = r.Evaluate(flag)
 		if pTrue || err != nil {
 			return
 		}
@@ -175,12 +175,12 @@ func (r *Itinerary) hasAll(step Step) (pTrue bool, err error) {
 		pTrue = true
 		return
 	}
-	for i := 0; i < r.Predicate.Count(); i++ {
+	for i := 0; i < r.Count(); i++ {
 		flag := Flag(1 << i)
 		if (step.All & flag) == 0 {
 			continue
 		}
-		pTrue, err = r.Predicate.Evaluate(flag)
+		pTrue, err = r.Evaluate(flag)
 		if !pTrue || err != nil {
 			return
 		}

@@ -524,7 +524,7 @@ func (r *Plan) DestinationHasUdnNetwork(client k8sclient.Client) bool {
 	if err != nil {
 		return false
 	}
-	_, hasUdnLabel := namespace.ObjectMeta.Labels[namespaceLabelPrimaryUDN]
+	_, hasUdnLabel := namespace.Labels[namespaceLabelPrimaryUDN]
 	if !hasUdnLabel {
 		return false
 	}

@@ -134,7 +134,7 @@ func (r *VMEventHandler) run() {
 	r.log.Info("Run started.")
 	defer r.log.Info("Run stopped.")
 	interval := time.Second * time.Duration(
-		Settings.PolicyAgent.SearchInterval)
+		Settings.SearchInterval)
 	r.list()
 	r.reset()
 	for {

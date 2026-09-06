@@ -198,7 +198,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	}
 	url := r.Source.Provider.Spec.URL
 
-	dsMapIn := r.Context.Map.Storage.Spec.Map
+	dsMapIn := r.Map.Storage.Spec.Map
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
 		ref := mapped.Source
@@ -255,10 +255,10 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 
 				dv := dvTemplate.DeepCopy()
 				dv.Spec = dvSpec
-				if dv.ObjectMeta.Annotations == nil {
-					dv.ObjectMeta.Annotations = make(map[string]string)
+				if dv.Annotations == nil {
+					dv.Annotations = make(map[string]string)
 				}
-				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = da.Disk.ID
+				dv.Annotations[planbase.AnnDiskSource] = da.Disk.ID
 				dvs = append(dvs, *dv)
 			}
 		}
@@ -483,7 +483,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 			bus = Virtio
 		}
 		var disk cnv.Disk
-		if da.Disk.Disk.StorageType == "lun" {
+		if da.Disk.StorageType == "lun" {
 			claimName = volumeName
 			disk = cnv.Disk{
 				Name: volumeName,
@@ -514,7 +514,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 				},
 			},
 		}
-		if da.DiskAttachment.Bootable {
+		if da.Bootable {
 			var bootOrder uint = 1
 			disk.BootOrder = &bootOrder
 		}
@@ -612,7 +612,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 
 // Return a stable identifier for a DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	return dv.ObjectMeta.Annotations[planbase.AnnDiskSource]
+	return dv.Annotations[planbase.AnnDiskSource]
 }
 
 // Return a stable identifier for a PersistentDataVolume.
@@ -735,7 +735,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 }
 
 func (r *Builder) SupportsVolumePopulators() bool {
-	return !r.Context.Plan.IsWarm() && r.Context.Plan.Provider.Destination.IsHost()
+	return !r.Plan.IsWarm() && r.Plan.Provider.Destination.IsHost()
 }
 
 func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
@@ -754,7 +754,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			// diskIndex so that the index stays aligned with migrated disks.
 			continue
 		}
-		_, err = r.getVolumePopulator(diskAttachment.DiskAttachment.ID)
+		_, err = r.getVolumePopulator(diskAttachment.ID)
 		if err != nil {
 			if !k8serr.IsNotFound(err) {
 				err = liberr.Wrap(err)
@@ -776,7 +776,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			pvc, err = r.persistentVolumeClaimWithSourceRef(diskAttachment, storageClassName, populatorName, annotations, vmRef, diskIndex)
 			if err != nil {
 				if !k8serr.IsAlreadyExists(err) {
-					err = liberr.Wrap(err, "disk attachment", diskAttachment.DiskAttachment.ID, "storage class", storageClassName, "populator", populatorName)
+					err = liberr.Wrap(err, "disk attachment", diskAttachment.ID, "storage class", storageClassName, "populator", populatorName)
 					return
 				}
 				err = nil
@@ -795,7 +795,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 func (r *Builder) mapStorageDomainToStorageClass() (map[string]string, error) {
 	sdToStorageClass := make(map[string]string)
-	for _, mapped := range r.Context.Map.Storage.Spec.Map {
+	for _, mapped := range r.Map.Storage.Spec.Map {
 		sd := &model.StorageDomain{}
 		if err := r.Source.Inventory.Find(sd, mapped.Source); err != nil {
 			return nil, liberr.Wrap(err)
@@ -808,7 +808,7 @@ func (r *Builder) mapStorageDomainToStorageClass() (map[string]string, error) {
 // Get the OvirtVolumePopulator CustomResource based on the disk ID.
 func (r *Builder) getVolumePopulator(diskID string) (populatorCr api.OvirtVolumePopulator, err error) {
 	list := api.OvirtVolumePopulatorList{}
-	err = r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
+	err = r.Destination.List(context.TODO(), &list, &client.ListOptions{
 		Namespace: r.Plan.Spec.TargetNamespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"migration": string(r.Migration.UID),
@@ -847,7 +847,7 @@ func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, 
 	}
 	populatorCR := &api.OvirtVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{
-			GenerateName: fmt.Sprintf("%s-", diskAttachment.DiskAttachment.ID),
+			GenerateName: fmt.Sprintf("%s-", diskAttachment.ID),
 			Namespace:    r.Plan.Spec.TargetNamespace,
 			Labels: map[string]string{
 				"vmID":      vmId,
@@ -863,7 +863,7 @@ func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, 
 			TransferNetwork:  r.Plan.Spec.TransferNetwork,
 		},
 	}
-	err = r.Context.Client.Create(context.TODO(), populatorCR, &client.CreateOptions{})
+	err = r.Create(context.TODO(), populatorCR, &client.CreateOptions{})
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -876,7 +876,7 @@ func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, 
 func (r *Builder) getDefaultVolumeAndAccessMode(storageClassName string) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
 	var filesystemMode = core.PersistentVolumeFilesystem
 	storageProfile := &cdi.StorageProfile{}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: storageClassName}, storageProfile)
+	err := r.Get(context.TODO(), types.NamespacedName{Name: storageClassName}, storageProfile)
 	if err != nil {
 		return nil, nil, liberr.Wrap(err)
 	}
@@ -960,7 +960,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 		return
 	}
 
-	err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
+	err = r.Create(context.TODO(), pvc, &client.CreateOptions{})
 	return
 }
 
@@ -1038,7 +1038,7 @@ func (r *Builder) setOvirtPopulatorLabels(populatorCr api.OvirtVolumePopulator, 
 	populatorCr.Labels["migration"] = migrationId
 	populatorCr.Labels["plan"] = string(r.Plan.GetUID())
 	patch := client.MergeFrom(populatorCrCopy)
-	err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
+	err = r.Destination.Patch(context.TODO(), &populatorCr, patch)
 	return
 }
 

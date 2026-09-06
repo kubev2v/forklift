@@ -17,7 +17,7 @@ const (
 // validateSSHReadiness validates SSH readiness for migration plans using xcopy volume populators
 func (r *Reconciler) validateSSHReadiness(plan *api.Plan) error {
 	// Check source provider for SSH readiness issues
-	sourceProvider := plan.Referenced.Provider.Source
+	sourceProvider := plan.Provider.Source
 	if sourceProvider == nil {
 		return nil // This would be caught by other validation
 	}
@@ -88,13 +88,13 @@ func (r *Reconciler) validateSSHReadiness(plan *api.Plan) error {
 // planUsesVSphereXcopyPopulator checks if a plan uses VSphere xcopy volume populators
 func (r *Reconciler) planUsesVSphereXcopyPopulator(plan *api.Plan) bool {
 	// Check storage mappings for VSphereXcopyPluginConfig
-	if plan.Referenced.Map.Storage == nil {
+	if plan.Map.Storage == nil {
 		return false
 	}
-	if plan.Referenced.Map.Storage.Spec.Map == nil {
+	if plan.Map.Storage.Spec.Map == nil {
 		return false
 	}
-	dsMapIn := plan.Referenced.Map.Storage.Spec.Map
+	dsMapIn := plan.Map.Storage.Spec.Map
 	for _, mapping := range dsMapIn {
 		if mapping.OffloadPlugin != nil && mapping.OffloadPlugin.VSphereXcopyPluginConfig != nil {
 			r.Log.V(2).Info("Plan uses VSphere xcopy volume populator", "plan", plan.Name)

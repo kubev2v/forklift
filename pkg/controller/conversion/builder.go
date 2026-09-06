@@ -185,12 +185,12 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 					ImagePullPolicy: core.PullAlways,
 					Resources: core.ResourceRequirements{
 						Requests: core.ResourceList{
-							core.ResourceCPU:    resource.MustParse(Settings.Migration.VirtV2vContainerRequestsCpu),
-							core.ResourceMemory: resource.MustParse(Settings.Migration.VirtV2vContainerRequestsMemory),
+							core.ResourceCPU:    resource.MustParse(Settings.VirtV2vContainerRequestsCpu),
+							core.ResourceMemory: resource.MustParse(Settings.VirtV2vContainerRequestsMemory),
 						},
 						Limits: core.ResourceList{
-							core.ResourceCPU:    resource.MustParse(Settings.Migration.VirtV2vContainerLimitsCpu),
-							core.ResourceMemory: resource.MustParse(Settings.Migration.VirtV2vContainerLimitsMemory),
+							core.ResourceCPU:    resource.MustParse(Settings.VirtV2vContainerLimitsCpu),
+							core.ResourceMemory: resource.MustParse(Settings.VirtV2vContainerLimitsMemory),
 						},
 					},
 					EnvFrom: []core.EnvFromSource{
@@ -440,19 +440,19 @@ func (b *Builder) BuildDeepInspectionPod(vm *plan.VMStatus, volumes []core.Volum
 func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) ([]core.EnvVar, error) {
 	env = append(env, b.Config.Environment...)
 
-	if settings.Settings.Migration.VirtV2vMemSize > 0 {
+	if settings.Settings.VirtV2vMemSize > 0 {
 		env = append(env, core.EnvVar{
 			Name:  "V2V_memSize",
-			Value: strconv.Itoa(settings.Settings.Migration.VirtV2vMemSize),
+			Value: strconv.Itoa(settings.Settings.VirtV2vMemSize),
 		})
 	}
-	if settings.Settings.Migration.VirtV2vSmp > 0 {
+	if settings.Settings.VirtV2vSmp > 0 {
 		env = append(env, core.EnvVar{
 			Name:  "V2V_smp",
-			Value: strconv.Itoa(settings.Settings.Migration.VirtV2vSmp),
+			Value: strconv.Itoa(settings.Settings.VirtV2vSmp),
 		})
 	}
-	if settings.Settings.Features.VsphereVmwareDriverRemoval {
+	if settings.Settings.VsphereVmwareDriverRemoval {
 		env = append(env,
 			core.EnvVar{
 				Name:  "V2V_vsphereVmwareDriverRemoval",
@@ -473,7 +473,7 @@ func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) (
 				Value: "true",
 			})
 	}
-	if settings.Settings.Features.WindowsRegistryNetworkConfig {
+	if settings.Settings.WindowsRegistryNetworkConfig {
 		env = append(env,
 			core.EnvVar{
 				Name:  "V2V_windowsRegistryNetworkConfig",
@@ -530,12 +530,12 @@ done
 		ImagePullPolicy: core.PullIfNotPresent,
 		Resources: core.ResourceRequirements{
 			Requests: core.ResourceList{
-				core.ResourceCPU:    resource.MustParse(settings.Settings.Migration.NetAppShiftDiskPermsInitRequestsCpu),
-				core.ResourceMemory: resource.MustParse(settings.Settings.Migration.NetAppShiftDiskPermsInitRequestsMemory),
+				core.ResourceCPU:    resource.MustParse(settings.Settings.NetAppShiftDiskPermsInitRequestsCpu),
+				core.ResourceMemory: resource.MustParse(settings.Settings.NetAppShiftDiskPermsInitRequestsMemory),
 			},
 			Limits: core.ResourceList{
-				core.ResourceCPU:    resource.MustParse(settings.Settings.Migration.NetAppShiftDiskPermsInitLimitsCpu),
-				core.ResourceMemory: resource.MustParse(settings.Settings.Migration.NetAppShiftDiskPermsInitLimitsMemory),
+				core.ResourceCPU:    resource.MustParse(settings.Settings.NetAppShiftDiskPermsInitLimitsCpu),
+				core.ResourceMemory: resource.MustParse(settings.Settings.NetAppShiftDiskPermsInitLimitsMemory),
 			},
 		},
 		SecurityContext: &core.SecurityContext{

@@ -56,7 +56,7 @@ func (r *Auth) Permit(ctx *gin.Context, p *api.Provider) (int, error) {
 			return http.StatusOK, nil
 		}
 	}
-	if p.ObjectMeta.UID == "" {
+	if p.UID == "" {
 		q := ctx.Request.URL.Query()
 		ns = q.Get(NsParam)
 	}
@@ -110,7 +110,7 @@ func (r *Auth) permit(token string, ns string, p *api.Provider) (int, error) {
 		return http.StatusInternalServerError, liberr.Wrap(err)
 	}
 	var verb, namespace string
-	if p.ObjectMeta.UID != "" {
+	if p.UID != "" {
 		verb = "get"
 		namespace = p.Namespace
 	} else {

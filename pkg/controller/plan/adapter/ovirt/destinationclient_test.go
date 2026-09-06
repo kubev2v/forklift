@@ -84,7 +84,7 @@ var _ = Describe("ovirt destinationclient tests", func() {
 			destinationClient.SetPopulatorCrOwnership()
 
 			patchedOvirtVolPopCr := &v1beta1.OvirtVolumePopulator{}
-			err := destinationClient.Client.Get(context.TODO(), client.ObjectKey{
+			err := destinationClient.Get(context.TODO(), client.ObjectKey{
 				Name:      "test",
 				Namespace: "test",
 			}, patchedOvirtVolPopCr)

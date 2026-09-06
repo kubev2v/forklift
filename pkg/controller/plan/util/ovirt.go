@@ -16,7 +16,7 @@ import (
 func OvirtVolumePopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL, transferNetwork *core.ObjectReference, targetNamespace, secretName, vmId, migrationId string) *api.OvirtVolumePopulator {
 	return &api.OvirtVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      da.DiskAttachment.ID,
+			Name:      da.ID,
 			Namespace: targetNamespace,
 			Labels:    map[string]string{"vmID": vmId, "migration": migrationId},
 		},

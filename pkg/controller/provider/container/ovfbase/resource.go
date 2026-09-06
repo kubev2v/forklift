@@ -179,7 +179,7 @@ type Network struct {
 func (r *Network) ApplyTo(m *model.Network) {
 	m.ID = r.ID
 	m.Description = r.Description
-	m.Base.Name = r.Name
+	m.Name = r.Name
 }
 
 // Disk.
@@ -197,8 +197,8 @@ type Disk struct {
 
 // Apply to (update) the model.
 func (r *Disk) ApplyTo(m *model.Disk) {
-	m.Base.Name = r.Name
-	m.Base.ID = r.ID
+	m.Name = r.Name
+	m.ID = r.ID
 	m.FilePath = r.FilePath
 	m.Capacity = r.Capacity
 	m.CapacityAllocationUnits = r.CapacityAllocationUnits
@@ -214,6 +214,6 @@ type Storage struct {
 }
 
 func (r *Storage) ApplyTo(m *model.Storage) {
-	m.Base.Name = m.Name
-	m.Base.ID = m.ID
+	m.Name = r.Name
+	m.ID = r.ID
 }

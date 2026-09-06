@@ -82,7 +82,7 @@ func (r *Reconciler) Record(object runtime.Object, cnd libcnd.Conditions) {
 		default:
 			event = core.EventTypeNormal
 		}
-		r.EventRecorder.Event(
+		r.Event(
 			object,
 			event,
 			cnd.Type,

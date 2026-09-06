@@ -50,7 +50,7 @@ func (h *VddkHandler) AddRoutes(e *gin.Engine) {
 // BuildImage receives a VDDK tar file, writes it to disk,
 // and triggers an OpenShift BuildConfig to build and push the image.
 func (h *VddkHandler) BuildImage(ctx *gin.Context) {
-	status, err := h.Handler.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		base.SetForkliftError(ctx, err)
@@ -97,14 +97,14 @@ func (h *VddkHandler) BuildImage(ctx *gin.Context) {
 // it returns a 200 JSON response containing the image reference. On error,
 // it writes a JSON error with the appropriate HTTP status.
 func (h *VddkHandler) ImageUrl(ctx *gin.Context) {
-	status, err := h.Handler.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		base.SetForkliftError(ctx, err)
 		return
 	}
 
-	if h.Handler.WatchRequest {
+	if h.WatchRequest {
 		h.watchImageURL(ctx)
 		return
 	}
@@ -137,7 +137,7 @@ func (h *VddkHandler) ImageUrl(ctx *gin.Context) {
 
 // DownloadVddkTar streams the uploaded VDDK tar back to the client.
 func (h *VddkHandler) DownloadVddkTar(ctx *gin.Context) {
-	status, err := h.Handler.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		base.SetForkliftError(ctx, err)

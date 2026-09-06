@@ -46,7 +46,7 @@ type Client struct {
 
 // Enabled.
 func (r *Client) Enabled() bool {
-	return Settings.PolicyAgent.Enabled()
+	return Settings.Enabled()
 }
 
 // Policy version.
@@ -116,7 +116,7 @@ func (r *Client) Validate(
 
 // Get request.
 func (r *Client) get(path string, out interface{}) (err error) {
-	parsedURL, err := liburl.Parse(Settings.PolicyAgent.URL)
+	parsedURL, err := liburl.Parse(Settings.URL)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -131,7 +131,7 @@ func (r *Client) get(path string, out interface{}) (err error) {
 		"GET request.",
 		"url",
 		url)
-	status, err := r.LibClient.Get(url, out)
+	status, err := r.Get(url, out)
 	if err != nil {
 		return
 	}
@@ -144,7 +144,7 @@ func (r *Client) get(path string, out interface{}) (err error) {
 
 // Post request.
 func (r *Client) post(path string, in interface{}, out interface{}) (err error) {
-	parsedURL, err := liburl.Parse(Settings.PolicyAgent.URL)
+	parsedURL, err := liburl.Parse(Settings.URL)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -161,7 +161,7 @@ func (r *Client) post(path string, in interface{}, out interface{}) (err error) 
 		url,
 		"body",
 		in)
-	status, err := r.LibClient.Post(url, in, out)
+	status, err := r.Post(url, in, out)
 	if err != nil {
 		return
 	}
@@ -174,7 +174,7 @@ func (r *Client) post(path string, in interface{}, out interface{}) (err error) 
 
 // Build and set the transport as needed.
 func (c *Client) buildTransport() (err error) {
-	if c.Transport != nil || !Settings.PolicyAgent.Enabled() {
+	if c.Transport != nil || !Settings.Enabled() {
 		return
 	}
 	transport := &http.Transport{
@@ -428,7 +428,7 @@ func (r *Pool) Backlog() int {
 
 // Number of workers.
 func (r *Pool) parallel() (limit int) {
-	limit = Settings.PolicyAgent.Limit.Worker
+	limit = Settings.Limit.Worker
 	if limit < 1 {
 		limit = 1
 	}

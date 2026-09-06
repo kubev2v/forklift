@@ -78,7 +78,7 @@ func TestNICNetworkRefs_NoDuplicates(t *testing.T) {
 	client := newFakeClient(vm).Build()
 
 	plan := &api.Plan{}
-	plan.Referenced.Map.Network = &api.NetworkMap{
+	plan.Map.Network = &api.NetworkMap{
 		Spec: api.NetworkMapSpec{
 			Map: []api.NetworkPair{
 				{
@@ -128,7 +128,7 @@ func TestNICNetworkRefs_TwoNICsSameNAD(t *testing.T) {
 	client := newFakeClient(vm).Build()
 
 	plan := &api.Plan{}
-	plan.Referenced.Map.Network = &api.NetworkMap{
+	plan.Map.Network = &api.NetworkMap{
 		Spec: api.NetworkMapSpec{
 			Map: []api.NetworkPair{
 				{
@@ -175,7 +175,7 @@ func TestNICNetworkRefs_TwoNICsSameSourceNetwork(t *testing.T) {
 	client := newFakeClient(vm).Build()
 
 	plan := &api.Plan{}
-	plan.Referenced.Map.Network = &api.NetworkMap{
+	plan.Map.Network = &api.NetworkMap{
 		Spec: api.NetworkMapSpec{
 			Map: []api.NetworkPair{
 				{
@@ -217,7 +217,7 @@ func TestNICNetworkRefs_VMOnlyUsesOneOfDuplicateMappings(t *testing.T) {
 	client := newFakeClient(vm).Build()
 
 	plan := &api.Plan{}
-	plan.Referenced.Map.Network = &api.NetworkMap{
+	plan.Map.Network = &api.NetworkMap{
 		Spec: api.NetworkMapSpec{
 			Map: []api.NetworkPair{
 				{
@@ -264,7 +264,7 @@ func TestNICNetworkRefs_PodAndMultus(t *testing.T) {
 	client := newFakeClient(vm).Build()
 
 	plan := &api.Plan{}
-	plan.Referenced.Map.Network = &api.NetworkMap{
+	plan.Map.Network = &api.NetworkMap{
 		Spec: api.NetworkMapSpec{
 			Map: []api.NetworkPair{
 				{

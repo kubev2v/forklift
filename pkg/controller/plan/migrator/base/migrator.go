@@ -19,7 +19,7 @@ type BaseMigrator struct {
 }
 
 func (r *BaseMigrator) Init() (err error) {
-	a, err := adapter.New(r.Context.Source.Provider)
+	a, err := adapter.New(r.Source.Provider)
 	if err != nil {
 		return
 	}
@@ -42,9 +42,9 @@ func (r *BaseMigrator) Complete(vm *plan.VMStatus) {
 }
 
 func (r *BaseMigrator) Status(vm plan.VM) (status *plan.VMStatus) {
-	if current, found := r.Context.Plan.Status.Migration.FindVM(vm.Ref); !found {
+	if current, found := r.Plan.Status.Migration.FindVM(vm.Ref); !found {
 		status = &plan.VMStatus{VM: vm}
-		if r.Context.Plan.IsWarm() {
+		if r.Plan.IsWarm() {
 			status.Warm = &plan.Warm{}
 		}
 	} else {
@@ -65,7 +65,7 @@ func (r *BaseMigrator) Reset(vm *plan.VMStatus, pipeline []*plan.Step) {
 		return
 	}
 	vm.DisksCopied = false
-	if r.Context.Plan.IsWarm() {
+	if r.Plan.IsWarm() {
 		vm.Warm = &plan.Warm{}
 	}
 }
@@ -288,7 +288,7 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	case api.PhaseCreateDataVolumes:
 		// This phase should be present in DiskTransfer step only when executing Preflight Inspection to avoid UI pipeline artifacts.
 		// If not executing Preflight Inspection, keep the Initialize step.
-		if r.Context.Plan.ShouldRunPreflightInspection() {
+		if r.Plan.ShouldRunPreflightInspection() {
 			step = DiskTransfer
 		} else {
 			step = Initialize
@@ -307,7 +307,7 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	case api.PhasePreHook, api.PhasePostHook:
 		step = status.Phase
 	case api.PhaseStorePowerState, api.PhasePowerOffSource, api.PhaseWaitForPowerOff:
-		if r.Context.Plan.IsWarm() {
+		if r.Plan.IsWarm() {
 			step = Cutover
 		} else {
 			step = Initialize

@@ -96,7 +96,7 @@ func (r *HookRunner) Run(vm *planapi.VMStatus) (err error) {
 	if conditions.HasCondition("Failed") {
 		step.AddError(conditions.FindCondition("Failed").Message)
 		step.MarkCompleted()
-	} else if int(job.Status.Failed) > Settings.Migration.HookRetry {
+	} else if int(job.Status.Failed) > Settings.HookRetry {
 		step.AddError("Retry limit exceeded.")
 		step.MarkCompleted()
 	} else if job.Status.Succeeded > 0 {
@@ -114,7 +114,7 @@ func (r *HookRunner) ensureJob() (job *batch.Job, err error) {
 		return
 	}
 	list := batch.JobList{}
-	err = r.Client.List(
+	err = r.List(
 		context.TODO(),
 		&list,
 		&client.ListOptions{
@@ -130,7 +130,7 @@ func (r *HookRunner) ensureJob() (job *batch.Job, err error) {
 		if err != nil {
 			return
 		}
-		err = r.Client.Create(context.TODO(), job)
+		err = r.Create(context.TODO(), job)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -155,7 +155,7 @@ func (r *HookRunner) ensureJob() (job *batch.Job, err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	err = r.Client.Update(context.TODO(), mp)
+	err = r.Update(context.TODO(), mp)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -204,12 +204,12 @@ func (r *HookRunner) template(mp *core.ConfigMap) (template *core.PodTemplateSpe
 					Image: r.hook.Spec.Image,
 					Resources: core.ResourceRequirements{
 						Requests: core.ResourceList{
-							core.ResourceCPU:    resource.MustParse(Settings.Migration.HooksContainerRequestsCpu),
-							core.ResourceMemory: resource.MustParse(Settings.Migration.HooksContainerRequestsMemory),
+							core.ResourceCPU:    resource.MustParse(Settings.HooksContainerRequestsCpu),
+							core.ResourceMemory: resource.MustParse(Settings.HooksContainerRequestsMemory),
 						},
 						Limits: core.ResourceList{
-							core.ResourceCPU:    resource.MustParse(Settings.Migration.HooksContainerLimitsCpu),
-							core.ResourceMemory: resource.MustParse(Settings.Migration.HooksContainerLimitsMemory),
+							core.ResourceCPU:    resource.MustParse(Settings.HooksContainerLimitsCpu),
+							core.ResourceMemory: resource.MustParse(Settings.HooksContainerLimitsMemory),
 						},
 					},
 					VolumeMounts: []core.VolumeMount{
@@ -239,7 +239,7 @@ func (r *HookRunner) template(mp *core.ConfigMap) (template *core.PodTemplateSpe
 		template.Spec.ActiveDeadlineSeconds = &deadline
 	}
 	// Hook SA > plan SA > global controller SA > namespace default (empty).
-	if sa := cmp.Or(r.hook.Spec.ServiceAccount, r.Context.Plan.Spec.ServiceAccount, Settings.Migration.ServiceAccount); sa != "" {
+	if sa := cmp.Or(r.hook.Spec.ServiceAccount, r.Plan.Spec.ServiceAccount, Settings.ServiceAccount); sa != "" {
 		template.Spec.ServiceAccountName = sa
 	}
 	if len(r.hook.Spec.Playbook) > 0 {
@@ -260,7 +260,7 @@ func (r *HookRunner) template(mp *core.ConfigMap) (template *core.PodTemplateSpe
 // Ensure the ConfigMap.
 func (r *HookRunner) ensureConfigMap() (mp *core.ConfigMap, err error) {
 	list := core.ConfigMapList{}
-	err = r.Client.List(
+	err = r.List(
 		context.TODO(),
 		&list,
 		&client.ListOptions{
@@ -276,7 +276,7 @@ func (r *HookRunner) ensureConfigMap() (mp *core.ConfigMap, err error) {
 		if err != nil {
 			return
 		}
-		err = r.Client.Create(context.TODO(), mp)
+		err = r.Create(context.TODO(), mp)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -398,7 +398,7 @@ func (r *HookRunner) aapJobExtraVars() map[string]string {
 		"plan_namespace":  r.Plan.Namespace,
 		"migration_phase": r.vm.Phase,
 	}
-	if id := r.vm.Ref.ID; id != "" {
+	if id := r.vm.ID; id != "" {
 		m["vm_source_id"] = id
 	}
 	return m

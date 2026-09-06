@@ -146,7 +146,7 @@ MUST_GATHER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-must-gather:$(REGISTRY
 UI_PLUGIN_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-console-plugin:$(REGISTRY_TAG)
 
 # Golangci-lint version
-GOLANGCI_LINT_VERSION ?= v1.64.2
+GOLANGCI_LINT_VERSION ?= v2.12
 GOLANGCI_LINT_BIN ?= $(GOBIN)/golangci-lint
 
 ##@ Main Targets
@@ -779,7 +779,7 @@ export DEPLOYMENT_VARS
 .PHONY: lint-install
 lint-install: ## Install golangci-lint
 	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
-	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 	@echo "golangci-lint installed successfully."
 
 .PHONY: lint

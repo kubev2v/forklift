@@ -437,8 +437,8 @@ var _ = ginkgo.Describe("failExecutingMigrationOnBlocker", func() {
 
 	backdateBlockerConditions := func(plan *api.Plan, age time.Duration) {
 		past := meta.NewTime(time.Now().Add(-age))
-		for i := range plan.Status.Conditions.List {
-			cnd := &plan.Status.Conditions.List[i]
+		for i := range plan.Status.List {
+			cnd := &plan.Status.List[i]
 			if cnd.Category == api.CategoryCritical || cnd.Category == libcnd.Error {
 				cnd.LastTransitionTime = past
 			}
@@ -702,7 +702,7 @@ var _ = ginkgo.Describe("failExecutingMigrationOnBlocker - transient conditions"
 var _ = ginkgo.Describe("criticalOrErrorCondition", func() {
 	backdateCondition := func(plan *api.Plan, condType string, age time.Duration) {
 		past := meta.NewTime(time.Now().Add(-age))
-		for i := range plan.Status.Conditions.List {
+		for i := range plan.Status.List {
 			if plan.Status.Conditions.List[i].Type == condType {
 				plan.Status.Conditions.List[i].LastTransitionTime = past
 			}

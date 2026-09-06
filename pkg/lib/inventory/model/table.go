@@ -488,7 +488,7 @@ func (t Table) List(list interface{}, options ListOptions) (err error) {
 	lt := reflect.TypeOf(list)
 	lv := reflect.ValueOf(list)
 	switch lt.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		lt = lt.Elem()
 		lv = lv.Elem()
 	default:

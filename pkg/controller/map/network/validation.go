@@ -63,8 +63,8 @@ func (r *Reconciler) validate(mp *api.NetworkMap) error {
 		validation.DestinationProviderNotReady) {
 		return nil
 	}
-	mp.Referenced.Provider.Source = pv.Referenced.Source
-	mp.Referenced.Provider.Destination = pv.Referenced.Destination
+	mp.Provider.Source = pv.Referenced.Source
+	mp.Provider.Destination = pv.Referenced.Destination
 
 	err = r.validateSource(mp)
 	if err != nil {
@@ -145,7 +145,7 @@ func (r *Reconciler) validateSource(mp *api.NetworkMap) (err error) {
 
 // Validate destination refs.
 func (r *Reconciler) validateDestination(mp *api.NetworkMap) (err error) {
-	provider := mp.Referenced.Provider.Destination
+	provider := mp.Provider.Destination
 	inventory, err := web.NewClient(provider)
 	if err != nil {
 		return

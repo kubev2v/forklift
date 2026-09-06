@@ -566,7 +566,7 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 					}
 				}
 				var networkPair *api.NetworkPair
-				networkMaps := r.Context.Map.Network.Spec.Map
+				networkMaps := r.Map.Network.Spec.Map
 				found := false
 				for i := range networkMaps {
 					networkPair = &networkMaps[i]
@@ -1000,7 +1000,7 @@ func (r *Builder) ensureVolumePopulatorPVC(workload *model.Workload, image *mode
 			originalVolumeDiskId = imageProperty.(string)
 		}
 
-		mapList := r.Context.Map.Storage.Spec.Map
+		mapList := r.Map.Storage.Spec.Map
 
 		// Check if there's a storage map available
 		if len(mapList) == 0 {
@@ -1098,7 +1098,7 @@ func (r *Builder) createVolumePopulatorCR(image model.Image, secretName, vmId st
 			TransferNetwork: r.Plan.Spec.TransferNetwork,
 		},
 	}
-	err = r.Context.Client.Create(context.TODO(), populatorCR, &client.CreateOptions{})
+	err = r.Create(context.TODO(), populatorCR, &client.CreateOptions{})
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -1128,7 +1128,7 @@ func (r *Builder) getStorageClassName(workload *model.Workload, volumeTypeName s
 		r.Log.Trace(err)
 		return
 	}
-	for _, storageMap := range r.Context.Map.Storage.Spec.Map {
+	for _, storageMap := range r.Map.Storage.Spec.Map {
 		if storageMap.Source.ID == volumeTypeID || storageMap.Source.Name == volumeTypeName {
 			storageClassName = storageMap.Destination.StorageClass
 		}
@@ -1145,7 +1145,7 @@ func (r *Builder) getStorageClassName(workload *model.Workload, volumeTypeName s
 func (r *Builder) getVolumeAndAccessMode(storageClassName string) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
 	filesystemMode := core.PersistentVolumeFilesystem
 	storageProfile := &cdi.StorageProfile{}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: storageClassName}, storageProfile)
+	err := r.Get(context.TODO(), types.NamespacedName{Name: storageClassName}, storageProfile)
 	if err != nil {
 		return nil, nil, liberr.Wrap(err, "storageClassName", storageClassName)
 	}
@@ -1169,7 +1169,7 @@ func (r *Builder) getVolumeAndAccessMode(storageClassName string) ([]core.Persis
 // Get the OpenstackVolumePopulator CustomResource based on the image ID.
 func (r *Builder) getVolumePopulatorCR(imageID string) (populatorCr api.OpenstackVolumePopulator, err error) {
 	populatorCrList := &api.OpenstackVolumePopulatorList{}
-	err = r.Destination.Client.List(context.TODO(), populatorCrList, &client.ListOptions{
+	err = r.Destination.List(context.TODO(), populatorCrList, &client.ListOptions{
 		Namespace: r.Plan.Spec.TargetNamespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"migration": getMigrationID(r.Context),
@@ -1196,7 +1196,7 @@ func (r *Builder) getVolumePopulatorCR(imageID string) (populatorCr api.Openstac
 
 func (r *Builder) getVolumePopulatorPVC(imageID string) (populatorPvc *core.PersistentVolumeClaim, err error) {
 	populatorPvcList := &core.PersistentVolumeClaimList{}
-	err = r.Destination.Client.List(context.TODO(), populatorPvcList, &client.ListOptions{
+	err = r.Destination.List(context.TODO(), populatorPvcList, &client.ListOptions{
 		Namespace: r.Plan.Spec.TargetNamespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"migration": getMigrationID(r.Context),
@@ -1295,7 +1295,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image,
 		return
 	}
 
-	err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
+	err = r.Create(context.TODO(), pvc, &client.CreateOptions{})
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
@@ -1404,7 +1404,7 @@ func (r *Builder) setPopulatorLabels(populatorCr api.OpenstackVolumePopulator, v
 	populatorCr.Labels["migration"] = migrationId
 	populatorCr.Labels["plan"] = string(r.Plan.GetUID())
 	patch := client.MergeFrom(populatorCrCopy)
-	err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
+	err = r.Destination.Patch(context.TODO(), &populatorCr, patch)
 	return
 }
 

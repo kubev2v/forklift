@@ -34,17 +34,17 @@ func TestRestClientURL_UsesConfiguredScheme(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Save and restore globals to avoid cross-test interference.
-			origHost, origPort, origScheme := Settings.Inventory.Host, Settings.Inventory.Port, Settings.Inventory.Scheme
+			origHost, origPort, origScheme := Settings.Host, Settings.Inventory.Port, Settings.Scheme
 			t.Cleanup(func() {
-				Settings.Inventory.Host = origHost
+				Settings.Host = origHost
 				Settings.Inventory.Port = origPort
-				Settings.Inventory.Scheme = origScheme
+				Settings.Scheme = origScheme
 			})
 
 			// Set up inventory settings
-			Settings.Inventory.Host = tt.host
+			Settings.Host = tt.host
 			Settings.Inventory.Port = tt.port
-			Settings.Inventory.Scheme = tt.scheme
+			Settings.Scheme = tt.scheme
 
 			c := &RestClient{Host: ""} // Empty Host forces use of Settings
 			got := c.url(tt.path)

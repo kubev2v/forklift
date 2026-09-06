@@ -85,7 +85,7 @@ var _ = Describe("openstack destinationclient tests", func() {
 			destinationClient.SetPopulatorCrOwnership()
 
 			patchedOpenstackVolPopCr := &v1beta1.OpenstackVolumePopulator{}
-			err := destinationClient.Client.Get(context.TODO(), client.ObjectKey{
+			err := destinationClient.Get(context.TODO(), client.ObjectKey{
 				Name:      "test",
 				Namespace: "test",
 			}, patchedOpenstackVolPopCr)

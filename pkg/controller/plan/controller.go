@@ -69,7 +69,7 @@ var Settings = &settings.Settings
 // controller_blocker_grace_period_minutes / BLOCKER_GRACE_PERIOD_MINUTES).
 // If settings were not loaded (e.g. unit tests), defaults to 5 minutes.
 func blockerGracePeriod() time.Duration {
-	m := Settings.Migration.BlockerGracePeriodMinutes
+	m := Settings.BlockerGracePeriodMinutes
 	if m <= 0 {
 		return 5 * time.Minute
 	}
@@ -293,7 +293,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 }
 
 func (r *Reconciler) isDanglingArchivedPlan(plan *api.Plan) bool {
-	return plan.Spec.Archived && plan.Referenced.Provider.Source == nil
+	return plan.Spec.Archived && plan.Provider.Source == nil
 }
 
 func (r *Reconciler) updatePlanStatus(plan *api.Plan) error {
@@ -329,7 +329,7 @@ func (r *Reconciler) setPopulatorDataSourceLabels(plan *api.Plan) {
 			}
 			plan.Annotations[AnnPopulatorLabels] = "True"
 			patch := client.MergeFrom(planCopy)
-			err = r.Client.Patch(context.TODO(), plan, patch)
+			err = r.Patch(context.TODO(), plan, patch)
 			if err != nil {
 				r.Log.Error(err, "Couldn't patch plan with populator labels.")
 			}
@@ -602,7 +602,7 @@ func (r *Reconciler) failExecutingMigrationOnBlocker(plan *api.Plan) {
 func criticalOrErrorCondition(plan *api.Plan, gracePeriod time.Duration) string {
 	now := time.Now()
 	var messages []string
-	for _, cnd := range plan.Status.Conditions.List {
+	for _, cnd := range plan.Status.List {
 		if cnd.Status != True {
 			continue
 		}
@@ -632,11 +632,11 @@ func (r *Reconciler) newSnapshot(ctx *plancontext.Context) *planapi.Snapshot {
 	snapshot := planapi.Snapshot{}
 	snapshot.Plan.With(plan)
 	snapshot.Migration.With(migration)
-	snapshot.Provider.Source.With(plan.Referenced.Provider.Source)
-	snapshot.Provider.Destination.With(plan.Referenced.Provider.Destination)
-	snapshot.Map.Network.With(plan.Referenced.Map.Network)
+	snapshot.Provider.Source.With(plan.Provider.Source)
+	snapshot.Provider.Destination.With(plan.Provider.Destination)
+	snapshot.Map.Network.With(plan.Map.Network)
 	if plan.Spec.Type != api.MigrationOnlyConversion {
-		snapshot.Map.Storage.With(plan.Referenced.Map.Storage)
+		snapshot.Map.Storage.With(plan.Map.Storage)
 	}
 	plan.Status.Migration.NewSnapshot(snapshot)
 	log.V(1).Info(
@@ -672,19 +672,19 @@ func (r *Reconciler) matchSnapshot(ctx *plancontext.Context) (matched bool) {
 		log.Info("Snapshot: plan not matched.")
 		return false
 	}
-	if !snapshot.Provider.Source.Match(plan.Referenced.Provider.Source) {
+	if !snapshot.Provider.Source.Match(plan.Provider.Source) {
 		log.Info("Snapshot: provider (source) not matched.")
 		return false
 	}
-	if !snapshot.Provider.Destination.Match(plan.Referenced.Provider.Destination) {
+	if !snapshot.Provider.Destination.Match(plan.Provider.Destination) {
 		log.Info("Snapshot: provider (destination) not matched.")
 		return false
 	}
-	if !snapshot.Map.Network.Match(plan.Referenced.Map.Network) {
+	if !snapshot.Map.Network.Match(plan.Map.Network) {
 		log.Info("Snapshot: networkMap not matched.")
 		return false
 	}
-	if plan.Spec.Type != api.MigrationOnlyConversion && !snapshot.Map.Storage.Match(plan.Referenced.Map.Storage) {
+	if plan.Spec.Type != api.MigrationOnlyConversion && !snapshot.Map.Storage.Match(plan.Map.Storage) {
 		log.Info("Snapshot: storageMap not matched.")
 		return false
 	}

@@ -178,8 +178,8 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return nil
 	}
 
-	plan.Referenced.Provider.Source = pv.Referenced.Source
-	plan.Referenced.Provider.Destination = pv.Referenced.Destination
+	plan.Provider.Source = pv.Referenced.Source
+	plan.Provider.Destination = pv.Referenced.Destination
 
 	if err = r.ensureSecretForProvider(plan); err != nil {
 		return err
@@ -325,12 +325,12 @@ func (r *Reconciler) validateNetworkNameTemplate(plan *api.Plan) error {
 }
 
 func (r *Reconciler) validateOpenShiftVersion(plan *api.Plan) error {
-	source := plan.Referenced.Provider.Source
+	source := plan.Provider.Source
 	if source == nil {
 		return nil
 	}
 
-	destination := plan.Referenced.Provider.Destination
+	destination := plan.Provider.Destination
 	if destination == nil {
 		return nil
 	}
@@ -345,7 +345,7 @@ func (r *Reconciler) validateOpenShiftVersion(plan *api.Plan) error {
 			Items:    []string{},
 		}
 
-		restCfg := ocp.RestCfg(source, plan.Referenced.Secret)
+		restCfg := ocp.RestCfg(source, plan.Secret)
 		clientset, err := kubernetes.NewForConfig(restCfg)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -362,9 +362,9 @@ func (r *Reconciler) validateOpenShiftVersion(plan *api.Plan) error {
 }
 
 func (r *Reconciler) ensureSecretForProvider(plan *api.Plan) error {
-	if plan.Referenced.Provider.Source != nil &&
-		plan.Referenced.Secret == nil &&
-		!plan.Referenced.Provider.Source.IsHost() {
+	if plan.Provider.Source != nil &&
+		plan.Secret == nil &&
+		!plan.Provider.Source.IsHost() {
 		err := r.setupSecret(plan)
 		if err != nil {
 			return err
@@ -441,7 +441,7 @@ func (r *Reconciler) validateWarmMigration(ctx *plancontext.Context) (err error)
 	if !ctx.Plan.IsWarm() {
 		return
 	}
-	provider := ctx.Plan.Referenced.Provider.Source
+	provider := ctx.Plan.Provider.Source
 	if provider == nil {
 		return nil
 	}
@@ -466,7 +466,7 @@ func (r *Reconciler) validateWarmMigration(ctx *plancontext.Context) (err error)
 }
 
 func (r *Reconciler) validateMigrationType(ctx *plancontext.Context) (err error) {
-	provider := ctx.Plan.Referenced.Provider.Source
+	provider := ctx.Plan.Provider.Source
 	if provider == nil {
 		return nil
 	}
@@ -548,7 +548,7 @@ func (r *Reconciler) getDestinationNamespaceNads(ctx *plancontext.Context) (*k8s
 		client.MatchingLabels{"k8s.ovn.org/user-defined-network": ""},
 	}
 
-	err := ctx.Destination.Client.List(context.TODO(), nadList, listOpts...)
+	err := ctx.Destination.List(context.TODO(), nadList, listOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -636,7 +636,7 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 			return
 		}
 	}
-	plan.Referenced.Map.Network = mp
+	plan.Map.Network = mp
 
 	return
 }
@@ -684,7 +684,7 @@ func (r *Reconciler) validateStorageMap(plan *api.Plan) (err error) {
 		})
 	}
 
-	plan.Referenced.Map.Storage = mp
+	plan.Map.Storage = mp
 
 	return
 }
@@ -996,8 +996,8 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	setOfTargetName := map[string]bool{}
 
 	// Check if plan uses storage offload (vSphere only)
-	source := plan.Referenced.Provider.Source
-	checkMixedUsage := source != nil && source.Type() == api.VSphere && settings.Settings.Features.CopyOffload
+	source := plan.Provider.Source
+	checkMixedUsage := source != nil && source.Type() == api.VSphere && settings.Settings.CopyOffload
 	planUsesOffload := checkMixedUsage && plan.IsUsingOffloadPlugin()
 	netAppShift := plan.HasNetAppShiftDestination()
 
@@ -1024,7 +1024,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			continue
 		}
 		// Source.
-		provider := plan.Referenced.Provider.Source
+		provider := plan.Provider.Source
 		if provider == nil {
 			return nil
 		}
@@ -1101,7 +1101,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		// CSI import only supports VVol and RDM — VMDK disks require xcopy.
 		if planUsesOffload {
 			if vsphereVM, ok := v.(*vsphere.VM); ok {
-				storageMap := plan.Referenced.Map.Storage
+				storageMap := plan.Map.Storage
 				if storageMap != nil {
 					curVMHasVddk, err := r.vmUsesVddk(storageMap, vsphereVM, vm.Name)
 					if err != nil {
@@ -1126,7 +1126,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		if err != nil {
 			return err
 		}
-		if plan.Referenced.Map.Network != nil {
+		if plan.Map.Network != nil {
 			ok, err := validator.NetworksMapped(*ref)
 			if err != nil {
 				return err
@@ -1142,7 +1142,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				multiplePodNetworkMappings.Items = append(multiplePodNetworkMappings.Items, ref.String())
 			}
 		}
-		if plan.Referenced.Map.Storage != nil {
+		if plan.Map.Storage != nil {
 			ok, err := validator.StorageMapped(*ref)
 			if err != nil {
 				return err
@@ -1304,7 +1304,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			}
 		}
 		// Destination.
-		provider = plan.Referenced.Provider.Destination
+		provider = plan.Provider.Destination
 		if provider == nil {
 			return nil
 		}
@@ -1515,7 +1515,7 @@ func (r *Reconciler) getVmPVCs(plan *api.Plan, vm *vsphere.VM) (pvcs []*core.Per
 		return
 	}
 	pvcsList := &core.PersistentVolumeClaimList{}
-	err = ctx.Destination.Client.List(
+	err = ctx.Destination.List(
 		context.TODO(),
 		pvcsList,
 		&client.ListOptions{
@@ -1785,7 +1785,7 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 				notFound.Items = append(notFound.Items, planHookVMRefDescription(vm, ref))
 				continue
 			}
-			plan.Referenced.Hooks = append(plan.Referenced.Hooks, hook)
+			plan.Hooks = append(plan.Hooks, hook)
 			hookRefDesc := planHookVMRefDescription(vm, ref)
 			if !api.HookExecutionConfigValid(hook) {
 				hookNotExecutable.Items = append(hookNotExecutable.Items, hookRefDesc)
@@ -1823,11 +1823,11 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 }
 
 func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
-	source := plan.Referenced.Provider.Source
+	source := plan.Provider.Source
 	if source == nil {
 		return liberr.New("source provider is not set")
 	}
-	destination := plan.Referenced.Provider.Destination
+	destination := plan.Provider.Destination
 	if destination == nil {
 		return liberr.New("destination provider is not set")
 	}
@@ -1869,7 +1869,7 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 
 func missingStaticIPsMessage(plan *api.Plan) string {
 	guestTools := "guest tools"
-	source := plan.Referenced.Provider.Source
+	source := plan.Provider.Source
 	if source != nil {
 		switch source.Type() {
 		case api.VSphere:
@@ -1882,7 +1882,7 @@ func missingStaticIPsMessage(plan *api.Plan) string {
 }
 
 func jobExceedsDeadline(job *batchv1.Job) bool {
-	ActiveDeadlineSeconds := settings.Settings.Migration.VddkJobActiveDeadline
+	ActiveDeadlineSeconds := settings.Settings.VddkJobActiveDeadline
 
 	if job.Status.StartTime == nil {
 		return false
@@ -1891,7 +1891,7 @@ func jobExceedsDeadline(job *batchv1.Job) bool {
 }
 
 func (r *Reconciler) validateVddkImageJob(job *batchv1.Job, plan *api.Plan) (err error) {
-	image := settings.GetVDDKImage(plan.Referenced.Provider.Source.Spec.Settings)
+	image := settings.GetVDDKImage(plan.Provider.Source.Spec.Settings)
 	vddkInvalid := libcnd.Condition{
 		Type:     VDDKInvalid,
 		Status:   True,
@@ -1918,7 +1918,7 @@ func (r *Reconciler) validateVddkImageJob(job *batchv1.Job, plan *api.Plan) (err
 	}
 	// check if a pod exists for the job
 	pods := &core.PodList{}
-	if err = ctx.Destination.Client.List(context.TODO(), pods, &client.ListOptions{
+	if err = ctx.Destination.List(context.TODO(), pods, &client.ListOptions{
 		Namespace:     plan.Spec.TargetNamespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{"job-name": job.Name}),
 	}); err != nil {
@@ -1997,7 +1997,7 @@ func (r *Reconciler) cancelOtherActiveVddkCheckJobs(plan *api.Plan) (err error) 
 	delete(queryLabels, "vddk")
 
 	jobs := &batchv1.JobList{}
-	if err = ctx.Destination.Client.List(
+	if err = ctx.Destination.List(
 		context.TODO(),
 		jobs,
 		&client.ListOptions{
@@ -2018,7 +2018,7 @@ func (r *Reconciler) cancelOtherActiveVddkCheckJobs(plan *api.Plan) (err error) 
 			// become orphaned while trying to pull its image indefinitely
 			fg := meta.DeletePropagationForeground
 			opts := &client.DeleteOptions{PropagationPolicy: &fg}
-			if err = ctx.Destination.Client.Delete(context.TODO(), &job, opts); err != nil {
+			if err = ctx.Destination.Delete(context.TODO(), &job, opts); err != nil {
 				return
 			}
 		}
@@ -2043,7 +2043,7 @@ func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan) (*batchv1.Job,
 
 	jobLabels := getVddkImageValidationJobLabels(ctx.Plan)
 	jobs := &batchv1.JobList{}
-	err = ctx.Destination.Client.List(
+	err = ctx.Destination.List(
 		context.TODO(),
 		jobs,
 		&client.ListOptions{
@@ -2056,7 +2056,7 @@ func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan) (*batchv1.Job,
 		return nil, err
 	case len(jobs.Items) == 0:
 		job := createVddkCheckJob(ctx.Plan)
-		err = ctx.Destination.Client.Create(context.Background(), job)
+		err = ctx.Destination.Create(context.Background(), job)
 		if err != nil {
 			return nil, err
 		}
@@ -2078,16 +2078,16 @@ func (r *Reconciler) ensureNamespace(ctx *plancontext.Context) error {
 }
 
 func getVddkImageValidationJobLabels(plan *api.Plan) map[string]string {
-	image := settings.GetVDDKImage(plan.Referenced.Provider.Source.Spec.Settings)
+	image := settings.GetVDDKImage(plan.Provider.Source.Spec.Settings)
 	sum := md5.Sum([]byte(image))
 	return map[string]string{
-		"plan": string(plan.ObjectMeta.UID),
+		"plan": string(plan.UID),
 		"vddk": hex.EncodeToString(sum[:]),
 	}
 }
 
 func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
-	image := settings.GetVDDKImage(plan.Referenced.Provider.Source.Spec.Settings)
+	image := settings.GetVDDKImage(plan.Provider.Source.Spec.Settings)
 
 	mount := core.VolumeMount{
 		Name:      VddkVolumeName,
@@ -2141,7 +2141,7 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 			Namespace:    plan.Spec.TargetNamespace,
 			Labels:       getVddkImageValidationJobLabels(plan),
 			Annotations: map[string]string{
-				"provider": plan.Referenced.Provider.Source.Name,
+				"provider": plan.Provider.Source.Name,
 				"vddk":     image,
 				"plan":     plan.Name,
 			},
@@ -2194,8 +2194,8 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 
 func (r *Reconciler) setupSecret(plan *api.Plan) (err error) {
 	key := client.ObjectKey{
-		Namespace: plan.Referenced.Provider.Source.Spec.Secret.Namespace,
-		Name:      plan.Referenced.Provider.Source.Spec.Secret.Name,
+		Namespace: plan.Provider.Source.Spec.Secret.Namespace,
+		Name:      plan.Provider.Source.Spec.Secret.Name,
 	}
 
 	secret := core.Secret{}
@@ -2204,7 +2204,7 @@ func (r *Reconciler) setupSecret(plan *api.Plan) (err error) {
 		return
 	}
 
-	plan.Referenced.Secret = &secret
+	plan.Secret = &secret
 	return
 }
 
@@ -2352,7 +2352,7 @@ func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
 
 	// Validate that the StorageClass exists in the cluster (conversion runs on destination/target)
 	sc := &storagev1.StorageClass{}
-	if err := r.Client.Get(context.Background(), client.ObjectKey{Name: storageClass}, sc); err != nil {
+	if err := r.Get(context.Background(), client.ObjectKey{Name: storageClass}, sc); err != nil {
 		if k8serr.IsNotFound(err) {
 			plan.Status.SetCondition(libcnd.Condition{
 				Type:     NotValid,
@@ -2384,7 +2384,7 @@ func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
 func (r *Reconciler) validateConversionTempStorageCapacity(plan *api.Plan, storageClassName string, requested resource.Quantity) error {
 	ctx := context.Background()
 	list := &storagev1.CSIStorageCapacityList{}
-	if err := r.Client.List(ctx, list, client.InNamespace(core.NamespaceAll)); err != nil {
+	if err := r.List(ctx, list, client.InNamespace(core.NamespaceAll)); err != nil {
 		r.Log.Info("Could not list CSIStorageCapacity (capacity check skipped)", "error", err.Error(), "storageClass", storageClassName)
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     NotValid,
@@ -2444,7 +2444,7 @@ func (r *Reconciler) validatePodSecurity(plan *api.Plan) error {
 	controllerNamespace := os.Getenv("POD_NAMESPACE")
 	if controllerNamespace == "" {
 		// Fallback to settings if available (loaded from POD_NAMESPACE env var)
-		controllerNamespace = settings.Settings.Inventory.Namespace
+		controllerNamespace = settings.Settings.Namespace
 	}
 	if controllerNamespace == "" {
 		// Can't check if we don't know the controller namespace
@@ -2463,7 +2463,7 @@ func (r *Reconciler) validatePodSecurity(plan *api.Plan) error {
 
 	// Read the namespace object
 	ns := &core.Namespace{}
-	err := r.Client.Get(context.TODO(), client.ObjectKey{Name: controllerNamespace}, ns)
+	err := r.Get(context.TODO(), client.ObjectKey{Name: controllerNamespace}, ns)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			// Namespace not found, skip check

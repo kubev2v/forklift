@@ -99,7 +99,7 @@ func main() {
 	// Create a new Cmd to provide shared dependencies and start components
 	log.Info("setting up manager")
 	mgr, err := manager.New(cfg, manager.Options{
-		Metrics: server.Options{BindAddress: Settings.Metrics.Address()},
+		Metrics: server.Options{BindAddress: Settings.Address()},
 	})
 	if err != nil {
 		log.Error(err, "unable to set up overall controller manager")
@@ -179,7 +179,7 @@ func profiler() (profiler interface{ Stop() }) {
 	default:
 		kind = profile.MemProfile
 	}
-	if len(Settings.Profiler.Path) == 0 {
+	if len(Settings.Path) == 0 {
 		return
 	}
 	settings := Settings.Profiler

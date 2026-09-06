@@ -81,7 +81,7 @@ var _ = Describe("DestinationClient", func() {
 
 			// Verify only vm-1 populators are deleted; vm-2 populator survives
 			populatorList := &v1beta1.VSphereXcopyVolumePopulatorList{}
-			err = destClient.Destination.Client.List(context.TODO(), populatorList, client.InNamespace("test"))
+			err = destClient.Destination.List(context.TODO(), populatorList, client.InNamespace("test"))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(populatorList.Items).To(HaveLen(1))
 			Expect(populatorList.Items[0].Name).To(Equal("populator-other-vm"))
@@ -212,7 +212,7 @@ var _ = Describe("DestinationClient", func() {
 
 			// Verify object is deleted
 			deletedPop := &v1beta1.VSphereXcopyVolumePopulator{}
-			err = destClient.Destination.Client.Get(context.TODO(), client.ObjectKey{
+			err = destClient.Destination.Get(context.TODO(), client.ObjectKey{
 				Name:      "test-populator",
 				Namespace: "test",
 			}, deletedPop)

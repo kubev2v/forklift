@@ -438,7 +438,7 @@ func (r *WatchReader) clone(in interface{}) (out interface{}) {
 	mt := reflect.TypeOf(in)
 	mv := reflect.ValueOf(in)
 	switch mt.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		mt = mt.Elem()
 		mv = mv.Elem()
 	}

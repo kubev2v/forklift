@@ -292,7 +292,7 @@ var _ = Describe("vSphere builder", func() {
 				},
 			}
 			builder.Source.Inventory = &mockInventory{ds: model.Datastore{Resource: model.Resource{ID: "ds-2"}}, vm: vm}
-			builder.Context.Map.Storage = &v1beta1.StorageMap{
+			builder.Map.Storage = &v1beta1.StorageMap{
 				Spec: v1beta1.StorageMapSpec{
 					Map: []v1beta1.StoragePair{{
 						Source: ref.Ref{ID: "ds-2"},

@@ -145,7 +145,7 @@ func (r *Client) Close() {
 
 func (r *Client) Finalize(vmStatuses []*planapi.VMStatus, migrationName string) {
 	for _, vmStatus := range vmStatuses {
-		vmRef := ref.Ref{ID: vmStatus.Ref.ID}
+		vmRef := ref.Ref{ID: vmStatus.ID}
 		vm, err := r.getVM(vmRef)
 		if err != nil {
 			r.Log.Error(err, "failed to find vm", "vm", vm.Name)

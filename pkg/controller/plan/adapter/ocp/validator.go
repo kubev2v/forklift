@@ -202,7 +202,7 @@ func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category st
 }
 
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Storage == nil {
+	if r.Plan.Map.Storage == nil {
 		return
 	}
 
@@ -248,7 +248,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 			return false, nil
 		}
 
-		_, found := r.Plan.Referenced.Map.Storage.FindStorageByName(*storageClass)
+		_, found := r.Plan.Map.Storage.FindStorageByName(*storageClass)
 		if !found {
 			err = liberr.Wrap(
 				err,
@@ -265,7 +265,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
+	if r.Plan.Map.Network == nil {
 		return
 	}
 
@@ -282,7 +282,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 
 	for _, net := range vm.Spec.Template.Spec.Networks {
 		if net.Pod != nil {
-			_, found := r.Plan.Referenced.Map.Network.FindNetworkByType(Pod)
+			_, found := r.Plan.Map.Network.FindNetworkByType(Pod)
 			if !found {
 				err = liberr.Wrap(
 					err,
@@ -296,7 +296,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 			}
 		} else if net.Multus != nil {
 			name, namespace := ocpclient.GetNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
-			_, found := r.Plan.Referenced.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
+			_, found := r.Plan.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
 			if !found {
 				err = liberr.Wrap(
 					err,
