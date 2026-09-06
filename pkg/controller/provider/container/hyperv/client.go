@@ -1008,7 +1008,7 @@ func (r *Client) validateDisksOnSMB(vms []types.VM) {
 		r.Log.Error(err, "Failed to call validate-disks endpoint", "url", baseURL)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		r.Log.Info("SMB disk validation unavailable, provider-server returned unexpected status",

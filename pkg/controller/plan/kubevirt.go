@@ -2446,7 +2446,7 @@ func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 	if err != nil {
 		return "", liberr.Wrap(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	inspectionBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", liberr.Wrap(err)
@@ -2476,7 +2476,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		}
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	vmConf, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -2523,7 +2523,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	// Fetch warnings before shutting down
 	warningsURL := fmt.Sprintf("http://%s:8080/warnings", pod.Status.PodIP)
 	if resp, err = v2vHTTPClient.Get(warningsURL); err == nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode == http.StatusOK {
 			var body []byte
 			if resp.Body != nil {
@@ -2559,7 +2559,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
 	resp, err = v2vHTTPClient.Post(shutdownURL, "application/json", nil)
 	if err == nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 	} else {
 		// This error indicates that the server was shut down
 		if strings.Contains(err.Error(), "EOF") {

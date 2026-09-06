@@ -45,6 +45,8 @@ type Itinerary struct {
 }
 
 // Errors.
+//
+//nolint:staticcheck // legacy exported error name; rename in follow-up
 var (
 	StepNotFound = errors.New("step not found")
 )

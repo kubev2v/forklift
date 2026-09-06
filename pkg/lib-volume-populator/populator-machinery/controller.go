@@ -818,7 +818,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 		// This would be bad
 		if pvcPrime == nil {
-			return fmt.Errorf("Failed to find PVC for populator pod")
+			return fmt.Errorf("failed to find PVC for populator pod")
 		}
 
 		// Get PV
@@ -937,7 +937,7 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		return err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		klog.V(5).Info(err)

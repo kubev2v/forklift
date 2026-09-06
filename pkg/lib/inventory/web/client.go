@@ -255,7 +255,7 @@ func (r *Client) Watch(url string, resource interface{}, h EventHandler) (status
 	post := func(w *WatchReader) (pStatus int, pErr error) {
 		socket, response, pErr := dialer.Dial(url, header)
 		if response != nil {
-			defer response.Body.Close()
+			defer func() { _ = response.Body.Close() }()
 			pStatus = response.StatusCode
 			switch pStatus {
 			case http.StatusOK,

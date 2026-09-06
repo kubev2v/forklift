@@ -165,7 +165,7 @@ func VerifyTLSConnection(rawURL string, secret *core.Secret) (*x509.Certificate,
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a secure TLS connection: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	return cert, nil
 }

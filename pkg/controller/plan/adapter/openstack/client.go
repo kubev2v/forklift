@@ -36,9 +36,12 @@ const (
 	VolumeStatusUploading = libclient.VolumeStatusUploading
 )
 
-var ResourceNotFoundError = errors.New("resource not found")
-var NameOrIDRequiredError = errors.New("id or name is required")
-var UnexpectedVolumeStatusError = errors.New("unexpected volume status")
+//nolint:staticcheck // legacy exported error names; rename in follow-up
+var (
+	ResourceNotFoundError       = errors.New("resource not found")
+	NameOrIDRequiredError       = errors.New("id or name is required")
+	UnexpectedVolumeStatusError = errors.New("unexpected volume status")
+)
 
 type Client struct {
 	libclient.Client

@@ -117,7 +117,7 @@ func PermitUser(request *admissionv1.AdmissionRequest,
 		} else {
 			namedResource = groupResource.Resource + "/" + name
 		}
-		err = fmt.Errorf("Action is forbidden: User %q cannot %s resource %q in API group %q in the namespace %q: %s",
+		err = fmt.Errorf("action is forbidden: User %q cannot %s resource %q in API group %q in the namespace %q: %s",
 			user.Username, verb, namedResource, groupResource.Group, ns, review.Status.Reason)
 		return err
 	}

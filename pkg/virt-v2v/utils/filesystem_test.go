@@ -21,7 +21,7 @@ var _ = Describe("FileSystem", func() {
 	})
 
 	AfterEach(func() {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 	})
 
 	Describe("FileSystemImpl", func() {

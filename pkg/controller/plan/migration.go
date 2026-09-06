@@ -2299,7 +2299,7 @@ func (r *Migration) updateConversionProgressV2vMonitor(pod *core.Pod, step *plan
 	resp, err := http.Get(url)
 	switch {
 	case err == nil:
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 	case strings.Contains(err.Error(), "connection refused"):
 		return nil
 	default:

@@ -116,7 +116,7 @@ func TestSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, 
 		return false
 	}
 	sshClient := ssh.NewClient(cc, chans, reqs)
-	defer sshClient.Close()
+	defer func() { _ = sshClient.Close() }()
 
 	log.V(3).Info("Connected to SSH server", "hostIP", hostIP)
 
@@ -128,7 +128,7 @@ func TestSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, 
 		log.V(2).Info("SSH connectivity test failed to create session", "hostIP", hostIP, "error", err)
 		return false
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Execute the status command with the provided datastore (or empty for connectivity test mode)
 	// Format: DS=<datastore>;CMD=<command>

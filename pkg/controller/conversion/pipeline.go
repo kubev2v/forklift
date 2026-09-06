@@ -510,7 +510,7 @@ func (p *ConversionPipeline) signalPodShutdown(podIP string) {
 		p.r.Log.V(3).Info("Could not signal pod shutdown; it will be deleted by the controller.", "error", err.Error())
 		return
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 // fetchInspectionResults calls GET /results on the deep-inspection pod and
@@ -522,7 +522,7 @@ func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.Inspecti
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusServiceUnavailable {
 		return nil, nil //nolint:nilnil

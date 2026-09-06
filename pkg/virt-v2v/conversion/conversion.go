@@ -307,7 +307,7 @@ func (c *Conversion) RunVirtV2v() error {
 	monitorCmd.SetStdin(pipe)
 	v2vCmd.SetStdout(writer)
 	v2vCmd.SetStderr(writer)
-	defer writer.Close()
+	defer func() { _ = writer.Close() }()
 
 	if err := monitorCmd.Start(); err != nil {
 		fmt.Printf("Error executing monitor command: %v\n", err)
@@ -319,7 +319,7 @@ func (c *Conversion) RunVirtV2v() error {
 	}
 
 	// virt-v2v is done, we can close the pipe to virt-v2v-monitor
-	writer.Close()
+	_ = writer.Close()
 
 	if err := monitorCmd.Wait(); err != nil {
 		fmt.Printf("Error waiting for virt-v2v-monitor to finish: %v\n", err)
@@ -401,7 +401,7 @@ func (c *Conversion) addVsphereInputTransport(cmd utils.CommandBuilder) vsphereT
 
 func (c *Conversion) addVirtV2vRemoteInspectionArgs(cmd utils.CommandBuilder) (err error) {
 	if len(c.RemoteInspectionDisks) == 0 {
-		return fmt.Errorf("No remote disks were supplied")
+		return fmt.Errorf("no remote disks were supplied")
 	}
 	fileKey := "vddk-file"
 	if c.vsphereInputTransport() == vsphereTransportNfc {
@@ -456,7 +456,7 @@ func (c *Conversion) GetDomainXML() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(c.VmName)
 	if err != nil {

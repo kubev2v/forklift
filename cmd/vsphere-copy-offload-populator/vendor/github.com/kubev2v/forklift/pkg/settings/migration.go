@@ -273,7 +273,7 @@ func (r *Migration) Load() (err error) {
 		if quantity, err := resource.ParseQuantity(overhead); err != nil {
 			return liberr.Wrap(err)
 		} else if r.BlockOverhead, ok = quantity.AsInt64(); !ok {
-			return fmt.Errorf("Block overhead is invalid: %s", overhead)
+			return fmt.Errorf("block overhead is invalid: %s", overhead)
 		}
 	}
 	if val, found := os.LookupEnv(OvirtOsConfigMap); found {

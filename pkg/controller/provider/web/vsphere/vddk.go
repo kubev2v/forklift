@@ -183,7 +183,7 @@ func saveFile(filePath string, file *multipart.FileHeader) error {
 	if err != nil {
 		return fmt.Errorf("could not process uploaded file: %v", err)
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	if err := os.MkdirAll(uploadDir, 0600); err != nil {
 		return fmt.Errorf("could not prepare upload directory: %v", err)
@@ -193,7 +193,7 @@ func saveFile(filePath string, file *multipart.FileHeader) error {
 	if err != nil {
 		return fmt.Errorf("error: %v, Could not save file on disk: %s. ", err, filePath)
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 
 	if _, err := io.Copy(dst, src); err != nil {
 		return fmt.Errorf("error copy to the local file: %v", err)

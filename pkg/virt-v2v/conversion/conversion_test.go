@@ -466,7 +466,7 @@ var _ = Describe("Conversion", func() {
 
 				err := conversion.addVirtV2vRemoteInspectionArgs(mockCommandBuilder)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(Equal("No remote disks were supplied"))
+				Expect(err.Error()).To(Equal("no remote disks were supplied"))
 			},
 		)
 	})

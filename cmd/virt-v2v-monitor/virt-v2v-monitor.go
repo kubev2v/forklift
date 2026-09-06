@@ -122,8 +122,8 @@ func main() {
 	scanner.Split(LimitedScanLines)
 	for scanner.Scan() {
 		line := scanner.Bytes()
-		os.Stdout.Write(line)
-		os.Stdout.Write([]byte("\n"))
+		_, _ = os.Stdout.Write(line)
+		_, _ = os.Stdout.Write([]byte("\n"))
 		err := scanner.Err()
 		if err != nil {
 			fmt.Println("virt-v2v monitoring: Output monitoring failed! ", err)

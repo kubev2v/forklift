@@ -23,7 +23,6 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -488,12 +487,12 @@ func rootDiskExcluded(vm *model.VM, rootDiskSpec string, exclude []string) (bus 
 	return root.BusAddress, excluded
 }
 
-func (r *Validator) getUdnSubnet(client client.Client) (string, error) {
-	key := k8sclient.ObjectKey{
+func (r *Validator) getUdnSubnet(k8sClient client.Client) (string, error) {
+	key := client.ObjectKey{
 		Name: r.Plan.Spec.TargetNamespace,
 	}
 	namespace := &core.Namespace{}
-	err := client.Get(context.TODO(), key, namespace)
+	err := k8sClient.Get(context.TODO(), key, namespace)
 	if err != nil {
 		return "", err
 	}
@@ -503,12 +502,12 @@ func (r *Validator) getUdnSubnet(client client.Client) (string, error) {
 	}
 
 	nadList := &k8snet.NetworkAttachmentDefinitionList{}
-	listOpts := []k8sclient.ListOption{
-		k8sclient.InNamespace(r.Plan.Spec.TargetNamespace),
-		k8sclient.MatchingLabels{nadLabelUDN: ""},
+	listOpts := []client.ListOption{
+		client.InNamespace(r.Plan.Spec.TargetNamespace),
+		client.MatchingLabels{nadLabelUDN: ""},
 	}
 
-	err = client.List(context.TODO(), nadList, listOpts...)
+	err = k8sClient.List(context.TODO(), nadList, listOpts...)
 	if err != nil {
 		return "", err
 	}

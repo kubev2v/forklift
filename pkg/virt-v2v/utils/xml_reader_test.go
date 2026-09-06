@@ -19,7 +19,7 @@ var _ = Describe("XML Reader", func() {
 	})
 
 	AfterEach(func() {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 	})
 
 	Describe("GetInspectionV2vFromFile", func() {

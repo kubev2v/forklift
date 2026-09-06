@@ -29,7 +29,7 @@ func dialTLSWithTimeout(host string, cfg *tls.Config, timeout time.Duration) (*t
 	// Set handshake timeout
 	err = tlsConn.Handshake()
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, err
 	}
 

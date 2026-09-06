@@ -61,10 +61,10 @@ var _ = Describe("EC2 Collector", func() {
 
 	AfterEach(func() {
 		if db != nil {
-			db.Close(true)
+			_ = db.Close(true)
 		}
 		if dbPath != "" {
-			os.RemoveAll(filepath.Dir(dbPath))
+			_ = os.RemoveAll(filepath.Dir(dbPath))
 		}
 	})
 

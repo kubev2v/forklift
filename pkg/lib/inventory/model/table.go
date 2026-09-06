@@ -122,6 +122,8 @@ LIMIT {{.Page.Limit}} OFFSET {{.Page.Offset}}
 `
 
 // Errors
+//
+//nolint:staticcheck // legacy exported error names; rename in follow-up
 var (
 	// Must have PK.
 	MustHavePkErr = errors.New("must have PK field")

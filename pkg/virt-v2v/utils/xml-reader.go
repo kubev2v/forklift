@@ -28,7 +28,7 @@ func GetInspectionV2vFromFile(xmlFilePath string) (*InspectionV2V, error) {
 	var xmlConf InspectionV2V
 	err = xml.Unmarshal(xmlData, &xmlConf)
 	if err != nil {
-		return nil, fmt.Errorf("Error unmarshalling XML: %v\n", err)
+		return nil, fmt.Errorf("error unmarshalling XML: %v", err)
 	}
 	return &xmlConf, nil
 }
