@@ -1693,8 +1693,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.Phase = api.StepRunning
 
 			if settings.Settings.UseConversionCR {
-				snapshotMoref := vm.Warm.Precopies[0].Snapshot
-
 				var cr *api.Conversion
 				cr, err = r.kubevirt.GetDeepInspectionConversion(vm)
 				if err != nil {
@@ -1704,8 +1702,14 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 
 				if cr == nil {
-					_, err = r.kubevirt.CreateDeepInspectionConversion(
-						vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID))
+					if r.Plan.Provider.Source.Type() == api.HyperV {
+						_, err = r.kubevirt.CreateDeepInspectionConversionHyperV(
+							vm, r.Plan.Name, string(r.Plan.UID))
+					} else {
+						snapshotMoref := vm.Warm.Precopies[0].Snapshot
+						_, err = r.kubevirt.CreateDeepInspectionConversion(
+							vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID))
+					}
 					if err != nil {
 						step.AddError(err.Error())
 						err = nil

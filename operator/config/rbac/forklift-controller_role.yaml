@@ -43,6 +43,13 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - ""
+  resources:
+  - pods/proxy
+  verbs:
+  - get
+  - create
+- apiGroups:
   - batch
   resources:
   - jobs
