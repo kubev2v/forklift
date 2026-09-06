@@ -3077,6 +3077,14 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 		return
 	}
 
+	if r.Plan.Spec.Timezone != "" {
+		if object.Spec.Template.Spec.Domain.Clock == nil {
+			object.Spec.Template.Spec.Domain.Clock = &cnv.Clock{}
+		}
+		tz := cnv.ClockOffsetTimezone(r.Plan.Spec.Timezone)
+		object.Spec.Template.Spec.Domain.Clock.ClockOffset.Timezone = &tz
+	}
+
 	return
 }
 
