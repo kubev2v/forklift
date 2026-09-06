@@ -261,7 +261,10 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 	if img == "" {
 		return nil, fmt.Errorf("deep inspection container image is not set (Conversion spec.image, DEEP_INSPECTION_IMAGE, or DEEP_INSPECTION_IMAGE_XFS when xfsCompatibility is enabled)")
 	}
-	if cfg.VDDKImage == "" {
+
+	isHyperV := cfg.IsHyperVSource()
+
+	if cfg.VDDKImage == "" && !isHyperV {
 		return nil, fmt.Errorf("VDDK image is required for deep inspection but is not set (Conversion spec.vddkImage or VDDK_IMAGE)")
 	}
 
@@ -270,7 +273,7 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 	nonRoot := true
 	allowPrivilegeEscalation := false
 
-	if !vddkVolumeInList(volumes) {
+	if !isHyperV && !vddkVolumeInList(volumes) {
 		volumes = append(volumes, core.Volume{
 			Name:         convctx.VddkVolumeName,
 			VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
@@ -282,7 +285,7 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 	}
 
 	var initContainers []core.Container
-	if cfg.VDDKImage != "" {
+	if cfg.VDDKImage != "" && !isHyperV {
 		initContainers = append(initContainers, core.Container{
 			Name:            "vddk-side-car",
 			Image:           cfg.VDDKImage,

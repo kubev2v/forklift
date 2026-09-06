@@ -42,20 +42,21 @@ type DetectorConfig struct {
 // NewDetector creates a new Detector with an internally managed inspector instance
 // Returns an error if required configuration is missing or invalid
 func NewDetector(config DetectorConfig) (*Detector, error) {
-	// Validate required credentials
-	if config.Credentials.VCenterURL == "" {
-		return nil, fmt.Errorf("credentials.VCenterURL is required")
-	}
-	if config.Credentials.Username == "" {
-		return nil, fmt.Errorf("credentials.Username is required")
-	}
-	if config.Credentials.Password == "" {
-		return nil, fmt.Errorf("credentials.Password is required")
-	}
-
-	// Validate required VDDKLibDir
-	if config.VDDKLibDir == "" {
-		return nil, fmt.Errorf("VDDKLibDir is required and cannot be empty")
+	// For local-path detection (e.g. Hyper-V), credentials and VDDK are not needed.
+	// Only validate when they'll actually be used (vSphere path).
+	if config.Credentials.VCenterURL != "" || config.VDDKLibDir != "" {
+		if config.Credentials.VCenterURL == "" {
+			return nil, fmt.Errorf("credentials.VCenterURL is required")
+		}
+		if config.Credentials.Username == "" {
+			return nil, fmt.Errorf("credentials.Username is required")
+		}
+		if config.Credentials.Password == "" {
+			return nil, fmt.Errorf("credentials.Password is required")
+		}
+		if config.VDDKLibDir == "" {
+			return nil, fmt.Errorf("VDDKLibDir is required and cannot be empty")
+		}
 	}
 
 	// Extract optional string parameters
@@ -293,5 +294,108 @@ func (r *Detector) getSnapshotDiskInfo(ctx context.Context, vmMoref, snapshotMor
 		DiskPaths:           nil, // Library queries these internally
 		BaseDiskPaths:       nil, // Library queries these internally
 		ComputeResourcePath: info.ComputeResourcePath,
+	}, nil
+}
+
+// DetectLocalParams specifies locally-mounted disk paths for inspection
+type DetectLocalParams struct {
+	Ctx       context.Context
+	DiskPaths []string // e.g. ["/hyperv/vm/disk.vhdx"]
+	Formats   []string // e.g. ["vhdx"] or ["vpc"] (maps to qemu format names)
+}
+
+// DetectLocal runs checks on locally-mounted disk files using virt-inspector
+// directly. Used for Hyper-V cold preflight.
+func (r *Detector) DetectLocal(params DetectLocalParams) (*DetectResult, error) {
+	if params.Ctx == nil {
+		return nil, fmt.Errorf("params.Ctx is required")
+	}
+	if len(params.DiskPaths) == 0 {
+		return nil, fmt.Errorf("at least one disk path is required")
+	}
+
+	// Build virt-inspector args for local disk paths.
+	// --format must appear before its corresponding -a argument.
+	var args []string
+	for i, diskPath := range params.DiskPaths {
+		if i < len(params.Formats) && params.Formats[i] != "" {
+			args = append(args, "--format="+params.Formats[i])
+		}
+		args = append(args, "-a", diskPath)
+	}
+
+	// Run virt-inspector on the local disk(s) and parse output
+	inspectorData, err := r.inspector.InspectLocal(params.Ctx, args)
+	if err != nil {
+		return nil, fmt.Errorf("local disk inspection failed: %w", err)
+	}
+
+	// For local inspection we already have the data, run validations directly
+	// rather than through InspectWithVirt.
+	results := make([]checks.CheckResult, 0, 2)
+	allConcerns := []checks.Concern{}
+	allPassed := true
+
+	// DiskAccess: if InspectLocal succeeded, disk is accessible
+	diskAccessResult := checks.CheckResult{
+		CheckType: checks.CheckTypeDiskAccess,
+		Passed:    true,
+	}
+	results = append(results, diskAccessResult)
+
+	// Fstab: validate using the inspection data we already have
+	fstabResult := internalchecks.ValidateMigrateableFstab(inspectorData)
+	fstabCheckResult := checks.CheckResult{
+		CheckType: checks.CheckTypeFstab,
+		Passed:    fstabResult.Passed,
+		Concerns:  fstabResult.Concerns,
+		Error:     fstabResult.Error,
+	}
+	results = append(results, fstabCheckResult)
+	allConcerns = append(allConcerns, fstabCheckResult.Concerns...)
+	if !fstabCheckResult.Passed {
+		allPassed = false
+	}
+
+	// Extract OS info from inspection data
+	var osInfo *OSInfo
+	var applications []types.Application
+	var filesystems []types.Filesystem
+	var mountpoints []types.Mountpoint
+
+	if inspectorData != nil && len(inspectorData.Operatingsystems) > 0 {
+		os := inspectorData.Operatingsystems[0]
+		osInfo = &OSInfo{
+			Name:              os.Name,
+			Distro:            os.Distro,
+			MajorVersion:      os.MajorVersion,
+			MinorVersion:      os.MinorVersion,
+			Architecture:      os.Architecture,
+			Hostname:          os.Hostname,
+			Product:           os.Product,
+			Root:              os.Root,
+			PackageFormat:     os.PackageFormat,
+			PackageManagement: os.PackageManagement,
+			OSInfo:            os.OSInfo,
+		}
+		if len(os.Applications.Application) > 0 {
+			applications = os.Applications.Application
+		}
+		if len(os.Filesystems.Filesystem) > 0 {
+			filesystems = os.Filesystems.Filesystem
+		}
+		if len(os.Mountpoints.Mountpoint) > 0 {
+			mountpoints = os.Mountpoints.Mountpoint
+		}
+	}
+
+	return &DetectResult{
+		Results:      results,
+		AllConcerns:  allConcerns,
+		Passed:       allPassed,
+		OSInfo:       osInfo,
+		Applications: applications,
+		Filesystems:  filesystems,
+		Mountpoints:  mountpoints,
 	}, nil
 }

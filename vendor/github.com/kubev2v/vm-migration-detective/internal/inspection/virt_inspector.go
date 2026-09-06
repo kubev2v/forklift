@@ -370,6 +370,68 @@ func parseInspectionXML(xmlData []byte) (*types.VirtInspectorXML, error) {
 	return &xmlRoot, nil
 }
 
+// InspectLocal runs virt-inspector directly on locally-mounted disk files.
+// The args slice contains the disk arguments (e.g. ["-a", "/path.vhdx", "--format=vhdx"]).
+func (i *VirtInspector) InspectLocal(ctx context.Context, diskArgs []string) (*types.VirtInspectorXML, error) {
+	inspectCtx, cancel := context.WithTimeout(ctx, i.timeout)
+	defer cancel()
+
+	if i.logger != nil {
+		i.logger.WithField("disk_args", diskArgs).Info("Running virt-inspector on local disk(s)")
+	}
+
+	diskUnlock := resolveDiskUnlock(i.logger)
+
+	cmd := cmdbuilder.New().
+		WithLogger(i.logger).
+		UnsetEnv("LD_LIBRARY_PATH").
+		SetEnv("LIBGUESTFS_DEBUG", "1")
+	for _, arg := range diskArgs {
+		cmd.Add(arg)
+	}
+	if args := diskUnlock.Args(); len(args) > 0 {
+		cmd.Add(args...)
+	}
+
+	stdout, stderr, err := cmd.RunSeparate(inspectCtx, i.virtInspectorPath)
+
+	if len(stderr) > 0 && i.logger != nil {
+		i.logger.WithField("stderr", string(stderr)).Debug("virt-inspector stderr output (local)")
+	}
+
+	if err != nil {
+		exitCode := cmdbuilder.ExitCode(err)
+		outputStr := string(stdout)
+		stderrStr := string(stderr)
+
+		combinedOutput := outputStr + stderrStr
+		if encrypted, _ := isEncryptedDiskError(combinedOutput); encrypted {
+			return nil, fmt.Errorf("disk encryption detected: cannot inspect encrypted local disk. Exit code: %d", exitCode)
+		}
+
+		if outputStr != "" || stderrStr != "" {
+			return nil, fmt.Errorf("virt-inspector (local) failed (exit code %d): %w\nStdout: %s\nStderr: %s", exitCode, err, outputStr, stderrStr)
+		}
+		return nil, fmt.Errorf("virt-inspector (local) failed (exit code %d): %w", exitCode, err)
+	}
+
+	inspectionData, err := parseInspectionXML(stdout)
+	if err != nil {
+		if i.logger != nil {
+			i.logger.WithFields(logrus.Fields{
+				"error":  err,
+				"stdout": string(stdout),
+			}).Error("Failed to parse virt-inspector XML output (local)")
+		}
+		return nil, fmt.Errorf("failed to parse local inspection output: %w", err)
+	}
+
+	if i.logger != nil {
+		i.logger.Info("Local disk inspection completed successfully")
+	}
+	return inspectionData, nil
+}
+
 // getBaseDiskPathsFromVSphere queries vSphere to get base disk paths by traversing the backing chain
 func (i *VirtInspector) getBaseDiskPathsFromVSphere(ctx context.Context, vcenterURL, username, password, vmMoref string) ([]string, error) {
 	// Import the vsphere package
