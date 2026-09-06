@@ -21,7 +21,7 @@ ARG DEEP_INSPECTION_IMAGE="registry.redhat.io/mtv-candidate/mtv-deep-inspection-
 
 ARG DEEP_INSPECTION_IMAGE_RHEL9="registry.redhat.io/mtv-candidate/mtv-deep-inspection-rhel9@sha256:a392ddf07f0f74494fcc63babaf6976e7bf844a97cddd71da188e295351059d7"
 
-ARG HYPERV_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-hyperv-provider-server-rhel9@sha256:96f6ac041d199daa1f8772478cd95188db70e7ae6360fbf045865761306b3abe"
+ARG HYPERV_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-hyperv-provider-server-rhel9@sha256:0d361eb124186297fbfb3431a5e0886066c14ab2cecccffa5bf48b784de439e9"
 
 ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel9@sha256:2e4504826d8db17ade93b4304dd4dcc703062bf08d49a77f229445cf9b41980a"
 
