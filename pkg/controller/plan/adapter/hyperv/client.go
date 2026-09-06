@@ -2,8 +2,10 @@ package hyperv
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
@@ -19,6 +21,17 @@ import (
 )
 
 var log = logging.WithName("hyperv|client")
+
+const clusterPowerOffTimeout = 5 * time.Minute
+
+func isTimeoutError(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	// WinRM may wrap the context error in its own message string
+	// rather than chaining it, so fall back to a substring check.
+	return strings.Contains(err.Error(), "context deadline exceeded")
+}
 
 // HyperV VM Client
 type Client struct {
@@ -158,11 +171,22 @@ func (r *Client) PowerOff(vmRef ref.Ref) error {
 		return err
 	}
 
-	// In cluster mode, the VM may be on a different node than the entry
-	// point. Route the Stop-VM command to the correct node via RunOnNode.
+	// Cluster mode: route Stop-VM to the owner node with an extended
+	// timeout (the multi-hop WinRM call can exceed the default 60s).
 	if r.Source.Provider.IsHyperVCluster() && vm.Host != "" {
 		cmd := ps.BuildCommand(ps.StopVM, vm.Name)
-		if _, err = drv.RunOnNode(cmd, vm.Host); err != nil {
+		if _, err = drv.RunOnNodeWithTimeout(cmd, vm.Host, clusterPowerOffTimeout); err != nil {
+			// Timeouts are non-fatal: Stop-VM -Force is accepted by
+			// VMMS before the WinRM response. Returning nil here lets
+			// PhasePowerOffSource state call NextPhase(vm),
+			// advancing to WaitForPowerOff which polls the actual
+			// power state via WinRM and will only proceed once the
+			// VM is truly off.
+			if isTimeoutError(err) {
+				log.Info("Stop-VM timed out, deferring to WaitForPowerOff",
+					"vm", vm.Name, "node", vm.Host, "error", err)
+				return nil
+			}
 			return fmt.Errorf("failed to power off VM %s on node %s: %w", vm.Name, vm.Host, err)
 		}
 		log.Info("Powered off VM via RunOnNode", "vm", vm.Name, "node", vm.Host)
