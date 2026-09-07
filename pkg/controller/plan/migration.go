@@ -135,6 +135,12 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 		vm, hasNext, err = r.scheduler.Next()
 		if err != nil {
 			if errors.As(err, &web.NotFoundError{}) {
+				if vm == nil {
+					// The scheduler couldn't identify which VM triggered
+					// the error, so there's nothing to mark. Retry next
+					// reconcile rather than panic on a nil receiver.
+					return
+				}
 				if !r.Source.Provider.Status.HasCondition(libcnd.Ready) {
 					r.Log.Info(
 						"VM not found in inventory but source provider is not ready, will retry.",
