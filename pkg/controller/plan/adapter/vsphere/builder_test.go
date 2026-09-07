@@ -1067,6 +1067,7 @@ var _ = Describe("vSphere builder", func() {
 			Expect(found).To(BeTrue())
 			Expect(staticIPs).To(ContainSubstring("00:50:56:83:25:47"))
 			Expect(staticIPs).NotTo(ContainSubstring("00:50:56:83:25:48"))
+			Expect(hasPreserveFlagEnv(env)).To(BeTrue())
 		})
 
 		It("should honor a per-network 'none' override on a name-based NetworkMap (Defect B)", func() {

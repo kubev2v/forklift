@@ -512,6 +512,35 @@ var _ = Describe("HyperV builder", func() {
 			Expect(staticIPs).To(ContainSubstring("00:15:5D:01:02:03"))
 			Expect(staticIPs).NotTo(ContainSubstring("00:15:5D:01:02:04"))
 		})
+
+		It("should fail when a NetworkMap source cannot be resolved", func() {
+			vm := &model.VM{}
+			vm.ID = "vm-1"
+			vm.Name = "test-vm"
+			vm.GuestOS = "Windows Server 2019"
+			vm.NICs = []hyperv.NIC{
+				{MAC: "00:15:5D:01:02:03", Network: hyperv.Ref{ID: "net-A"}},
+			}
+			vm.GuestNetworks = []hyperv.GuestNetwork{
+				{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+			}
+
+			builder := createBuilder()
+			builder.Plan.Spec.PreserveStaticIPs = true
+			builder.Source.Inventory = &stubInventory{
+				vms: map[string]*model.VM{"vm-1": vm},
+			}
+			builder.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{Map: []v1beta1.NetworkPair{
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "missing-network"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}, NetworkIPMode: v1beta1.NetworkIPModeNone},
+				}},
+			}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).To(HaveOccurred())
+			_, found := staticIPsEnv(env)
+			Expect(found).To(BeFalse())
+		})
 	})
 
 })
