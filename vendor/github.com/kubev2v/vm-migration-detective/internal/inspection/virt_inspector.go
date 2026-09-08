@@ -3,7 +3,6 @@ package inspection
 import (
 	"context"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -221,10 +220,6 @@ func (i *VirtInspector) attemptInspect(
 	outputStr := string(stdout)
 	stderrStr := string(stderr)
 	if err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return nil, fmt.Errorf("inspection interrupted: %w", err)
-		}
-
 		exitCode := cmdbuilder.ExitCode(err)
 
 		// Check if this is likely an encrypted disk error (check both stdout and stderr)

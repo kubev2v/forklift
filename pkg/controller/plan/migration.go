@@ -364,6 +364,9 @@ func (r *Migration) Archive() {
 		if err := r.deleteProviderStorage(); err != nil {
 			r.Log.Error(err, "Failed to clean up the PVC and PV for the provider storage")
 		}
+		if err := r.deleteSMBCSISecrets(); err != nil {
+			r.Log.Error(err, "Failed to clean up SMB CSI credential secrets")
+		}
 	case api.VSphere:
 		r.Log.Info("Deleting validate-VDDK job(s).")
 		if err := r.deleteValidateVddkJob(); err != nil {
@@ -733,6 +736,35 @@ func (r *Migration) deleteProviderStorage() (err error) {
 	}
 
 	return r.deleteProviderPVs(getPVsFunc, string(providerType))
+}
+
+// deleteSMBCSISecrets deletes the SMB CSI credential secrets that were copied
+// to the destination cluster for HyperV SMB CSI PVs.
+func (r *Migration) deleteSMBCSISecrets() error {
+	if r.Plan.Provider.Source.Type() != api.HyperV {
+		return nil
+	}
+	matchLabels := map[string]string{
+		"plan":   string(r.Plan.UID),
+		"hyperv": "smb-csi-secret",
+	}
+	list := &core.SecretList{}
+	if err := r.Destination.List(context.TODO(), list,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(matchLabels),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	); err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		s := &list.Items[i]
+		if err := r.Destination.Delete(context.TODO(), s); err != nil && !k8serr.IsNotFound(err) {
+			return liberr.Wrap(err)
+		}
+		r.Log.V(1).Info("SMB CSI secret deleted.", "secret", path.Join(s.Namespace, s.Name))
+	}
+	return nil
 }
 
 // deleteProviderPVs is a helper function that gets and deletes PVs for a provider type.

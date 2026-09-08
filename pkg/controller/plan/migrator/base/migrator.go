@@ -289,7 +289,7 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		// When executing Preflight Inspection, this phase maps to the appropriate
 		// disk step to avoid UI pipeline artifacts. For CDI flow it maps to DiskTransfer,
 		// for virt-v2v flow it maps to DiskAllocation.
-		if r.Context.Plan.ShouldRunPreflightInspection() {
+		if r.Plan.ShouldRunPreflightInspection() {
 			if _, found := status.FindStep(DiskTransfer); found {
 				step = DiskTransfer
 			} else {

@@ -760,9 +760,16 @@ func (r *KubeVirt) getHyperVDiskPaths(vm *plan.VMStatus) ([]string, error) {
 func (r *KubeVirt) CreateDeepInspectionConversionHyperV(
 	vm *plan.VMStatus, planName, planID string,
 ) (*api.Conversion, error) {
+	// Ensure SMB CSI credentials exist on the destination cluster so the
+	// CSI driver can stage the volume (required for remote destinations).
+	csiSecretName, csiSecretNS, err := r.EnsureSMBCSISecret(vm)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
 	// Build SMB PV/PVC (same as virt-v2v pod uses)
-	pv := r.BuildPVForSMB(vm)
-	pv, err := r.EnsurePVForSMB(pv)
+	pv := r.BuildPVForSMB(vm, csiSecretName, csiSecretNS)
+	pv, err = r.EnsurePVForSMB(pv)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -3763,7 +3770,12 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 			mountPath = "/ova"
 		} else {
 			// HyperV: Static SMB CSI PV/PVC
-			pv := r.BuildPVForSMB(vm)
+			var csiSecretName, csiSecretNS string
+			csiSecretName, csiSecretNS, err = r.EnsureSMBCSISecret(vm)
+			if err != nil {
+				return
+			}
+			pv := r.BuildPVForSMB(vm, csiSecretName, csiSecretNS)
 			pv, err = r.EnsurePVForSMB(pv)
 			if err != nil {
 				return
@@ -4657,16 +4669,46 @@ func getEntityPrefixName(resourceType, providerName, planName string) string {
 	return fmt.Sprintf("ova-store-%s-%s-%s-", resourceType, providerName, planName)
 }
 
+// EnsureSMBCSISecret copies SMB credentials to the destination cluster
+// so the CSI driver can read them at node-stage time.
+func (r *KubeVirt) EnsureSMBCSISecret(vm *plan.VMStatus) (secretName, secretNS string, err error) {
+	smbUser, smbPass := hvutil.SMBCredentials(r.Source.Secret)
+	data := map[string][]byte{
+		"username": []byte(smbUser),
+		"password": []byte(smbPass),
+	}
+	labels := map[string]string{
+		"provider":  r.Plan.Provider.Source.Name,
+		"app":       "forklift",
+		"migration": string(r.Migration.UID),
+		"plan":      string(r.Plan.UID),
+		"hyperv":    "smb-csi-secret",
+		kVM:         vm.ID,
+	}
+	spec := r.buildConversionSecret(
+		r.Plan.Spec.TargetNamespace,
+		fmt.Sprintf("hyperv-smb-csi-%s-%s-", r.Source.Provider.Name, r.Plan.Name),
+		labels,
+		data,
+	)
+	out, err := r.ensureConversionSecret(r.Destination.Client, spec)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	secretName = out.Name
+	secretNS = out.Namespace
+	return
+}
+
 // BuildPVForSMB creates a static PV for HyperV using SMB CSI driver.
-func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus) (pv *core.PersistentVolume) {
+// csiSecretName/csiSecretNS reference the SMB credential secret that was
+// previously copied to the destination cluster by EnsureSMBCSISecret.
+func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus, csiSecretName, csiSecretNS string) (pv *core.PersistentVolume) {
 	sourceProvider := r.Source.Provider
 	smbUrl := hvutil.SMBUrl(r.Source.Secret)
 	smbSource := ctrlutil.ParseSMBSource(smbUrl)
 	pvNamePrefix := fmt.Sprintf("hyperv-store-pv-%s-%s-", r.Source.Provider.Name, r.Plan.Name)
-
-	// Get secret reference from provider
-	secretName := sourceProvider.Spec.Secret.Name
-	secretNamespace := sourceProvider.Spec.Secret.Namespace
 
 	pv = &core.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{
@@ -4689,8 +4731,8 @@ func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 						"source": smbSource,
 					},
 					NodeStageSecretRef: &core.SecretReference{
-						Name:      secretName,
-						Namespace: secretNamespace,
+						Name:      csiSecretName,
+						Namespace: csiSecretNS,
 					},
 				},
 			},

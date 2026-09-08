@@ -314,15 +314,7 @@ func (r *Detector) DetectLocal(params DetectLocalParams) (*DetectResult, error) 
 		return nil, fmt.Errorf("at least one disk path is required")
 	}
 
-	// Build virt-inspector args for local disk paths.
-	// --format must appear before its corresponding -a argument.
-	var args []string
-	for i, diskPath := range params.DiskPaths {
-		if i < len(params.Formats) && params.Formats[i] != "" {
-			args = append(args, "--format="+params.Formats[i])
-		}
-		args = append(args, "-a", diskPath)
-	}
+	args := localInspectorArgs(params.DiskPaths, params.Formats)
 
 	// Run virt-inspector on the local disk(s) and parse output
 	inspectorData, err := r.inspector.InspectLocal(params.Ctx, args)
@@ -398,4 +390,17 @@ func (r *Detector) DetectLocal(params DetectLocalParams) (*DetectResult, error) 
 		Filesystems:  filesystems,
 		Mountpoints:  mountpoints,
 	}, nil
+}
+
+// localInspectorArgs builds virt-inspector disk args. --format must precede
+// its matching -a so qemu opens VHD/VHDX with the right driver.
+func localInspectorArgs(diskPaths, formats []string) []string {
+	var args []string
+	for i, diskPath := range diskPaths {
+		if i < len(formats) && formats[i] != "" {
+			args = append(args, "--format="+formats[i])
+		}
+		args = append(args, "-a", diskPath)
+	}
+	return args
 }
