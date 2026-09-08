@@ -137,8 +137,12 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 			if errors.As(err, &web.NotFoundError{}) {
 				if vm == nil {
 					// The scheduler couldn't identify which VM triggered
-					// the error, so there's nothing to mark. Retry next
-					// reconcile rather than panic on a nil receiver.
+					// the error, so there's nothing to mark. Missing VMs
+					// should already be handled by the scheduler's
+					// markNotFound; retry next reconcile rather than panic.
+					r.Log.Info(
+						"Scheduler returned NotFoundError without selecting a VM; retrying on next reconcile.",
+						"plan", r.Plan.Name)
 					return
 				}
 				if !r.Source.Provider.Status.HasCondition(libcnd.Ready) {
