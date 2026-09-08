@@ -358,6 +358,27 @@ var _ = Describe("Conversion", func() {
 	})
 
 	Describe("addConversionExtraArgs", func() {
+		It("adds selinux-relabel-at-boot when enabled",
+			func() {
+				appConfig.SelinuxRelabelAtBoot = true
+
+				mockCommandBuilder.EXPECT().AddFlag("--selinux-relabel-at-boot").Return(mockCommandBuilder)
+
+				conversion.addConversionExtraArgs(mockCommandBuilder)
+			},
+		)
+
+		It("adds selinux-relabel-exclude for each configured directory",
+			func() {
+				appConfig.SelinuxRelabelExclude = []string{"/foo", "/bar"}
+
+				mockCommandBuilder.EXPECT().AddArg("--selinux-relabel-exclude", "/foo").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddArg("--selinux-relabel-exclude", "/bar").Return(mockCommandBuilder)
+
+				conversion.addConversionExtraArgs(mockCommandBuilder)
+			},
+		)
+
 		It("adds extra args when they are set",
 			func() {
 				appConfig.ExtraArgs = []string{"--arg1", "--arg2", "value"}
@@ -592,17 +613,19 @@ var _ = Describe("Conversion", func() {
 	})
 
 	Describe("addVirtV2vArgs", func() {
-		It("adds OVA args when source is OVA", func() {
+		It("adds OVA args and conversion extra args when source is OVA", func() {
 			appConfig.Source = config.OVA
 			appConfig.Workdir = "/var/tmp/v2v"
 			appConfig.NewVmName = "new-vm"
 			appConfig.DiskPath = "/path/to/disk.ova"
+			appConfig.ExtraArgs = []string{"--custom-flag"}
 
 			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-os", "/var/tmp/v2v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-on", "new-vm").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddExtraArgs("--custom-flag").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-i", "ova").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("/path/to/disk.ova").Return(mockCommandBuilder)
 
@@ -622,6 +645,45 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-on", "new-vm").Return(mockCommandBuilder)
 
 			err := conversion.addVirtV2vArgs(mockCommandBuilder)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("adds selinux conversion args before vSphere guest name", func() {
+			plugin, err := os.CreateTemp("", "nbdkit-nfc-plugin-*.so")
+			Expect(err).ToNot(HaveOccurred())
+			defer func() { _ = os.Remove(plugin.Name()) }()
+			Expect(plugin.Close()).To(Succeed())
+
+			appConfig.Source = config.VSPHERE
+			appConfig.Workdir = "/var/tmp/v2v"
+			appConfig.NewVmName = "new-vm"
+			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
+			appConfig.SecretKey = "/etc/secret/secretKey"
+			appConfig.HostName = "vcenter.example.com"
+			appConfig.VmName = "test-vm"
+			appConfig.Fingerprint = "AA:BB:CC"
+			appConfig.NfcPluginPath = plugin.Name()
+			appConfig.SelinuxRelabelAtBoot = true
+			appConfig.SelinuxRelabelExclude = []string{"/foo"}
+
+			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-os", "/var/tmp/v2v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-on", "new-vm").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--selinux-relabel-at-boot").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--selinux-relabel-exclude", "/foo").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-it", "nfc").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-io", "nfc-thumbprint=AA:BB:CC").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
+
+			err = conversion.addVirtV2vArgs(mockCommandBuilder)
 			Expect(err).ToNot(HaveOccurred())
 		})
 

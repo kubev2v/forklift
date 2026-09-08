@@ -320,6 +320,15 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 	if vm.NewName != "" {
 		res.podConfig.Environment = append(res.podConfig.Environment, core.EnvVar{Name: "V2V_NewName", Value: r.getNewVMName(vm)})
 	}
+	if r.SelinuxRelabelAtBoot(vm.Ref) {
+		res.podConfig.Environment = append(res.podConfig.Environment,
+			core.EnvVar{Name: "V2V_selinuxRelabelAtBoot", Value: "true"})
+	}
+	if dirs := r.SelinuxRelabelExclude(vm.Ref); len(dirs) > 0 {
+		b, _ := json.Marshal(dirs)
+		res.podConfig.Environment = append(res.podConfig.Environment,
+			core.EnvVar{Name: "V2V_selinuxRelabelExclude", Value: string(b)})
+	}
 
 	res.ready = true
 	if podType == convctx.VirtV2vInspectionPod && step != nil {
