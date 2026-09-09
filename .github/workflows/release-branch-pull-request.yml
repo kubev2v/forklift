@@ -12,7 +12,7 @@ jobs:
         # Steps represent a sequence of tasks that will be executed as part of the job
         steps:
           - name: Checks-out repository under $GITHUB_WORKSPACE
-            uses: actions/checkout@v4
+            uses: actions/checkout@v7
             with:
               path: go/src/github.com/${{github.repository}}
     
