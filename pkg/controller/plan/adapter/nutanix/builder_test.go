@@ -2,10 +2,14 @@ package nutanix
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +36,72 @@ func TestConfigMapSetsCDICertKeys(t *testing.T) {
 	}
 	if !bytes.Equal(configMap.BinaryData["tls.crt"], cacert) {
 		t.Fatalf("expected tls.crt to match provider CA for CDI nbdkit cainfo")
+	}
+}
+
+func TestConfigMapInsecureDoesNotFetchEarly(t *testing.T) {
+	secret := &core.Secret{
+		Data: map[string][]byte{
+			"insecureSkipVerify": []byte("true"),
+		},
+	}
+	configMap := &core.ConfigMap{}
+	builder := &Builder{}
+
+	err := builder.ConfigMap(ref.Ref{}, secret, configMap)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if configMapHasCert(configMap) {
+		t.Fatal("expected insecure ConfigMap() to defer cert fetch to DataVolumes()")
+	}
+}
+
+func TestFetchCertFromURL(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	t.Cleanup(server.Close)
+
+	builder := &Builder{}
+	secret := &core.Secret{
+		Data: map[string][]byte{"insecureSkipVerify": []byte("true")},
+	}
+	cacert, err := builder.fetchCertFromURL(server.URL, secret)
+	if err != nil {
+		t.Fatalf("fetchCertFromURL: %v", err)
+	}
+	if len(cacert) == 0 || !bytes.Contains(cacert, []byte("BEGIN CERTIFICATE")) {
+		t.Fatalf("expected PEM certificate, got %q", cacert)
+	}
+}
+
+func TestImportCertURL_PrismElement(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/nutanix/v3/clusters/list":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[{"status":{"resources":{"network":{"external_ip":"10.0.0.1"}}}}]}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := newConnectedTestClient(t, server.URL)
+	builder := &Builder{
+		Context: &plancontext.Context{
+			Source: plancontext.Source{
+				Provider: &api.Provider{Spec: api.ProviderSpec{URL: server.URL}},
+			},
+		},
+	}
+	vm := &model.VM{VM1: model.VM1{Disks: []model.Disk{{UUID: "disk-1"}}}}
+
+	got, err := builder.importCertURL(client, ref.Ref{ID: "vm-1"}, vm)
+	if err != nil {
+		t.Fatalf("importCertURL: %v", err)
+	}
+	if got != server.URL {
+		t.Fatalf("expected %q, got %q", server.URL, got)
 	}
 }
 
