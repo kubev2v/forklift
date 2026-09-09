@@ -59,6 +59,17 @@ type StorageGroupResult struct {
 	Message      string         `json:"message"`
 }
 
+// StorageGroupVolumeCounts : collection of storage groups with their volume counts
+type StorageGroupVolumeCounts struct {
+	StorageGroups []StorageGroupVolumeCount `json:"storage_groups"`
+}
+
+// StorageGroupVolumeCount : number of volumes in an SG
+type StorageGroupVolumeCount struct {
+	ID          string `json:"id"`
+	VolumeCount int    `json:"num_of_volumes"`
+}
+
 // CreateStorageGroupParam : Payload for creating Storage Group
 type CreateStorageGroupParam struct {
 	ExecutionOption           string                      `json:"executionOption,omitempty"`

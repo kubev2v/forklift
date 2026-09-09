@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,11 +37,13 @@ type RemoteSystem struct {
 	DataNetworkLatency string `json:"data_network_latency,omitempty"`
 	// List of supported remote protection capabilities
 	Capabilities []string `json:"capabilities,omitempty"`
+	// List of the iscsi data_connection ipaddresses
+	IscsiAddresses []string `json:"iscsi_addresses,omitempty"`
 }
 
 // Fields returns fields which must be requested to fill struct
 func (r *RemoteSystem) Fields() []string {
-	return []string{"id", "name", "description", "serial_number", "type", "management_address", "data_connection_state", "data_network_latency", "capabilities"}
+	return []string{"id", "name", "description", "serial_number", "type", "management_address", "data_connection_state", "data_network_latency", "capabilities", "iscsi_addresses"}
 }
 
 type DataConnectStateEnum string
@@ -77,6 +79,8 @@ const (
 type Cluster struct {
 	// Unique identifier of the cluster.
 	ID string `json:"id,omitempty"`
+	// Global unique identifier of the cluster.
+	GlobalID string `json:"global_id,omitempty"`
 	// User-specified name of the cluster
 	Name string `json:"name,omitempty"`
 	// Management IP address of the remote system instance
@@ -91,5 +95,5 @@ type Cluster struct {
 
 // Fields returns fields which must be requested to fill struct
 func (r *Cluster) Fields() []string {
-	return []string{"id", "name", "management_address", "state", "system_time"}
+	return []string{"id", "global_id", "name", "management_address", "state", "system_time"}
 }
