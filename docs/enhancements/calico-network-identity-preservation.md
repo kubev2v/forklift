@@ -39,16 +39,14 @@ When a VM is migrated from vSphere to a KubeVirt cluster whose pod network is
 provided by Calico CNI, the VM should be able to keep its network identity,
 and retain L2 connectivity to its source subnet.
 
-An upcoming Calico release will include support for attaching pod NICs to L2
-networks, and for requesting L2 and L3 addresses for each of a pod's NICs in
-order to preserve workload identity.
+Calico is releasing support for [attaching pod NICs to L2
+networks](https://docs.tigera.io/calico-enterprise/3.24/networking/l2-bridge/about-l2-bridge) available in the host-network, and for [requesting L2 and L3 addresses
+for each of a pod's/VM's NICs](https://docs.tigera.io/calico-enterprise/3.24/networking/l2-bridge/vm-identity#set-the-mac-address) in order to preserve workload identity.
 
-This enhancement teaches Forklift to validate Calico resources in the destination,
-and also allows Forklift to drive Calico's L2 and address-preservation features via
-pod (VM template) annotations.
-
-Users express their intent to use Calico as the networking provider for a given
-NIC in the NetworkMap, and Forklift stamps the right annotations on the migrated VM
+This document proposes enhancing Forklift to validate Calico resources in the destination,
+to drive Calico's L2 and address-preservation features with VM template annotations. Users
+express their intent to use Calico as the networking provider for a given NIC, either in the
+NetworkMap or in a NAD, and Forklift stamps Calico CNI annotations on the migrated VM
 so it comes up with the same addresses it had on vSphere (assuming validation passed).
 
 ## Motivation
@@ -66,19 +64,19 @@ annotations, and can even go a step further and validate destination cluster con
 ### Goals
 
 - Migrated VMs keep their source MAC and IP addresses on Calico-backed
-  networks, for (either or both) the primary (pod-network) NIC and secondary (Multus)
+  networks, for (either or both) the pod-network NIC and secondary Multus
   NICs.
-- Misconfiguration is caught before migration: broken references, missing
-  Calico capability on the destination, addresses that no IPPool can serve —
-  all surface as conditions on the NetworkMap or Plan, with messages that say
-  what to fix.
+- Catch misconfigurations before migration: missing Calico capabilities on the
+  destination, addresses that no Calico IPPool can serve, all surface as conditions
+  on the NetworkMap or Plan, with messages that say what to fix.
 - Clusters without Calico, and Calico installations without the newer capabilities,
   are detected; the feature degrades to "not supported here" feedback.
 - Ideally, the implementation code is neat and contained:
-  - One suggestion was to have no Calico methods on the shared provider interfaces, no stubs in
+  - One suggestion was not to have Calico methods on the shared provider interfaces, no stubs in
     unimplemented provider interfaces.
   - There may be an opportunity to create a basic, generic plugin harness with Calico as the
     first implementation.
+
 
 ### Non-Goals
 
@@ -100,7 +98,7 @@ for the purpose of networking pods together at Layer 3, and performs IPAM for
 said pods ("workloads") when provided with an [IPPool CR](https://docs.tigera.io/calico/latest/reference/resources/ippool).
 
 Traditionally, Calico connects pods together at Layer 3, by transforming each
-K8s node into a router. When a CNI ADD event invokes Calico, a virtual
+K8s node into a pod-router. When a CNI ADD event invokes Calico, a virtual
 ethernet (veth) device pair is created. One end of the veth in the pod namespace,
 and one end in the host namespace. Pod traffic is emitted into the host namespace
 where it can be routed, tunneled, etc.
@@ -109,17 +107,18 @@ where it can be routed, tunneled, etc.
 
 Historically, if a pod, or Kubevirt VM was scheduled and Calico CNI invoked, a fresh
 IP would be allocated from an available Calico `IPPool`. By default, the pod-side link also
-receives a semi-random MAC allocated by the kernel. However, these values can
-be fixed by annotating the associated Pod manifest:
+receives a dummy MAC address. However, these values can be fixed by annotating the associated Pod manifest:
 
 ```yaml
 cni.projectcalico.org/hwAddr: "1c:0c:0a:c0:ff:ee"
 cni.projectcalico.org/ipAddrs: '["192.168.0.1", "2001:db8::1"]'
 ```
 
+This is pre-existing functionality in all supported versions of Calico.
+
 In Calico Enterprise and Calico Cloud, Multus is officially supported, allowing pods
-to receive secondary attachments. An upcoming release will allow setting annotations
-for pods' secondary links:
+to receive secondary attachments. Since Calico EE v3.24 early-preview 2, similar annotations
+for pods' secondary links can be set:
 
 ```yaml
 cni.projectcalico.org/hwAddr: "1c:0c:0a:c0:ff:ee"
@@ -128,20 +127,25 @@ cni.projectcalico.org/eth1.hwAddr: "1c:2c:2a:c2:ff:ee"
 cni.projectcalico.org/eth1.ipAddrs: '["192.168.0.2", "2001:db8::2"]
 ```
 
+This covers the possibility for full identity-preservation of pods/VMs. The following
+section covers the other half of the problem: keeping the pod/VM endpoints connected
+to their original segments.
+
+
 ### L2 attachment
 
-The same upcoming release is also scheduled to include Layer 2 pod networking.
+Calico received support for [Layer 2 pod/VM networking in EE v3.24, early-preview 2](https://docs.tigera.io/calico-enterprise/3.24/networking/l2-bridge/).
 Calico L2 expects the cluster admin to expose their K8s nodes to any subnets
 they want their pods homed on, i.e., by having a trunk NIC for those networks
-plugged ahead of time. Calico can then be configured by way of a `Network` CR
+plugged ahead of time. Calico can then be configured by way of a [Network](https://docs.tigera.io/calico-enterprise/3.24/reference/resources/network) CR
 to bridge pod veth traffic onto the trunk, tagged with a VLAN ID.
 
 The `Network` CR is the declarative resource describing what Networks a pod
 can be attached to. In the case of L2 bridging, the admin describes in the `Network`:
  - the VLAN,
  - subnet CIDR,
- - the trunk to bridge, and
- - whether they'd like to manage the bridge themselves, or let Calico do it.
+ - the trunk to bridge to workload endpoints, and
+ - whether to manage the bridge themselves, or let Calico do it.
 
 In the case where a pod's primary veth should be bridged onto an L2 network known
 to Calico, an annotation is placed on the Pod which references the desired `Network`
@@ -177,47 +181,12 @@ config (and the pod references the NAD):
 
 ```
 
-### Sample Network resource for an L2-attached Calico node.
-
-```yaml
-  apiVersion: projectcalico.org/v3
-  kind: Network
-  metadata:
-    # Cluster-scoped; this is what the `networks`
-    # annotation and/or NAD "network" references.
-    name: prod-net
-  spec:
-    l2Bridge:
-      # Required: which bridge to use on which nodes, and how it
-      # connects to the physical network. The bridge is either
-      # pre-existing (managed by the admin) or Calico-managed.
-      hostConfig:
-        - bridge:
-            existingBridge:
-              name: br-prod
-          hostConnections:
-            - trunkPort:
-                interface:
-                  name: eth1
-      # Which VIDs are allowed to pass over the host-ns
-      # bridge/trunk upper/lower.
-      vlans:
-        - vlan:
-            id: 100
-          subnets:
-            # Preserved IPs must fall here, AND inside an enabled
-            # IPPool with allowedUses [L2Workload] (exclusive — it
-            # cannot be combined with other uses, and the pool must
-            # set disableBGPExport) whose CIDR is contained in this
-            # subnet.
-            - cidr: 10.100.0.0/24
-```
 
 _`Network.spec` also has a `vrf` struct which allows for multi-VRF
 networking since Calico Enterprise >=v3.23. Docs for that can be
 found [here](https://docs.tigera.io/calico-enterprise/latest/networking/configuring/multi-vrf),
-though Calico VRF support in Forklift may be omitted from this enhancement
-to keep the feature size down._
+Calico VRF support in Forklift does not necessarily need to be included
+in this proposal and can be deferred to keep PRs smaller.
 
 ## Proposal
 
@@ -230,7 +199,8 @@ Two additions to NetworkMap items:
 preservation: the source MAC is carried over, and the source IP too when the
 Plan sets `preserveStaticIPs`. "Carried over" in the case of a Calico attachment
 means that that particular NIC has a corresponding pod-annotation :
-`cni.projectcalico.org/<nic>.hwAddr` or `cni.projectcalico.org/<nic>.ipAddrs`.
+`cni.projectcalico.org/<nic>.hwAddr` and/or `cni.projectcalico.org/<nic>.ipAddrs`.
+
 The optional `network` and `vlan` fields additionally attach the NIC to a VLAN
 of a named Calico Network resource; without them the NIC stays on the default
 pod network and the preserved IP must fall inside an ordinary workload IPPool.
@@ -280,7 +250,7 @@ At migration time, the vSphere builder shapes the destination VM:
 
 - Each Calico-backed secondary NIC gets the interface-scoped variants, keyed
   by the VMI network name (Calico CNI itself will map pod interface names back to VMI
-  network names for virt-launcher pods, as is aware of KubeVirt iface name hashing):
+  network names for virt-launcher pods, and is aware of KubeVirt iface name hashing):
 
   ```yaml
   cni.projectcalico.org/net-1.hwAddr: "00:50:56:aa:bb:02"
@@ -288,7 +258,7 @@ At migration time, the vSphere builder shapes the destination VM:
   ```
 
 When the virt-launcher pod is first created, Calico CNI reads the annotations,
-reserves the requested address from an eligible IPPool, programs the MAC,
+reserves the requested IP from an eligible IPPool, programs the MAC,
 and attaches the interface to the requested segment in the host ns.
 
 ### Validation
@@ -296,21 +266,22 @@ and attaches the interface to the requested segment in the host ns.
 Validation happens where each concern lives:
 
 - **NetworkMap-scoped**: evaluated by the NetworkMap controller against the destination cluster:
-  - the NAD parses and references a Calico Network;
+  - the NAD parses correctly and references a Calico Network;
   - the Network exists and is of a usable type;
-  - a VLAN is named and exists in the Network;
+  - a VLAN is named in the networkmap item or NAD (depending on primary or secondary attachment) and also exists in the Network;
   - an enabled IPPool with the right `allowedUses` covers the VLAN's subnets;
   - the destination actually ships the needed Calico capability;
-  - the `calico` block sits on a `pod` entry and appears at most once.
+  - the `calico` block sits only on a `pod` entry and appears at most once.
   Failures are Critical conditions on the map.
 - **Plan-scoped**:
   - the interaction with `preserveStaticIPs`,
-    - If the plan does not preserve static IPs, and a Calico opt-in is present, Warn. Calico will assign a random IP, and the guest will receive it over DHCP.
-      Bigger deal than if Calico were not present, because the opt-in bridges
+    - If the plan does not preserve static IPs, and a Calico opt-in is present, Warn.
+      Calico will assign a random IP, and the guest will receive it over DHCP.
+      Bigger deal than if Calico were not present, because the Calico opt-in bridges
       the NIC: a DHCP-configured guest adopts the fresh address, while a
       statically-configured guest keeps its old one and diverges from what
       the dataplane routes and enforces.
-  - VM placement versus node-scoped networks,
+  - Node-scoped Network is compatible with the VMs destination node.
   - a conflict with a UDN-labelled target namespace.
   - per-VM checks:
     - each VM's NIC must have at most one IPv4 to preserve, and:
@@ -338,6 +309,13 @@ probes:
   - VLAN-bridged networks require the eBPF dataplane;
   - VRF networks require the nftables dataplane.
 
+This method of capability detection also provides another benefit:
+verifying that Forklift meets all of it's responsibilities pertaining to a Calico
+cluster only requires that those CRDs are present for it to read.
+It means there is no requirement to fully install Calico, saving time and resources.
+It also means that, in the case of licensed Calico features, no license is
+necessary to determine if Forklift fulfills its role.
+
 
 ### Incremental delivery
 
@@ -347,9 +325,9 @@ ones. PR 2 is deliberately the largest: it banks the whole secondary-NIC
 path, which needs no Forklift API change, before the `calico` block lands.
 
 #### PR 1
-This document, Calico resources added to the Inventory model, and a hack
-script which provisions a kind cluster with some mock Calico CRDs for
-Forklift to work off of.
+This document, plus Calico resources added to the Inventory model, plus a hack
+script which provisions a kind cluster with some Calico CRDs for
+Forklift to measure Calico capabilities, and perform validation against.
 
 **Inventory:** The provider inventory serves the destination's `projectcalico.org`
 resources: IPPools and Networks. Reports on the provider
@@ -361,13 +339,13 @@ Forklift will behave in the presence of Calico.
 
 #### PR 2
 **CI enablement, and NetworkMap validation for Calico NADs** A CI lane that installs Calico CRDs (or stand-ins)
-(see the environment below) and exercises the validation surface end to end.
+(see the environment below) and exercises the capability detection and validation surface end to end.
 
 **NetworkMap validation for Calico NADs:** the NetworkMap-controller checks
 for Multus entries backed by Calico NADs, reading Calico state through the
 inventory. Broken Calico references surface as conditions on the map.
 
-**Plan validation:** the per-VM address checks for Multus-mapped NICs:
+**Plan validation:** per-VM address checks for Multus-mapped NICs:
  - at most one IPv4 to preserve,
  - IP is inside the VLAN's subnets,
  - an eligible IPPool covers the subnets.
@@ -393,7 +371,25 @@ dataplane checks.
 
 ### User Stories
 
-#### Story 1: keep a database server's address
+#### Story 1: multi-homed appliance
+
+A VM has a management NIC and a backend NIC. The management NIC maps to the
+pod network with a `calico` block; the second NIC's NetworkMap entry references
+a Multus NAD backed by a Calico Network. Both interfaces keep their MAC and IP;
+if the Multus NAD references a valid Calico `Network`, then the secondary NIC will
+remain bridged to its original VLAN.
+The plan surfaces a per-VM error before migration if either address cannot be served
+by an IPPool on the destination. Otherwise the virt-launcher pod comes up with two
+NICs preserving the inner guest's addresses.
+
+#### Story 2: destination can't do it
+
+A user opts a plan into Calico preservation, by referencing a NAD of type:calico
+and which references a Calico `Network`. But, the destination's Calico
+installation does not serve the `Network` CRD. The NetworkMap goes not-ready
+with a condition naming the missing capability, before any VM moves.
+
+#### Story 3: keep a server's address, but re-home.
 
 A statically-configured database VM at `10.100.0.5` moves to
 KubeVirt. The administrator maps its port group to `type: pod` with
@@ -401,31 +397,36 @@ an empty `calico: {}` block and sets `preserveStaticIPs: true` on the Plan.
 After cutover the VM answers at `10.100.0.5` with its old MAC.
 Since no Calico Network CR was referenced, the NIC was not attached
 by Calico during CNI ADD, and rides Calico's L3 pod network.
+The VM remains reachable within the Calico network and, provided
+routing has been configured on the outside network, allows ingressing
+connections on the same IP, too.
 
-#### Story 2: a VM lives on the same subnet as K8s nodes.
+#### Story 4a: a VM lives on the same subnet as K8s nodes.
 
-A statically-configured database VM, and a K8s cluster both live
-on the same management subnet, VLAN 100.
+Expected to be a less-common use-case, but allowed in this proposal right now...
+
+A statically-configured database VM with one NIC, and a K8s cluster's nodes live
+on the same subnet, VLAN 100.
+
 The administrator maps the VM port group to `type: pod` with
-`calico: {network: mgmt-subnet, vlan: 100}`. They also ensure a thin
-IPPool covers the IP of the VM. Calico CNI will create
-the primary NIC and bridge it onto the management network with its
-original IP and MAC.
+`calico: {network: mgmt-subnet, vlan: 100}`. The admin also ensures a thin
+IPPool covers the IP of the VM to-be-migrated. On migration, Calico CNI will create
+the primary NIC for the virt-launcher pod and sets the source VM's original IP.
+Calico will then bridge that NIC onto the management network. The guest's addresses
+stay preserved, and there is a direct L2 path from the guest out to its original network.
 
-#### Story 3: multi-homed appliance
+Despite the virt-launcher only having one NIC, this primary NIC will be isolated from pods on the pod network.
 
-A VM has a management NIC and a backend NIC. The management NIC maps to the
-pod network with a `calico` block; the second NIC's NetworkMap entry references
-a Multus NAD backed by a Calico Network. Both interfaces keep their MAC and IP;
-the plan surfaces a per-VM error before migration if either address cannot be served
-by an IPPool on the destination. Otherwise the virt-launcher pod comes up with two
-NICs preserving the inner guest's addresses.
+#### Story 4b:
 
-#### Story 4: destination can't do it
+Alternatively to the above configuration, a `type:multus` map entry could
+be provided with the same Calico opt-in for that since NIC. The effect of this is the same for the NIC
+that was named in the map. The difference is that, in the absence of an explicitly-named pod-network entry, Calico
+will auto-create a pod NIC with a fresh IP also. It will be mounted to the virt-launcher's
+namespace, and since the fresh NIC has no relation to the guest OS, it will dangle in the virt-launcher NS.
 
-A user opts a plan into Calico preservation, but the destination's Calico
-installation does not support the Network resource. The NetworkMap goes not-ready
-with a condition naming the missing capability, before any VM moves.
+I expect configurations like these to be edge cases, but would be interested if you have any thoughts
+on them, or have seen similar configurations.
 
 ### Security, Risks, and Mitigations
 
