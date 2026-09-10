@@ -109,6 +109,7 @@ func (r *Builder) PersistentVolume(provider *api.Provider, secret *core.Secret) 
 			AccessModes: []core.PersistentVolumeAccessMode{
 				core.ReadOnlyMany,
 			},
+			MountOptions: SMBMountOptions(provider.Spec.Settings),
 			PersistentVolumeSource: core.PersistentVolumeSource{
 				CSI: &core.CSIPersistentVolumeSource{
 					Driver:       SMBCSIDriver,
