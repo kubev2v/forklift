@@ -832,6 +832,17 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
+              virt_v2v_seccomp_profile:
+                description: Seccomp profile for the conversion pods, as a Localhost
+                  profile name resolved by the kubelet under its seccomp profile root
+                  (for example "profiles/unshare.json"). The conversion appliance
+                  runs passt, which calls unshare(CLONE_NEWUSER) and then mount, umount2
+                  and pivot_root; a runtime's default profile denies those. Unlike
+                  Unconfined, a Localhost profile keeps syscall filtering enabled
+                  and is admitted by the baseline and restricted Pod Security Standards.
+                  Optional. When empty, OpenShift clusters use profiles/unshare.json
+                  as before and all others use the runtime default.
+                type: string
               virt_v2v_smp:
                 description: Number of virtual CPUs for the virt-v2v conversion appliance.
                 format: int32
