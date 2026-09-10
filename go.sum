@@ -435,8 +435,8 @@ github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0 h1:qS4r4ljINLWKJ
 github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0/go.mod h1:oGXx2XTEzs9ikW2V6IC1dD8trgjRsS/Mvc2JRiC618Y=
 github.com/kubev2v/gophercloud v0.0.0-20230629135522-9d701a75c760 h1:2+joXldqFBM5YnNAINDK8/8866ML9W1kaa34voAxwhQ=
 github.com/kubev2v/gophercloud v0.0.0-20230629135522-9d701a75c760/go.mod h1:aAVqcocTSXh2vYFZ1JTvx4EQmfgzxRcNupUfxZbBNDM=
-github.com/kubev2v/vm-migration-detective v0.0.0-20260902041931-9ed26d672e4d h1:YiSFSYcd4YtZOhp3GAcOzK0bz+qYuji2Dk4bPU2NRvk=
-github.com/kubev2v/vm-migration-detective v0.0.0-20260902041931-9ed26d672e4d/go.mod h1:G/1I29xQDnu3LBZL/GUWrAGnECnVcktqMrGjvMK63ug=
+github.com/kubev2v/vm-migration-detective v0.0.0-20260908083350-a89447103cf3 h1:LyIswgk0L2AS5Idn176yZxbez6RWDXEt7Xq0Y4dE2u8=
+github.com/kubev2v/vm-migration-detective v0.0.0-20260908083350-a89447103cf3/go.mod h1:G/1I29xQDnu3LBZL/GUWrAGnECnVcktqMrGjvMK63ug=
 github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/leodido/go-urn v1.4.0 h1:WT9HwE9SGECu3lg4d/dIA+jxlljEa1/ffXKmRjqdmIQ=
