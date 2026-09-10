@@ -1,0 +1,36 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forklift-ui-plugin-policy
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+spec:
+  podSelector:
+    matchLabels:
+      service: {{ ui_plugin_service_name }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+  # Allow OpenShift Console to access UI plugin
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-console
+    ports:
+    - protocol: TCP
+      port: 9443
+  # Allow monitoring access
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-monitoring
+    ports:
+    - protocol: TCP
+      port: 9443
+  egress:
+  # Allow all egress for UI plugin functionality
+  # The UI plugin needs to access various internal services dynamically
+  - {}
