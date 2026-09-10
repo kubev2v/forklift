@@ -1028,7 +1028,52 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, _ *core.Secret) (env []core.EnvV
 		return
 	}
 	env = append(env, core.EnvVar{Name: "V2V_vmName", Value: vm.Name})
+
+	if r.Plan.Spec.PreserveStaticIPs {
+		staticIPs, staticErr := r.mapMacStaticIps(vm)
+		if staticErr != nil {
+			err = staticErr
+			return
+		}
+		if staticIPs != "" {
+			env = append(env, core.EnvVar{Name: "V2V_staticIPs", Value: staticIPs})
+		}
+	}
+
 	return
+}
+
+// mapMacStaticIps builds the V2V_staticIPs value for virt-v2v's --mac flag.
+// For each NIC that has IP addresses, it looks up the subnet to obtain the
+// default gateway, prefix length, and DNS servers, then formats each IP as:
+//
+//	<MAC>:ip:<IP>,<Gateway>,<PrefixLength>,<DNS1>,<DNS2>,...
+//
+// Multiple entries are joined with "_". NICs whose subnet cannot be found or
+// has no gateway are skipped with a warning rather than failing the migration.
+func (r *Builder) mapMacStaticIps(vm *model.VM) (string, error) {
+	var entries []string
+	for _, nic := range vm.NICs {
+		if len(nic.StaticIPConfigs) == 0 {
+			continue
+		}
+
+		// DNS servers come from the subnet (subnet-wide, not per-IP).
+		dnsString := ""
+		if nic.SubnetUUID != "" {
+			network := &model.Network{}
+			if err := r.Source.Inventory.Find(network, ref.Ref{ID: nic.SubnetUUID}); err == nil {
+				dnsString = strings.Join(network.DNSServers, ",")
+			}
+		}
+
+		for _, cfg := range nic.StaticIPConfigs {
+			entry := fmt.Sprintf("%s:ip:%s,%s,%d,%s",
+				nic.MACAddress, cfg.IP, cfg.Gateway, cfg.Prefix, dnsString)
+			entries = append(entries, strings.TrimSuffix(entry, ","))
+		}
+	}
+	return strings.Join(entries, "_"), nil
 }
 
 // DomainXML generates a libvirt domain XML document from the Nutanix VM

@@ -75,22 +75,36 @@ func applyNICs(nics []libclient.VMNIC) []model.NIC {
 	result := make([]model.NIC, 0, len(nics))
 	for _, nic := range nics {
 		addresses := make([]string, 0, len(nic.IPEndpointList))
+		var staticConfigs []model.StaticIPConfig
 		for _, endpoint := range nic.IPEndpointList {
-			if endpoint.IP != "" {
-				addresses = append(addresses, endpoint.IP)
+			if endpoint.IP == "" {
+				continue
+			}
+			addresses = append(addresses, endpoint.IP)
+			if endpoint.IPType == "STATIC" && endpoint.PrefixLength > 0 {
+				gateway := ""
+				if len(endpoint.GatewayAddressList) > 0 {
+					gateway = endpoint.GatewayAddressList[0]
+				}
+				staticConfigs = append(staticConfigs, model.StaticIPConfig{
+					IP:      endpoint.IP,
+					Prefix:  endpoint.PrefixLength,
+					Gateway: gateway,
+				})
 			}
 		}
 
 		result = append(result, model.NIC{
-			IPAddresses: addresses,
-			IsConnected: nic.IsConnected,
-			MACAddress:  nic.MACAddress,
-			Model:       nic.Model,
-			NicType:     nic.NicType,
-			SubnetName:  nic.SubnetReference.Name,
-			SubnetUUID:  nic.SubnetReference.UUID,
-			UUID:        nic.UUID,
-			VlanMode:    nic.VlanMode,
+			IPAddresses:     addresses,
+			StaticIPConfigs: staticConfigs,
+			IsConnected:     nic.IsConnected,
+			MACAddress:      nic.MACAddress,
+			Model:           nic.Model,
+			NicType:         nic.NicType,
+			SubnetName:      nic.SubnetReference.Name,
+			SubnetUUID:      nic.SubnetReference.UUID,
+			UUID:            nic.UUID,
+			VlanMode:        nic.VlanMode,
 		})
 	}
 	return result
