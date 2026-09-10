@@ -18,6 +18,11 @@ type InspectionV2V struct {
 	OS InspectionOS `xml:"operatingsystem"`
 }
 
+// virtInspectorXML matches the root element produced by virt-inspector.
+type virtInspectorXML struct {
+	OS InspectionOS `xml:"operatingsystem"`
+}
+
 func GetInspectionV2vFromFile(xmlFilePath string) (*InspectionV2V, error) {
 	xmlData, err := os.ReadFile(xmlFilePath)
 	if err != nil {
@@ -25,12 +30,22 @@ func GetInspectionV2vFromFile(xmlFilePath string) (*InspectionV2V, error) {
 		return nil, err
 	}
 
-	var xmlConf InspectionV2V
-	err = xml.Unmarshal(xmlData, &xmlConf)
-	if err != nil {
+	// virt-inspector writes <operatingsystems><operatingsystem>...</operatingsystem></operatingsystems>
+	var inspectorXML virtInspectorXML
+	if err := xml.Unmarshal(xmlData, &inspectorXML); err == nil && hasInspectionOS(inspectorXML.OS) {
+		return &InspectionV2V{OS: inspectorXML.OS}, nil
+	}
+
+	// virt-v2v-inspector writes <v2v><operatingsystem>...</operatingsystem></v2v>
+	var v2vXML InspectionV2V
+	if err := xml.Unmarshal(xmlData, &v2vXML); err != nil {
 		return nil, fmt.Errorf("error unmarshalling XML: %v", err)
 	}
-	return &xmlConf, nil
+	return &v2vXML, nil
+}
+
+func hasInspectionOS(os InspectionOS) bool {
+	return os.Name != "" || os.Distro != "" || os.Osinfo != "" || os.Arch != ""
 }
 
 func (os InspectionOS) IsWindows() bool {

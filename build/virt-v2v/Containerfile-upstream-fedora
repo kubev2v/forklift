@@ -9,7 +9,7 @@ ENV GOEXPERIMENT=strictfipsruntime
 
 RUN go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-monitor ./cmd/virt-v2v-monitor/virt-v2v-monitor.go
 RUN go build -buildvcs=false -ldflags="-w -s" -o image-converter ./cmd/image-converter/image-converter.go
-RUN go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper ./cmd/virt-v2v/entrypoint.go
+RUN go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper ./cmd/virt-v2v/
 RUN go build -buildvcs=false -ldflags="-w -s" -o forklift-wait-for-reboot github.com/kubev2v/forklift/cmd/forklift-wait-for-reboot
 
 # Main container
