@@ -710,3 +710,76 @@ func (s *stubImportCredentialRefresher) RefreshImportCredentials(_ *cdi.DataVolu
 	s.calls++
 	return s.refreshed, nil
 }
+
+func newLocalV2vMigration(t *testing.T) *Migration {
+	t.Helper()
+	vsphere, openshift := api.VSphere, api.OpenShift
+	return &Migration{
+		Context: &plancontext.Context{
+			Plan: &api.Plan{
+				Spec:   api.PlanSpec{MigrateSharedDisks: true},
+				Status: api.PlanStatus{NetAppShiftDestination: false},
+				Referenced: api.Referenced{
+					Provider: struct {
+						Source, Destination *api.Provider
+					}{
+						Source:      &api.Provider{Spec: api.ProviderSpec{Type: &vsphere, URL: "https://vc"}},
+						Destination: &api.Provider{Spec: api.ProviderSpec{Type: &openshift, URL: ""}},
+					},
+				},
+			},
+			Log: logging.WithName("test"),
+		},
+	}
+}
+
+func TestRequiredPipelineStepsComplete(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	m := newLocalV2vMigration(t)
+	vm := &plan.VMStatus{
+		VM: plan.VM{Ref: ref.Ref{ID: "vm-1", Name: "test-vm"}},
+		Pipeline: []*plan.Step{
+			{Task: plan.Task{Name: ImageConversion}},
+			{Task: plan.Task{Name: DiskTransferV2v}},
+			{Task: plan.Task{Name: VirtualMachineCreation}},
+		},
+	}
+
+	g.Expect(m.requiredPipelineStepsComplete(vm)).To(gomega.BeFalse())
+
+	vm.Pipeline[0].MarkCompleted()
+	vm.Pipeline[1].MarkCompleted()
+	g.Expect(m.requiredPipelineStepsComplete(vm)).To(gomega.BeFalse())
+
+	vm.Pipeline[2].MarkCompleted()
+	g.Expect(m.requiredPipelineStepsComplete(vm)).To(gomega.BeTrue())
+}
+
+func TestResumeIncompletePipelinePhase(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	m := newLocalV2vMigration(t)
+	vm := &plan.VMStatus{
+		VM:    plan.VM{Ref: ref.Ref{ID: "vm-1", Name: "test-vm"}},
+		Phase: api.PhaseCompleted,
+		Pipeline: []*plan.Step{
+			{Task: plan.Task{Name: ImageConversion}},
+			{Task: plan.Task{Name: DiskTransferV2v}},
+			{Task: plan.Task{Name: VirtualMachineCreation}},
+		},
+	}
+	vm.MarkCompleted()
+	vm.Pipeline[0].MarkCompleted()
+
+	m.resumeIncompletePipelinePhase(vm)
+
+	g.Expect(vm.Phase).To(gomega.Equal(api.PhaseCopyDisksVirtV2V))
+	g.Expect(vm.MarkedCompleted()).To(gomega.BeFalse())
+
+	vm.Pipeline[1].MarkCompleted()
+	vm.Phase = api.PhaseCompleted
+	vm.MarkCompleted()
+	m.resumeIncompletePipelinePhase(vm)
+
+	g.Expect(vm.Phase).To(gomega.Equal(api.PhaseCreateVM))
+	g.Expect(vm.MarkedCompleted()).To(gomega.BeFalse())
+}

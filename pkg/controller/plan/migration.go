@@ -51,8 +51,9 @@ const (
 	// TODO: ImageConversion and DiskTransferV2v step names remain here
 	// until remaining cold/warm migration flow details can be
 	// moved into base migrators.
-	ImageConversion = "ImageConversion"
-	DiskTransferV2v = "DiskTransferV2v"
+	ImageConversion        = "ImageConversion"
+	DiskTransferV2v        = "DiskTransferV2v"
+	VirtualMachineCreation = "VirtualMachineCreation"
 
 	// annCookieRefreshedAt records when import credentials were last
 	// refreshed for a DataVolume so short-lived download cookies are not
@@ -1808,6 +1809,14 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	}
 	vm.ReflectPipeline()
 	if vm.Phase == api.PhaseCompleted && vm.Error == nil {
+		if !r.requiredPipelineStepsComplete(vm) {
+			r.Log.Info(
+				"VM reached completed phase before required pipeline steps finished; resuming migration",
+				"vm",
+				vm.String())
+			r.resumeIncompletePipelinePhase(vm)
+			return
+		}
 		err = r.provider.DetachDisks(vm.Ref)
 		if err != nil {
 			step, found := vm.FindStep(r.migrator.Step(vm))
@@ -2232,6 +2241,15 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			}
 			switch conv.Status.Phase {
 			case api.PhaseSucceeded:
+				useV2v, vErr := r.Plan.ShouldUseV2vForTransfer(vm.Ref)
+				if vErr != nil {
+					return liberr.Wrap(vErr)
+				}
+				// For virt-v2v-for-transfer, guest conversion can finish before disk
+				// copy; keep ImageConversion open until the v2v monitor advances it.
+				if useV2v && step.Name == ImageConversion {
+					return nil
+				}
 				step.MarkCompleted()
 				step.Progress.Completed = step.Progress.Total
 				return nil
@@ -2343,7 +2361,54 @@ func (r *Migration) updateConversionProgressV2vMonitor(pod *core.Pod, step *plan
 		step.Progress.Completed = step.Progress.Total
 		return
 	}
+	if step.Name == DiskTransferV2v && len(step.Tasks) > 0 {
+		allDone := true
+		for _, task := range step.Tasks {
+			if task.Progress.Completed < task.Progress.Total {
+				allDone = false
+				break
+			}
+		}
+		if allDone {
+			step.MarkCompleted()
+			step.Progress.Completed = step.Progress.Total
+		}
+	}
 	return
+}
+
+// requiredPipelineStepsComplete reports whether mandatory pipeline steps have
+// finished before the VM is marked Succeeded.
+func (r *Migration) requiredPipelineStepsComplete(vm *plan.VMStatus) bool {
+	for _, step := range vm.Pipeline {
+		if step.Name == VirtualMachineCreation && !step.MarkedCompleted() {
+			return false
+		}
+		if step.Name == DiskTransferV2v {
+			useV2v, err := r.Plan.ShouldUseV2vForTransfer(vm.Ref)
+			if err != nil {
+				r.Log.Error(err, "Could not verify virt-v2v transfer requirement", "vm", vm.String())
+				return false
+			}
+			if useV2v && !step.MarkedCompleted() {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// resumeIncompletePipelinePhase rewinds a VM that reached PhaseCompleted before
+// disk transfer or VM creation finished.
+func (r *Migration) resumeIncompletePipelinePhase(vm *plan.VMStatus) {
+	vm.Completed = nil
+	if step, found := vm.FindStep(DiskTransferV2v); found && !step.MarkedCompleted() {
+		vm.Phase = api.PhaseCopyDisksVirtV2V
+		return
+	}
+	if step, found := vm.FindStep(VirtualMachineCreation); found && !step.MarkedCompleted() {
+		vm.Phase = api.PhaseCreateVM
+	}
 }
 
 func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
