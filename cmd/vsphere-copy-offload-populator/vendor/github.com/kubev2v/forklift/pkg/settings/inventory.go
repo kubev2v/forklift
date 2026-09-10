@@ -19,16 +19,17 @@ const (
 
 // Environment variables.
 const (
-	AllowedOrigins = "CORS_ALLOWED_ORIGINS"
-	WorkingDir     = "WORKING_DIR"
-	AuthRequired   = "AUTH_REQUIRED"
-	Host           = "API_HOST"
-	Namespace      = "POD_NAMESPACE"
-	Port           = "API_PORT"
-	Scheme         = "INVENTORY_SERVICE_SCHEME"
-	TLSCertificate = "API_TLS_CERTIFICATE"
-	TLSKey         = "API_TLS_KEY"
-	TLSCa          = "API_TLS_CA"
+	AllowedOrigins                = "CORS_ALLOWED_ORIGINS"
+	WorkingDir                    = "WORKING_DIR"
+	AuthRequired                  = "AUTH_REQUIRED"
+	Host                          = "API_HOST"
+	Namespace                     = "POD_NAMESPACE"
+	Port                          = "API_PORT"
+	Scheme                        = "INVENTORY_SERVICE_SCHEME"
+	TLSCertificate                = "API_TLS_CERTIFICATE"
+	TLSKey                        = "API_TLS_KEY"
+	TLSCa                         = "API_TLS_CA"
+	VsphereExcludedVMPropertiesEv = "INVENTORY_VSPHERE_EXCLUDED_VM_PROPERTIES"
 )
 
 // CORS
@@ -62,6 +63,9 @@ type Inventory struct {
 		// CA path
 		CA string
 	}
+	// vSphere VM properties to exclude from the PropertyCollector PathSet.
+	// Comma-separated vCenter property paths (e.g. "customValue,availableField").
+	VsphereExcludedVMProperties []string
 }
 
 // Load settings.
@@ -126,6 +130,16 @@ func (r *Inventory) Load() error {
 	} else {
 		if _, err := os.Stat(ServiceCAFile); !errors.Is(err, os.ErrNotExist) {
 			r.TLS.CA = ServiceCAFile
+		}
+	}
+	// vSphere excluded VM properties
+	r.VsphereExcludedVMProperties = []string{}
+	if s, found := os.LookupEnv(VsphereExcludedVMPropertiesEv); found {
+		for _, p := range strings.Split(s, ",") {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				r.VsphereExcludedVMProperties = append(r.VsphereExcludedVMProperties, p)
+			}
 		}
 	}
 

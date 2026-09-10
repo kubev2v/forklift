@@ -24,6 +24,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
 )
 
 var _ = Describe("vSphere collector", func() {
@@ -46,6 +47,59 @@ var _ = Describe("vSphere collector", func() {
 		table.Entry("collect TPM from vSphere 6.7", "6.7", ContainElements(fTpmPresent)),
 		table.Entry("collect TPM from vSphere > 6.7", "7.0", ContainElements(fTpmPresent)),
 	)
+})
+
+var _ = Describe("vmPathSet exclusion", func() {
+	collector := Collector{}
+	url, _ := liburl.Parse("https://fake.com/sdk")
+	vimClient := &vim25.Client{
+		Client:         soap.NewClient(url, false),
+		ServiceContent: types.ServiceContent{},
+	}
+	collector.client = &govmomi.Client{
+		SessionManager: session.NewManager(vimClient),
+		Client:         vimClient,
+	}
+	collector.client.ServiceContent.About.ApiVersion = "7.0"
+
+	var savedExcluded []string
+
+	BeforeEach(func() {
+		savedExcluded = settings.Settings.VsphereExcludedVMProperties
+		settings.Settings.VsphereExcludedVMProperties = []string{}
+	})
+
+	AfterEach(func() {
+		settings.Settings.VsphereExcludedVMProperties = savedExcluded
+	})
+
+	It("should return the full pathSet when no exclusions are set", func() {
+		pathSet := collector.vmPathSet()
+		Expect(pathSet).To(ContainElements(fCustomValue, fAvailableField, fName, fDevices))
+	})
+
+	It("should exclude listed properties", func() {
+		settings.Settings.VsphereExcludedVMProperties = []string{fCustomValue, fAvailableField}
+		pathSet := collector.vmPathSet()
+		Expect(pathSet).NotTo(ContainElement(fCustomValue))
+		Expect(pathSet).NotTo(ContainElement(fAvailableField))
+	})
+
+	It("should preserve denylisted properties even when listed for exclusion", func() {
+		settings.Settings.VsphereExcludedVMProperties = []string{fName, fDevices, fGuestNet, fCustomValue}
+		pathSet := collector.vmPathSet()
+		Expect(pathSet).To(ContainElement(fName))
+		Expect(pathSet).To(ContainElement(fDevices))
+		Expect(pathSet).To(ContainElement(fGuestNet))
+		Expect(pathSet).NotTo(ContainElement(fCustomValue))
+	})
+
+	It("should ignore whitespace in exclusion entries", func() {
+		settings.Settings.VsphereExcludedVMProperties = []string{"  customValue  ", " availableField"}
+		pathSet := collector.vmPathSet()
+		Expect(pathSet).NotTo(ContainElement(fCustomValue))
+		Expect(pathSet).NotTo(ContainElement(fAvailableField))
+	})
 })
 
 var _ = Describe("apply", func() {
