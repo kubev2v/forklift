@@ -42,19 +42,21 @@ type NICRef struct {
 	NetworkID string
 }
 
-// NICRefsFrom converts a slice of any NIC type to []NICRef using the provided accessor.
-func NICRefsFrom[N any](nics []N, toRef func(N) NICRef) []NICRef {
-	refs := make([]NICRef, len(nics))
-	for i := range nics {
-		refs[i] = toRef(nics[i])
+// NICRefsFromKeys pairs each MAC with its resolved lookup key. macs and keys
+// must be the same length and share NIC order.
+func NICRefsFromKeys(macs []string, keys []string) []NICRef {
+	refs := make([]NICRef, len(macs))
+	for i := range macs {
+		refs[i] = NICRef{MAC: macs[i], NetworkID: keys[i]}
 	}
 	return refs
 }
 
-// ResolveNICModes returns a MAC->mode map based on NetworkMap pairs and NADPool allocation.
-func ResolveNICModes(nics []NICRef, networkMap *api.NetworkMap, preserveStaticIPs bool) map[string]string {
+// ResolveNICModes returns a MAC->mode map based on pre-resolved NetworkPairs and NADPool
+// allocation. pairsBySource must be keyed by each NIC's resolved network key.
+func ResolveNICModes(nics []NICRef, pairsBySource map[string][]api.NetworkPair, preserveStaticIPs bool) map[string]string {
 	modes := map[string]string{}
-	if networkMap == nil {
+	if pairsBySource == nil {
 		for _, nic := range nics {
 			if preserveStaticIPs {
 				modes[nic.MAC] = string(api.NetworkIPModePreserve)
@@ -66,7 +68,7 @@ func ResolveNICModes(nics []NICRef, networkMap *api.NetworkMap, preserveStaticIP
 	}
 	pool := NewNADPool()
 	for _, nic := range nics {
-		pairs := networkMap.FindAllNetworks(nic.NetworkID)
+		pairs := pairsBySource[nic.NetworkID]
 		if len(pairs) == 0 {
 			continue
 		}
