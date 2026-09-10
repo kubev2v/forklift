@@ -45,3 +45,8 @@
       state: "{{ webhook_state }}"
       definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-providers.yml.j2') }}"
 
+  - name: "Setup hooks mutating webhook configuration"
+    k8s:
+      state: "{{ webhook_state }}"
+      definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-hooks.yml.j2') }}"
+

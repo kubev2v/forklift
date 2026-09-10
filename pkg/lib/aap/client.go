@@ -18,6 +18,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/settings"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // AAP controller API job status values (subset used for polling).
@@ -86,6 +87,40 @@ type JobTemplateListResponse struct {
 	Next     string               `json:"next"`
 	Previous string               `json:"previous"`
 	Results  []JobTemplateSummary `json:"results"`
+}
+
+// NewClientForHook builds an AAP client from hook-local or cluster-default settings.
+func NewClientForHook(ctx context.Context, k8sClient client.Client, hook *api.Hook) (*Client, error) {
+	if hook == nil || hook.Spec.AAP == nil {
+		return nil, fmt.Errorf("invalid AAP hook")
+	}
+	a := hook.Spec.AAP
+	m := settings.Settings.Migration
+	useHook := strings.TrimSpace(a.URL) != "" && a.TokenSecret != nil && strings.TrimSpace(a.TokenSecret.Name) != ""
+	if !useHook && (strings.TrimSpace(m.AAPURL) == "" || strings.TrimSpace(m.AAPTokenSecretName) == "") {
+		return nil, fmt.Errorf("AAP is not configured")
+	}
+	var url, token string
+	var err error
+	if useHook {
+		url = strings.TrimSpace(a.URL)
+		token, err = GetTokenFromSecret(ctx, k8sClient, hook.Namespace, a.TokenSecret)
+	} else {
+		url = strings.TrimSpace(m.AAPURL)
+		token, err = GetTokenFromSecretName(ctx, k8sClient, settings.ControllerNamespace(), m.AAPTokenSecretName)
+	}
+	if err != nil {
+		return nil, err
+	}
+	to := 30 * time.Second
+	if m.AAPTimeoutSeconds > 0 {
+		to = time.Duration(m.AAPTimeoutSeconds) * time.Second
+	}
+	tr, err := TLSTransportFromSettings(ctx, k8sClient, m.AAPInsecureSkipVerify, m.AAPCASecretName)
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(url, token, to, tr), nil
 }
 
 // resolvePathPrefix sets apiPathPrefix once: optional static ([WithPathPrefix]), else GET {baseURL}/api
@@ -261,6 +296,41 @@ func (c *Client) GetJobStatus(ctx context.Context, jobID int) (*JobStatusRespons
 	}
 
 	var result JobStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, liberr.Wrap(err, "failed to decode response")
+	}
+
+	return &result, nil
+}
+
+// GetJobTemplate retrieves a job template by ID from the AAP controller API.
+func (c *Client) GetJobTemplate(ctx context.Context, jobTemplateID int) (*JobTemplateSummary, error) {
+	u, err := c.resourceURL(ctx, fmt.Sprintf("/job_templates/%d/", jobTemplateID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, liberr.Wrap(err, "failed to create request")
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, liberr.Wrap(err, "failed to get AAP job template")
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("AAP returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result JobTemplateSummary
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, liberr.Wrap(err, "failed to decode response")
 	}
