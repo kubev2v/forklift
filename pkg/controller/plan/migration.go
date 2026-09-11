@@ -215,6 +215,7 @@ func (r *Migration) init() (err error) {
 
 // Begin the migration.
 func (r *Migration) begin() (err error) {
+	start := time.Now()
 	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
 	if snapshot.HasAnyCondition(api.ConditionExecuting, api.ConditionSucceeded, api.ConditionFailed, api.ConditionCanceled) {
 		return
@@ -264,6 +265,7 @@ func (r *Migration) begin() (err error) {
 			Message:  "The plan is EXECUTING.",
 			Durable:  true,
 		})
+	setupStart := time.Now()
 	err = r.kubevirt.EnsureNamespace()
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -279,8 +281,12 @@ func (r *Migration) begin() (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+	setupDuration := time.Since(setupStart)
+
+	r.Source.Inventory = web.NewCachingClient(r.Source.Inventory)
 	//
 	// Delete
+	cleanupStart := time.Now()
 	kept := []*plan.VMStatus{}
 	for _, status := range r.Plan.Status.Migration.VMs {
 
@@ -296,8 +302,10 @@ func (r *Migration) begin() (err error) {
 		}
 	}
 	r.Plan.Status.Migration.VMs = kept
+	cleanupDuration := time.Since(cleanupStart)
 	//
 	// Add/Update.
+	pipelineStart := time.Now()
 	list := []*plan.VMStatus{}
 	for _, vm := range r.Plan.Spec.VMs {
 		status := r.migrator.Status(vm)
@@ -333,6 +341,7 @@ func (r *Migration) begin() (err error) {
 	}
 
 	r.Plan.Status.Migration.VMs = list
+	pipelineDuration := time.Since(pipelineStart)
 
 	err = r.migrator.Begin()
 	if err != nil {
@@ -340,9 +349,26 @@ func (r *Migration) begin() (err error) {
 		return
 	}
 
-	r.Log.Info("Migration [STARTED]")
+	r.logInventoryCacheStats("migration begin")
+	r.Log.Info(
+		"Migration [STARTED]",
+		"vmCount", len(r.Plan.Spec.VMs),
+		"setup", setupDuration,
+		"cleanup", cleanupDuration,
+		"pipeline", pipelineDuration,
+		"total", time.Since(start))
 
 	return
+}
+
+func (r *Migration) logInventoryCacheStats(phase string) {
+	if cached, ok := r.Source.Inventory.(*web.CachingClient); ok {
+		r.Log.Info(
+			"Inventory cache stats",
+			"phase", phase,
+			"plan", r.Plan.Name,
+			"stats", cached.Stats())
+	}
 }
 
 // Archive the plan.
