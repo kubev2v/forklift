@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
@@ -32,7 +33,7 @@ func TestSetAuthFailureConditions_HyperV_SetsBothConditions(t *testing.T) {
 }
 
 func TestSetAuthFailureConditions_NonHyperV_OnlyAuthFailed(t *testing.T) {
-	for _, pt := range []api.ProviderType{api.VSphere, api.OVirt, api.OpenStack, api.Ova} {
+	for _, pt := range []api.ProviderType{api.OVirt, api.OpenStack, api.Ova} {
 		t.Run(string(pt), func(t *testing.T) {
 			p := makeProvider(pt)
 			setAuthFailureConditions(p, fmt.Errorf("HTTP 401"))
@@ -63,7 +64,7 @@ func TestDeferRequeue_HyperV_AuthRetry(t *testing.T) {
 
 // Verify the defer logic: ConnectionAuthFailed without ConnectionAuthRetry → requeue = 0
 func TestDeferRequeue_NonHyperV_AuthFailed_StopsReconciliation(t *testing.T) {
-	p := makeProvider(api.VSphere)
+	p := makeProvider(api.OVirt)
 	setAuthFailureConditions(p, fmt.Errorf("HTTP 401"))
 
 	if p.Status.HasCondition(ConnectionAuthRetry) {
@@ -73,6 +74,34 @@ func TestDeferRequeue_NonHyperV_AuthFailed_StopsReconciliation(t *testing.T) {
 		t.Fatal("expected ConnectionAuthFailed")
 	}
 	// ConnectionAuthRetry absent → falls through to ConnectionAuthFailed → requeue = 0
+}
+
+// VSphere can set ConnectionAuthRetry up to an AuthRetryWindow timeout,
+// then go back to requeue 0 to avoid account lockouts.
+func TestAuthRetryWindow_VSphere(t *testing.T) {
+	p := makeProvider(api.VSphere)
+	setAuthFailureConditions(p, fmt.Errorf("HTTP 401"))
+
+	// First login failure: set retry
+	if !p.Status.HasCondition(ConnectionAuthRetry) {
+		t.Fatal("expected ConnectionAuthRetry")
+	}
+
+	// Move transition time past allowable retry window
+	condition := p.Status.FindCondition(ConnectionAuthFailed)
+	condition.LastTransitionTime = v1.NewTime(time.Now().Add(-2 * AuthRetryWindow))
+	p.Status.DeleteCondition(ConnectionAuthRetry)
+	p.Status.BeginStagingConditions()
+	setAuthFailureConditions(p, fmt.Errorf("HTTP 401"))
+	p.Status.EndStagingConditions()
+
+	// Failure after window: should clear retry, and just mark failed for requeue 0
+	if p.Status.HasCondition(ConnectionAuthRetry) {
+		t.Fatal("expected ConnectionAuthRetry to be cleared")
+	}
+	if !p.Status.HasCondition(ConnectionAuthFailed) {
+		t.Fatal("expected ConnectionAuthFailed")
+	}
 }
 
 // Verify staging removes both auth conditions after a successful connection test
