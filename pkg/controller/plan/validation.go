@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -166,6 +167,7 @@ const (
 
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
+	start := time.Now()
 	// Provider.
 	pv := validation.ProviderPair{Client: r}
 	conditions, err := pv.Validate(plan.Spec.Provider)
@@ -209,6 +211,8 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	if err != nil {
 		return err
 	}
+	ctx.Source.Inventory = web.NewCachingClient(ctx.Source.Inventory)
+	ctx.Destination.Inventory = web.NewCachingClient(ctx.Destination.Inventory)
 
 	if err = r.validateUserDefinedNetwork(ctx); err != nil {
 		return err
@@ -285,7 +289,33 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		r.Log.V(1).Info("Failed to validate pod security policies", "error", err)
 	}
 
+	r.logValidateInventoryCache(plan, ctx)
+	r.Log.Info(
+		"Plan validate timing",
+		"plan", plan.Name,
+		"vmCount", len(plan.Spec.VMs),
+		"duration", time.Since(start))
+
 	return nil
+}
+
+func (r *Reconciler) logValidateInventoryCache(plan *api.Plan, ctx *plancontext.Context) {
+	if cached, ok := ctx.Source.Inventory.(*web.CachingClient); ok {
+		r.Log.Info(
+			"Inventory cache stats",
+			"phase", "plan validate",
+			"plan", plan.Name,
+			"inventory", "source",
+			"stats", cached.Stats())
+	}
+	if cached, ok := ctx.Destination.Inventory.(*web.CachingClient); ok {
+		r.Log.Info(
+			"Inventory cache stats",
+			"phase", "plan validate",
+			"plan", plan.Name,
+			"inventory", "destination",
+			"stats", cached.Stats())
+	}
 }
 
 func (r *Reconciler) validateVolumeNameTemplate(plan *api.Plan) error {
@@ -720,6 +750,7 @@ func aggregateWarningConcerns(v interface{}, vmRef string, unsupportedOVFExportS
 
 // Validate listed VMs.
 func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error {
+	start := time.Now()
 	if plan.Status.HasCondition(Executing) {
 		return nil
 	}
@@ -1001,6 +1032,15 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	planUsesOffload := checkMixedUsage && plan.IsUsingOffloadPlugin()
 	netAppShift := plan.HasNetAppShiftDestination()
 
+	sourceProvider := plan.Provider.Source
+	if sourceProvider == nil {
+		return nil
+	}
+	pAdapter, err := adapter.New(sourceProvider)
+	if err != nil {
+		return err
+	}
+
 	// Referenced VMs.
 	for i := range plan.Spec.VMs {
 		vm := &plan.Spec.VMs[i]
@@ -1024,15 +1064,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			continue
 		}
 		// Source.
-		provider := plan.Provider.Source
-		if provider == nil {
-			return nil
-		}
-		inventory, pErr := web.NewClient(provider)
-		if pErr != nil {
-			return liberr.Wrap(pErr)
-		}
-		v, pErr := inventory.VM(ref)
+		v, pErr := ctx.Source.Inventory.VM(ref)
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
 				notFound.Items = append(notFound.Items, ref.String())
@@ -1076,7 +1108,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				if vsphereVM.Snapshot.ID != "" {
 					shiftSnapshotVMs.Items = append(shiftSnapshotVMs.Items, ref.String())
 				}
-				if label, sErr := hasShiftDiskMissingNAS(vsphereVM, plan.Map.Storage, inventory, ctx.Destination.Client); sErr != nil {
+				if label, sErr := hasShiftDiskMissingNAS(vsphereVM, plan.Map.Storage, ctx.Source.Inventory, ctx.Destination.Client); sErr != nil {
 					return sErr
 				} else if label != "" {
 					shiftNASMissing.Items = append(shiftNASMissing.Items, label)
@@ -1112,15 +1144,6 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 					}
 				}
 			}
-		}
-		pAdapter, err := adapter.New(provider)
-		if err != nil {
-			return err
-		}
-		var ctx *plancontext.Context
-		ctx, err = plancontext.New(r, plan, r.Log)
-		if err != nil {
-			return err
 		}
 		validator, err := pAdapter.Validator(ctx)
 		if err != nil {
@@ -1304,13 +1327,8 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			}
 		}
 		// Destination.
-		provider = plan.Provider.Destination
-		if provider == nil {
+		if plan.Provider.Destination == nil {
 			return nil
-		}
-		inventory, pErr = web.NewClient(provider)
-		if pErr != nil {
-			return liberr.Wrap(pErr)
 		}
 		vmName := ref.Name
 		if vm.TargetName != "" {
@@ -1321,7 +1339,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			Name:      vmName,
 			Namespace: plan.Spec.TargetNamespace,
 		}
-		_, pErr = inventory.VM(vmRef)
+		_, pErr = ctx.Destination.Inventory.VM(vmRef)
 		if pErr == nil {
 			if _, found := plan.Status.Migration.FindVM(*ref); !found {
 				// This VM is preexisting or is being managed by a
@@ -1498,6 +1516,12 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	if len(independentDiskWarning.Items) > 0 {
 		plan.Status.SetCondition(independentDiskWarning)
 	}
+
+	r.Log.Info(
+		"Plan validate VM timing",
+		"plan", plan.Name,
+		"vmCount", len(plan.Spec.VMs),
+		"duration", time.Since(start))
 
 	return nil
 }
