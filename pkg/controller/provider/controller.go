@@ -60,8 +60,9 @@ import (
 )
 
 const (
-	Name         = "provider"
-	AuthRetryReQ = 3 * time.Minute
+	Name            = "provider"
+	AuthRetryReQ    = 3 * time.Minute
+	AuthRetryWindow = 7 * time.Minute // Allow approximately two retries to ride through vSphere service startup
 )
 
 // Package logger.
