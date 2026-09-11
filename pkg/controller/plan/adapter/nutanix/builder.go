@@ -835,8 +835,8 @@ func (r *Builder) TemplateLabels(_ ref.Ref) (map[string]string, error) {
 }
 
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	if dv.ObjectMeta.Annotations != nil {
-		if id, ok := dv.ObjectMeta.Annotations[planbase.AnnDiskSource]; ok {
+	if dv.Annotations != nil {
+		if id, ok := dv.Annotations[planbase.AnnDiskSource]; ok {
 			return id
 		}
 	}

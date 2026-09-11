@@ -2053,7 +2053,7 @@ func (r *KubeVirt) ensureDomainXMLConfigMap(vmRef ref.Ref, domainXML string) (co
 	labels[AnnLibvirtDomainXML] = "true"
 
 	list := &core.ConfigMapList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -2069,7 +2069,7 @@ func (r *KubeVirt) ensureDomainXMLConfigMap(vmRef ref.Ref, domainXML string) (co
 	if len(list.Items) > 0 {
 		configMap = &list.Items[0]
 		configMap.Data = map[string]string{"input.xml": domainXML}
-		err = r.Destination.Client.Update(context.TODO(), configMap)
+		err = r.Destination.Update(context.TODO(), configMap)
 		if err != nil {
 			err = liberr.Wrap(err)
 		}
@@ -2087,7 +2087,7 @@ func (r *KubeVirt) ensureDomainXMLConfigMap(vmRef ref.Ref, domainXML string) (co
 		},
 		Data: map[string]string{"input.xml": domainXML},
 	}
-	err = r.Destination.Client.Create(context.TODO(), configMap)
+	err = r.Destination.Create(context.TODO(), configMap)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
