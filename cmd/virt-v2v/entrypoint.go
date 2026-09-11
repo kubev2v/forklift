@@ -65,12 +65,33 @@ func main() {
 						err = convert.RunVirtV2vInPlace()
 					}
 				}
-			} else if _, statErr := os.Stat(convert.LibvirtDomainFile); statErr == nil {
-				// Domain XML already present (pre-mounted from a ConfigMap)
-				err = convert.RunVirtV2vInPlace()
-			} else if !errors.Is(statErr, os.ErrNotExist) {
-				// domain xml file was present but there were other errors
-				err = statErr
+			} else if err = func() error {
+				// Check if Domain XML was mounted in the pod via a ConfigMap
+				fileContents, err := os.ReadFile(convert.LibvirtDomainFile)
+				if err != nil {
+					return err
+				}
+
+				// The disk paths in the domain xml are currently pointing to the raw disk
+				// files, so we need to modify the xml to point to the disk symlink so
+				// that it will work with overlay enabled
+				modifiedXML, err := convert.UpdateDiskPaths(string(fileContents))
+				if err != nil {
+					return fmt.Errorf("failed to update disk paths in domain XML: %w", err)
+				}
+
+				if err := os.WriteFile(convert.LibvirtDomainFile, []byte(modifiedXML), 0644); err != nil {
+					return fmt.Errorf("failed to write domain XML file: %w", err)
+				}
+				return nil
+			}(); err == nil || !errors.Is(err, os.ErrNotExist) {
+				if err == nil {
+					if convert.OverlayEnabled {
+						err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlace)
+					} else {
+						err = convert.RunVirtV2vInPlace()
+					}
+				}
 			} else {
 				if convert.OverlayEnabled {
 					err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlaceDisk)
