@@ -2782,21 +2782,27 @@ func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) (pvcs
 			continue
 		}
 
+		volumeMode := core.PersistentVolumeFilesystem
 		storageClass := mapped.Destination.StorageClass
-
-		capacity, cErr := utils.CalculateSpaceWithCDIOverhead(
-			r.Destination.Client, storageClass, disk.Capacity)
-		if cErr != nil {
-			err = liberr.Wrap(cErr, "CDIConfig overhead", storageClass)
-			return
+		if mapped.Destination.VolumeMode != "" {
+			volumeMode = mapped.Destination.VolumeMode
+		}
+		var capacity int64
+		if volumeMode == core.PersistentVolumeBlock {
+			capacity, err = utils.CalculateSpaceWithCDIOverhead(
+				r.Destination.Client, storageClass, disk.Capacity)
+			if err != nil {
+				err = liberr.Wrap(err, "CDIConfig overhead", storageClass)
+				return
+			}
+		} else {
+			capacity = disk.Capacity
 		}
 
-		fsMode := core.PersistentVolumeFilesystem
 		accessModes := []core.PersistentVolumeAccessMode{core.ReadWriteMany}
 		if mapped.Destination.AccessMode != "" {
 			accessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
 		}
-
 		pvc := &core.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    r.Plan.Spec.TargetNamespace,
@@ -2806,7 +2812,7 @@ func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) (pvcs
 			},
 			Spec: core.PersistentVolumeClaimSpec{
 				AccessModes:      accessModes,
-				VolumeMode:       &fsMode,
+				VolumeMode:       &volumeMode,
 				StorageClassName: &storageClass,
 				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
