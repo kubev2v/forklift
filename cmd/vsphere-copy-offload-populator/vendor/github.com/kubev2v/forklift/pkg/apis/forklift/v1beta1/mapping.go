@@ -80,11 +80,60 @@ type NetworkPair struct {
 }
 
 // OffloadPlugin is a storage plugin that acts on the storage allocation and copying
-// phase of the migration. There can be more than one available but currently only
-// one will be supported
+// phase of the migration. Both xcopy and CSI volume import may be configured together.
 type OffloadPlugin struct {
 	VSphereXcopyPluginConfig *VSphereXcopyPluginConfig `json:"vsphereXcopyConfig,omitempty"`
 	CsiVolumeImport          *CsiVolumeImport          `json:"csiVolumeImport,omitempty"`
+}
+
+// MergeOffloadPlugins combines two offload plugin configs. Order does not matter.
+func MergeOffloadPlugins(a, b *OffloadPlugin) *OffloadPlugin {
+	if a == nil && b == nil {
+		return nil
+	}
+	if a == nil {
+		return b.DeepCopy()
+	}
+	if b == nil {
+		return a.DeepCopy()
+	}
+	merged := a.DeepCopy()
+	if b.VSphereXcopyPluginConfig != nil {
+		merged.VSphereXcopyPluginConfig = b.VSphereXcopyPluginConfig.DeepCopy()
+	}
+	if b.CsiVolumeImport != nil {
+		merged.CsiVolumeImport = b.CsiVolumeImport.DeepCopy()
+	}
+	return merged
+}
+
+// MergeStoragePair combines two mappings for the same source datastore.
+// Destination fields from src override empty fields on dst; offload plugins are merged.
+func MergeStoragePair(dst, src StoragePair) StoragePair {
+	out := dst
+	if src.Source.ID != "" {
+		out.Source.ID = src.Source.ID
+	}
+	if src.Source.Name != "" {
+		out.Source.Name = src.Source.Name
+	}
+	if src.Source.Namespace != "" {
+		out.Source.Namespace = src.Source.Namespace
+	}
+	if src.Source.Type != "" {
+		out.Source.Type = src.Source.Type
+	}
+	if src.Destination.StorageClass != "" {
+		out.Destination.StorageClass = src.Destination.StorageClass
+	}
+	if src.Destination.AccessMode != "" {
+		out.Destination.AccessMode = src.Destination.AccessMode
+	}
+	if src.Destination.VolumeMode != "" {
+		out.Destination.VolumeMode = src.Destination.VolumeMode
+	}
+	out.OffloadPlugin = MergeOffloadPlugins(dst.OffloadPlugin, src.OffloadPlugin)
+	return out
 }
 
 // CsiVolumeImport uses the CSI driver's native import capability to migrate VVol/RDM disks.
@@ -330,24 +379,38 @@ type StorageMap struct {
 }
 
 // Find storage map for source ID.
+// When multiple map entries reference the same datastore, their offload plugin
+// configurations are merged so xcopy and CSI import can be supplied independently.
 func (r *StorageMap) FindStorage(storageID string) (pair StoragePair, found bool) {
-	for _, pair = range r.Spec.Map {
-		if pair.Source.ID == storageID {
-			found = true
-			break
+	for _, entry := range r.Spec.Map {
+		if entry.Source.ID != storageID {
+			continue
 		}
+		if !found {
+			pair = entry
+			found = true
+			continue
+		}
+		pair = MergeStoragePair(pair, entry)
 	}
 
 	return
 }
 
 // Find storage map for source Name.
+// When multiple map entries reference the same datastore name, their offload plugin
+// configurations are merged.
 func (r *StorageMap) FindStorageByName(storageName string) (pair StoragePair, found bool) {
-	for _, pair = range r.Spec.Map {
-		if pair.Source.Name == storageName {
-			found = true
-			break
+	for _, entry := range r.Spec.Map {
+		if entry.Source.Name != storageName {
+			continue
 		}
+		if !found {
+			pair = entry
+			found = true
+			continue
+		}
+		pair = MergeStoragePair(pair, entry)
 	}
 
 	return
