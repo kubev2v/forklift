@@ -1530,4 +1530,19 @@ func setAuthFailureConditions(provider *api.Provider, connErr error) {
 				Message:  "HyperV auth failure may be a host-side WinRM configuration issue, periodic retry enabled.",
 			})
 	}
+	if provider.Type() == api.VSphere {
+		condition := provider.Status.FindCondition(ConnectionAuthFailed)
+		if condition != nil && time.Since(condition.LastTransitionTime.Time) > AuthRetryWindow {
+			log.Info("vSphere authentication failure exceeded retry window, no further retries to prevent account lockout")
+			return
+		}
+		provider.Status.SetCondition(
+			libcnd.Condition{
+				Type:     ConnectionAuthRetry,
+				Status:   True,
+				Reason:   Tested,
+				Category: Advisory,
+				Message:  "vSphere authentication failure may be due to service startup, periodic retry enabled",
+			})
+	}
 }
