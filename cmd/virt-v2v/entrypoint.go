@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"os"
 
@@ -42,9 +43,10 @@ func main() {
 	} else {
 		// virt-v2v or virt-v2v-in-place
 		if convert.IsInPlace {
-			// Choose in-place conversion method based on available configuration:
-			// - If LibvirtUrl is set: fetch domain XML from libvirt and use -i libvirtxml mode
-			// - Otherwise: use -i disk mode directly on the mounted disks (e.g., EC2)
+			// Choose in-place conversion method:
+			// - libvirt URL set: fetch domain XML from source via libvirt (vSphere)
+			// - domain XML file pre-exists: use it directly (e.g., mounted from ConfigMap for Nutanix)
+			// - otherwise: use -i disk mode directly on the mounted disks (e.g., EC2)
 			if convert.LibvirtUrl != "" {
 				err = func() error {
 					domainXML, err := convert.GetDomainXML()
@@ -56,6 +58,33 @@ func main() {
 					}
 					return nil
 				}()
+				if err == nil {
+					if convert.OverlayEnabled {
+						err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlace)
+					} else {
+						err = convert.RunVirtV2vInPlace()
+					}
+				}
+			} else if err = func() error {
+				// Check if Domain XML was mounted in the pod via a ConfigMap
+				fileContents, err := os.ReadFile(convert.LibvirtDomainFile)
+				if err != nil {
+					return err
+				}
+
+				// The disk paths in the domain xml are currently pointing to the raw disk
+				// files, so we need to modify the xml to point to the disk symlink so
+				// that it will work with overlay enabled
+				modifiedXML, err := convert.UpdateDiskPaths(string(fileContents))
+				if err != nil {
+					return fmt.Errorf("failed to update disk paths in domain XML: %w", err)
+				}
+
+				if err := os.WriteFile(convert.LibvirtDomainFile, []byte(modifiedXML), 0644); err != nil {
+					return fmt.Errorf("failed to write domain XML file: %w", err)
+				}
+				return nil
+			}(); err == nil || !errors.Is(err, os.ErrNotExist) {
 				if err == nil {
 					if convert.OverlayEnabled {
 						err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlace)
