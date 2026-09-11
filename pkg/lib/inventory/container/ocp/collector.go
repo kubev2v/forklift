@@ -20,6 +20,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	cnv "kubevirt.io/api/core/v1"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -291,6 +292,14 @@ func (r *Collector) buildClient() (err error) {
 		})
 
 	return
+}
+
+// RestCfg returns the REST configuration for the collector's cluster.
+// Used by consumers that need more than the typed client — e.g. API
+// discovery.
+func (r *Collector) RestCfg() *rest.Config {
+	provider := r.cluster.(*api.Provider)
+	return ocp.RestCfg(provider, r.secret)
 }
 
 func (r *Collector) ClearError(kind string) {
