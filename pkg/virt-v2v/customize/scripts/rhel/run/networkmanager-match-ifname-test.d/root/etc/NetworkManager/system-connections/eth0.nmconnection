@@ -1,0 +1,11 @@
+[connection]
+id=eth0
+type=ethernet
+interface-name=eth0
+
+[match]
+interface-name=eth0;enp3s0;
+
+[ipv4]
+method=manual
+address1=192.168.1.10/24
