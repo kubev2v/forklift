@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -206,13 +206,7 @@ func (m *CryptoManagerKmip) SetDefaultKmsCluster(
 				if req.Entity == nil {
 					c.UseAsDefault = true
 				} else {
-					found := false
-					for j := range c.UseAsEntityDefault {
-						if *req.Entity == c.UseAsEntityDefault[j] {
-							found = true
-							break
-						}
-					}
+					found := slices.Contains(c.UseAsEntityDefault, *req.Entity)
 					if !found {
 						c.UseAsEntityDefault = append(
 							c.UseAsEntityDefault,

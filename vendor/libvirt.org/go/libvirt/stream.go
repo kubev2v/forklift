@@ -114,6 +114,10 @@ func (v *Stream) Recv(p []byte) (int, error) {
 		pPtr = (*C.char)(unsafe.Pointer(&p[0]))
 	}
 	n := C.virStreamRecvWrapper(v.ptr, pPtr, C.size_t(np), &err)
+	// -2 == blocking, -3 == in hole
+	if n == -2 || n == -3 {
+		return int(n), nil
+	}
 	if n < 0 {
 		return 0, makeError(&err)
 	}
@@ -133,6 +137,10 @@ func (v *Stream) RecvFlags(p []byte, flags StreamRecvFlagsValues) (int, error) {
 		pPtr = (*C.char)(unsafe.Pointer(&p[0]))
 	}
 	n := C.virStreamRecvFlagsWrapper(v.ptr, pPtr, C.size_t(np), C.uint(flags), &err)
+	// -2 == blocking, -3 == in hole
+	if n == -2 || n == -3 {
+		return int(n), nil
+	}
 	if n < 0 {
 		return 0, makeError(&err)
 	}
@@ -164,6 +172,10 @@ func (v *Stream) Send(p []byte) (int, error) {
 		pPtr = (*C.char)(unsafe.Pointer(&p[0]))
 	}
 	n := C.virStreamSendWrapper(v.ptr, pPtr, C.size_t(np), &err)
+	// -2 == blocking
+	if n == -2 {
+		return int(n), nil
+	}
 	if n < 0 {
 		return 0, makeError(&err)
 	}
@@ -188,8 +200,8 @@ func (v *Stream) SendHole(len int64, flags uint32) error {
 type StreamSinkFunc func(*Stream, []byte) (int, error)
 type StreamSinkHoleFunc func(*Stream, int64) error
 
-//export streamSinkCallback
-func streamSinkCallback(stream C.virStreamPtr, cdata *C.char, nbytes C.size_t, callbackID int) int {
+//export virGoStreamSinkCallback
+func virGoStreamSinkCallback(stream C.virStreamPtr, cdata *C.char, nbytes C.size_t, callbackID int) int {
 	callbackFunc := getCallbackId(callbackID)
 
 	callback, ok := callbackFunc.(StreamSinkFunc)
@@ -211,8 +223,8 @@ func streamSinkCallback(stream C.virStreamPtr, cdata *C.char, nbytes C.size_t, c
 	return retnbytes
 }
 
-//export streamSinkHoleCallback
-func streamSinkHoleCallback(stream C.virStreamPtr, length C.longlong, callbackID int) int {
+//export virGoStreamSinkHoleCallback
+func virGoStreamSinkHoleCallback(stream C.virStreamPtr, length C.longlong, callbackID int) int {
 	callbackFunc := getCallbackId(callbackID)
 
 	callback, ok := callbackFunc.(StreamSinkHoleFunc)
@@ -235,7 +247,7 @@ func (v *Stream) RecvAll(handler StreamSinkFunc) error {
 
 	var err C.virError
 	ret := C.virStreamRecvAllHelper(v.ptr, (C.int)(callbackID), &err)
-	freeCallbackId(callbackID)
+	virGoFreeCallbackId(callbackID)
 	if ret == -1 {
 		return makeError(&err)
 	}
@@ -250,8 +262,8 @@ func (v *Stream) SparseRecvAll(handler StreamSinkFunc, holeHandler StreamSinkHol
 
 	var err C.virError
 	ret := C.virStreamSparseRecvAllHelper(v.ptr, (C.int)(callbackID), (C.int)(holeCallbackID), &err)
-	freeCallbackId(callbackID)
-	freeCallbackId(holeCallbackID)
+	virGoFreeCallbackId(callbackID)
+	virGoFreeCallbackId(holeCallbackID)
 	if ret == -1 {
 		return makeError(&err)
 	}
@@ -263,8 +275,8 @@ type StreamSourceFunc func(*Stream, int) ([]byte, error)
 type StreamSourceHoleFunc func(*Stream) (bool, int64, error)
 type StreamSourceSkipFunc func(*Stream, int64) error
 
-//export streamSourceCallback
-func streamSourceCallback(stream C.virStreamPtr, cdata *C.char, nbytes C.size_t, callbackID int) int {
+//export virGoStreamSourceCallback
+func virGoStreamSourceCallback(stream C.virStreamPtr, cdata *C.char, nbytes C.size_t, callbackID int) int {
 	callbackFunc := getCallbackId(callbackID)
 
 	callback, ok := callbackFunc.(StreamSourceFunc)
@@ -290,8 +302,8 @@ func streamSourceCallback(stream C.virStreamPtr, cdata *C.char, nbytes C.size_t,
 	return nretbytes
 }
 
-//export streamSourceHoleCallback
-func streamSourceHoleCallback(stream C.virStreamPtr, cinData *C.int, clength *C.longlong, callbackID int) int {
+//export virGoStreamSourceHoleCallback
+func virGoStreamSourceHoleCallback(stream C.virStreamPtr, cinData *C.int, clength *C.longlong, callbackID int) int {
 	callbackFunc := getCallbackId(callbackID)
 
 	callback, ok := callbackFunc.(StreamSourceHoleFunc)
@@ -314,8 +326,8 @@ func streamSourceHoleCallback(stream C.virStreamPtr, cinData *C.int, clength *C.
 	return 0
 }
 
-//export streamSourceSkipCallback
-func streamSourceSkipCallback(stream C.virStreamPtr, length C.longlong, callbackID int) int {
+//export virGoStreamSourceSkipCallback
+func virGoStreamSourceSkipCallback(stream C.virStreamPtr, length C.longlong, callbackID int) int {
 	callbackFunc := getCallbackId(callbackID)
 
 	callback, ok := callbackFunc.(StreamSourceSkipFunc)
@@ -338,7 +350,7 @@ func (v *Stream) SendAll(handler StreamSourceFunc) error {
 
 	var err C.virError
 	ret := C.virStreamSendAllHelper(v.ptr, (C.int)(callbackID), &err)
-	freeCallbackId(callbackID)
+	virGoFreeCallbackId(callbackID)
 	if ret == -1 {
 		return makeError(&err)
 	}
@@ -354,9 +366,9 @@ func (v *Stream) SparseSendAll(handler StreamSourceFunc, holeHandler StreamSourc
 
 	var err C.virError
 	ret := C.virStreamSparseSendAllHelper(v.ptr, (C.int)(callbackID), (C.int)(holeCallbackID), (C.int)(skipCallbackID), &err)
-	freeCallbackId(callbackID)
-	freeCallbackId(holeCallbackID)
-	freeCallbackId(skipCallbackID)
+	virGoFreeCallbackId(callbackID)
+	virGoFreeCallbackId(holeCallbackID)
+	virGoFreeCallbackId(skipCallbackID)
 	if ret == -1 {
 		return makeError(&err)
 	}
@@ -379,8 +391,8 @@ func (v *Stream) EventAddCallback(events StreamEventType, callback StreamEventCa
 	return nil
 }
 
-//export streamEventCallback
-func streamEventCallback(st C.virStreamPtr, events int, callbackID int) {
+//export virGoStreamEventCallback
+func virGoStreamEventCallback(st C.virStreamPtr, events int, callbackID int) {
 	callbackFunc := getCallbackId(callbackID)
 
 	callback, ok := callbackFunc.(StreamEventCallback)

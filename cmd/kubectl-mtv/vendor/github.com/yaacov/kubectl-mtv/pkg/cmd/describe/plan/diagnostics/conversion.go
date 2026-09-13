@@ -26,7 +26,7 @@ func CollectConversions(ctx context.Context, dynClient dynamic.Interface, namesp
 
 	// Sort newest-first so the caller gets the latest conversion at index 0
 	sort.Slice(convList.Items, func(i, j int) bool {
-		return convList.Items[i].GetCreationTimestamp().Time.After(convList.Items[j].GetCreationTimestamp().Time)
+		return convList.Items[i].GetCreationTimestamp().After(convList.Items[j].GetCreationTimestamp().Time)
 	})
 
 	var results []ConversionInfo

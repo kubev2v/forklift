@@ -112,9 +112,14 @@ type VirtualMachineInstancetypeSpec struct {
 	// +optional
 	IOThreadsPolicy *v1.IOThreadsPolicy `json:"ioThreadsPolicy,omitempty"`
 
+	// Optionally specifies the IOThreads options to be used by the instancetype.
+	// +optional
+	IOThreads *v1.DiskIOThreads `json:"ioThreads,omitempty"`
+
 	// Optionally defines the LaunchSecurity to be used by the instancetype.
 	//
 	// +optional
+	// Deprecated: Will be removed with v1beta2 or v1
 	LaunchSecurity *v1.LaunchSecurity `json:"launchSecurity,omitempty"`
 
 	// Optionally defines the required Annotations to be used by the instance type and applied to the VirtualMachineInstance
@@ -298,6 +303,16 @@ type VirtualMachinePreferenceSpec struct {
 	//
 	//+optional
 	PreferSpreadSocketToCoreRatio uint32 `json:"preferSpreadSocketToCoreRatio,omitempty"`
+
+	// PreferredArchitecture defines a prefeerred architecture for the VirtualMachine
+	//
+	//+optional
+	PreferredArchitecture *string `json:"preferredArchitecture,omitempty"`
+
+	// Optionally defines the preferred LaunchSecurity
+	//
+	// +optional
+	PreferredLaunchSecurity *v1.LaunchSecurity `json:"preferredLaunchSecurity,omitempty"`
 }
 
 type VolumePreferences struct {
@@ -524,6 +539,11 @@ type DevicePreferences struct {
 	//
 	// +optional
 	PreferredPanicDeviceModel *v1.PanicDeviceModel `json:"preferredPanicDeviceModel,omitempty"`
+
+	// PreferredVideoType optionally defines the preferred type for Video devices.
+	//
+	// +optional
+	PreferredVideoType *string `json:"preferredVideoType,omitempty"`
 }
 
 // FeaturePreferences contains various optional defaults for Features.
@@ -629,6 +649,11 @@ type PreferenceRequirements struct {
 	//
 	//+optional
 	Memory *MemoryPreferenceRequirement `json:"memory,omitempty"`
+
+	// Required Architecture of the VM referencing this preference
+	//
+	//+optional
+	Architecture *string `json:"architecture,omitempty"`
 }
 
 type CPUPreferenceRequirement struct {

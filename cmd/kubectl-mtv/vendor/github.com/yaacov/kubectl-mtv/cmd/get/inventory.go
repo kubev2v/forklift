@@ -24,7 +24,7 @@ Available resource types vary by provider:
   - OpenStack: instance, image, flavor, project, volume, volume-type, snapshot, subnet, openstack-region
   - OpenShift: namespace, pvc, data-volume, openshift-instance-type, openshift-cluster-instance-type, openshift-kubevirt
   - EC2: ec2-instance, ec2-volume, ec2-volume-type, ec2-network, ec2-snapshot
-  - Azure: vm, network, storage
+  - Azure: vm, network, storage, disk
   - Nutanix: vm, network, storage, host, cluster, nutanix-image
   - Hyper-V: vm, network, storage, host, cluster, disk`,
 		SilenceUsage: true,

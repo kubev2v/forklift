@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package find
@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/vmware/govmomi/list"
@@ -68,13 +69,7 @@ func (s *spec) traversable(o mo.Reference) bool {
 		return true
 	}
 
-	for _, kind := range s.Parents {
-		if kind == ref.Type {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(s.Parents, ref.Type)
 }
 
 func (s *spec) traversableChildType(ctypes []string) bool {
@@ -83,10 +78,8 @@ func (s *spec) traversableChildType(ctypes []string) bool {
 	}
 
 	for _, t := range ctypes {
-		for _, c := range s.ChildType {
-			if t == c {
-				return true
-			}
+		if slices.Contains(s.ChildType, t) {
+			return true
 		}
 	}
 
@@ -100,13 +93,7 @@ func (s *spec) wanted(e list.Element) bool {
 
 	w := e.Object.Reference().Type
 
-	for _, kind := range s.Include {
-		if w == kind {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(s.Include, w)
 }
 
 // listMode is a global option to revert to the original Finder behavior,
