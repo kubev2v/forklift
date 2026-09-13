@@ -20,6 +20,7 @@ import (
 	azureFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/azure"
 	ec2Fetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/ec2"
 	hypervFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/hyperv"
+	nutanixFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/nutanix"
 	openshiftFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/openshift"
 	openstackFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/openstack"
 	ovaFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/ova"
@@ -29,6 +30,7 @@ import (
 	azureMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/azure"
 	ec2Mapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/ec2"
 	hypervMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/hyperv"
+	nutanixMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/nutanix"
 	openshiftMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/openshift"
 	openstackMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/openstack"
 	ovaMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/ova"
@@ -345,6 +347,9 @@ func GetSourceStorageFetcher(ctx context.Context, configFlags *genericclioptions
 	case "azure":
 		klog.V(4).Infof("DEBUG: Using Azure source storage fetcher for %s", providerName)
 		return azureFetcher.NewAzureStorageFetcher(), nil
+	case "nutanix":
+		klog.V(4).Infof("DEBUG: Using Nutanix source storage fetcher for %s", providerName)
+		return nutanixFetcher.NewStorageFetcher(), nil
 	default:
 		return nil, fmt.Errorf("unsupported source provider type: %s", providerType)
 	}
@@ -396,6 +401,9 @@ func GetTargetStorageFetcher(ctx context.Context, configFlags *genericclioptions
 	case "azure":
 		klog.V(4).Infof("DEBUG: Using Azure target storage fetcher for %s", providerName)
 		return azureFetcher.NewAzureStorageFetcher(), nil
+	case "nutanix":
+		klog.V(4).Infof("DEBUG: Using Nutanix target storage fetcher for %s", providerName)
+		return nutanixFetcher.NewStorageFetcher(), nil
 	default:
 		return nil, fmt.Errorf("unsupported target provider type: %s", providerType)
 	}
@@ -458,6 +466,9 @@ func GetStorageMapper(ctx context.Context, configFlags *genericclioptions.Config
 	case "azure":
 		klog.V(4).Infof("DEBUG: Using Azure storage mapper for source %s", sourceProviderName)
 		return azureMapper.NewAzureStorageMapper(), sourceProviderType, targetProviderType, nil
+	case "nutanix":
+		klog.V(4).Infof("DEBUG: Using Nutanix storage mapper for source %s", sourceProviderName)
+		return nutanixMapper.NewStorageMapper(), sourceProviderType, targetProviderType, nil
 	default:
 		return nil, "", "", fmt.Errorf("unsupported source provider type: %s", sourceProviderType)
 	}

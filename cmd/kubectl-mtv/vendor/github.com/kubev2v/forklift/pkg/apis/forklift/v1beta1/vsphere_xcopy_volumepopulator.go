@@ -31,10 +31,6 @@ type VSphereXcopyVolumePopulatorSpec struct {
 	// StorageVendorProduct is the storage vendor the target disk and PVC are connected to
 	// Supported values [vantara, ontap, primera3par]
 	StorageVendorProduct string `json:"storageVendorProduct"`
-	// MigrationHost is the ESXi host ID to use for the XCOPY operation.
-	// If empty, the host where the source VM is registered will be used.
-	// +optional
-	MigrationHost string `json:"migrationHost,omitempty"`
 }
 
 type VSphereXcopyVolumePopulatorStatus struct {
@@ -42,6 +38,22 @@ type VSphereXcopyVolumePopulatorStatus struct {
 	Progress string `json:"progress"`
 	// +optional
 	XcopyUsed string `json:"xcopyUsed,omitempty"`
+	// +optional
+	VibVersion string `json:"vibVersion,omitempty"`
+	// +optional
+	CopyDurationSeconds string `json:"copyDurationSeconds,omitempty"`
+	// +optional
+	Result string `json:"result,omitempty"`
+	// +optional
+	StorageVendor string `json:"storageVendor,omitempty"`
+	// +optional
+	CloneMethod string `json:"cloneMethod,omitempty"`
+	// +optional
+	StorageProtocol string `json:"storageProtocol,omitempty"`
+	// +optional
+	ProvisionedBytes string `json:"provisionedBytes,omitempty"`
+	// +optional
+	AllocatedBytes string `json:"allocatedBytes,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

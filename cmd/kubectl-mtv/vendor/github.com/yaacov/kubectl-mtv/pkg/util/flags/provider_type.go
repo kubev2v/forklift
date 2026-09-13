@@ -20,6 +20,7 @@ var providerTypes = []forkliftv1beta1.ProviderType{
 	forkliftv1beta1.HyperV,
 	forkliftv1beta1.EC2,
 	AzureProviderType,
+	forkliftv1beta1.Nutanix,
 }
 
 // providerTypeStrings returns the string representations of provider types.

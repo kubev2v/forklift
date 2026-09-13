@@ -51,6 +51,12 @@ func Create(configFlags *genericclioptions.ConfigFlags, providerType string, opt
 		providerResource, secretResource, err = ec2.CreateProvider(configFlags, options)
 	case string(flags.AzureProviderType):
 		providerResource, secretResource, err = azure.CreateProvider(configFlags, options)
+	case string(forkliftv1beta1.Nutanix):
+		if err := validateNutanixOptions(options); err != nil {
+			return err
+		}
+		options.Settings = nutanixSettings(options)
+		providerResource, secretResource, err = generic.CreateProvider(configFlags, options, string(forkliftv1beta1.Nutanix))
 	default:
 		return fmt.Errorf("unsupported provider type: %s", providerType)
 	}
@@ -79,4 +85,31 @@ func Create(configFlags *genericclioptions.ConfigFlags, providerType string, opt
 	}
 
 	return nil
+}
+
+func validateNutanixOptions(options providerutil.ProviderOptions) error {
+	if options.NutanixPrismType == "" {
+		return nil
+	}
+	switch options.NutanixPrismType {
+	case string(forkliftv1beta1.NutanixPrismCentral), string(forkliftv1beta1.NutanixPrismElement):
+		return nil
+	default:
+		return fmt.Errorf("invalid --nutanix-prism-type %q: must be %s or %s",
+			options.NutanixPrismType, forkliftv1beta1.NutanixPrismCentral, forkliftv1beta1.NutanixPrismElement)
+	}
+}
+
+func nutanixSettings(options providerutil.ProviderOptions) map[string]string {
+	settings := map[string]string{}
+	if options.NutanixPrismType != "" {
+		settings[forkliftv1beta1.NutanixPrismType] = options.NutanixPrismType
+	}
+	if options.NutanixClusterUUID != "" {
+		settings[forkliftv1beta1.NutanixClusterUUID] = options.NutanixClusterUUID
+	}
+	if len(settings) == 0 {
+		return nil
+	}
+	return settings
 }

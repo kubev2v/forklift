@@ -35,8 +35,9 @@ the command path (e.g., help --machine get plan). Use --short with --machine
 to omit long descriptions and examples for a condensed view.
 
 Help topics are also available for domain-specific languages:
-  tsl   - Tree Search Language query syntax reference
-  karl  - Kubernetes Affinity Rule Language syntax reference`,
+  tsl     - Tree Search Language query syntax reference
+  karl    - Kubernetes Affinity Rule Language syntax reference
+  offload - Storage copy-offload (XCOPY) configuration reference`,
 		Example: `  # Get help for a command
   kubectl-mtv help get plan
 
@@ -45,6 +46,9 @@ Help topics are also available for domain-specific languages:
 
   # Learn about the KARL affinity syntax
   kubectl-mtv help karl
+
+  # Learn about storage copy-offload configuration
+  kubectl-mtv help offload
 
   # Output complete command schema as JSON
   kubectl-mtv help --machine
@@ -76,7 +80,7 @@ Help topics are also available for domain-specific languages:
 					if machine {
 						return outputTopic(cmd, topic, outputFormat)
 					}
-					fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n%s\n", topic.Short, topic.Content)
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n%s\n", topic.Short, topic.Content)
 					return nil
 				}
 			}
@@ -155,7 +159,7 @@ func outputTopic(cmd *cobra.Command, topic *help.Topic, format string) error {
 		return fmt.Errorf("failed to marshal topic: %w", err)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), string(output))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(output))
 	return nil
 }
 
@@ -177,6 +181,6 @@ func outputSchema(cmd *cobra.Command, schema *help.HelpSchema, format string) er
 		return fmt.Errorf("failed to marshal schema: %w", err)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), string(output))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(output))
 	return nil
 }

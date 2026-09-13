@@ -194,14 +194,6 @@ func (pc *ProviderClient) GetDatastore(ctx context.Context, id string, detail in
 	return pc.GetResourceByID(ctx, "datastores", id, detail)
 }
 
-func (pc *ProviderClient) GetResourcePools(ctx context.Context, detail int) (interface{}, error) {
-	return pc.GetResourceCollection(ctx, "resourcepools", detail)
-}
-
-func (pc *ProviderClient) GetResourcePool(ctx context.Context, id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID(ctx, "resourcepools", id, detail)
-}
-
 func (pc *ProviderClient) GetFolders(ctx context.Context, detail int) (interface{}, error) {
 	return pc.GetResourceCollection(ctx, "folders", detail)
 }
@@ -212,12 +204,12 @@ func (pc *ProviderClient) GetFolder(ctx context.Context, id string, detail int) 
 
 // OpenStack Provider Resources
 func (pc *ProviderClient) GetInstances(ctx context.Context, detail int) (interface{}, error) {
-	// OpenStack instances are equivalent to VMs
-	return pc.GetResourceCollection(ctx, "instances", detail)
+	// OpenStack inventory serves Nova instances at "vms", not "instances".
+	return pc.GetVMs(ctx, detail)
 }
 
 func (pc *ProviderClient) GetInstance(ctx context.Context, id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID(ctx, "instances", id, detail)
+	return pc.GetVM(ctx, id, detail)
 }
 
 func (pc *ProviderClient) GetImages(ctx context.Context, detail int) (interface{}, error) {
@@ -244,14 +236,6 @@ func (pc *ProviderClient) GetSubnet(ctx context.Context, id string, detail int) 
 	return pc.GetResourceByID(ctx, "subnets", id, detail)
 }
 
-func (pc *ProviderClient) GetPorts(ctx context.Context, detail int) (interface{}, error) {
-	return pc.GetResourceCollection(ctx, "ports", detail)
-}
-
-func (pc *ProviderClient) GetPort(ctx context.Context, id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID(ctx, "ports", id, detail)
-}
-
 func (pc *ProviderClient) GetVolumeTypes(ctx context.Context, detail int) (interface{}, error) {
 	return pc.GetResourceCollection(ctx, "volumetypes", detail)
 }
@@ -266,22 +250,6 @@ func (pc *ProviderClient) GetVolumes(ctx context.Context, detail int) (interface
 
 func (pc *ProviderClient) GetVolume(ctx context.Context, id string, detail int) (interface{}, error) {
 	return pc.GetResourceByID(ctx, "volumes", id, detail)
-}
-
-func (pc *ProviderClient) GetSecurityGroups(ctx context.Context, detail int) (interface{}, error) {
-	return pc.GetResourceCollection(ctx, "securitygroups", detail)
-}
-
-func (pc *ProviderClient) GetSecurityGroup(ctx context.Context, id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID(ctx, "securitygroups", id, detail)
-}
-
-func (pc *ProviderClient) GetFloatingIPs(ctx context.Context, detail int) (interface{}, error) {
-	return pc.GetResourceCollection(ctx, "floatingips", detail)
-}
-
-func (pc *ProviderClient) GetFloatingIP(ctx context.Context, id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID(ctx, "floatingips", id, detail)
 }
 
 func (pc *ProviderClient) GetProjects(ctx context.Context, detail int) (interface{}, error) {
@@ -333,13 +301,32 @@ func (pc *ProviderClient) GetDataVolume(ctx context.Context, id string, detail i
 	return pc.GetResourceByID(ctx, "datavolumes", id, detail)
 }
 
-// OVA Provider Resources
-func (pc *ProviderClient) GetOVAFiles(ctx context.Context, detail int) (interface{}, error) {
-	return pc.GetResourceCollection(ctx, "ovafiles", detail)
+// vSphere-specific resources
+func (pc *ProviderClient) GetCustomFieldDefs(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "customfielddefs", detail)
 }
 
-func (pc *ProviderClient) GetOVAFile(ctx context.Context, id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID(ctx, "ovafiles", id, detail)
+// oVirt-specific resources
+func (pc *ProviderClient) GetServerCpus(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "servercpus", detail)
+}
+
+// OpenStack-specific resources
+func (pc *ProviderClient) GetRegions(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "regions", detail)
+}
+
+// OpenShift-specific resources
+func (pc *ProviderClient) GetInstanceTypes(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "instancetypes", detail)
+}
+
+func (pc *ProviderClient) GetClusterInstanceTypes(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "clusterinstancetypes", detail)
+}
+
+func (pc *ProviderClient) GetKubeVirts(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "kubevirts", detail)
 }
 
 // Generic helper functions for provider-agnostic operations

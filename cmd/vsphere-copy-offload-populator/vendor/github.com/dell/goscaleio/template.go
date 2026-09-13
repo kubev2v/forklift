@@ -1,4 +1,4 @@
-// Copyright © 2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2024 - 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ func (gc *GatewayClient) GetTemplateByID(id string) (*types.TemplateDetails, err
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -92,7 +92,7 @@ func (gc *GatewayClient) GetAllTemplates() ([]types.TemplateDetails, error) {
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -138,7 +138,7 @@ func (gc *GatewayClient) GetTemplateByFilters(key string, value string) ([]types
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}

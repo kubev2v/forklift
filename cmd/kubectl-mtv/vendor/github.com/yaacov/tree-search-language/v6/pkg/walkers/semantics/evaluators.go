@@ -180,11 +180,16 @@ func evaluateLikePattern(value interface{}, pattern interface{}) (bool, error) {
 		}
 	}
 
-	// Convert SQL LIKE pattern to regex pattern
+	// Escape regex metacharacters, then convert SQL LIKE wildcards to regex
+	patternStr = regexp.QuoteMeta(patternStr)
 	patternStr = strings.ReplaceAll(patternStr, "%", ".*")
 	patternStr = strings.ReplaceAll(patternStr, "_", ".")
-	matched, _ := regexp.MatchString("^"+patternStr+"$", valueStr)
-	return matched, nil
+
+	re, err := regexp.Compile("^" + patternStr + "$")
+	if err != nil {
+		return false, err
+	}
+	return re.MatchString(valueStr), nil
 }
 
 // evaluateIlikePattern performs case-insensitive pattern matching with SQL LIKE semantics
@@ -234,9 +239,9 @@ func evaluateRegexMatch(value interface{}, pattern interface{}) (bool, error) {
 		}
 	}
 
-	matched, err := regexp.MatchString(patternStr, valueStr)
+	re, err := regexp.Compile(patternStr)
 	if err != nil {
 		return false, err
 	}
-	return matched, nil
+	return re.MatchString(valueStr), nil
 }

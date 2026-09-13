@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -151,7 +151,7 @@ func wrapValue(rval reflect.Value, rtype reflect.Type) any {
 }
 
 func fieldValueInterface(f reflect.StructField, rval reflect.Value, keyed ...bool) any {
-	if rval.Kind() == reflect.Ptr {
+	if rval.Kind() == reflect.Pointer {
 		rval = rval.Elem()
 	}
 
@@ -177,7 +177,7 @@ func fieldValue(rval reflect.Value, p string, keyed ...bool) (any, error) {
 			kind = rval.Type().Kind()
 		}
 
-		if kind == reflect.Ptr {
+		if kind == reflect.Pointer {
 			if rval.IsNil() {
 				continue
 			}
@@ -223,7 +223,7 @@ func fieldValueKey(rval reflect.Value, p mo.Field) (any, error) {
 		if item.Kind() == reflect.Interface {
 			item = item.Elem()
 		}
-		if item.Kind() == reflect.Ptr {
+		if item.Kind() == reflect.Pointer {
 			item = item.Elem()
 		}
 		if item.Kind() != reflect.Struct {
@@ -284,7 +284,7 @@ func fieldRefs(f any) []types.ManagedObjectReference {
 
 func isEmpty(rval reflect.Value) bool {
 	switch rval.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return rval.IsNil()
 	case reflect.String:
 		return rval.Len() == 0

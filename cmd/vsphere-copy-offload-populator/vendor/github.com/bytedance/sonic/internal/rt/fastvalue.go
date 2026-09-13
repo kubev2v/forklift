@@ -71,10 +71,6 @@ func (self *GoType) String() string {
 	return self.Pack().String()
 }
 
-func (self *GoType) Indirect() bool {
-	return self.KindFlags&F_direct == 0
-}
-
 type GoItab struct {
 	it unsafe.Pointer
 	Vt *GoType
@@ -113,10 +109,6 @@ type GoMapType struct {
 	ElemSize   uint8
 	BucketSize uint16
 	Flags      uint32
-}
-
-func (self *GoMapType) IndirectElem() bool {
-	return self.Flags&2 != 0
 }
 
 type GoStructType struct {
@@ -227,5 +219,3 @@ func PtrAdd(ptr unsafe.Pointer, offset uintptr) unsafe.Pointer {
 //go:noescape
 //go:linkname GetItab runtime.getitab
 func GetItab(inter *GoInterfaceType, typ *GoType, canfail bool) *GoItab
-
-

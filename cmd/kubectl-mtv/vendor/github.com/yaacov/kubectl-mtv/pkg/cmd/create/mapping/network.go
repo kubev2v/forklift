@@ -55,7 +55,8 @@ func validateNetworkPairsTargets(pairStr string) error {
 			continue
 		}
 
-		parts := strings.SplitN(pair, ":", 2)
+		mainPart, _ := splitPairMainAndOptions(pair)
+		parts := strings.SplitN(mainPart, ":", 2)
 		if len(parts) != 2 {
 			continue // Skip malformed pairs, let parseNetworkPairs handle the error
 		}
@@ -77,6 +78,7 @@ func validateNetworkPairsTargets(pairStr string) error {
 // parseNetworkPairs parses network pairs in format "source1:namespace/target1,source2:namespace/target2"
 // If namespace is omitted, the provided defaultNamespace will be used
 // Special target values: "default" for pod networking, "ignored" to ignore the source network
+// Optional per-pair IP mode: ";networkIPMode=preserve|dhcp|none" (overrides plan-level preserveStaticIPs)
 func parseNetworkPairs(ctx context.Context, pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string) ([]forkliftv1beta1.NetworkPair, error) {
 	return parseNetworkPairsWithInsecure(ctx, pairStr, defaultNamespace, configFlags, sourceProvider, inventoryURL, false)
 }
@@ -101,9 +103,15 @@ func parseNetworkPairsWithInsecure(ctx context.Context, pairStr, defaultNamespac
 			continue
 		}
 
-		parts := strings.SplitN(pairStr, ":", 2)
+		mainPart, optionParts := splitPairMainAndOptions(pairStr)
+		networkIPMode, err := parseNetworkIPModeOptions(optionParts)
+		if err != nil {
+			return nil, fmt.Errorf("invalid network pair '%s': %v", pairStr, err)
+		}
+
+		parts := strings.SplitN(mainPart, ":", 2)
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid network pair format '%s': expected 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored'", pairStr)
+			return nil, fmt.Errorf("invalid network pair format '%s': expected 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored', optionally followed by ';networkIPMode=preserve|dhcp|none'", pairStr)
 		}
 
 		sourcePart := strings.TrimSpace(parts[0])
@@ -161,8 +169,9 @@ func parseNetworkPairsWithInsecure(ctx context.Context, pairStr, defaultNamespac
 		// Create a pair for each matching source network resource
 		for _, sourceNetworkRef := range sourceNetworkRefs {
 			pair := forkliftv1beta1.NetworkPair{
-				Source:      forkliftv1beta1.NetworkSourceRef{Ref: sourceNetworkRef, Vlan: vlan},
-				Destination: destinationNetwork,
+				Source:        forkliftv1beta1.NetworkSourceRef{Ref: sourceNetworkRef, Vlan: vlan},
+				Destination:   destinationNetwork,
+				NetworkIPMode: networkIPMode,
 			}
 
 			pairs = append(pairs, pair)
@@ -265,4 +274,48 @@ func parseSourceVLAN(sourcePart string) (name, vlan string, err error) {
 		return name, vlan, nil
 	}
 	return sourcePart, "", nil
+}
+
+// splitPairMainAndOptions splits "source:target;key=value" into the main pair
+// and remaining semicolon-separated option fragments.
+func splitPairMainAndOptions(pair string) (main string, options []string) {
+	parts := strings.Split(pair, ";")
+	main = strings.TrimSpace(parts[0])
+	for _, part := range parts[1:] {
+		if opt := strings.TrimSpace(part); opt != "" {
+			options = append(options, opt)
+		}
+	}
+	return main, options
+}
+
+func parseNetworkIPModeOptions(optionParts []string) (forkliftv1beta1.NetworkIPMode, error) {
+	var mode forkliftv1beta1.NetworkIPMode
+	for _, optionPart := range optionParts {
+		keyValue := strings.SplitN(optionPart, "=", 2)
+		if len(keyValue) != 2 {
+			return "", fmt.Errorf("invalid option format '%s': expected 'networkIPMode=preserve|dhcp|none'", optionPart)
+		}
+		key := strings.TrimSpace(keyValue[0])
+		value := strings.TrimSpace(keyValue[1])
+		switch key {
+		case "networkIPMode":
+			if err := validateNetworkIPMode(value); err != nil {
+				return "", err
+			}
+			mode = forkliftv1beta1.NetworkIPMode(value)
+		default:
+			return "", fmt.Errorf("unknown network pair option '%s': expected 'networkIPMode=preserve|dhcp|none'", key)
+		}
+	}
+	return mode, nil
+}
+
+func validateNetworkIPMode(value string) error {
+	switch forkliftv1beta1.NetworkIPMode(value) {
+	case forkliftv1beta1.NetworkIPModePreserve, forkliftv1beta1.NetworkIPModeDHCP, forkliftv1beta1.NetworkIPModeNone:
+		return nil
+	default:
+		return fmt.Errorf("invalid networkIPMode '%s': must be preserve, dhcp, or none", value)
+	}
 }

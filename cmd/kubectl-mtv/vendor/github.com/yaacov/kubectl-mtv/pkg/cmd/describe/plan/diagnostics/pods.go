@@ -126,7 +126,7 @@ func collectLogs(ctx context.Context, clientset *kubernetes.Clientset, namespace
 			return nil, nil, 0, 0, nil
 		}
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	var lines []string
 	var rootCauseLines []string

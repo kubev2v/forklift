@@ -88,6 +88,7 @@ type DeleteVolumeSnapshot struct {
 type VolumeSnapshotSource struct {
 	SnapshotName         string          `json:"snapshotName"`
 	Generation           int64           `json:"generation"`
+	SnapID               int64           `json:"snap_id"`
 	TimeStamp            string          `json:"timestamp"`
 	State                string          `json:"state"`
 	ProtectionExpireTime int64           `json:"protectionExpireTime"`

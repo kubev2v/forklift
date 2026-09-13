@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -8,13 +8,13 @@ import (
 	"archive/tar"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -61,82 +61,134 @@ func createSimulationVM(vm *VirtualMachine) *simVM {
 	return nil
 }
 
-// applies container network settings to vm.Guest properties.
-func (svm *simVM) syncNetworkConfigToVMGuestProperties() error {
-	if svm == nil {
+// syncNetworkConfigToVMGuestProperties applies container network settings to
+// vm.Guest properties and triggers granular property-change notifications.
+//
+// out and detail are an optional docker/podman inspect result (e.g.
+// from watchContainer's update loop, which must inspect anyway to detect
+// container removal). If detail is nil this function perform its own inspect().
+//
+// The inspect() call, when performed here, happens outside the lock to avoid
+// holding it during I/O. ctx.AutoUpdate acquires the VM lock once for the
+// whole checkpoint → modify → diff → update sequence, preventing races with
+// concurrent SOAP handlers (e.g. DestroyTask) that also hold the VM lock.
+func (svm *simVM) syncNetworkConfigToVMGuestProperties(ctx *Context, out []byte, detail *containerDetails) error {
+	if svm == nil || ctx == nil {
 		return nil
 	}
 
-	out, detail, err := svm.c.inspect()
-	if err != nil {
-		return err
+	if detail == nil {
+		o, d, err := svm.c.inspect()
+		if err != nil {
+			return err
+		}
+		out = o
+		detail = &d
 	}
 
-	svm.vm.Config.Annotation = "inspect"
-	svm.vm.logPrintf("%s: %s", svm.vm.Config.Annotation, string(out))
-
-	netS := detail.NetworkSettings.networkSettings
-
-	// ? Why is this valid - we're taking the first entry while iterating over a MAP
+	// Precompute values that don't need the VM lock.
+	//
+	// primaryNet is chosen by taking an arbitrary entry from Go's randomized
+	// map iteration over multi-network containers. This is intentional instability
+	// until we've verified the real VC algo for selecting "primary" network.
+	primaryNet := detail.NetworkSettings.networkSettings
 	for _, n := range detail.NetworkSettings.Networks {
-		netS = n
+		primaryNet = n
 		break
 	}
 
-	if detail.State.Paused {
-		svm.vm.Runtime.PowerState = types.VirtualMachinePowerStateSuspended
-	} else if detail.State.Running {
-		svm.vm.Runtime.PowerState = types.VirtualMachinePowerStatePoweredOn
-	} else {
-		svm.vm.Runtime.PowerState = types.VirtualMachinePowerStatePoweredOff
-	}
+	ctx.AutoUpdate(svm.vm, func() {
+		svm.vm.Config.Annotation = "inspect"
+		svm.vm.logPrintf("%s: %s", svm.vm.Config.Annotation, string(out))
 
-	svm.vm.Guest.IpAddress = netS.IPAddress
-	svm.vm.Summary.Guest.IpAddress = netS.IPAddress
-	if svm.vm.Guest.HostName == "" {
-		svm.vm.Guest.HostName = detail.Config.Hostname
-	}
-
-	if len(svm.vm.Guest.Net) != 0 {
-		net := &svm.vm.Guest.Net[0]
-		net.IpAddress = []string{netS.IPAddress}
-		net.MacAddress = netS.MacAddress
-		net.IpConfig = &types.NetIpConfigInfo{
-			IpAddress: []types.NetIpConfigInfoIpAddress{{
-				IpAddress:    netS.IPAddress,
-				PrefixLength: int32(netS.IPPrefixLen),
-				State:        string(types.NetIpConfigInfoIpAddressStatusPreferred),
-			}},
+		if detail.State.Paused {
+			svm.vm.Runtime.PowerState = types.VirtualMachinePowerStateSuspended
+		} else if detail.State.Running {
+			svm.vm.Runtime.PowerState = types.VirtualMachinePowerStatePoweredOn
+		} else {
+			svm.vm.Runtime.PowerState = types.VirtualMachinePowerStatePoweredOff
 		}
 
-		gsi := types.GuestStackInfo{
-			DnsConfig: &types.NetDnsConfigInfo{
-				Dhcp:         false,
-				HostName:     svm.vm.Guest.HostName,
-				DomainName:   detail.Config.Domainname,
-				IpAddress:    detail.Config.DNS,
-				SearchDomain: nil,
-			},
-			IpRouteConfig: &types.NetIpRouteConfigInfo{
-				IpRoute: []types.NetIpRouteConfigInfoIpRoute{{
-					Network:      "0.0.0.0",
-					PrefixLength: 0,
-					Gateway: types.NetIpRouteConfigInfoGateway{
-						IpAddress: netS.Gateway,
-						Device:    "0",
-					},
-				}},
-			},
-		}
-		svm.vm.Guest.IpStack = []types.GuestStackInfo{gsi}
-	}
+		svm.vm.Guest.IpAddress = primaryNet.IPAddress
+		svm.vm.Summary.Guest.IpAddress = primaryNet.IPAddress
 
-	for _, d := range svm.vm.Config.Hardware.Device {
-		if eth, ok := d.(types.BaseVirtualEthernetCard); ok {
-			eth.GetVirtualEthernetCard().MacAddress = netS.MacAddress
-			break
+		if detail.Config.Hostname != "" {
+			svm.vm.Guest.HostName = detail.Config.Hostname
+			svm.vm.Summary.Guest.HostName = detail.Config.Hostname
 		}
-	}
+
+		var guestNics []types.GuestNicInfo
+		nicIndex := int32(0)
+		for networkName, netSettings := range detail.NetworkSettings.Networks {
+			if netSettings.IPAddress == "" {
+				continue
+			}
+			nic := types.GuestNicInfo{
+				Network:        networkName,
+				IpAddress:      []string{netSettings.IPAddress},
+				MacAddress:     netSettings.MacAddress,
+				Connected:      true,
+				DeviceConfigId: nicIndex,
+				IpConfig: &types.NetIpConfigInfo{
+					IpAddress: []types.NetIpConfigInfoIpAddress{{
+						IpAddress:    netSettings.IPAddress,
+						PrefixLength: int32(netSettings.IPPrefixLen),
+						State:        string(types.NetIpConfigInfoIpAddressStatusPreferred),
+					}},
+				},
+			}
+			guestNics = append(guestNics, nic)
+			nicIndex++
+		}
+
+		if len(guestNics) == 0 && primaryNet.IPAddress != "" {
+			guestNics = append(guestNics, types.GuestNicInfo{
+				Network:        "default",
+				IpAddress:      []string{primaryNet.IPAddress},
+				MacAddress:     primaryNet.MacAddress,
+				Connected:      true,
+				DeviceConfigId: 0,
+				IpConfig: &types.NetIpConfigInfo{
+					IpAddress: []types.NetIpConfigInfoIpAddress{{
+						IpAddress:    primaryNet.IPAddress,
+						PrefixLength: int32(primaryNet.IPPrefixLen),
+						State:        string(types.NetIpConfigInfoIpAddressStatusPreferred),
+					}},
+				},
+			})
+		}
+
+		svm.vm.Guest.Net = guestNics
+
+		if primaryNet.IPAddress != "" {
+			svm.vm.Guest.IpStack = []types.GuestStackInfo{{
+				DnsConfig: &types.NetDnsConfigInfo{
+					Dhcp:         false,
+					HostName:     svm.vm.Guest.HostName,
+					DomainName:   detail.Config.Domainname,
+					IpAddress:    detail.Config.DNS,
+					SearchDomain: nil,
+				},
+				IpRouteConfig: &types.NetIpRouteConfigInfo{
+					IpRoute: []types.NetIpRouteConfigInfoIpRoute{{
+						Network:      "0.0.0.0",
+						PrefixLength: 0,
+						Gateway: types.NetIpRouteConfigInfoGateway{
+							IpAddress: primaryNet.Gateway,
+							Device:    "0",
+						},
+					}},
+				},
+			}}
+		}
+
+		for _, d := range svm.vm.Config.Hardware.Device {
+			if eth, ok := d.(types.BaseVirtualEthernetCard); ok {
+				eth.GetVirtualEthernetCard().MacAddress = primaryNet.MacAddress
+				break
+			}
+		}
+	})
 
 	return nil
 }
@@ -213,6 +265,7 @@ func (svm *simVM) start(ctx *Context) error {
 	var args []string
 	var env []string
 	var ports []string
+	var networks []string
 	mountDMI := true
 
 	for _, opt := range svm.vm.Config.ExtraConfig {
@@ -234,6 +287,13 @@ func (svm *simVM) start(ctx *Context) error {
 				mountDMI = mount
 			}
 
+			continue
+		}
+
+		if val.Key == "RUN.network" {
+			// Specify container network (e.g., "podman" for rootless podman bridge network)
+			// This is important for rootless podman which doesn't assign IPs without a network
+			networks = append(networks, val.Value.(string))
 			continue
 		}
 
@@ -277,7 +337,7 @@ func (svm *simVM) start(ctx *Context) error {
 	}
 
 	var err error
-	svm.c, err = create(ctx, svm.vm.Name, svm.vm.uid.String(), nil, volumes, ports, env, args[0], args[1:])
+	svm.c, err = create(ctx, svm.vm.Name, svm.vm.uid.String(), networks, volumes, ports, env, args[0], args[1:])
 	if err != nil {
 		return err
 	}
@@ -302,15 +362,29 @@ func (svm *simVM) start(ctx *Context) error {
 
 	svm.vm.logPrintf("%s: %s", args, svm.c.id)
 
-	if err = svm.syncNetworkConfigToVMGuestProperties(); err != nil {
-		log.Printf("%s inspect %s: %s", svm.vm.Name, svm.c.id, err)
+	// Sync network config, retrying a few times to allow the container to get an IP
+	// Container runtimes may take a moment to assign an IP address after start
+	for range 5 {
+		if err = svm.syncNetworkConfigToVMGuestProperties(ctx, nil, nil); err != nil {
+			log.Printf("%s inspect %s: %s", svm.vm.Name, svm.c.id, err)
+			break
+		}
+		if svm.vm.Guest.IpAddress != "" {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 
-	callback := func(details *containerDetails, c *container) error {
-		if c.id == "" && svm.vm != nil {
+	callback := func(callbackCtx *Context, out []byte, details *containerDetails, c *container) error {
+		// c.id is written under c.Lock() in container.remove().
+		c.Lock()
+		containerGone := c.id == ""
+		c.Unlock()
+
+		if containerGone && svm.vm != nil {
 			// If the container cannot be found then destroy this VM unless the VM is no longer configured for container backing (svm.vm == nil)
-			taskRef := svm.vm.DestroyTask(ctx, &types.Destroy_Task{This: svm.vm.Self}).(*methods.Destroy_TaskBody).Res.Returnval
-			task, ok := ctx.Map.Get(taskRef).(*Task)
+			taskRef := svm.vm.DestroyTask(callbackCtx, &types.Destroy_Task{This: svm.vm.Self}).(*methods.Destroy_TaskBody).Res.Returnval
+			task, ok := callbackCtx.Map.Get(taskRef).(*Task)
 			if !ok {
 				panic(fmt.Sprintf("couldn't retrieve task for moref %+q while deleting VM %s", taskRef, svm.vm.Name))
 			}
@@ -318,21 +392,20 @@ func (svm *simVM) start(ctx *Context) error {
 			// Wait for the task to complete and see if there is an error.
 			task.Wait()
 			if task.Info.Error != nil {
-				msg := fmt.Sprintf("failed to destroy vm: err=%v", *task.Info.Error)
-				svm.vm.logPrintf(msg)
-
-				return errors.New(msg)
+				err := fmt.Errorf("failed to destroy vm: %v", task.Info.Error)
+				svm.vm.logPrintf("%s", err.Error())
+				return err
 			}
 		}
 
-		return svm.syncNetworkConfigToVMGuestProperties()
+		return svm.syncNetworkConfigToVMGuestProperties(callbackCtx, out, details)
 	}
 
 	// Start watching the container resource.
 	err = svm.c.watchContainer(ctx, callback)
 	if _, ok := err.(uninitializedContainer); ok {
 		// the container has been deleted before we could watch, despite successful launch so clean up.
-		callback(nil, svm.c)
+		callback(ctx, nil, nil, svm.c)
 
 		// successful launch so nil the error
 		return nil
@@ -481,7 +554,7 @@ func productSerial(id uuid.UUID) string {
 	var dst [len(id)*2 + len(id) - 1]byte
 
 	j := 0
-	for i := 0; i < len(id); i++ {
+	for i := range len(id) {
 		hex.Encode(dst[j:j+2], id[i:i+1])
 		j += 3
 		if j < len(dst) {

@@ -106,3 +106,8 @@ const (
 	AnnDiskSource = "forklift.konveyor.io/disk-source"
 	AnnSource     = "forklift.konveyor.io/source"
 )
+
+// Labels.
+const (
+	LabelSourceHost = "sourceHost"
+)

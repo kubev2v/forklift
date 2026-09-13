@@ -58,7 +58,7 @@ type PatchPlanOptions struct {
 	NetworkNameTemplate            string
 	MigrateSharedDisks             bool
 	Archived                       bool
-	PVCNameTemplateUseGenerateName bool
+	PVCNameTemplateUseGenerateName string
 	DeleteGuestConversionPod       bool
 	DeleteVmOnFailMigration        string
 	SkipGuestConversion            bool
@@ -105,6 +105,37 @@ func PatchPlan(opts PatchPlanOptions) error {
 	patchSpec := make(map[string]interface{})
 	planUpdated := false
 
+	// Validate all string-enum fields up front before any API calls
+	// to prevent partial updates when invalid input is provided.
+	if opts.InstallLegacyDriversChanged {
+		switch strings.ToLower(opts.InstallLegacyDrivers) {
+		case "true", "false", "auto", "":
+		default:
+			return fmt.Errorf("invalid value for install-legacy-drivers: %s (must be 'true', 'false', or 'auto')", opts.InstallLegacyDrivers)
+		}
+	}
+	if opts.EnableNestedVirtualizationChanged {
+		switch strings.ToLower(opts.EnableNestedVirtualization) {
+		case "true", "false", "auto", "":
+		default:
+			return fmt.Errorf("invalid value for enable-nested-virtualization: %s (must be 'true', 'false', or 'auto')", opts.EnableNestedVirtualization)
+		}
+	}
+	if opts.PVCNameTemplateUseGenerateNameChanged {
+		switch strings.ToLower(opts.PVCNameTemplateUseGenerateName) {
+		case "true", "false", "auto", "":
+		default:
+			return fmt.Errorf("invalid value for pvc-name-template-use-generate-name: %s (must be 'true', 'false', or 'auto')", opts.PVCNameTemplateUseGenerateName)
+		}
+	}
+	if opts.DeleteVmOnFailMigrationChanged {
+		switch strings.ToLower(opts.DeleteVmOnFailMigration) {
+		case "true", "false":
+		default:
+			return fmt.Errorf("invalid value for delete-vm-on-fail-migration: %s (must be 'true' or 'false')", opts.DeleteVmOnFailMigration)
+		}
+	}
+
 	// Update transfer network if provided
 	if opts.TransferNetwork != "" {
 		klog.V(2).Infof("Updating transfer network to '%s'", opts.TransferNetwork)
@@ -144,8 +175,6 @@ func PatchPlan(opts PatchPlanOptions) error {
 			patchSpec["installLegacyDrivers"] = nil
 			klog.V(2).Infof("Reset install legacy drivers to auto-detect")
 			planUpdated = true
-		default:
-			return fmt.Errorf("invalid value for install-legacy-drivers: %s (must be 'true', 'false', or 'auto')", opts.InstallLegacyDrivers)
 		}
 	}
 
@@ -164,8 +193,6 @@ func PatchPlan(opts PatchPlanOptions) error {
 			patchSpec["enableNestedVirtualization"] = nil
 			klog.V(2).Infof("Reset enable nested virtualization to auto-detect")
 			planUpdated = true
-		default:
-			return fmt.Errorf("invalid value for enable-nested-virtualization: %s (must be 'true', 'false', or 'auto')", opts.EnableNestedVirtualization)
 		}
 	}
 
@@ -453,9 +480,20 @@ func PatchPlan(opts PatchPlanOptions) error {
 
 	// Update PVC name template use generate name if flag was changed
 	if opts.PVCNameTemplateUseGenerateNameChanged {
-		patchSpec["pvcNameTemplateUseGenerateName"] = opts.PVCNameTemplateUseGenerateName
-		klog.V(2).Infof("Updated PVC name template use generate name to %t", opts.PVCNameTemplateUseGenerateName)
-		planUpdated = true
+		switch strings.ToLower(opts.PVCNameTemplateUseGenerateName) {
+		case "true":
+			patchSpec["pvcNameTemplateUseGenerateName"] = true
+			klog.V(2).Infof("Updated PVC name template use generate name to true")
+			planUpdated = true
+		case "false":
+			patchSpec["pvcNameTemplateUseGenerateName"] = false
+			klog.V(2).Infof("Updated PVC name template use generate name to false")
+			planUpdated = true
+		case "auto", "":
+			patchSpec["pvcNameTemplateUseGenerateName"] = nil
+			klog.V(2).Infof("Reset PVC name template use generate name to auto-detect")
+			planUpdated = true
+		}
 	}
 
 	// Update delete guest conversion pod if flag was changed
@@ -476,8 +514,6 @@ func PatchPlan(opts PatchPlanOptions) error {
 			patchSpec["deleteVmOnFailMigration"] = false
 			klog.V(2).Infof("Updated delete VM on fail migration to false")
 			planUpdated = true
-		default:
-			return fmt.Errorf("invalid value for delete-vm-on-fail-migration: %s (must be 'true' or 'false')", opts.DeleteVmOnFailMigration)
 		}
 	}
 
@@ -581,7 +617,8 @@ func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, n
 	targetName, rootDisk, instanceType, pvcNameTemplate, volumeNameTemplate, networkNameTemplate, luksSecret, targetPowerState string,
 	addPreHook, addPostHook, removeHook string, clearHooks bool, deleteVmOnFailMigration string, deleteVmOnFailMigrationChanged bool,
 	nbdeClevis bool, nbdeClevisChanged bool, enableNestedVirtualization string, enableNestedVirtualizationChanged bool,
-	migrateSharedDisks string, migrateSharedDisksChanged bool, rdmAsLun string, rdmAsLunChanged bool) error {
+	migrateSharedDisks string, migrateSharedDisksChanged bool, rdmAsLun string, rdmAsLunChanged bool,
+	excludeDisks string, excludeDisksChanged bool) error {
 
 	klog.V(2).Infof("Patching VM '%s' in plan '%s'", vmName, planName)
 
@@ -837,6 +874,21 @@ func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, n
 		}
 	}
 
+	if excludeDisksChanged {
+		disks := parseCommaSeparated(excludeDisks)
+		if len(disks) == 0 {
+			unstructured.RemoveNestedField(vmCopy, "excludeDisks")
+			klog.V(2).Infof("Cleared VM excludeDisks")
+		} else {
+			err = unstructured.SetNestedStringSlice(vmCopy, disks, "excludeDisks")
+			if err != nil {
+				return fmt.Errorf("failed to set excludeDisks: %v", err)
+			}
+			klog.V(2).Infof("Updated VM excludeDisks to %v", disks)
+		}
+		vmUpdated = true
+	}
+
 	// Handle hook operations
 	hooksUpdated, err := updateVMHooksUnstructured(vmCopy, namespace, addPreHook, addPostHook, removeHook, clearHooks)
 	if err != nil {
@@ -1038,4 +1090,18 @@ func updateVMHooksUnstructured(vm map[string]interface{}, namespace, addPreHook,
 	}
 
 	return updated, nil
+}
+
+func parseCommaSeparated(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if s := strings.TrimSpace(part); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
