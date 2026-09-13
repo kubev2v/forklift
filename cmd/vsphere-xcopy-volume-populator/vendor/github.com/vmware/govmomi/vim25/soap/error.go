@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package soap
@@ -68,7 +68,7 @@ type vimFaultError struct {
 
 func (v vimFaultError) Error() string {
 	typ := reflect.TypeOf(v.fault)
-	for typ.Kind() == reflect.Ptr {
+	for typ.Kind() == reflect.Pointer {
 		typ = typ.Elem()
 	}
 

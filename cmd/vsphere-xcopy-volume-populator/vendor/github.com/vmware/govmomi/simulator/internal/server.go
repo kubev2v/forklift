@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package internal
@@ -236,7 +236,7 @@ func (s *Server) CloseClientConnections() {
 	// in tests.
 	timer := time.NewTimer(5 * time.Second)
 	defer timer.Stop()
-	for i := 0; i < nconn; i++ {
+	for range nconn {
 		select {
 		case <-ch:
 		case <-timer.C:
@@ -260,11 +260,9 @@ func (s *Server) Client() *http.Client {
 }
 
 func (s *Server) goServe() {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	s.wg.Go(func() {
 		s.Config.Serve(s.Listener)
-	}()
+	})
 }
 
 // wrap installs the connection state-tracking hook to know which

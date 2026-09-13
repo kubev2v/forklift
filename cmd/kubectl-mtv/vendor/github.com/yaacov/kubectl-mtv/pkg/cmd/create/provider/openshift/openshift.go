@@ -110,31 +110,41 @@ func CreateProvider(configFlags *genericclioptions.ConfigFlags, options provider
 	var err error
 
 	if options.Token != "" {
-		createdSecret, err = createSecret(configFlags, options.Namespace, options.Name,
-			options.URL, options.Token, options.CACert, options.InsecureSkipTLS)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create vSphere secret: %v", err)
-		}
-
-		// If token is provided
 		if options.Secret != "" {
-			// Use the provided secret if specified alongside the token
 			provider.Spec.Secret = corev1.ObjectReference{
 				Name:      options.Secret,
 				Namespace: options.Namespace,
 			}
 		} else {
-			// Create a new secret if no existing secret is specified
-			createdSecret, err = createSecret(configFlags, options.Namespace, options.Name, options.URL, options.Token, options.CACert, options.InsecureSkipTLS)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create OpenShift secret: %v", err)
-			}
+			if options.DryRun {
+				createdSecret = buildSecret(options.Namespace, options.Name,
+					options.URL, options.Token, options.CACert, options.InsecureSkipTLS)
+				provider.Spec.Secret = corev1.ObjectReference{
+					Name:      createdSecret.Name,
+					Namespace: createdSecret.Namespace,
+				}
+			} else {
+				createdSecret, err = createSecret(configFlags, options.Namespace, options.Name,
+					options.URL, options.Token, options.CACert, options.InsecureSkipTLS)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to create OpenShift secret: %v", err)
+				}
 
-			provider.Spec.Secret = corev1.ObjectReference{
-				Name:      createdSecret.Name,
-				Namespace: createdSecret.Namespace,
+				provider.Spec.Secret = corev1.ObjectReference{
+					Name:      createdSecret.Name,
+					Namespace: createdSecret.Namespace,
+				}
 			}
 		}
+	} else if options.Secret != "" {
+		provider.Spec.Secret = corev1.ObjectReference{
+			Name:      options.Secret,
+			Namespace: options.Namespace,
+		}
+	}
+
+	if options.DryRun {
+		return provider, createdSecret, nil
 	}
 
 	// Create the provider

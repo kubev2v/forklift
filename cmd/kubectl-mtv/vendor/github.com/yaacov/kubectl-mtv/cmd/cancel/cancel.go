@@ -14,6 +14,9 @@ func NewCancelCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 		SilenceUsage: true,
 	}
 
-	cmd.AddCommand(NewPlanCmd(kubeConfigFlags))
+	planCmd := NewPlanCmd(kubeConfigFlags)
+	planCmd.Aliases = []string{"plans"}
+	cmd.AddCommand(planCmd)
+
 	return cmd
 }

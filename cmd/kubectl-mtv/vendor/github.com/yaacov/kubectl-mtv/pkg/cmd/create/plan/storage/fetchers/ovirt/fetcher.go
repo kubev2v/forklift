@@ -23,7 +23,7 @@ func NewOvirtStorageFetcher() *OvirtStorageFetcher {
 }
 
 // FetchSourceStorages extracts storage references from oVirt VMs
-func (f *OvirtStorageFetcher) FetchSourceStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string) ([]ref.Ref, error) {
+func (f *OvirtStorageFetcher) FetchSourceStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	klog.V(4).Infof("oVirt storage fetcher - extracting source storages for provider: %s", providerName)
 
 	// Get the provider object
@@ -33,7 +33,7 @@ func (f *OvirtStorageFetcher) FetchSourceStorages(ctx context.Context, configFla
 	}
 
 	// Fetch storage domains inventory first to create ID-to-storage mapping
-	storageDomainsInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "storagedomains?detail=4")
+	storageDomainsInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "storagedomains?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch storage domains inventory: %v", err)
 	}
@@ -61,7 +61,7 @@ func (f *OvirtStorageFetcher) FetchSourceStorages(ctx context.Context, configFla
 	}
 
 	// Fetch VMs inventory to get disk references from VMs
-	vmsInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "vms?detail=4")
+	vmsInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "vms?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch VMs inventory: %v", err)
 	}
@@ -102,13 +102,13 @@ func (f *OvirtStorageFetcher) FetchSourceStorages(ctx context.Context, configFla
 	storageDomainIDSet := make(map[string]bool)
 
 	// Try to fetch disks inventory to get storage domain mappings
-	disksInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "disks?detail=4")
+	disksInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "disks?detail=4", insecureSkipTLS)
 	if err != nil {
 		// If disks endpoint doesn't work, try disk profiles as fallback
 		klog.V(4).Infof("Disks endpoint failed, trying disk profiles: %v", err)
 
 		// Fetch disk profiles to map disks to storage domains
-		diskProfilesInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "diskprofiles?detail=4")
+		diskProfilesInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "diskprofiles?detail=4", insecureSkipTLS)
 		if err != nil {
 			klog.V(4).Infof("Warning: Could not fetch disk profiles either: %v", err)
 			// Return all storage domains as fallback
@@ -134,21 +134,7 @@ func (f *OvirtStorageFetcher) FetchSourceStorages(ctx context.Context, configFla
 			return nil, fmt.Errorf("unexpected data format: expected array for disks inventory")
 		}
 
-		// Map disk IDs to storage domains
-		for _, diskItem := range disksArray {
-			if disk, ok := diskItem.(map[string]interface{}); ok {
-				if diskID, ok := disk["id"].(string); ok {
-					// Check if this disk is used by our VMs
-					if diskIDSet[diskID] {
-						// Extract storage domain from disk
-						if storageDomainID, ok := disk["storageDomain"].(string); ok {
-							klog.V(4).Infof("Disk %s uses storage domain: %s", diskID, storageDomainID)
-							storageDomainIDSet[storageDomainID] = true
-						}
-					}
-				}
-			}
-		}
+		collectStorageDomains(disksArray, diskIDSet, storageDomainIDSet)
 	}
 
 	// Create source storage references for the storage domains used by VMs
@@ -163,8 +149,30 @@ func (f *OvirtStorageFetcher) FetchSourceStorages(ctx context.Context, configFla
 	return sourceStorages, nil
 }
 
+// collectStorageDomains iterates over disk inventory items, skips LUN disks,
+// and adds the storage domain IDs of the remaining disks (that are in diskIDSet)
+// to storageDomainIDSet.
+func collectStorageDomains(disksArray []interface{}, diskIDSet, storageDomainIDSet map[string]bool) {
+	for _, diskItem := range disksArray {
+		if disk, ok := diskItem.(map[string]interface{}); ok {
+			if diskID, ok := disk["id"].(string); ok {
+				if diskIDSet[diskID] {
+					if storageType, ok := disk["storageType"].(string); ok && storageType == "lun" {
+						klog.V(4).Infof("Skipping LUN disk %s - LUN disks are not mapped", diskID)
+						continue
+					}
+					if storageDomainID, ok := disk["storageDomain"].(string); ok {
+						klog.V(4).Infof("Disk %s uses storage domain: %s", diskID, storageDomainID)
+						storageDomainIDSet[storageDomainID] = true
+					}
+				}
+			}
+		}
+	}
+}
+
 // FetchTargetStorages is not supported for oVirt as target - only OpenShift is supported as target
-func (f *OvirtStorageFetcher) FetchTargetStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string) ([]forkliftv1beta1.DestinationStorage, error) {
+func (f *OvirtStorageFetcher) FetchTargetStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, insecureSkipTLS bool) ([]forkliftv1beta1.DestinationStorage, error) {
 	klog.V(4).Infof("oVirt provider does not support target storage fetching - only OpenShift is supported as target")
 	return nil, fmt.Errorf("oVirt provider does not support target storage fetching - only OpenShift is supported as migration target")
 }

@@ -70,7 +70,15 @@ func (r *MigrationStatus) NewSnapshot(snapshot Snapshot) {
 // Find a VM status.
 func (r *MigrationStatus) FindVM(ref ref.Ref) (v *VMStatus, found bool) {
 	for _, vm := range r.VMs {
-		if vm.ID == ref.ID {
+		if vm.ID != "" && vm.ID == ref.ID {
+			found = true
+			v = vm
+			return
+		}
+	}
+	// Fallback: match by Name when the status VM has no ID
+	for _, vm := range r.VMs {
+		if vm.ID == "" && vm.Name != "" && vm.Name == ref.Name {
 			found = true
 			v = vm
 			return

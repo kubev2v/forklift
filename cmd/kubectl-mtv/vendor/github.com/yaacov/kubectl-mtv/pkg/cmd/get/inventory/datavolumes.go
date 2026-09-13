@@ -3,7 +3,6 @@ package inventory
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -12,18 +11,16 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListDataVolumes queries the provider's data volume inventory and displays the results
-func ListDataVolumes(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listDataVolumesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListDataVolumesWithInsecure queries the provider's data volume inventory with optional insecure TLS skip verification
+func ListDataVolumesWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listDataVolumesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listDataVolumesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listDataVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listDataVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -31,7 +28,7 @@ func listDataVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify data volume support
 	providerType, err := providerClient.GetProviderType()
@@ -40,18 +37,18 @@ func listDataVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	}
 
 	// Define default headers based on provider type
-	var defaultHeaders []output.Header
+	var defaultHeaders []output.Column
 	switch providerType {
 	case "openshift":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "NAMESPACE", JSONPath: "namespace"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "PHASE", JSONPath: "object.status.phase"},
-			{DisplayName: "PROGRESS", JSONPath: "object.status.progress"},
-			{DisplayName: "STORAGE_CLASS", JSONPath: "object.spec.pvc.storageClassName"},
-			{DisplayName: "SIZE", JSONPath: "sizeFormatted"},
-			{DisplayName: "CREATED", JSONPath: "object.metadata.creationTimestamp"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "NAMESPACE", Key: "namespace"},
+			{Title: "ID", Key: "id"},
+			{Title: "PHASE", Key: "object.status.phase", ColorFunc: output.ColorizeStatus},
+			{Title: "PROGRESS", Key: "object.status.progress", ColorFunc: output.ColorizeProgress},
+			{Title: "STORAGE_CLASS", Key: "object.spec.pvc.storageClassName"},
+			{Title: "SIZE", Key: "sizeFormatted"},
+			{Title: "CREATED", Key: "object.metadata.creationTimestamp"},
 		}
 	default:
 		return fmt.Errorf("provider type '%s' does not support data volume inventory", providerType)
@@ -61,7 +58,7 @@ func listDataVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	var data interface{}
 	switch providerType {
 	case "openshift":
-		data, err = providerClient.GetDataVolumes(4)
+		data, err = providerClient.GetDataVolumes(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support data volume inventory", providerType)
 	}
@@ -125,6 +122,8 @@ func listDataVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 		return output.PrintJSONWithEmpty(dataVolumes, emptyMessage)
 	case "yaml":
 		return output.PrintYAMLWithEmpty(dataVolumes, emptyMessage)
+	case "markdown":
+		return output.PrintMarkdownWithQuery(dataVolumes, defaultHeaders, queryOpts, emptyMessage)
 	case "table":
 		return output.PrintTableWithQuery(dataVolumes, defaultHeaders, queryOpts, emptyMessage)
 	default:

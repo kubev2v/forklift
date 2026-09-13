@@ -169,3 +169,35 @@ func (s *System) GetHostNvmeControllers(host types.NvmeHost) ([]types.NvmeContro
 		http.MethodGet, path, nil, &nvmeControllers)
 	return nvmeControllers, err
 }
+
+// MapVolumeNVMe maps a volume to NVMe host
+func (v *Volume) MapVolumeNVMe(
+	mapVolumeNVMeParam *types.MapVolumeNVMeParam,
+) error {
+	defer TimeSpent("MapVolumeNVMe", time.Now())
+
+	path := fmt.Sprintf("/api/instances/Volume::%s/action/addMappedHost",
+		v.Volume.ID)
+
+	err := v.client.getJSONWithRetry(
+		http.MethodPost, path, mapVolumeNVMeParam, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (v *Volume) RemoveMappedHost(unmapVolumeNVMeParam *types.UnmapVolumeNVMeParam) error {
+	defer TimeSpent("RemoveMappedHost", time.Now())
+
+	path := fmt.Sprintf("/api/instances/Volume::%s/action/removeMappedHost", v.Volume.ID)
+
+	err := v.client.getJSONWithRetry(
+		http.MethodPost, path, unmapVolumeNVMeParam, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

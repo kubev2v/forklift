@@ -162,6 +162,23 @@ func getValueByPath(obj interface{}, pathParts []string) (interface{}, error) {
 			return value, nil
 		}
 
+		// Implicit wildcard: when value is an array and we have remaining path parts,
+		// iterate over all elements (equivalent to field[*].subfield)
+		if arr, ok := value.([]interface{}); ok {
+			var results []interface{}
+			for _, item := range arr {
+				result, err := getValueByPath(item, remainingParts)
+				if err == nil && result != nil {
+					if resultArray, isArray := result.([]interface{}); isArray {
+						results = append(results, resultArray...)
+					} else {
+						results = append(results, result)
+					}
+				}
+			}
+			return results, nil
+		}
+
 		// Otherwise, continue recursing
 		return getValueByPath(value, remainingParts)
 

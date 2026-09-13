@@ -1,5 +1,5 @@
 /*
- Copyright © 2020 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -17,14 +17,17 @@ package pmax
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/dell/gopowermax/v2/api"
+	v100 "github.com/dell/gopowermax/v2/types/v100"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -37,17 +40,25 @@ type Client struct {
 	version        string
 	symmetrixID    string
 	contextTimeout time.Duration
+	opts           clientOpts
+	headers        clientHeaders
+}
+
+type clientOpts struct {
+	logResponseTimes bool
+}
+
+type clientHeaders struct {
+	accept          string
+	contentType     string
+	applicationType string
 }
 
 var (
-	errNilReponse    = errors.New("nil response from API")
-	errBodyRead      = errors.New("error reading body")
-	errNoLink        = errors.New("Error: problem finding link")
-	debug, _         = strconv.ParseBool(os.Getenv("X_CSI_POWERMAX_DEBUG"))
-	accHeader        string
-	conHeader        string
-	applicationType  string
-	logResponseTimes bool
+	errNilReponse = errors.New("nil response from API")
+	errBodyRead   = errors.New("error reading body")
+	errNoLink     = errors.New("Error: problem finding link")
+	debug, _      = strconv.ParseBool(os.Getenv("X_CSI_POWERMAX_DEBUG"))
 	// PmaxTimeout is the timeout value for pmax calls.
 	// If Unisphere fails to answer within this period, an error will be returned.
 	defaultPmaxTimeout = 10 * time.Minute
@@ -60,7 +71,12 @@ func (c *Client) Authenticate(ctx context.Context, configConnect *ConfigConnect)
 		log.SetLevel(log.DebugLevel)
 	}
 
+	// Store explicit version before assignment to track if user requested specific version
+	explicitVersion := configConnect.Version
 	c.configConnect = configConnect
+	if configConnect.Version != "" {
+		c.version = configConnect.Version
+	}
 	c.api.SetToken("")
 	basicAuthString := basicAuth(configConnect.Username, configConnect.Password)
 
@@ -81,6 +97,28 @@ func (c *Client) Authenticate(ctx context.Context, configConnect *ConfigConnect)
 		return errNilReponse
 	case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
 		return c.api.ParseJSONError(resp)
+	}
+
+	// Parse version response to extract API version
+	versionDetails := &v100.VersionDetails{}
+	decoder := json.NewDecoder(resp.Body)
+	if err = decoder.Decode(versionDetails); err != nil && err != io.EOF {
+		return err
+	}
+	if versionDetails.APIVersion != "" {
+		// If explicit version was provided in ConfigConnect (e.g., "104"), keep it
+		// Otherwise, use DefaultAPIVersion for general operations
+		if explicitVersion == "" {
+			c.version = DefaultAPIVersion
+			c.configConnect.Version = DefaultAPIVersion
+			doLog(log.Debug, fmt.Sprintf("Detected array version: %s, using API version: %s", versionDetails.APIVersion, DefaultAPIVersion))
+		} else {
+			// Keep the explicit version that was already set
+			doLog(log.Debug, fmt.Sprintf("Detected array version: %s, using explicit API version: %s", versionDetails.APIVersion, c.version))
+		}
+		acceptHeader := fmt.Sprintf("%s;version=%s", api.HeaderValContentTypeJSON, c.version)
+		c.headers.accept = acceptHeader
+		c.headers.contentType = acceptHeader
 	}
 	doLog(log.Infoln, "authentication successful")
 	err = resp.Body.Close()
@@ -139,7 +177,7 @@ func NewClientWithArgs(
 	useCerts bool,
 	certFile string,
 ) (client Pmax, err error) {
-	logResponseTimes, _ = strconv.ParseBool(os.Getenv("X_CSI_POWERMAX_RESPONSE_TIMES"))
+	setLogResponseTimes, _ := strconv.ParseBool(os.Getenv("X_CSI_POWERMAX_RESPONSE_TIMES"))
 
 	contextTimeout := defaultPmaxTimeout
 	if timeoutStr := os.Getenv("X_CSI_UNISPHERE_TIMEOUT"); timeoutStr != "" {
@@ -157,7 +195,7 @@ func NewClientWithArgs(
 		"useCerts":         useCerts,
 		"version":          DefaultAPIVersion,
 		"debug":            debug,
-		"logResponseTimes": logResponseTimes,
+		"logResponseTimes": setLogResponseTimes,
 	}
 
 	doLog(log.WithFields(fields).Debug, "pmax client init")
@@ -174,17 +212,13 @@ func NewClientWithArgs(
 		CertFile: certFile,
 	}
 
-	if applicationType != "" {
-		log.Debug(fmt.Sprintf("Application type already set to: %s, Resetting it to: %s",
-			applicationType, applicationName))
-	}
-	applicationType = applicationName
-
 	ac, err := api.New(endpoint, opts, debug)
 	if err != nil {
 		doLog(log.WithError(err).Error, "Unable to create HTTP client")
 		return nil, err
 	}
+
+	acceptHeader := fmt.Sprintf("%s;version=%s", api.HeaderValContentTypeJSON, DefaultAPIVersion)
 
 	client = &Client{
 		api: ac,
@@ -194,11 +228,15 @@ func NewClientWithArgs(
 		allowedArrays:  []string{},
 		version:        DefaultAPIVersion,
 		contextTimeout: contextTimeout,
+		opts: clientOpts{
+			logResponseTimes: setLogResponseTimes,
+		},
+		headers: clientHeaders{
+			accept:          acceptHeader,
+			contentType:     acceptHeader,
+			applicationType: applicationName,
+		},
 	}
-
-	accHeader = api.HeaderValContentTypeJSON
-	accHeader = fmt.Sprintf("%s;version=%s", api.HeaderValContentTypeJSON, DefaultAPIVersion)
-	conHeader = accHeader
 
 	return client, nil
 }
@@ -218,11 +256,11 @@ func (c *Client) SetContextTimeout(timeout time.Duration) Pmax {
 
 func (c *Client) getDefaultHeaders() map[string]string {
 	headers := make(map[string]string)
-	headers["Accept"] = accHeader
-	if applicationType != "" {
-		headers["Application-Type"] = applicationType
+	headers["Accept"] = c.headers.accept
+	if c.headers.applicationType != "" {
+		headers["Application-Type"] = c.headers.applicationType
 	}
-	headers["Content-Type"] = conHeader
+	headers["Content-Type"] = c.headers.contentType
 	basicAuthString := basicAuth(c.configConnect.Username, c.configConnect.Password)
 	headers["Authorization"] = "Basic " + basicAuthString
 	if c.symmetrixID != "" {
@@ -234,4 +272,19 @@ func (c *Client) getDefaultHeaders() map[string]string {
 // GetHTTPClient will return an underlying http client
 func (c *Client) GetHTTPClient() *http.Client {
 	return c.api.GetHTTPClient()
+}
+
+// SetToken sets the Auth token for the HTTP client
+func (c *Client) SetToken(token string) {
+	c.api.SetToken(token)
+}
+
+// SetCustomHTTPHeaders sets custom HTTP headers that will be sent with every request
+func (c *Client) SetCustomHTTPHeaders(headers http.Header) {
+	c.api.SetCustomHTTPHeaders(headers)
+}
+
+// GetCustomHTTPHeaders returns the current custom HTTP headers
+func (c *Client) GetCustomHTTPHeaders() http.Header {
+	return c.api.GetCustomHTTPHeaders()
 }
