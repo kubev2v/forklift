@@ -4,7 +4,6 @@
 [![Run Tests](https://github.com/gin-contrib/sse/actions/workflows/go.yml/badge.svg)](https://github.com/gin-contrib/sse/actions/workflows/go.yml)
 [![Trivy Security Scan](https://github.com/gin-contrib/sse/actions/workflows/trivy-scan.yml/badge.svg)](https://github.com/gin-contrib/sse/actions/workflows/trivy-scan.yml)
 [![codecov](https://codecov.io/gh/gin-contrib/sse/branch/master/graph/badge.svg)](https://codecov.io/gh/gin-contrib/sse)
-[![Go Report Card](https://goreportcard.com/badge/github.com/gin-contrib/sse)](https://goreportcard.com/report/github.com/gin-contrib/sse)
 
 Server-sent events (SSE) is a technology where a browser receives automatic updates from a server via HTTP connection. The Server-Sent Events EventSource API is [standardized as part of HTML5[1] by the W3C](http://www.w3.org/TR/2009/WD-eventsource-20091029/).
 
