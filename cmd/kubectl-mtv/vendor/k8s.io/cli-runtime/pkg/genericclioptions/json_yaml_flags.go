@@ -17,6 +17,7 @@ limitations under the License.
 package genericclioptions
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -29,7 +30,7 @@ func (f *JSONYamlPrintFlags) AllowedFormats() []string {
 	if f == nil {
 		return []string{}
 	}
-	return []string{"json", "yaml"}
+	return []string{"json", "yaml", "kyaml"}
 }
 
 // JSONYamlPrintFlags provides default flags necessary for json/yaml printing.
@@ -47,11 +48,19 @@ func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePr
 	var printer printers.ResourcePrinter
 
 	outputFormat = strings.ToLower(outputFormat)
+
+	valid := f.AllowedFormats()
+	if !slices.Contains(valid, outputFormat) {
+		return nil, NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: valid}
+	}
+
 	switch outputFormat {
 	case "json":
 		printer = &printers.JSONPrinter{}
 	case "yaml":
 		printer = &printers.YAMLPrinter{}
+	case "kyaml":
+		printer = &printers.KYAMLPrinter{}
 	default:
 		return nil, NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: f.AllowedFormats()}
 	}
