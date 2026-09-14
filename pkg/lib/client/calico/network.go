@@ -187,58 +187,89 @@ func parseVLANEntry(m map[string]interface{}, idx int) (VLANEntry, error) {
 	// The vlan field is a schema-enforced one-of: a single id or a
 	// {start, end} range. Bounds (1-4094) are the schema's to enforce;
 	// the parser serves what the API server accepted.
-	vidRaw, found, err := unstructured.NestedFieldNoCopy(m, "vlan", "id")
+	vid, found, err := parseVLANID(m, idx)
 	if err != nil {
-		return entry, fmt.Errorf("vlans[%d].vlan.id: %w", idx, err)
+		return entry, err
 	}
 	if found {
-		id, ok := asInt64(vidRaw)
-		if !ok {
-			return entry, fmt.Errorf("vlans[%d].vlan.id: not an integer (%v)", idx, vidRaw)
-		}
-		entry.VID = uint16(id)
-		entry.RangeStart = entry.VID
-		entry.RangeEnd = entry.VID
+		entry.VID = vid
+		entry.RangeStart = vid
+		entry.RangeEnd = vid
 	} else {
-		startRaw, startFound, err := unstructured.NestedFieldNoCopy(m, "vlan", "range", "start")
+		entry.RangeStart, entry.RangeEnd, err = parseVLANRange(m, idx)
 		if err != nil {
-			return entry, fmt.Errorf("vlans[%d].vlan.range.start: %w", idx, err)
+			return entry, err
 		}
-		endRaw, endFound, err := unstructured.NestedFieldNoCopy(m, "vlan", "range", "end")
-		if err != nil {
-			return entry, fmt.Errorf("vlans[%d].vlan.range.end: %w", idx, err)
-		}
-		if !startFound || !endFound {
-			return entry, fmt.Errorf("vlans[%d].vlan: neither id nor a complete range present", idx)
-		}
-		start, ok := asInt64(startRaw)
-		if !ok {
-			return entry, fmt.Errorf("vlans[%d].vlan.range.start: not an integer (%v)", idx, startRaw)
-		}
-		end, ok := asInt64(endRaw)
-		if !ok {
-			return entry, fmt.Errorf("vlans[%d].vlan.range.end: not an integer (%v)", idx, endRaw)
-		}
-		entry.RangeStart = uint16(start)
-		entry.RangeEnd = uint16(end)
 	}
 
+	entry.Subnets, err = parseVLANSubnets(m, idx)
+	if err != nil {
+		return entry, err
+	}
+	return entry, nil
+}
+
+// parseVLANID reads vlan.id; found reports whether the one-of chose the
+// single-id form.
+func parseVLANID(m map[string]interface{}, idx int) (vid uint16, found bool, err error) {
+	vidRaw, found, err := unstructured.NestedFieldNoCopy(m, "vlan", "id")
+	if err != nil {
+		return 0, false, fmt.Errorf("vlans[%d].vlan.id: %w", idx, err)
+	}
+	if !found {
+		return 0, false, nil
+	}
+	id, ok := asInt64(vidRaw)
+	if !ok {
+		return 0, false, fmt.Errorf("vlans[%d].vlan.id: not an integer (%v)", idx, vidRaw)
+	}
+	return uint16(id), true, nil
+}
+
+// parseVLANRange reads vlan.range.{start,end}, required once vlan.id is
+// absent.
+func parseVLANRange(m map[string]interface{}, idx int) (start, end uint16, err error) {
+	startRaw, startFound, err := unstructured.NestedFieldNoCopy(m, "vlan", "range", "start")
+	if err != nil {
+		return 0, 0, fmt.Errorf("vlans[%d].vlan.range.start: %w", idx, err)
+	}
+	endRaw, endFound, err := unstructured.NestedFieldNoCopy(m, "vlan", "range", "end")
+	if err != nil {
+		return 0, 0, fmt.Errorf("vlans[%d].vlan.range.end: %w", idx, err)
+	}
+	if !startFound || !endFound {
+		return 0, 0, fmt.Errorf("vlans[%d].vlan: neither id nor a complete range present", idx)
+	}
+	s, ok := asInt64(startRaw)
+	if !ok {
+		return 0, 0, fmt.Errorf("vlans[%d].vlan.range.start: not an integer (%v)", idx, startRaw)
+	}
+	e, ok := asInt64(endRaw)
+	if !ok {
+		return 0, 0, fmt.Errorf("vlans[%d].vlan.range.end: not an integer (%v)", idx, endRaw)
+	}
+	return uint16(s), uint16(e), nil
+}
+
+// parseVLANSubnets collects the non-empty subnet CIDRs of a VLAN entry.
+func parseVLANSubnets(m map[string]interface{}, idx int) ([]string, error) {
 	subnetsRaw, _, err := unstructured.NestedSlice(m, "subnets")
 	if err != nil {
-		return entry, fmt.Errorf("vlans[%d].subnets: %w", idx, err)
+		return nil, fmt.Errorf("vlans[%d].subnets: %w", idx, err)
 	}
+	var subnets []string
 	for j, s := range subnetsRaw {
 		sMap, ok := s.(map[string]interface{})
 		if !ok {
-			return entry, fmt.Errorf("vlans[%d].subnets[%d]: not an object", idx, j)
+			return nil, fmt.Errorf("vlans[%d].subnets[%d]: not an object", idx, j)
 		}
 		cidr, _, err := unstructured.NestedString(sMap, "cidr")
 		if err != nil {
-			return entry, fmt.Errorf("vlans[%d].subnets[%d].cidr: %w", idx, j, err)
+			return nil, fmt.Errorf("vlans[%d].subnets[%d].cidr: %w", idx, j, err)
 		}
 		if cidr != "" {
-			entry.Subnets = append(entry.Subnets, cidr)
+			subnets = append(subnets, cidr)
 		}
 	}
-	return entry, nil
+	return subnets, nil
 }
