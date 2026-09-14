@@ -7,7 +7,7 @@ detaches the mount, IPC and UTS namespaces, then remounts `/` and pivots into
 an empty tmpfs.
 
 The conversion pod runs as uid 107 with every capability dropped. Two of the
-node's default confinement settings deny that sandbox:
+node's default confinement settings may deny that sandbox:
 
 | Barrier | Rule | Symptom |
 |---|---|---|
@@ -26,9 +26,7 @@ on the non-root path, not the capability set.
 
 ## Enabling conversion
 
-The controller reads four settings, all unset by default. Leaving them unset
-keeps today's behaviour on every platform, because naming a profile that a node
-does not carry makes the kubelet refuse to start the pod at all.
+The controller reads four settings, all unset by default:
 
 | Setting | Values | Default |
 |---|---|---|
@@ -111,5 +109,5 @@ AppArmor profile too.
 - https://github.com/kubev2v/forklift/issues/1942 — the pod-start failure that led to gating the profile on OpenShift
 
 The Kyverno policy suggested on #4491, which makes the conversion pod
-privileged, does not work: it was tested against both `:latest` and
+privileged, did not work as tested: it was tested against both `:latest` and
 `release-2.8` and fails identically, for the reason given above.
