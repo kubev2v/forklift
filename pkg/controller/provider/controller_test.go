@@ -90,7 +90,6 @@ func TestAuthRetryWindow_VSphere(t *testing.T) {
 	// Move transition time past allowable retry window
 	condition := p.Status.FindCondition(ConnectionAuthFailed)
 	condition.LastTransitionTime = v1.NewTime(time.Now().Add(-2 * AuthRetryWindow))
-	p.Status.DeleteCondition(ConnectionAuthRetry)
 	p.Status.BeginStagingConditions()
 	setAuthFailureConditions(p, fmt.Errorf("HTTP 401"))
 	p.Status.EndStagingConditions()
