@@ -1,12 +1,14 @@
 package conversion
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -121,7 +123,16 @@ func TestCheckPendingPodTimeout_Exceeded(t *testing.T) {
 			Name:              "test-pod",
 			CreationTimestamp: meta.NewTime(time.Now().Add(-6 * time.Minute)),
 		},
-		Status: core.PodStatus{Phase: core.PodPending},
+		Status: core.PodStatus{
+			Phase: core.PodPending,
+			Conditions: []core.PodCondition{
+				{
+					Type:               core.PodScheduled,
+					Status:             core.ConditionFalse,
+					LastTransitionTime: meta.NewTime(time.Now().Add(-6 * time.Minute)),
+				},
+			},
+		},
 	}
 	err := p.checkPendingPodTimeout(pod)
 	if err == nil {
@@ -129,6 +140,31 @@ func TestCheckPendingPodTimeout_Exceeded(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "stuck in Pending") {
 		t.Errorf("unexpected error message: %s", err.Error())
+	}
+}
+
+func TestCheckPendingPodTimeout_ScheduledInitPending(t *testing.T) {
+	Settings.ConversionPodPendingTimeout = 5
+	p := &ConversionPipeline{}
+	pod := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Name:              "test-pod",
+			CreationTimestamp: meta.NewTime(time.Now().Add(-6 * time.Minute)),
+		},
+		Status: core.PodStatus{
+			Phase: core.PodPending,
+			Conditions: []core.PodCondition{
+				{
+					Type:               core.PodScheduled,
+					Status:             core.ConditionTrue,
+					LastTransitionTime: meta.NewTime(time.Now().Add(-6 * time.Minute)),
+				},
+			},
+		},
+	}
+	err := p.checkPendingPodTimeout(pod)
+	if err != nil {
+		t.Errorf("expected no timeout while scheduled pod initializes, got: %v", err)
 	}
 }
 
@@ -200,6 +236,23 @@ func TestPendingPodReason_ContainerWaiting(t *testing.T) {
 	}
 	if !strings.Contains(reason, "my-scripts") {
 		t.Errorf("expected configmap name in reason, got: %s", reason)
+	}
+}
+
+func TestConversionRequestsForPod(t *testing.T) {
+	reqs := conversionRequestsForPod(context.TODO(), &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Labels: map[string]string{
+				convctx.LabelConversion:    "plan-vm-1-abc",
+				convctx.LabelPlanNamespace: "openshift-mtv",
+			},
+		},
+	})
+	if len(reqs) != 1 {
+		t.Fatalf("expected one reconcile request, got %d", len(reqs))
+	}
+	if reqs[0].Name != "plan-vm-1-abc" || reqs[0].Namespace != "openshift-mtv" {
+		t.Fatalf("unexpected request: %+v", reqs[0])
 	}
 }
 

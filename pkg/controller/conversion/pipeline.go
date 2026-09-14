@@ -683,10 +683,16 @@ func (p *ConversionPipeline) checkPendingPodTimeout(pod *core.Pod) error {
 	if timeout == 0 {
 		return nil
 	}
-	if pod.CreationTimestamp.IsZero() {
+	// Init container image pulls keep phase Pending after scheduling; only fail
+	// pods that cannot be scheduled.
+	if podScheduled(pod) {
 		return nil
 	}
-	elapsed := time.Since(pod.CreationTimestamp.Time)
+	since := unschedulableSince(pod)
+	if since.IsZero() {
+		return nil
+	}
+	elapsed := time.Since(since)
 	if elapsed < timeout {
 		return nil
 	}
@@ -694,6 +700,27 @@ func (p *ConversionPipeline) checkPendingPodTimeout(pod *core.Pod) error {
 	return liberr.New(
 		fmt.Sprintf("conversion pod %s stuck in Pending for %s (reason: %s)",
 			pod.Name, elapsed.Truncate(time.Second), reason))
+}
+
+func podScheduled(pod *core.Pod) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == core.PodScheduled && cond.Status == core.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+func unschedulableSince(pod *core.Pod) time.Time {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == core.PodScheduled && cond.Status == core.ConditionFalse {
+			return cond.LastTransitionTime.Time
+		}
+	}
+	if !pod.CreationTimestamp.IsZero() {
+		return pod.CreationTimestamp.Time
+	}
+	return time.Time{}
 }
 
 func pendingPodReason(pod *core.Pod) string {
