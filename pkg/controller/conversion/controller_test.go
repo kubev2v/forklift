@@ -2,16 +2,21 @@ package conversion
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/base"
 	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestResolvePhaseConditions_FailedWithError(t *testing.T) {
@@ -253,6 +258,125 @@ func TestConversionRequestsForPod(t *testing.T) {
 	}
 	if reqs[0].Name != "plan-vm-1-abc" || reqs[0].Namespace != "openshift-mtv" {
 		t.Fatalf("unexpected request: %+v", reqs[0])
+	}
+}
+
+func TestMarkConversionSucceeded_RemovesFailureCondition(t *testing.T) {
+	conv := &api.Conversion{
+		ObjectMeta: meta.ObjectMeta{Name: "test-conv", Namespace: "default"},
+		Status: api.ConversionStatus{
+			Phase: api.PhaseFailed,
+			Conditions: libcnd.Conditions{
+				List: []libcnd.Condition{
+					{Type: api.ConversionFailed, Status: True, Category: Critical},
+				},
+			},
+		},
+	}
+
+	Reconciler{}.markConversionSucceeded(conv)
+
+	if conv.Status.Phase != api.PhaseSucceeded {
+		t.Fatalf("expected PhaseSucceeded, got %q", conv.Status.Phase)
+	}
+	if conv.Status.Stage != api.StageFinished {
+		t.Fatalf("expected StageFinished, got %q", conv.Status.Stage)
+	}
+	if conv.Status.FindCondition(api.ConversionFailed) != nil {
+		t.Fatal("expected ConversionFailed condition to be removed")
+	}
+	if conv.Status.FindCondition(libcnd.Ready) == nil {
+		t.Fatal("expected Ready condition to be set")
+	}
+}
+
+func TestPipelineFailureWithSucceededPod_SetsCompletedStatus(t *testing.T) {
+	conv := &api.Conversion{
+		ObjectMeta: meta.ObjectMeta{Name: "test-conv", Namespace: "default"},
+		Status: api.ConversionStatus{
+			Phase: api.PhaseRunning,
+			Stage: api.StagePodRunning,
+		},
+	}
+
+	succeeded := true
+	if succeeded {
+		conv.Status.Phase = api.PhaseSucceeded
+		conv.Status.Stage = api.StageFinished
+	}
+	resolvePhaseConditions(conv, nil)
+
+	if conv.Status.Phase != api.PhaseSucceeded {
+		t.Fatalf("expected PhaseSucceeded, got %q", conv.Status.Phase)
+	}
+	if conv.Status.Stage != api.StageFinished {
+		t.Fatalf("expected StageFinished, got %q", conv.Status.Stage)
+	}
+	if conv.Status.FindCondition(libcnd.Ready) == nil {
+		t.Fatal("expected Ready condition to be set")
+	}
+}
+
+func testConversionReconciler(t *testing.T, objs ...runtime.Object) Reconciler {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	if err := core.AddToScheme(scheme); err != nil {
+		t.Fatalf("AddToScheme core: %v", err)
+	}
+	cl := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithRuntimeObjects(objs...).
+		Build()
+	return Reconciler{
+		Reconciler: base.Reconciler{
+			Client: cl,
+			Log:    logging.WithName("test"),
+		},
+	}
+}
+
+func TestConversionPodSucceeded(t *testing.T) {
+	pod := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{Name: "v2v-pod", Namespace: "target-ns"},
+		Status:     core.PodStatus{Phase: core.PodSucceeded},
+	}
+	conv := &api.Conversion{
+		ObjectMeta: meta.ObjectMeta{Name: "test-conv", Namespace: "default"},
+		Spec: api.ConversionSpec{
+			Type:            api.Remote,
+			TargetNamespace: "target-ns",
+		},
+		Status: api.ConversionStatus{
+			Pod: core.ObjectReference{Name: "v2v-pod", Namespace: "target-ns"},
+		},
+	}
+	r := testConversionReconciler(t, pod)
+
+	ok, err := r.conversionPodSucceeded(context.Background(), conv)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected conversion pod to be reported as succeeded")
+	}
+}
+
+func TestConversionPodSucceeded_NoPod(t *testing.T) {
+	conv := &api.Conversion{
+		ObjectMeta: meta.ObjectMeta{Name: "test-conv", Namespace: "default"},
+		Spec: api.ConversionSpec{
+			Type:            api.Remote,
+			TargetNamespace: "target-ns",
+		},
+	}
+	r := testConversionReconciler(t)
+
+	ok, err := r.conversionPodSucceeded(context.Background(), conv)
+	if !errors.Is(err, ErrNoPodFound) {
+		t.Fatalf("expected ErrNoPodFound, got %v", err)
+	}
+	if ok {
+		t.Fatal("expected conversion pod to not be reported as succeeded")
 	}
 }
 

@@ -678,6 +678,7 @@ func (p *ConversionPipeline) runStageWaitingForSnapshotRemoval() (stageDone bool
 	return true, nil
 }
 
+// checkPendingPodTimeout fails only pods that remain unschedulable past the configured timeout.
 func (p *ConversionPipeline) checkPendingPodTimeout(pod *core.Pod) error {
 	timeout := pendingPodTimeout()
 	if timeout == 0 {
@@ -702,6 +703,7 @@ func (p *ConversionPipeline) checkPendingPodTimeout(pod *core.Pod) error {
 			pod.Name, elapsed.Truncate(time.Second), reason))
 }
 
+// podScheduled reports whether the scheduler has assigned the pod to a node.
 func podScheduled(pod *core.Pod) bool {
 	for _, cond := range pod.Status.Conditions {
 		if cond.Type == core.PodScheduled && cond.Status == core.ConditionTrue {
@@ -711,6 +713,7 @@ func podScheduled(pod *core.Pod) bool {
 	return false
 }
 
+// unschedulableSince returns when the pod became unschedulable, or creation time as fallback.
 func unschedulableSince(pod *core.Pod) time.Time {
 	for _, cond := range pod.Status.Conditions {
 		if cond.Type == core.PodScheduled && cond.Status == core.ConditionFalse {
@@ -723,6 +726,7 @@ func unschedulableSince(pod *core.Pod) time.Time {
 	return time.Time{}
 }
 
+// pendingPodReason summarizes why a conversion pod is still pending.
 func pendingPodReason(pod *core.Pod) string {
 	for _, cond := range pod.Status.Conditions {
 		if cond.Type == core.PodScheduled && cond.Status == core.ConditionFalse {

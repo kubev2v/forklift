@@ -87,10 +87,12 @@ func Add(mgr manager.Manager) error {
 	return nil
 }
 
+// conversionPodEvent reports whether a pod update should trigger conversion reconciliation.
 func conversionPodEvent(pod *core.Pod) bool {
 	return pod != nil && pod.Labels[convctx.LabelConversion] != ""
 }
 
+// conversionRequestsForPod maps a labeled conversion pod to its Conversion reconcile request.
 func conversionRequestsForPod(_ context.Context, pod *core.Pod) []reconcile.Request {
 	if pod == nil {
 		return nil
@@ -204,7 +206,12 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	pipe := NewConversionPipeline(ctx, &r, conversion)
 	succeeded, pipelineErr := pipe.Run()
 	if pipelineErr != nil {
-		if r.conversionPodSucceeded(ctx, conversion) {
+		podSucceeded, podErr := r.conversionPodSucceeded(ctx, conversion)
+		if podErr != nil {
+			err = podErr
+			return
+		}
+		if podSucceeded {
 			r.Log.Info("Conversion pipeline failed but pod succeeded; marking conversion succeeded.",
 				"type", conversion.Spec.Type,
 				"conversion", conversion.Name)
@@ -264,6 +271,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	return
 }
 
+// conversionPod returns the managed conversion pod from status or label lookup.
 func (r Reconciler) conversionPod(ctx context.Context, conversion *api.Conversion) (*core.Pod, error) {
 	ensurer, err := NewEnsurer(r.Client, r.Log, conversion.Spec)
 	if err != nil {
@@ -290,14 +298,19 @@ func (r Reconciler) conversionPod(ctx context.Context, conversion *api.Conversio
 	return pod, nil
 }
 
-func (r Reconciler) conversionPodSucceeded(ctx context.Context, conversion *api.Conversion) bool {
+// conversionPodSucceeded reports whether the managed conversion pod completed successfully.
+func (r Reconciler) conversionPodSucceeded(ctx context.Context, conversion *api.Conversion) (bool, error) {
 	pod, err := r.conversionPod(ctx, conversion)
 	if err != nil {
-		return false
+		return false, err
 	}
-	return pod.Status.Phase == core.PodSucceeded
+	if pod == nil {
+		return false, nil
+	}
+	return pod.Status.Phase == core.PodSucceeded, nil
 }
 
+// reconcileFailedConversion recovers stale Failed conversions from the managed pod phase.
 func (r Reconciler) reconcileFailedConversion(ctx context.Context, conversion *api.Conversion) (recovered bool, requeue bool, err error) {
 	pod, err := r.conversionPod(ctx, conversion)
 	if err != nil {
@@ -323,9 +336,11 @@ func (r Reconciler) reconcileFailedConversion(ctx context.Context, conversion *a
 	}
 }
 
+// markConversionSucceeded sets terminal success status and clears stale failure conditions.
 func (r Reconciler) markConversionSucceeded(conversion *api.Conversion) {
 	conversion.Status.Phase = api.PhaseSucceeded
 	conversion.Status.Stage = api.StageFinished
+	conversion.Status.DeleteCondition(api.ConversionFailed)
 	resolvePhaseConditions(conversion, nil)
 }
 
