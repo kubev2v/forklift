@@ -35,7 +35,7 @@ if [ -z "$KIND" ]; then
     echo "Downloading kind ${KIND_VERSION}..."
     OS="$(uname | tr '[:upper:]' '[:lower:]')"
     ARCH="$(uname -m)"; case "$ARCH" in x86_64) ARCH=amd64 ;; aarch64) ARCH=arm64 ;; esac
-    curl -sLo "$KIND" "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-${OS}-${ARCH}"
+    curl --proto '=https' -sLo "$KIND" "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-${OS}-${ARCH}"
     chmod +x "$KIND"
   fi
 fi
@@ -53,7 +53,7 @@ EOF
 echo "Installing the Calico projectcalico.org/v3 CRDs (api-server-less datastore)..."
 
 # Install just CRDs.
-curl -sL "${CALICO_MANIFESTS}/v3_projectcalico_org.yaml" \
+curl --proto '=https' -sL "${CALICO_MANIFESTS}/v3_projectcalico_org.yaml" \
   | python3 -c "import sys; print('\n---\n'.join(d for d in sys.stdin.read().split('\n---\n') if 'kind: CustomResourceDefinition' in d))" \
   | kubectl apply --server-side -f -
 
@@ -69,7 +69,7 @@ echo "Installing the tigera operator in api-server-less (v3-CRD) mode..."
 # -manage-crds=false keeps the operator's hands off the CRDs applied above.
 # With the v3 group already present at boot, the operator's API-mode discovery
 # picks v3-CRD mode; CALICO_API_GROUP pins that decision explicitly.
-curl -sL "${CALICO_MANIFESTS}/tigera-operator.yaml" \
+curl --proto '=https' -sL "${CALICO_MANIFESTS}/tigera-operator.yaml" \
   | sed 's/-manage-crds=true/-manage-crds=false/' \
   | kubectl create -f -
 kubectl set env -n tigera-operator deployment/tigera-operator CALICO_API_GROUP=projectcalico.org/v3
@@ -80,7 +80,7 @@ kubectl wait --for=condition=Established --timeout=120s crd/installations.operat
 
 # Apply only the Installation from custom-resources: no APIServer CR — the
 # projectcalico.org/v3 group is CRD-served.
-curl -sL "${CALICO_MANIFESTS}/custom-resources.yaml" \
+curl --proto '=https' -sL "${CALICO_MANIFESTS}/custom-resources.yaml" \
   | python3 -c "import sys; print('\n---\n'.join(d for d in sys.stdin.read().split('---') if 'kind: Installation' in d))" \
   | kubectl create -f -
 
