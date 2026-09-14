@@ -62,7 +62,7 @@ github.com/evanphx/json-patch/v5/internal/json
 # github.com/fxamacker/cbor/v2 v2.8.0
 ## explicit; go 1.20
 github.com/fxamacker/cbor/v2
-# github.com/go-logr/logr v1.4.3
+# github.com/go-logr/logr v1.4.4
 ## explicit; go 1.18
 github.com/go-logr/logr
 github.com/go-logr/logr/funcr
@@ -165,7 +165,7 @@ github.com/josharian/intern
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
-# github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.6
+# github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7
 ## explicit; go 1.21
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1
@@ -259,7 +259,7 @@ github.com/netapp/trident/utils/version
 # github.com/oklog/ulid v1.3.1
 ## explicit
 github.com/oklog/ulid
-# github.com/onsi/ginkgo/v2 v2.25.1
+# github.com/onsi/ginkgo/v2 v2.25.3
 ## explicit; go 1.23.0
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -281,7 +281,7 @@ github.com/onsi/ginkgo/v2/internal/parallel_support
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.38.2
+# github.com/onsi/gomega v1.38.3
 ## explicit; go 1.23.0
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -317,8 +317,8 @@ github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promauto
 github.com/prometheus/client_golang/prometheus/promhttp
 github.com/prometheus/client_golang/prometheus/promhttp/internal
-# github.com/prometheus/client_model v0.6.1
-## explicit; go 1.19
+# github.com/prometheus/client_model v0.6.3
+## explicit; go 1.23
 github.com/prometheus/client_model/go
 # github.com/prometheus/common v0.62.0
 ## explicit; go 1.21
@@ -451,7 +451,7 @@ go.uber.org/mock/gomock
 # go.uber.org/multierr v1.11.0
 ## explicit; go 1.19
 go.uber.org/multierr
-# go.uber.org/zap v1.27.0
+# go.uber.org/zap v1.27.1
 ## explicit; go 1.19
 go.uber.org/zap
 go.uber.org/zap/buffer
@@ -602,8 +602,8 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.36.7
-## explicit; go 1.22
+# google.golang.org/protobuf v1.36.12
+## explicit; go 1.23
 google.golang.org/protobuf/encoding/protodelim
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
@@ -654,7 +654,7 @@ gopkg.in/yaml.v3
 # howett.net/plist v0.0.0-20181124034731-591f970eefbb
 ## explicit
 howett.net/plist
-# k8s.io/api v0.32.8
+# k8s.io/api v0.32.13
 ## explicit; go 1.23.0
 k8s.io/api/admissionregistration/v1
 k8s.io/api/admissionregistration/v1alpha1
@@ -712,11 +712,11 @@ k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
 k8s.io/api/storagemigration/v1alpha1
-# k8s.io/apiextensions-apiserver v0.32.5
+# k8s.io/apiextensions-apiserver v0.32.13
 ## explicit; go 1.23.0
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
-# k8s.io/apimachinery v0.32.8
+# k8s.io/apimachinery v0.32.13
 ## explicit; go 1.23.0
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
@@ -769,7 +769,7 @@ k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/client-go v0.32.8
+# k8s.io/client-go v0.32.13
 ## explicit; go 1.23.0
 k8s.io/client-go/applyconfigurations/admissionregistration/v1
 k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1
