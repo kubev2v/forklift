@@ -20,6 +20,8 @@ set -eo pipefail
 # of a Calico release (or hashrelease) that ships the projectcalico.org/v3
 # CRD bundle (v3.32 and later).
 CALICO_MANIFESTS="${CALICO_MANIFESTS:-https://raw.githubusercontent.com/projectcalico/calico/v3.32.2/manifests}"
+# Every download enforces HTTPS on all hops, including redirects.
+CURL_PROTO="=https"
 CLUSTER_NAME="${CLUSTER_NAME:-forklift-calico-mock}"
 KIND_VERSION="${KIND_VERSION:-v0.30.0}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -41,7 +43,7 @@ if [[ -z "$KIND" ]]; then
       amd64|arm64) ;;
       *) echo "STOP: unsupported architecture: ${ARCH}"; exit 1 ;;
     esac
-    curl --proto '=https' -fsLo "$KIND" "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-${OS}-${ARCH}"
+    curl --proto "${CURL_PROTO}" -fsLo "$KIND" "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-${OS}-${ARCH}"
     chmod +x "$KIND"
   fi
 fi
@@ -59,7 +61,7 @@ EOF
 echo "Installing the Calico projectcalico.org/v3 CRDs (api-server-less datastore)..."
 
 # Install just CRDs.
-curl --proto '=https' -fsL "${CALICO_MANIFESTS}/v3_projectcalico_org.yaml" \
+curl --proto "${CURL_PROTO}" -fsL "${CALICO_MANIFESTS}/v3_projectcalico_org.yaml" \
   | python3 -c "import sys; print('\n---\n'.join(d for d in sys.stdin.read().split('\n---\n') if 'kind: CustomResourceDefinition' in d))" \
   | kubectl apply --server-side -f -
 
@@ -75,7 +77,7 @@ echo "Installing the tigera operator in api-server-less (v3-CRD) mode..."
 # -manage-crds=false keeps the operator's hands off the CRDs applied above.
 # With the v3 group already present at boot, the operator's API-mode discovery
 # picks v3-CRD mode; CALICO_API_GROUP pins that decision explicitly.
-curl --proto '=https' -fsL "${CALICO_MANIFESTS}/tigera-operator.yaml" \
+curl --proto "${CURL_PROTO}" -fsL "${CALICO_MANIFESTS}/tigera-operator.yaml" \
   | sed 's/-manage-crds=true/-manage-crds=false/' \
   | kubectl create -f -
 kubectl set env -n tigera-operator deployment/tigera-operator CALICO_API_GROUP=projectcalico.org/v3
@@ -86,7 +88,7 @@ kubectl wait --for=condition=Established --timeout=120s crd/installations.operat
 
 # Apply only the Installation from custom-resources: no APIServer CR — the
 # projectcalico.org/v3 group is CRD-served.
-curl --proto '=https' -fsL "${CALICO_MANIFESTS}/custom-resources.yaml" \
+curl --proto "${CURL_PROTO}" -fsL "${CALICO_MANIFESTS}/custom-resources.yaml" \
   | python3 -c "import sys; print('\n---\n'.join(d for d in sys.stdin.read().split('---') if 'kind: Installation' in d))" \
   | kubectl create -f -
 
