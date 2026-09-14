@@ -15,8 +15,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/modelcontextprotocol/go-sdk/internal/jsonrpc2"
+	"github.com/modelcontextprotocol/go-sdk/internal/mcpgodebug"
 	"github.com/modelcontextprotocol/go-sdk/internal/util"
+	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/yosida95/uritemplate/v3"
 )
 
@@ -37,11 +38,28 @@ type serverResourceTemplate struct {
 // If it cannot find the resource, it should return the result of calling [ResourceNotFoundError].
 type ResourceHandler func(context.Context, *ReadResourceRequest) (*ReadResourceResult, error)
 
+// customresnotfounderrcode is a compatibility parameter that restores the
+// pre-1.7.0 behavior of [ResourceNotFoundError] and [CodeResourceNotFound],
+// where the error code was a custom -32002. See the documentation for the mcpgodebug
+// package for instructions on how to enable it.
+// The option will be removed in the future version of the SDK.
+var customresnotfounderrcode = mcpgodebug.Value("customresnotfounderrcode")
+
+func init() {
+	if customresnotfounderrcode == "1" {
+		CodeResourceNotFound = -32002
+	}
+}
+
 // ResourceNotFoundError returns an error indicating that a resource being read could
 // not be found.
+//
+// By default, the error code is -32602 (Invalid Params), as specified in the
+// MCP specification (SEP-2164). To restore the pre-1.7.0 release behavior where the
+// error code was -32002, set MCPGODEBUG=customresnotfounderrcode=1.
 func ResourceNotFoundError(uri string) error {
-	return &jsonrpc2.WireError{
-		Code:    codeResourceNotFound,
+	return &jsonrpc.Error{
+		Code:    CodeResourceNotFound,
 		Message: "Resource not found",
 		Data:    json.RawMessage(fmt.Sprintf(`{"uri":%q}`, uri)),
 	}
@@ -111,6 +129,23 @@ func computeURIFilepath(rawURI, dirFilepath string, rootFilepaths []string) (str
 		}
 	}
 	return uriFilepathRel, nil
+}
+
+// withFile calls f on the file at join(dir, rel),
+// protecting against path traversal attacks.
+func withFile(dir, rel string, f func(*os.File) error) (err error) {
+	r, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	file, err := r.Open(rel)
+	if err != nil {
+		return err
+	}
+	// Record error, in case f writes.
+	defer func() { err = errors.Join(err, file.Close()) }()
+	return f(file)
 }
 
 // fileRoots transforms the Roots obtained from the client into absolute paths on

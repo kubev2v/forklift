@@ -28,9 +28,6 @@ var (
 	// The following errors are not part of the json specification, but
 	// compliant extensions specific to this implementation.
 
-	// ErrServerOverloaded is returned when a message was refused due to a
-	// server being temporarily unable to accept any new messages.
-	ErrServerOverloaded = NewError(-32000, "overloaded")
 	// ErrUnknown should be used for all non coded errors.
 	ErrUnknown = NewError(-32001, "unknown error")
 	// ErrServerClosing is returned for calls that arrive while the server is closing.
@@ -47,7 +44,7 @@ var (
 	// Such failures do not indicate that the connection is broken, but rather
 	// should be returned to the caller to indicate that the specific request is
 	// invalid in the current context.
-	ErrRejected = NewError(-32004, "rejected by transport")
+	ErrRejected = NewError(-32005, "rejected by transport")
 )
 
 const wireVersion = "2.0"

@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -8,13 +8,13 @@ import (
 	"archive/tar"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -62,7 +62,8 @@ func createSimulationVM(vm *VirtualMachine) *simVM {
 }
 
 // applies container network settings to vm.Guest properties.
-func (svm *simVM) syncNetworkConfigToVMGuestProperties() error {
+// If ctx is provided, property change notifications will be triggered for all modified properties.
+func (svm *simVM) syncNetworkConfigToVMGuestProperties(ctx *Context) error {
 	if svm == nil {
 		return nil
 	}
@@ -83,6 +84,11 @@ func (svm *simVM) syncNetworkConfigToVMGuestProperties() error {
 		break
 	}
 
+	// Collect property changes as we modify the VM state
+	var changes []types.PropertyChange
+
+	// Update power state based on container state
+	var oldPowerState types.VirtualMachinePowerState
 	if detail.State.Paused {
 		svm.vm.Runtime.PowerState = types.VirtualMachinePowerStateSuspended
 	} else if detail.State.Running {
@@ -90,20 +96,51 @@ func (svm *simVM) syncNetworkConfigToVMGuestProperties() error {
 	} else {
 		svm.vm.Runtime.PowerState = types.VirtualMachinePowerStatePoweredOff
 	}
-
-	svm.vm.Guest.IpAddress = netS.IPAddress
-	svm.vm.Summary.Guest.IpAddress = netS.IPAddress
-	if svm.vm.Guest.HostName == "" {
-		svm.vm.Guest.HostName = detail.Config.Hostname
+	if svm.vm.Runtime.PowerState != oldPowerState {
+		changes = append(changes, types.PropertyChange{
+			Name: "runtime.powerState",
+			Val:  svm.vm.Runtime.PowerState,
+			Op:   types.PropertyChangeOpAssign,
+		})
 	}
 
+	// Update IP address
+	newIP := netS.IPAddress
+	if svm.vm.Guest.IpAddress != newIP {
+		svm.vm.Guest.IpAddress = newIP
+		changes = append(changes, types.PropertyChange{
+			Name: "guest.ipAddress",
+			Val:  newIP,
+			Op:   types.PropertyChangeOpAssign,
+		})
+	}
+	if svm.vm.Summary.Guest.IpAddress != newIP {
+		svm.vm.Summary.Guest.IpAddress = newIP
+		changes = append(changes, types.PropertyChange{
+			Name: "summary.guest.ipAddress",
+			Val:  newIP,
+			Op:   types.PropertyChangeOpAssign,
+		})
+	}
+
+	// Update hostname
+	if svm.vm.Guest.HostName == "" && detail.Config.Hostname != "" {
+		svm.vm.Guest.HostName = detail.Config.Hostname
+		changes = append(changes, types.PropertyChange{
+			Name: "guest.hostName",
+			Val:  detail.Config.Hostname,
+			Op:   types.PropertyChangeOpAssign,
+		})
+	}
+
+	// Update network info if we have a NIC configured
 	if len(svm.vm.Guest.Net) != 0 {
 		net := &svm.vm.Guest.Net[0]
-		net.IpAddress = []string{netS.IPAddress}
+		net.IpAddress = []string{newIP}
 		net.MacAddress = netS.MacAddress
 		net.IpConfig = &types.NetIpConfigInfo{
 			IpAddress: []types.NetIpConfigInfoIpAddress{{
-				IpAddress:    netS.IPAddress,
+				IpAddress:    newIP,
 				PrefixLength: int32(netS.IPPrefixLen),
 				State:        string(types.NetIpConfigInfoIpAddressStatusPreferred),
 			}},
@@ -129,13 +166,31 @@ func (svm *simVM) syncNetworkConfigToVMGuestProperties() error {
 			},
 		}
 		svm.vm.Guest.IpStack = []types.GuestStackInfo{gsi}
+
+		// guest.net is a complex structure, trigger update for the whole thing
+		changes = append(changes, types.PropertyChange{
+			Name: "guest.net",
+			Val:  svm.vm.Guest.Net,
+			Op:   types.PropertyChangeOpAssign,
+		})
+		changes = append(changes, types.PropertyChange{
+			Name: "guest.ipStack",
+			Val:  svm.vm.Guest.IpStack,
+			Op:   types.PropertyChangeOpAssign,
+		})
 	}
 
+	// Update MAC address on virtual ethernet card
 	for _, d := range svm.vm.Config.Hardware.Device {
 		if eth, ok := d.(types.BaseVirtualEthernetCard); ok {
 			eth.GetVirtualEthernetCard().MacAddress = netS.MacAddress
 			break
 		}
+	}
+
+	// Trigger property change notifications if we have changes and context is available
+	if ctx != nil && len(changes) > 0 {
+		ctx.Update(svm.vm, changes)
 	}
 
 	return nil
@@ -213,6 +268,7 @@ func (svm *simVM) start(ctx *Context) error {
 	var args []string
 	var env []string
 	var ports []string
+	var networks []string
 	mountDMI := true
 
 	for _, opt := range svm.vm.Config.ExtraConfig {
@@ -234,6 +290,13 @@ func (svm *simVM) start(ctx *Context) error {
 				mountDMI = mount
 			}
 
+			continue
+		}
+
+		if val.Key == "RUN.network" {
+			// Specify container network (e.g., "podman" for rootless podman bridge network)
+			// This is important for rootless podman which doesn't assign IPs without a network
+			networks = append(networks, val.Value.(string))
 			continue
 		}
 
@@ -277,7 +340,7 @@ func (svm *simVM) start(ctx *Context) error {
 	}
 
 	var err error
-	svm.c, err = create(ctx, svm.vm.Name, svm.vm.uid.String(), nil, volumes, ports, env, args[0], args[1:])
+	svm.c, err = create(ctx, svm.vm.Name, svm.vm.uid.String(), networks, volumes, ports, env, args[0], args[1:])
 	if err != nil {
 		return err
 	}
@@ -302,15 +365,24 @@ func (svm *simVM) start(ctx *Context) error {
 
 	svm.vm.logPrintf("%s: %s", args, svm.c.id)
 
-	if err = svm.syncNetworkConfigToVMGuestProperties(); err != nil {
-		log.Printf("%s inspect %s: %s", svm.vm.Name, svm.c.id, err)
+	// Sync network config, retrying a few times to allow the container to get an IP
+	// Container runtimes may take a moment to assign an IP address after start
+	for i := 0; i < 5; i++ {
+		if err = svm.syncNetworkConfigToVMGuestProperties(ctx); err != nil {
+			log.Printf("%s inspect %s: %s", svm.vm.Name, svm.c.id, err)
+			break
+		}
+		if svm.vm.Guest.IpAddress != "" {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 
-	callback := func(details *containerDetails, c *container) error {
+	callback := func(callbackCtx *Context, details *containerDetails, c *container) error {
 		if c.id == "" && svm.vm != nil {
 			// If the container cannot be found then destroy this VM unless the VM is no longer configured for container backing (svm.vm == nil)
-			taskRef := svm.vm.DestroyTask(ctx, &types.Destroy_Task{This: svm.vm.Self}).(*methods.Destroy_TaskBody).Res.Returnval
-			task, ok := ctx.Map.Get(taskRef).(*Task)
+			taskRef := svm.vm.DestroyTask(callbackCtx, &types.Destroy_Task{This: svm.vm.Self}).(*methods.Destroy_TaskBody).Res.Returnval
+			task, ok := callbackCtx.Map.Get(taskRef).(*Task)
 			if !ok {
 				panic(fmt.Sprintf("couldn't retrieve task for moref %+q while deleting VM %s", taskRef, svm.vm.Name))
 			}
@@ -318,21 +390,20 @@ func (svm *simVM) start(ctx *Context) error {
 			// Wait for the task to complete and see if there is an error.
 			task.Wait()
 			if task.Info.Error != nil {
-				msg := fmt.Sprintf("failed to destroy vm: err=%v", *task.Info.Error)
-				svm.vm.logPrintf(msg)
-
-				return errors.New(msg)
+				err := fmt.Errorf("failed to destroy vm: %v", task.Info.Error)
+				svm.vm.logPrintf("%s", err.Error())
+				return err
 			}
 		}
 
-		return svm.syncNetworkConfigToVMGuestProperties()
+		return svm.syncNetworkConfigToVMGuestProperties(callbackCtx)
 	}
 
 	// Start watching the container resource.
 	err = svm.c.watchContainer(ctx, callback)
 	if _, ok := err.(uninitializedContainer); ok {
 		// the container has been deleted before we could watch, despite successful launch so clean up.
-		callback(nil, svm.c)
+		callback(ctx, nil, svm.c)
 
 		// successful launch so nil the error
 		return nil

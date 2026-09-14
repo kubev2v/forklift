@@ -10,8 +10,11 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 // Logging levels.
@@ -66,6 +69,11 @@ func compareLevels(l1, l2 LoggingLevel) int {
 }
 
 // LoggingHandlerOptions are options for a LoggingHandler.
+//
+// Deprecated: the logging feature is deprecated as of protocol version
+// 2026-07-28 (SEP-2577). It remains functional during the deprecation window
+// (at least twelve months). See
+// https://modelcontextprotocol.io/seps/2577-deprecate-roots-sampling-and-logging.
 type LoggingHandlerOptions struct {
 	// The value for the "logger" field of logging notifications.
 	LoggerName string
@@ -76,20 +84,38 @@ type LoggingHandlerOptions struct {
 }
 
 // A LoggingHandler is a [slog.Handler] for MCP.
+//
+// Deprecated: the logging feature is deprecated as of protocol version
+// 2026-07-28 (SEP-2577). It remains functional during the deprecation window
+// (at least twelve months). See
+// https://modelcontextprotocol.io/seps/2577-deprecate-roots-sampling-and-logging.
 type LoggingHandler struct {
 	opts LoggingHandlerOptions
 	ss   *ServerSession
 	// Ensures that the buffer reset is atomic with the write (see Handle).
 	// A pointer so that clones share the mutex. See
 	// https://github.com/golang/example/blob/master/slog-handler-guide/README.md#getting-the-mutex-right.
-	mu              *sync.Mutex
-	lastMessageSent time.Time // for rate-limiting
-	buf             *bytes.Buffer
-	handler         slog.Handler
+	mu      *sync.Mutex
+	limiter *rate.Limiter // for rate-limiting
+	buf     *bytes.Buffer
+	handler slog.Handler
+}
+
+// ensureLogger returns l if non-nil, otherwise a discard logger.
+func ensureLogger(l *slog.Logger) *slog.Logger {
+	if l != nil {
+		return l
+	}
+	return slog.New(slog.DiscardHandler)
 }
 
 // NewLoggingHandler creates a [LoggingHandler] that logs to the given [ServerSession] using a
 // [slog.JSONHandler].
+//
+// Deprecated: the logging feature is deprecated as of protocol version
+// 2026-07-28 (SEP-2577). It remains functional during the deprecation window
+// (at least twelve months). See
+// https://modelcontextprotocol.io/seps/2577-deprecate-roots-sampling-and-logging.
 func NewLoggingHandler(ss *ServerSession, opts *LoggingHandlerOptions) *LoggingHandler {
 	var buf bytes.Buffer
 	jsonHandler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{
@@ -109,6 +135,9 @@ func NewLoggingHandler(ss *ServerSession, opts *LoggingHandlerOptions) *LoggingH
 	}
 	if opts != nil {
 		lh.opts = *opts
+		if opts.MinInterval > 0 {
+			lh.limiter = rate.NewLimiter(rate.Every(opts.MinInterval), 1)
+		}
 	}
 	return lh
 }
@@ -148,16 +177,12 @@ func (h *LoggingHandler) Handle(ctx context.Context, r slog.Record) error {
 
 func (h *LoggingHandler) handle(ctx context.Context, r slog.Record) error {
 	// Observe the rate limit.
-	// TODO(jba): use golang.org/x/time/rate. (We can't here because it would require adding
-	// golang.org/x/time to the go.mod file.)
-	h.mu.Lock()
-	skip := time.Since(h.lastMessageSent) < h.opts.MinInterval
-	h.mu.Unlock()
-	if skip {
+	if h.limiter != nil && !h.limiter.Allow() {
 		return nil
 	}
 
 	var err error
+	var data json.RawMessage
 	// Make the buffer reset atomic with the record write.
 	// We are careful here in the unlikely event that the handler panics.
 	// We don't want to hold the lock for the entire function, because Notify is
@@ -168,19 +193,17 @@ func (h *LoggingHandler) handle(ctx context.Context, r slog.Record) error {
 		defer h.mu.Unlock()
 		h.buf.Reset()
 		err = h.handler.Handle(ctx, r)
+		// Clone the buffer as Bytes() references the internal buffer.
+		data = json.RawMessage(slices.Clone(h.buf.Bytes()))
 	}()
 	if err != nil {
 		return err
 	}
 
-	h.mu.Lock()
-	h.lastMessageSent = time.Now()
-	h.mu.Unlock()
-
 	params := &LoggingMessageParams{
 		Logger: h.opts.LoggerName,
 		Level:  slogLevelToMCP(r.Level),
-		Data:   json.RawMessage(h.buf.Bytes()),
+		Data:   data,
 	}
 	// We pass the argument context to Notify, even though slog.Handler.Handle's
 	// documentation says not to.
