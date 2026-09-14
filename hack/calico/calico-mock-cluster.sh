@@ -28,10 +28,10 @@ MOCK_DIR="${SCRIPT_DIR}"
 
 # Ensure kind.
 KIND="$(command -v kind || true)"
-if [ -z "$KIND" ]; then
+if [[ -z "$KIND" ]]; then
   mkdir -p "$BIN_DIR"
   KIND="$BIN_DIR/kind"
-  if [ ! -x "$KIND" ]; then
+  if [[ ! -x "$KIND" ]]; then
     echo "Downloading kind ${KIND_VERSION}..."
     OS="$(uname | tr '[:upper:]' '[:lower:]')"
     ARCH="$(uname -m)"
