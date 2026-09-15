@@ -41,12 +41,14 @@ spec:
                 /host-seccomp/profiles/apparmor-unshare.profile
               echo "installed seccomp profile"
               # AppArmor is optional: nodes that do not enforce it have no
-              # apparmor_parser and need only the seccomp profile.
-              if [ -x /host-usr-sbin/apparmor_parser ]; then
+              # apparmor_parser and need only the seccomp profile. The host
+              # names its own parser; a host without sh has no AppArmor either.
+              PARSER="$(chroot /host sh -c 'command -v apparmor_parser' || true)"
+              if [ -n "$PARSER" ]; then
                 # The userns rule is AppArmor 4.0 syntax. Parsers below 4.0
                 # reject it, and the systems they ship on do not mediate user
                 # namespaces, so the rule is stripped for them.
-                PARSER_MAJOR="$(chroot /host /usr/sbin/apparmor_parser --version \
+                PARSER_MAJOR="$(chroot /host "$PARSER" --version \
                   | sed -n 's/^AppArmor parser version \([0-9]*\).*/\1/p')"
                 if [ -z "$PARSER_MAJOR" ]; then
                   echo "STOP: could not read the apparmor_parser major version"
@@ -58,7 +60,7 @@ spec:
                   sed '/^[[:space:]]*userns,/d' /profiles/apparmor-unshare.profile \
                     > /host-seccomp/profiles/apparmor-unshare.profile
                 fi
-                chroot /host /usr/sbin/apparmor_parser -r -W \
+                chroot /host "$PARSER" -r -W \
                   /var/lib/kubelet/seccomp/profiles/apparmor-unshare.profile
                 echo "loaded AppArmor profile"
               else
@@ -74,8 +76,6 @@ spec:
               mountPath: /host-seccomp
             - name: host
               mountPath: /host
-            - name: host-usr-sbin
-              mountPath: /host-usr-sbin
       containers:
         - name: pause
           image: registry.k8s.io/pause:3.9
@@ -94,8 +94,4 @@ spec:
         - name: host
           hostPath:
             path: /
-            type: Directory
-        - name: host-usr-sbin
-          hostPath:
-            path: /usr/sbin
             type: Directory
