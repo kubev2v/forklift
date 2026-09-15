@@ -479,7 +479,7 @@ func (c *Conversion) GetDomainXML() (string, error) {
 		return "", fmt.Errorf("failed to get domain XML: %w", err)
 	}
 
-	modifiedXML, err := c.updateDiskPaths(domainXML)
+	modifiedXML, err := c.UpdateDiskPaths(domainXML)
 	if err != nil {
 		return "", fmt.Errorf("failed to update disk paths in domain XML: %w", err)
 	}
@@ -504,7 +504,7 @@ func updateDiskSource(disk *libvirtxml.DomainDisk, path string) bool {
 }
 
 // modify the domain XML to use the local disk paths for in-place conversions
-func (c *Conversion) updateDiskPaths(domainXML string) (string, error) {
+func (c *Conversion) UpdateDiskPaths(domainXML string) (string, error) {
 	fmt.Printf("Updating disk paths: found %d disks\n", len(c.Disks))
 	domain := &libvirtxml.Domain{}
 	err := domain.Unmarshal(domainXML)

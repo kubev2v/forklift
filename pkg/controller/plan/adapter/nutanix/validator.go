@@ -49,6 +49,12 @@ func (r *Validator) NICNetworkRefs(_ ref.Ref) ([]ref.Ref, error) {
 }
 
 func (r *Validator) StaticIPs(_ ref.Ref) (bool, error) {
+	// Nutanix inventory does not expose the subnet mask, gateway, or DNS
+	// configuration needed to rewrite the guest's network config. Static IP
+	// preservation is not yet supported for Nutanix migrations.
+	if r.Plan.Spec.PreserveStaticIPs {
+		return false, nil
+	}
 	return true, nil
 }
 
