@@ -1,6 +1,7 @@
 package nutanix
 
 import (
+	"bytes"
 	"context"
 	"encoding/pem"
 	"fmt"
@@ -73,9 +74,11 @@ func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) error {
 }
 
 // ConfigMap carries a CA certificate for CDI's HTTP importer to trust when
-// downloading catalog images. When the provider secret includes ca.crt it is
-// copied here. Otherwise, for insecureSkipVerify lab setups, the cert is
-// fetched later in DataVolumes() from the actual HTTP import URL.
+// downloading catalog images. In secure mode (no insecureSkipVerify), only
+// ca.crt from the provider secret is copied; CDI verifies import TLS against
+// that bundle. When insecureSkipVerify is set, DataVolumes() may fetch and
+// pin leaf certificates from import endpoints (CDI HTTP import has no
+// insecureSkipVerify field).
 func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) error {
 	if cacert, found := libutil.GetCACert(in); found && len(cacert) > 0 {
 		setCDICACerts(object, cacert)
@@ -101,9 +104,10 @@ func configMapHasCert(configMap *core.ConfigMap) bool {
 	return len(configMap.BinaryData["ca.pem"]) > 0 || len(configMap.BinaryData["tls.crt"]) > 0
 }
 
-// ensureImportCertConfigMap populates the CDI cert ConfigMap from the TLS
-// endpoint CDI will import from. Skipped when the provider secret already
-// carries ca.crt. Only runs for insecureSkipVerify lab setups without ca.crt.
+// ensureImportCertConfigMap updates the CDI cert ConfigMap for Nutanix HTTP
+// imports when insecureSkipVerify is enabled. It merges optional ca.crt with
+// leaf certificates fetched from each distinct import TLS endpoint. Secure
+// migrations rely on a pre-configured ca.crt bundle only.
 func (r *Builder) ensureImportCertConfigMap(
 	configMap *core.ConfigMap,
 	secret *core.Secret,
@@ -111,50 +115,52 @@ func (r *Builder) ensureImportCertConfigMap(
 	vmRef ref.Ref,
 	vm *model.VM,
 ) error {
-	if _, found := libutil.GetCACert(secret); found {
-		return nil
-	}
 	if !providerbase.GetInsecureSkipVerifyFlag(secret) {
 		return nil
 	}
-	if configMapHasCert(configMap) {
-		return nil
-	}
 
-	downloadURL, err := r.importCertURL(client, vmRef, vm)
+	urls, err := r.importCertURLs(client, vmRef, vm)
 	if err != nil {
 		return err
 	}
 
-	cacert, err := r.fetchCertFromURL(downloadURL, secret)
-	if err != nil {
-		r.Log.Error(err, "Failed to fetch Nutanix import certificate",
-			"url", downloadURL,
-			"vm", vmRef.String())
+	bundle := r.buildImportCertBundle(secret, urls)
+	if len(bundle) == 0 {
+		return nil
+	}
+	if configMapHasCert(configMap) && bytes.Equal(configMap.BinaryData["ca.pem"], bundle) {
 		return nil
 	}
 
-	setCDICACerts(configMap, cacert)
+	setCDICACerts(configMap, bundle)
 	if err = r.Destination.Update(context.TODO(), configMap); err != nil {
 		return liberr.Wrap(err, "configMap", path.Join(configMap.Namespace, configMap.Name))
 	}
-	r.Log.V(1).Info("Updated CDI cert ConfigMap from import URL.",
+	r.Log.V(1).Info("Updated CDI cert ConfigMap for Nutanix HTTP import endpoints.",
 		"configMap", path.Join(configMap.Namespace, configMap.Name),
-		"url", downloadURL,
+		"urls", urls,
 		"vm", vmRef.String())
 	return nil
 }
 
-// importCertURL returns the HTTPS endpoint whose certificate CDI must trust.
-// PE: the provider API host. PC: the resolved entity_download Location after
-// VIP rewrite.
-func (r *Builder) importCertURL(client *Client, vmRef ref.Ref, vm *model.VM) (string, error) {
+// importCertURLs lists HTTPS endpoints whose certificates CDI may need to
+// trust. Prism Element uses the provider URL. Prism Central includes the
+// provider URL plus each resolved entity_download URL (deduped by host).
+func (r *Builder) importCertURLs(client *Client, vmRef ref.Ref, vm *model.VM) ([]string, error) {
+	providerURL := strings.TrimRight(r.Source.Provider.Spec.URL, "/")
 	element, err := client.isPrismElement()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if element {
-		return strings.TrimRight(r.Source.Provider.Spec.URL, "/"), nil
+		return []string{providerURL}, nil
+	}
+
+	seen := map[string]struct{}{}
+	var urls []string
+	urls, err = appendUniqueImportCertURL(urls, seen, providerURL)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, disk := range vm.Disks {
@@ -164,16 +170,94 @@ func (r *Builder) importCertURL(client *Client, vmRef ref.Ref, vm *model.VM) (st
 		name := migrationImageName(string(r.Migration.UID), vmRef, disk.UUID)
 		downloadURL, _, err := r.resolveCentralDownload(client, name)
 		if err != nil {
-			return "", liberr.Wrap(err, "vm", vmRef.String(), "disk", disk.UUID)
+			return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", disk.UUID)
 		}
-		return downloadURL, nil
+		urls, err = appendUniqueImportCertURL(urls, seen, downloadURL)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return "", liberr.New("no importable disks found for cert resolution", "vm", vmRef.String())
+	if len(urls) == 0 {
+		return nil, liberr.New("no importable disks found for cert resolution", "vm", vmRef.String())
+	}
+	return urls, nil
+}
+
+func appendUniqueImportCertURL(urls []string, seen map[string]struct{}, rawURL string) ([]string, error) {
+	host, err := importCertTLSHost(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := seen[host]; ok {
+		return urls, nil
+	}
+	seen[host] = struct{}{}
+	return append(urls, strings.TrimRight(rawURL, "/")), nil
+}
+
+func importCertTLSHost(rawURL string) (string, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "", liberr.Wrap(err, "failed to parse import URL", "url", rawURL)
+	}
+	if parsed.Scheme == "" {
+		parsed.Scheme = "https"
+	}
+	if parsed.Host == "" {
+		return "", liberr.New("import URL missing host", "url", rawURL)
+	}
+	return parsed.Host, nil
+}
+
+// buildImportCertBundle merges ca.crt from the provider secret with leaf
+// certificates fetched from each import URL when insecureSkipVerify is set.
+// Fetch failures are logged and skipped so a partial bundle can still be used.
+func (r *Builder) buildImportCertBundle(secret *core.Secret, urls []string) []byte {
+	var chunks [][]byte
+	if cacert, found := libutil.GetCACert(secret); found && len(cacert) > 0 {
+		chunks = append(chunks, cacert)
+	}
+	if !providerbase.GetInsecureSkipVerifyFlag(secret) {
+		return mergePEMCertificates(chunks...)
+	}
+	for _, rawURL := range urls {
+		cacert, err := r.fetchCertFromURL(rawURL, secret)
+		if err != nil {
+			r.Log.Error(err, "Failed to fetch Nutanix import certificate", "url", rawURL)
+			continue
+		}
+		chunks = append(chunks, cacert)
+	}
+	return mergePEMCertificates(chunks...)
+}
+
+func mergePEMCertificates(chunks ...[]byte) []byte {
+	seen := map[string]struct{}{}
+	var out []byte
+	for _, chunk := range chunks {
+		rest := chunk
+		for {
+			var block *pem.Block
+			block, rest = pem.Decode(rest)
+			if block == nil {
+				break
+			}
+			if block.Type != "CERTIFICATE" {
+				continue
+			}
+			key := string(block.Bytes)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, pem.EncodeToMemory(block)...)
+		}
+	}
+	return out
 }
 
 // fetchCertFromURL dials the given HTTPS endpoint and returns its leaf
-// certificate PEM-encoded. Used for insecureSkipVerify lab setups when
-// no ca.crt is provided in the provider secret.
+// certificate PEM-encoded.
 func (r *Builder) fetchCertFromURL(rawURL string, secret *core.Secret) ([]byte, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
@@ -183,13 +267,9 @@ func (r *Builder) fetchCertFromURL(rawURL string, secret *core.Secret) ([]byte, 
 		parsedURL.Scheme = "https"
 	}
 
-	tlsSecret := secret
-	if providerbase.GetInsecureSkipVerifyFlag(secret) {
-		tlsSecret = &core.Secret{
-			Data: map[string][]byte{"insecureSkipVerify": []byte("true")},
-		}
-	}
-	cert, err := libutil.GetTlsCertificate(parsedURL, tlsSecret)
+	cert, err := libutil.GetTlsCertificate(parsedURL, &core.Secret{
+		Data: map[string][]byte{"insecureSkipVerify": []byte("true")},
+	})
 	if err != nil {
 		return nil, liberr.Wrap(err, "failed to fetch certificate from import URL", "url", rawURL)
 	}

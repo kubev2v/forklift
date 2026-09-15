@@ -74,7 +74,7 @@ func TestFetchCertFromURL(t *testing.T) {
 	}
 }
 
-func TestImportCertURL_PrismElement(t *testing.T) {
+func TestImportCertURLs_PrismElement(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/api/nutanix/v3/clusters/list":
@@ -96,12 +96,79 @@ func TestImportCertURL_PrismElement(t *testing.T) {
 	}
 	vm := &model.VM{VM1: model.VM1{Disks: []model.Disk{{UUID: "disk-1"}}}}
 
-	got, err := builder.importCertURL(client, ref.Ref{ID: "vm-1"}, vm)
+	got, err := builder.importCertURLs(client, ref.Ref{ID: "vm-1"}, vm)
 	if err != nil {
-		t.Fatalf("importCertURL: %v", err)
+		t.Fatalf("importCertURLs: %v", err)
 	}
-	if got != server.URL {
-		t.Fatalf("expected %q, got %q", server.URL, got)
+	if len(got) != 1 || got[0] != server.URL {
+		t.Fatalf("expected single URL %q, got %v", server.URL, got)
+	}
+}
+
+func TestMergePEMCertificatesDedupes(t *testing.T) {
+	pemBlock := []byte("-----BEGIN CERTIFICATE-----\nYQ==\n-----END CERTIFICATE-----\n")
+	merged := mergePEMCertificates(pemBlock, pemBlock, append(pemBlock, pemBlock...))
+	if bytes.Count(merged, []byte("BEGIN CERTIFICATE")) != 1 {
+		t.Fatalf("expected one certificate in merged bundle, got %q", merged)
+	}
+}
+
+func TestBuildImportCertBundleSecureUsesProviderCAOnly(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	t.Cleanup(server.Close)
+
+	providerCA := []byte("-----BEGIN CERTIFICATE-----\nprovider\n-----END CERTIFICATE-----\n")
+	secret := &core.Secret{
+		Data: map[string][]byte{
+			"ca.crt": providerCA,
+		},
+	}
+	builder := &Builder{}
+	bundle := builder.buildImportCertBundle(secret, []string{server.URL})
+	if !bytes.Equal(bundle, providerCA) {
+		t.Fatalf("expected provider ca.crt only, got %q", bundle)
+	}
+}
+
+func TestBuildImportCertBundleMergesProviderAndFetch(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	t.Cleanup(server.Close)
+
+	providerCA := []byte("-----BEGIN CERTIFICATE-----\nprovider\n-----END CERTIFICATE-----\n")
+	secret := &core.Secret{
+		Data: map[string][]byte{
+			"ca.crt":             providerCA,
+			"insecureSkipVerify": []byte("true"),
+		},
+	}
+	builder := &Builder{}
+	bundle := builder.buildImportCertBundle(secret, []string{server.URL})
+	if !bytes.Contains(bundle, []byte("provider")) {
+		t.Fatal("expected provider ca.crt in bundle")
+	}
+	if !bytes.Contains(bundle, []byte("BEGIN CERTIFICATE")) {
+		t.Fatalf("expected fetched leaf in bundle, got %q", bundle)
+	}
+	if bytes.Count(bundle, []byte("BEGIN CERTIFICATE")) < 2 {
+		t.Fatalf("expected at least two certificates, got %q", bundle)
+	}
+}
+
+func TestAppendUniqueImportCertURLByHost(t *testing.T) {
+	seen := map[string]struct{}{}
+	var urls []string
+	var err error
+	urls, err = appendUniqueImportCertURL(urls, seen, "https://10.0.0.1:9440")
+	if err != nil || len(urls) != 1 {
+		t.Fatalf("first URL: urls=%v err=%v", urls, err)
+	}
+	urls, err = appendUniqueImportCertURL(urls, seen, "https://10.0.0.1:9440/entity_download/foo")
+	if err != nil || len(urls) != 1 {
+		t.Fatalf("same host different path should dedupe: urls=%v err=%v", urls, err)
+	}
+	urls, err = appendUniqueImportCertURL(urls, seen, "https://10.0.0.2:9440")
+	if err != nil || len(urls) != 2 {
+		t.Fatalf("second host: urls=%v err=%v", urls, err)
 	}
 }
 
