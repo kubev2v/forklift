@@ -19,8 +19,11 @@ profile forklift-virt-v2v-unshare flags=(attach_disconnected,mediate_deleted) {
   mount fstype=tmpfs -> /tmp/,
   pivot_root,
 
-  # Only mediated where kernel.apparmor_restrict_unprivileged_userns=1, Ubuntu
-  # among them; harmless elsewhere.
+  # Allows creating user namespaces where AppArmor mediates them
+  # (kernel.apparmor_restrict_unprivileged_userns=1; Ubuntu 24.04 among them).
+  # This rule is AppArmor 4.0 syntax: parsers below 4.0 reject it, and the
+  # profile installer strips it for them — safe, because their systems do not
+  # mediate user namespaces.
   userns,
 
   deny @{PROC}/* w,

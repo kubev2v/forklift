@@ -60,6 +60,11 @@ unconditionally rather than only under `CAP_SYS_ADMIN`.
 `hack/seccomp/apparmor-unshare.profile` is the runtime's default AppArmor
 profile with the mounts that `passt` performs permitted.
 
+The installer adapts the AppArmor profile to the node's parser: the `userns`
+rule is AppArmor 4.0 syntax, and `apparmor_parser` releases below 4.0 reject
+it, so it is stripped before loading there — safe, because the systems those
+parsers ship on do not mediate user namespaces.
+
 ### 2. Point the controller at them
 
 Set the fields on the `ForkliftController` CR. Mistakes are rejected as the
