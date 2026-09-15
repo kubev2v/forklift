@@ -1508,6 +1508,9 @@ func (r *Reconciler) setForkliftNotInstalled(provider *api.Provider) {
 // setAuthFailureConditions sets ConnectionAuthFailed on the provider.
 // For HyperV, it also sets ConnectionAuthRetry because a 401 may indicate
 // disabled WinRM Basic auth rather than wrong credentials.
+// For vSphere, it also sets ConnectionAuthRetry for a several-minute
+// retry window, in case VMware services are just starting up - this can be
+// indistinguishable from sending bad credentials.
 func setAuthFailureConditions(provider *api.Provider, connErr error) {
 	provider.Status.Phase = ConnectionFailed
 	provider.Status.SetCondition(
@@ -1528,6 +1531,21 @@ func setAuthFailureConditions(provider *api.Provider, connErr error) {
 				Reason:   Tested,
 				Category: Advisory,
 				Message:  "HyperV auth failure may be a host-side WinRM configuration issue, periodic retry enabled.",
+			})
+	}
+	if provider.Type() == api.VSphere {
+		condition := provider.Status.FindCondition(ConnectionAuthFailed)
+		if condition != nil && time.Since(condition.LastTransitionTime.Time) > AuthRetryWindow {
+			log.Info("vSphere authentication failure exceeded retry window, no further retries to prevent account lockout")
+			return
+		}
+		provider.Status.SetCondition(
+			libcnd.Condition{
+				Type:     ConnectionAuthRetry,
+				Status:   True,
+				Reason:   Tested,
+				Category: Advisory,
+				Message:  "vSphere authentication failure may be due to service startup, periodic retry enabled",
 			})
 	}
 }
