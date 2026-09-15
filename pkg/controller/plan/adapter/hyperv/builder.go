@@ -126,7 +126,9 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	r.mapFirmware(vm, object)
 	r.mapInput(object)
 	r.mapTpm(vm, object)
-	r.mapNetworks(vm, object)
+	if err := r.mapNetworks(vm, object); err != nil {
+		return err
+	}
 	r.mapCPU(vmRef, vm, object, usesInstanceType)
 	r.mapMemory(vm, object, usesInstanceType)
 
@@ -222,13 +224,16 @@ func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 	}
 }
 
-func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) error {
 	var kNetworks []cnv.Network
 	var kInterfaces []cnv.Interface
 
 	numNetworks := 0
 	pool := planbase.NewNADPool()
-	nicKeys, pairsBySource := r.buildNICResolver(vm.NICs)
+	nicKeys, pairsBySource, err := r.buildNICResolver(vm.NICs)
+	if err != nil {
+		return err
+	}
 
 	for i, nic := range vm.NICs {
 		pair, allocated := planbase.AllocateNetwork(pool, pairsBySource[nicKeys[i]])
@@ -270,9 +275,10 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) {
 
 	object.Template.Spec.Networks = kNetworks
 	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
+	return nil
 }
 
-func (r *Builder) buildNICResolver(nics []hyperv.NIC) ([]string, map[string][]api.NetworkPair) {
+func (r *Builder) buildNICResolver(nics []hyperv.NIC) ([]string, map[string][]api.NetworkPair, error) {
 	networkCount := nicNetworkCount(nics)
 
 	pairsBySource := map[string][]api.NetworkPair{}
@@ -281,7 +287,7 @@ func (r *Builder) buildNICResolver(nics []hyperv.NIC) ([]string, map[string][]ap
 		for _, pair := range r.Map.Network.Spec.Map {
 			network := &model.Network{}
 			if err := r.Source.Inventory.Find(network, pair.Source.Ref); err != nil {
-				continue
+				return nil, nil, liberr.Wrap(err, "buildNICResolver, source", pair.Source.String())
 			}
 			key := buildPairKey(network.ID, pair.Source.Vlan, networkCount)
 			pairsBySource[key] = append(pairsBySource[key], pair)
@@ -291,7 +297,7 @@ func (r *Builder) buildNICResolver(nics []hyperv.NIC) ([]string, map[string][]ap
 		}
 	}
 
-	return buildNICKeys(nics, networkCount, vlanQualifiedNetworks), pairsBySource
+	return buildNICKeys(nics, networkCount, vlanQualifiedNetworks), pairsBySource, nil
 }
 
 // nicNetworkCount returns a map of network ID → number of NICs attached to it.
@@ -560,12 +566,6 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 	return pvc.Name
 }
 
-func nicRefsFromVM(vm *model.VM) []planbase.NICRef {
-	return planbase.NICRefsFrom(vm.NICs, func(n hyperv.NIC) planbase.NICRef {
-		return planbase.NICRef{MAC: n.MAC, NetworkID: n.Network.ID}
-	})
-}
-
 func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
@@ -587,11 +587,21 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		core.EnvVar{Name: "V2V_diskPath", Value: strings.Join(diskPaths, ",")},
 	)
 
-	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
-	if planbase.HasPreserveMode(modeByMAC) {
+	nicKeys, pairsBySource, err := r.buildNICResolver(vm.NICs)
+	if err != nil {
+		return
+	}
+	macs := make([]string, len(vm.NICs))
+	for i, nic := range vm.NICs {
+		macs[i] = nic.MAC
+	}
+	modeByMAC := planbase.ResolveNICModes(planbase.NICRefsFromKeys(macs, nicKeys), pairsBySource, r.Plan.Spec.PreserveStaticIPs)
+	// A per-network "preserve" override applies even when the plan-level flag is false.
+	if r.Plan.Spec.PreserveStaticIPs || planbase.HasPreserveMode(modeByMAC) {
 		macsToIps := r.mapMacStaticIps(vm, modeByMAC)
 		if macsToIps != "" {
 			env = append(env,
+				core.EnvVar{Name: "V2V_preserveStaticIPs", Value: "true"},
 				core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps},
 			)
 		}

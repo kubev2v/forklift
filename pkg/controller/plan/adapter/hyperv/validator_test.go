@@ -15,8 +15,10 @@ import (
 // stubInventory returns pre-configured VMs and Hosts for testing.
 type stubInventory struct {
 	base.Client
-	vms   map[string]*hyperv.VM
-	hosts map[string]*hyperv.Host
+	vms            map[string]*hyperv.VM
+	hosts          map[string]*hyperv.Host
+	networks       map[string]hyperv.Network // keyed by ID
+	networksByName map[string]hyperv.Network // keyed by name; for name-based NetworkMap sources
 }
 
 func (s *stubInventory) Find(resource interface{}, r base.Ref) error {
@@ -33,6 +35,18 @@ func (s *stubInventory) Find(resource interface{}, r base.Ref) error {
 			return base.NotFoundError{Ref: r}
 		}
 		*res = *host
+	case *hyperv.Network:
+		if net, ok := s.networks[r.ID]; ok {
+			*res = net
+			return nil
+		}
+		if r.ID == "" {
+			if net, ok := s.networksByName[r.Name]; ok {
+				*res = net
+				return nil
+			}
+		}
+		return base.NotFoundError{Ref: r}
 	}
 	return nil
 }

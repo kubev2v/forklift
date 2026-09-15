@@ -210,18 +210,22 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		vm.RemoveSharedDisks()
 	}
 	r.removeExcludedDisks(vm)
+	nicKeys, pairsBySource, err := r.buildNICResolver(vm.NICs)
+	if err != nil {
+		return
+	}
+	macs := make([]string, len(vm.NICs))
+	for i, nic := range vm.NICs {
+		macs[i] = nic.MAC
+	}
 	macsToIps := ""
-	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
-	if planbase.HasPreserveMode(modeByMAC) {
+	modeByMAC := planbase.ResolveNICModes(planbase.NICRefsFromKeys(macs, nicKeys), pairsBySource, r.Plan.Spec.PreserveStaticIPs)
+	// A per-network "preserve" override applies even when the plan-level flag is false.
+	if r.Plan.Spec.PreserveStaticIPs || planbase.HasPreserveMode(modeByMAC) {
 		macsToIps, err = r.mapMacStaticIps(vm, modeByMAC)
 		if err != nil {
 			return
 		}
-
-		env = append(env, core.EnvVar{
-			Name:  "V2V_preserveStaticIPs",
-			Value: "true",
-		})
 	}
 
 	useLegacyDrivers := false
@@ -303,10 +307,10 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		},
 	)
 	if macsToIps != "" {
-		env = append(env, core.EnvVar{
-			Name:  "V2V_staticIPs",
-			Value: macsToIps,
-		})
+		env = append(env,
+			core.EnvVar{Name: "V2V_preserveStaticIPs", Value: "true"},
+			core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps},
+		)
 	}
 	return
 }
@@ -417,12 +421,6 @@ func formatNetworkConfig(network vsphere.GuestNetwork, gateway string) string {
 	config := fmt.Sprintf("%s:ip:%s,%s,%d,%s",
 		network.MAC, network.IP, gateway, network.PrefixLength, dnsString)
 	return strings.TrimSuffix(config, ",")
-}
-
-func nicRefsFromVM(vm *model.VM) []planbase.NICRef {
-	return planbase.NICRefsFrom(vm.NICs, func(n vsphere.NIC) planbase.NICRef {
-		return planbase.NICRef{MAC: n.MAC, NetworkID: n.Network.ID}
-	})
 }
 
 func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) (ipMap string, err error) {
@@ -1002,15 +1000,17 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 
 func (r *Builder) buildNICResolver(nics []vsphere.NIC) ([]string, map[string][]api.NetworkPair, error) {
 	pairsBySource := map[string][]api.NetworkPair{}
-	for _, pair := range r.Map.Network.Spec.Map {
-		network := &model.Network{}
-		if err := r.Source.Inventory.Find(network, pair.Source.Ref); err != nil {
-			return nil, nil, liberr.Wrap(err, "buildNICResolver, source", pair.Source.String())
+	if r.Map.Network != nil {
+		for _, pair := range r.Map.Network.Spec.Map {
+			network := &model.Network{}
+			if err := r.Source.Inventory.Find(network, pair.Source.Ref); err != nil {
+				return nil, nil, liberr.Wrap(err, "buildNICResolver, source", pair.Source.String())
+			}
+			if network.Variant == vsphere.NetDvPortGroup || network.Variant == vsphere.OpaqueNetwork {
+				pairsBySource[network.Key] = append(pairsBySource[network.Key], pair)
+			}
+			pairsBySource[network.ID] = append(pairsBySource[network.ID], pair)
 		}
-		if network.Variant == vsphere.NetDvPortGroup || network.Variant == vsphere.OpaqueNetwork {
-			pairsBySource[network.Key] = append(pairsBySource[network.Key], pair)
-		}
-		pairsBySource[network.ID] = append(pairsBySource[network.ID], pair)
 	}
 	nicKeys := make([]string, len(nics))
 	for i, nic := range nics {
