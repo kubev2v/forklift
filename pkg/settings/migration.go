@@ -46,6 +46,7 @@ const (
 	VirtV2vContainerLimitsMemory           = "VIRT_V2V_CONTAINER_LIMITS_MEMORY"
 	VirtV2vContainerRequestsCpu            = "VIRT_V2V_CONTAINER_REQUESTS_CPU"
 	VirtV2vContainerRequestsMemory         = "VIRT_V2V_CONTAINER_REQUESTS_MEMORY"
+	VirtV2vSeccompProfile                  = "VIRT_V2V_SECCOMP_PROFILE"
 	HooksContainerLimitsCpu                = "HOOKS_CONTAINER_LIMITS_CPU"
 	HooksContainerLimitsMemory             = "HOOKS_CONTAINER_LIMITS_MEMORY"
 	HooksContainerRequestsCpu              = "HOOKS_CONTAINER_REQUESTS_CPU"
@@ -149,14 +150,18 @@ type Migration struct {
 	VirtV2vContainerLimitsMemory   string
 	VirtV2vContainerRequestsCpu    string
 	VirtV2vContainerRequestsMemory string
-	HooksContainerLimitsCpu        string
-	HooksContainerLimitsMemory     string
-	HooksContainerRequestsCpu      string
-	HooksContainerRequestsMemory   string
-	OvaContainerLimitsCpu          string
-	OvaContainerLimitsMemory       string
-	OvaContainerRequestsCpu        string
-	OvaContainerRequestsMemory     string
+	// Seccomp profile for the virt-v2v conversion pod. When set, the pod uses a
+	// Localhost profile of this name, resolved by the kubelet under its seccomp
+	// profile root. Empty keeps the built-in behaviour.
+	VirtV2vSeccompProfile        string
+	HooksContainerLimitsCpu      string
+	HooksContainerLimitsMemory   string
+	HooksContainerRequestsCpu    string
+	HooksContainerRequestsMemory string
+	OvaContainerLimitsCpu        string
+	OvaContainerLimitsMemory     string
+	OvaContainerRequestsCpu      string
+	OvaContainerRequestsMemory   string
 	// VDDK image for guest conversion
 	VddkImage string
 	// TlsConnectionTimeout is the timeout for TLS connections in seconds
@@ -340,6 +345,9 @@ func (r *Migration) Load() (err error) {
 		r.VirtV2vContainerRequestsMemory = val
 	} else {
 		r.VirtV2vContainerRequestsMemory = "1Gi"
+	}
+	if val, found := os.LookupEnv(VirtV2vSeccompProfile); found {
+		r.VirtV2vSeccompProfile = val
 	}
 	if val, found := os.LookupEnv(HooksContainerLimitsCpu); found {
 		r.HooksContainerLimitsCpu = val
