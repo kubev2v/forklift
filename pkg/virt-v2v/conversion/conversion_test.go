@@ -706,6 +706,49 @@ var _ = Describe("Conversion", func() {
 			err := conversion.addVirtV2vArgs(mockCommandBuilder)
 			Expect(err).ToNot(HaveOccurred())
 		})
+
+		It("places inline customize args before vSphere guest name", func() {
+			plugin, err := os.CreateTemp("", "nbdkit-nfc-plugin-*.so")
+			Expect(err).ToNot(HaveOccurred())
+			defer func() { _ = os.Remove(plugin.Name()) }()
+			Expect(plugin.Close()).To(Succeed())
+
+			appConfig.Source = config.VSPHERE
+			appConfig.Workdir = "/var/tmp/v2v"
+			appConfig.NewVmName = "new-vm"
+			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
+			appConfig.SecretKey = "/etc/secret/secretKey"
+			appConfig.HostName = "vcenter.example.com"
+			appConfig.VmName = "test-vm"
+			appConfig.Fingerprint = "AA:BB:CC"
+			appConfig.NfcPluginPath = plugin.Name()
+
+			builder := &utils.CommandBuilderImpl{}
+			builder.New("virt-v2v")
+			err = conversion.addVirtV2vArgsExceptGuest(builder)
+			Expect(err).ToNot(HaveOccurred())
+			builder.AddArg("--run", "/var/tmp/v2v/scripts/rhel/run/network_config_util.sh")
+			err = conversion.addVirtV2vGuestArgs(builder)
+			Expect(err).ToNot(HaveOccurred())
+
+			args := builder.Args
+			runIdx := -1
+			guestSepIdx := -1
+			vmIdx := -1
+			for i, arg := range args {
+				switch arg {
+				case "--run":
+					runIdx = i
+				case "--":
+					guestSepIdx = i
+				case "test-vm":
+					vmIdx = i
+				}
+			}
+			Expect(runIdx).To(BeNumerically(">=", 0))
+			Expect(guestSepIdx).To(BeNumerically(">", runIdx))
+			Expect(vmIdx).To(Equal(guestSepIdx + 1))
+		})
 	})
 
 	Describe("addCommonArgs with LUKS files", func() {
@@ -1189,7 +1232,6 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
@@ -1210,7 +1252,6 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			// Note: NO AddExtraArgs expectation - this is the critical test
 			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
@@ -1231,7 +1272,6 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "/dev/sdb").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
@@ -1251,7 +1291,6 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--mac", "00:11:22:33:44:55:ip:192.168.1.100").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
@@ -1273,7 +1312,6 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 
 			mockFileSystem.EXPECT().Stat(luksDir).Return(nil, nil)
@@ -1294,7 +1332,6 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArgs("--key", "all:clevis").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
@@ -1315,7 +1352,6 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
@@ -1339,7 +1375,6 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-it", "nfc").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-io", "nfc-thumbprint=AA:BB:CC").Return(mockCommandBuilder)

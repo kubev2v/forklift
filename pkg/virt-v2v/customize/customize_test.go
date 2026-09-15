@@ -112,7 +112,7 @@ var _ = Describe("Customize", func() {
 			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "run")).Return(runScripts, nil)
 			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "firstboot")).Return(firstBootScripts, nil)
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -139,7 +139,7 @@ var _ = Describe("Customize", func() {
 			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "run")).Return(runScripts, nil)
 			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "firstboot")).Return(firstBootScripts, nil)
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to execute domain customization"))
 		})
@@ -784,7 +784,7 @@ var _ = Describe("Customize", func() {
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 
-			err := customize.customizeWindows()
+			err := customize.runWindowsCustomize()
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -798,7 +798,7 @@ var _ = Describe("Customize", func() {
 			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
 
-			err := customize.customizeWindows()
+			err := customize.runWindowsCustomize()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to read scripts directory"))
 		})
@@ -827,7 +827,7 @@ var _ = Describe("Customize", func() {
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 
-			err := customize.customizeWindows()
+			err := customize.runWindowsCustomize()
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -931,7 +931,7 @@ var _ = Describe("Customize", func() {
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -947,7 +947,7 @@ var _ = Describe("Customize", func() {
 			expectedContent := "00:11:22:33:44:55:ip:192.168.1.100\n"
 			mockFileSystem.EXPECT().WriteFile(expectedPath, []byte(expectedContent), fs.FileMode(0755)).Return(errors.New("write error"))
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to write MAC to IP mapping file"))
 		})
@@ -993,7 +993,7 @@ var _ = Describe("Customize", func() {
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -1008,7 +1008,7 @@ var _ = Describe("Customize", func() {
 			mockFileSystem.EXPECT().Stat(appConfig.DynamicScriptsDir).Return(nil, nil)
 			mockFileSystem.EXPECT().ReadDir(appConfig.DynamicScriptsDir).Return(nil, errors.New("read error"))
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to read scripts directory"))
 		})
@@ -1054,7 +1054,7 @@ var _ = Describe("Customize", func() {
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})

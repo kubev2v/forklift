@@ -45,6 +45,28 @@ var _ = Describe("XML Reader", func() {
 			Expect(result.OS.Arch).To(Equal("x86_64"))
 		})
 
+		It("parses virt-inspector operatingsystems XML", func() {
+			xmlContent := `<?xml version="1.0" encoding="UTF-8"?>
+<operatingsystems>
+  <operatingsystem>
+    <name>Red Hat Enterprise Linux</name>
+    <distro>rhel</distro>
+    <osinfo>rhel8.6</osinfo>
+    <arch>x86_64</arch>
+  </operatingsystem>
+</operatingsystems>`
+			xmlPath := filepath.Join(tempDir, "inspector.xml")
+			err := os.WriteFile(xmlPath, []byte(xmlContent), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			result, err := GetInspectionV2vFromFile(xmlPath)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.OS.Name).To(Equal("Red Hat Enterprise Linux"))
+			Expect(result.OS.Distro).To(Equal("rhel"))
+			Expect(result.OS.Osinfo).To(Equal("rhel8.6"))
+			Expect(result.OS.Arch).To(Equal("x86_64"))
+		})
+
 		It("parses Windows OS info correctly", func() {
 			xmlContent := `<?xml version="1.0" encoding="UTF-8"?>
 <v2v>

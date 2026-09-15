@@ -112,24 +112,20 @@ func NewCustomize(cfg *config.AppConfig, disks []string, operatingSystem utils.I
 
 func (c *Customize) Run() (err error) {
 	fmt.Printf("Customizing disks '%s'\n", c.disks)
-	// Customization for vSphere source.
-	err = c.embeddedFileSystem.CreateFilesFromFS(c.appConfig.Workdir)
-	if err != nil {
+	if err = c.Prepare(); err != nil {
 		return fmt.Errorf("failed to create files from filesystem: %w", err)
 	}
 
-	// windows
 	if c.operatingSystem.IsWindows() {
-		err = c.customizeWindows()
+		err = c.runWindowsCustomize()
 		if err != nil {
 			fmt.Println("Error customizing disk image:", err)
 			return err
 		}
 	}
 
-	// Linux
 	if !c.operatingSystem.IsWindows() {
-		err = c.customizeLinux()
+		err = c.runLinuxCustomize()
 		if err != nil {
 			fmt.Println("Error customizing disk image:", err)
 			return err
@@ -148,15 +144,23 @@ func (c *Customize) Run() (err error) {
 //
 // Returns:
 //   - error: An error if something goes wrong during the process, or nil if successful.
-func (c *Customize) customizeWindows() (err error) {
+func (c *Customize) runWindowsCustomize() error {
 	cmdBuilder := c.commandBuilder.New("virt-customize")
 	cmdBuilder.AddFlag("--verbose")
 	cmdBuilder.AddArg("--format", "raw")
 
-	if _, err = c.fileSystem.Stat(c.appConfig.DynamicScriptsDir); !os.IsNotExist(err) {
+	if err := c.appendWindowsCustomizeArgs(cmdBuilder); err != nil {
+		return fmt.Errorf("failed to append Windows virt-customize args: %w", err)
+	}
+
+	c.addDisksToCustomize(cmdBuilder)
+	return c.runCmd(cmdBuilder)
+}
+
+func (c *Customize) appendWindowsCustomizeArgs(cmdBuilder utils.CommandBuilder) error {
+	if _, err := c.fileSystem.Stat(c.appConfig.DynamicScriptsDir); !os.IsNotExist(err) {
 		fmt.Println("Adding windows dynamic scripts")
-		err = c.addWinDynamicScripts(cmdBuilder, c.appConfig.DynamicScriptsDir)
-		if err != nil {
+		if err := c.addWinDynamicScripts(cmdBuilder, c.appConfig.DynamicScriptsDir); err != nil {
 			return err
 		}
 	}
@@ -166,17 +170,7 @@ func (c *Customize) customizeWindows() (err error) {
 		c.addVsphereVmwareDriverRemoval(cmdBuilder)
 	}
 
-	if err = c.addWinFirstbootScripts(cmdBuilder); err != nil {
-		return err
-	}
-
-	c.addDisksToCustomize(cmdBuilder)
-
-	err = c.runCmd(cmdBuilder)
-	if err != nil {
-		return err
-	}
-	return nil
+	return c.addWinFirstbootScripts(cmdBuilder)
 }
 
 // addDisksToCustomize appends disk arguments to extraArgs
@@ -413,17 +407,33 @@ func (c *Customize) getScriptsWithRegex(directory string, regex string) ([]Scrip
 	return scripts, nil
 }
 
-func (c *Customize) customizeLinux() (err error) {
+func (c *Customize) runLinuxCustomize() error {
 	cmdBuilder := c.commandBuilder.New("virt-customize")
 	cmdBuilder.AddFlag("--verbose")
 	cmdBuilder.AddArg("--format", "raw")
 
-	// Step 2: Handle static IP configuration
+	if err := c.appendLinuxCustomizeArgs(cmdBuilder); err != nil {
+		return fmt.Errorf("failed to append Linux virt-customize args: %w", err)
+	}
+
+	c.addDisksToCustomize(cmdBuilder)
+
+	if err := c.addLuksKeysToCustomize(cmdBuilder); err != nil {
+		return err
+	}
+
+	if err := c.runCmd(cmdBuilder); err != nil {
+		return fmt.Errorf("failed to execute domain customization: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Customize) appendLinuxCustomizeArgs(cmdBuilder utils.CommandBuilder) error {
 	if err := c.handleStaticIPConfiguration(cmdBuilder); err != nil {
 		return err
 	}
 
-	// Step 3: Add dynamic scripts from the configmap
 	if _, err := c.fileSystem.Stat(c.appConfig.DynamicScriptsDir); !os.IsNotExist(err) {
 		fmt.Println("Adding linux dynamic scripts")
 		if err = c.addRhelDynamicScripts(cmdBuilder, c.appConfig.DynamicScriptsDir); err != nil {
@@ -431,28 +441,10 @@ func (c *Customize) customizeLinux() (err error) {
 		}
 	}
 
-	// Step 4: Add scripts from embedded FS
 	if err := c.addRhelRunScripts(cmdBuilder); err != nil {
 		return err
 	}
-	if err := c.addRhelFirstbootScripts(cmdBuilder); err != nil {
-		return err
-	}
-
-	// Step 5: Add the disks to customize
-	c.addDisksToCustomize(cmdBuilder)
-
-	// Step 6: Adds LUKS keys, if they exist
-	if err := c.addLuksKeysToCustomize(cmdBuilder); err != nil {
-		return err
-	}
-
-	// Step 7: Execute the customization with the collected arguments
-	if err := c.runCmd(cmdBuilder); err != nil {
-		return fmt.Errorf("failed to execute domain customization: %w", err)
-	}
-
-	return nil
+	return c.addRhelFirstbootScripts(cmdBuilder)
 }
 
 // handleStaticIPConfiguration processes the static IP configuration and returns the initial extraArgs
