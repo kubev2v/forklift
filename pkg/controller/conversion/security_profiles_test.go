@@ -10,6 +10,22 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// assertLocalhostProfile checks a localhost profile pointer against the
+// expected value, where "" expects the field to be absent.
+func assertLocalhostProfile(t *testing.T, got *string, want string) {
+	t.Helper()
+	switch {
+	case want == "":
+		if got != nil {
+			t.Errorf("localhost profile = %q, want nil", *got)
+		}
+	case got == nil:
+		t.Errorf("localhost profile = nil, want %q", want)
+	case *got != want:
+		t.Errorf("localhost profile = %q, want %q", *got, want)
+	}
+}
+
 // Pins what the override must not break: OpenShift keeps the profile it had,
 // and a silent cluster keeps the runtime default rather than a profile its
 // nodes may not carry.
@@ -78,16 +94,7 @@ func TestVirtV2vSeccompProfile(t *testing.T) {
 			if got.Type != tt.wantType {
 				t.Errorf("type = %q, want %q", got.Type, tt.wantType)
 			}
-			switch {
-			case tt.wantPath == "":
-				if got.LocalhostProfile != nil {
-					t.Errorf("localhost profile = %q, want nil", *got.LocalhostProfile)
-				}
-			case got.LocalhostProfile == nil:
-				t.Errorf("localhost profile = nil, want %q", tt.wantPath)
-			case *got.LocalhostProfile != tt.wantPath:
-				t.Errorf("localhost profile = %q, want %q", *got.LocalhostProfile, tt.wantPath)
-			}
+			assertLocalhostProfile(t, got.LocalhostProfile, tt.wantPath)
 		})
 	}
 }
@@ -155,17 +162,37 @@ func TestVirtV2vAppArmorProfile(t *testing.T) {
 			if got.Type != tt.wantType {
 				t.Errorf("type = %q, want %q", got.Type, tt.wantType)
 			}
-			switch {
-			case tt.wantPath == "":
-				if got.LocalhostProfile != nil {
-					t.Errorf("localhost profile = %q, want nil", *got.LocalhostProfile)
-				}
-			case got.LocalhostProfile == nil:
-				t.Errorf("localhost profile = nil, want %q", tt.wantPath)
-			case *got.LocalhostProfile != tt.wantPath:
-				t.Errorf("localhost profile = %q, want %q", *got.LocalhostProfile, tt.wantPath)
-			}
+			assertLocalhostProfile(t, got.LocalhostProfile, tt.wantPath)
 		})
+	}
+}
+
+// assertPodSecurityProfiles fails unless the pod security context carries the
+// Localhost seccomp and AppArmor profiles the wiring test configured.
+func assertPodSecurityProfiles(t *testing.T, name string, sc *core.PodSecurityContext) {
+	t.Helper()
+	if sc == nil {
+		t.Fatalf("%s: pod security context is nil", name)
+	}
+	if sc.SeccompProfile == nil {
+		t.Fatalf("%s: seccomp profile is nil", name)
+	}
+	if sc.SeccompProfile.Type != core.SeccompProfileTypeLocalhost {
+		t.Errorf("%s: seccomp type = %q, want Localhost", name, sc.SeccompProfile.Type)
+	}
+	if sc.SeccompProfile.LocalhostProfile == nil ||
+		*sc.SeccompProfile.LocalhostProfile != "profiles/unshare.json" {
+		t.Errorf("%s: seccomp profile path not carried through", name)
+	}
+	if sc.AppArmorProfile == nil {
+		t.Fatalf("%s: apparmor profile is nil", name)
+	}
+	if sc.AppArmorProfile.Type != core.AppArmorProfileTypeLocalhost {
+		t.Errorf("%s: apparmor type = %q, want Localhost", name, sc.AppArmorProfile.Type)
+	}
+	if sc.AppArmorProfile.LocalhostProfile == nil ||
+		*sc.AppArmorProfile.LocalhostProfile != "forklift-virt-v2v-unshare" {
+		t.Errorf("%s: apparmor profile name not carried through", name)
 	}
 }
 
@@ -220,48 +247,21 @@ func TestVirtV2vPodSpecCarriesSecurityProfiles(t *testing.T) {
 	vm := &plan.VMStatus{}
 	secret := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "v2v-secret", Namespace: "vms"}}
 
-	assertProfiles := func(t *testing.T, name string, sc *core.PodSecurityContext) {
-		t.Helper()
-		if sc == nil {
-			t.Fatalf("%s: pod security context is nil", name)
-		}
-		if sc.SeccompProfile == nil {
-			t.Fatalf("%s: seccomp profile is nil", name)
-		}
-		if sc.SeccompProfile.Type != core.SeccompProfileTypeLocalhost {
-			t.Errorf("%s: seccomp type = %q, want Localhost", name, sc.SeccompProfile.Type)
-		}
-		if sc.SeccompProfile.LocalhostProfile == nil ||
-			*sc.SeccompProfile.LocalhostProfile != "profiles/unshare.json" {
-			t.Errorf("%s: seccomp profile path not carried through", name)
-		}
-		if sc.AppArmorProfile == nil {
-			t.Fatalf("%s: apparmor profile is nil", name)
-		}
-		if sc.AppArmorProfile.Type != core.AppArmorProfileTypeLocalhost {
-			t.Errorf("%s: apparmor type = %q, want Localhost", name, sc.AppArmorProfile.Type)
-		}
-		if sc.AppArmorProfile.LocalhostProfile == nil ||
-			*sc.AppArmorProfile.LocalhostProfile != "forklift-virt-v2v-unshare" {
-			t.Errorf("%s: apparmor profile name not carried through", name)
-		}
-	}
-
 	conversionPod, _, err := builder.GetVirtV2vPodSpec(vm, nil, nil, nil, secret, false)
 	if err != nil {
 		t.Fatalf("conversion pod spec: %v", err)
 	}
-	assertProfiles(t, "conversion", conversionPod.Spec.SecurityContext)
+	assertPodSecurityProfiles(t, "conversion", conversionPod.Spec.SecurityContext)
 
 	inspectionPod, err := builder.BuildVirtV2vInspectionPod(conversionPod, nil, vm)
 	if err != nil {
 		t.Fatalf("inspection pod spec: %v", err)
 	}
-	assertProfiles(t, "inspection", inspectionPod.Spec.SecurityContext)
+	assertPodSecurityProfiles(t, "inspection", inspectionPod.Spec.SecurityContext)
 
 	deepInspectionPod, err := builder.GetDeepInspectionPodSpec(nil, nil, nil, secret)
 	if err != nil {
 		t.Fatalf("deep inspection pod spec: %v", err)
 	}
-	assertProfiles(t, "deep inspection", deepInspectionPod.Spec.SecurityContext)
+	assertPodSecurityProfiles(t, "deep inspection", deepInspectionPod.Spec.SecurityContext)
 }
