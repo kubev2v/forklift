@@ -94,10 +94,10 @@ depends on the distribution rather than on Kubernetes:
 
 ```sh
 kubectl run unshare-probe --rm -it --restart=Never \
-  --image=registry.k8s.io/busybox:1.27.2 \
+  --image=docker.io/library/busybox:1.37.0 \
   --overrides='{"spec":{"securityContext":{"runAsUser":107,"runAsNonRoot":true,
     "seccompProfile":{"type":"Localhost","localhostProfile":"profiles/unshare.json"}},
-    "containers":[{"name":"probe","image":"registry.k8s.io/busybox:1.27.2",
+    "containers":[{"name":"probe","image":"docker.io/library/busybox:1.37.0",
     "command":["sh","-c","unshare -Urm true && echo SANDBOX_OK"],
     "securityContext":{"allowPrivilegeEscalation":false,
     "capabilities":{"drop":["ALL"]}}}]}}'

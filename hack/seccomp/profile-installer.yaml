@@ -29,7 +29,7 @@ spec:
         - operator: Exists
       initContainers:
         - name: install
-          image: registry.k8s.io/busybox:1.27.2
+          image: docker.io/library/busybox:1.37.0
           command:
             - sh
             - -c
