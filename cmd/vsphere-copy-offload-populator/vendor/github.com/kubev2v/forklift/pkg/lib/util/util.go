@@ -9,7 +9,6 @@ import (
 	"net"
 	liburl "net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -39,8 +38,8 @@ func dialTLSWithTimeout(host string, cfg *tls.Config, timeout time.Duration) (*t
 func extractServerName(address string) string {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
-		// If SplitHostPort fails (likely no port is present), fallback
-		return strings.Split(address, ":")[0]
+		// If SplitHostPort fails (likely no port is present), assume the entire address is the host.
+		return address
 	}
 	return host
 }
