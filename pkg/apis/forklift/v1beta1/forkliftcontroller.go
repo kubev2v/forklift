@@ -746,6 +746,7 @@ type ForkliftControllerSpec struct {
 	VirtV2VSeccompProfileType string `json:"virt_v2v_seccomp_profile_type,omitempty"`
 	// Seccomp profile path relative to the kubelet seccomp root, used only with the Localhost type. Optional. Defaults to profiles/unshare.json.
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="!self.startsWith('/') && !self.matches('(^|/)[.][.](/|$)')",message="must be a relative path below the kubelet seccomp root"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	VirtV2VSeccompProfilePath string `json:"virt_v2v_seccomp_profile_path,omitempty"`
 	// AppArmor profile type for the virt-v2v pods. Optional. Leave empty to leave the pod spec untouched. Needed on nodes whose default AppArmor profile denies the mounts the libguestfs appliance sandbox performs.
