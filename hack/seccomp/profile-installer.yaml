@@ -25,6 +25,9 @@ spec:
         app: forklift
         service: forklift-virt-v2v-profile-installer
     spec:
+      # The installer only touches the node filesystem; it never talks to the
+      # API server.
+      automountServiceAccountToken: false
       tolerations:
         - operator: Exists
       initContainers:
@@ -67,6 +70,12 @@ spec:
                 echo "no apparmor_parser on this node, skipping AppArmor"
               fi
           securityContext:
+            # Deliberate: loading an AppArmor profile writes into securityfs,
+            # which the runtime's default AppArmor profile denies. Narrowing to
+            # CAP_MAC_ADMIN would also require lifting the container's own
+            # AppArmor confinement, a pod field that only exists on Kubernetes
+            # 1.30+. privileged works uniformly, and this DaemonSet is opt-in:
+            # nothing in the default install applies it.
             privileged: true
             runAsUser: 0
           volumeMounts:
@@ -83,6 +92,10 @@ spec:
             requests:
               cpu: 1m
               memory: 8Mi
+              ephemeral-storage: 8Mi
+            limits:
+              memory: 8Mi
+              ephemeral-storage: 8Mi
       volumes:
         - name: profiles
           configMap:
