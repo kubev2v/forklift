@@ -43,6 +43,21 @@ spec:
               # AppArmor is optional: nodes that do not enforce it have no
               # apparmor_parser and need only the seccomp profile.
               if [ -x /host-usr-sbin/apparmor_parser ]; then
+                # The userns rule is AppArmor 4.0 syntax. Parsers below 4.0
+                # reject it, and the systems they ship on do not mediate user
+                # namespaces, so the rule is stripped for them.
+                PARSER_MAJOR="$(chroot /host /usr/sbin/apparmor_parser --version \
+                  | sed -n 's/^AppArmor parser version \([0-9]*\).*/\1/p')"
+                if [ -z "$PARSER_MAJOR" ]; then
+                  echo "STOP: could not read the apparmor_parser major version"
+                  exit 1
+                fi
+                if [ "$PARSER_MAJOR" -lt 4 ]; then
+                  echo "apparmor_parser ${PARSER_MAJOR}.x predates userns mediation;" \
+                    "installing the profile without the userns rule"
+                  sed '/^[[:space:]]*userns,/d' /profiles/apparmor-unshare.profile \
+                    > /host-seccomp/profiles/apparmor-unshare.profile
+                fi
                 chroot /host /usr/sbin/apparmor_parser -r -W \
                   /var/lib/kubelet/seccomp/profiles/apparmor-unshare.profile
                 echo "loaded AppArmor profile"
