@@ -169,8 +169,9 @@ func TestVirtV2vAppArmorProfile(t *testing.T) {
 	}
 }
 
-// Guards the wiring, not the resolution: profiles can be computed correctly and
-// still never reach either pod spec.
+// Guards the wiring, not the resolution: profiles can be computed correctly
+// and still never reach the pod specs — the conversion pod, the inspection
+// pod derived from it, and the independently built deep-inspection pod.
 func TestVirtV2vPodSpecCarriesSecurityProfiles(t *testing.T) {
 	origOpenShift := settings.Settings.OpenShift
 	origSeccompType := settings.Settings.Migration.VirtV2vSeccompProfileType
@@ -213,6 +214,8 @@ func TestVirtV2vPodSpecCarriesSecurityProfiles(t *testing.T) {
 		TargetNamespace: "vms",
 		Image:           "quay.io/kubev2v/forklift-virt-v2v:latest",
 		GenerateName:    "probe-",
+		// The deep-inspection builder refuses to run without a VDDK image.
+		VDDKImage: "quay.io/kubev2v/vddk:latest",
 	}}
 	vm := &plan.VMStatus{}
 	secret := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "v2v-secret", Namespace: "vms"}}
@@ -255,4 +258,10 @@ func TestVirtV2vPodSpecCarriesSecurityProfiles(t *testing.T) {
 		t.Fatalf("inspection pod spec: %v", err)
 	}
 	assertProfiles(t, "inspection", inspectionPod.Spec.SecurityContext)
+
+	deepInspectionPod, err := builder.GetDeepInspectionPodSpec(nil, nil, nil, secret)
+	if err != nil {
+		t.Fatalf("deep inspection pod spec: %v", err)
+	}
+	assertProfiles(t, "deep inspection", deepInspectionPod.Spec.SecurityContext)
 }

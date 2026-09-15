@@ -82,6 +82,11 @@ kubectl -n konveyor-forklift patch forkliftcontroller forklift-controller \
 Nodes that do not enforce AppArmor need only the seccomp pair; leave the
 AppArmor settings unset there.
 
+The pod-level `appArmorProfile` field requires Kubernetes 1.30 or newer. On
+older clusters the AppArmor settings cannot take effect — the API server
+drops the field — so nodes whose AppArmor denies the sandbox keep failing
+conversion there.
+
 On a deployment without the operator, set the `VIRT_V2V_*` environment
 variables from the table above on the controller Deployment instead. That
 path has no admission check: a path without its type stops the controller
