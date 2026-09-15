@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -46,6 +49,10 @@ const (
 	VirtV2vContainerLimitsMemory           = "VIRT_V2V_CONTAINER_LIMITS_MEMORY"
 	VirtV2vContainerRequestsCpu            = "VIRT_V2V_CONTAINER_REQUESTS_CPU"
 	VirtV2vContainerRequestsMemory         = "VIRT_V2V_CONTAINER_REQUESTS_MEMORY"
+	VirtV2vSeccompProfileType              = "VIRT_V2V_SECCOMP_PROFILE_TYPE"
+	VirtV2vSeccompProfilePath              = "VIRT_V2V_SECCOMP_PROFILE_PATH"
+	VirtV2vAppArmorProfileType             = "VIRT_V2V_APPARMOR_PROFILE_TYPE"
+	VirtV2vAppArmorProfilePath             = "VIRT_V2V_APPARMOR_PROFILE_PATH"
 	HooksContainerLimitsCpu                = "HOOKS_CONTAINER_LIMITS_CPU"
 	HooksContainerLimitsMemory             = "HOOKS_CONTAINER_LIMITS_MEMORY"
 	HooksContainerRequestsCpu              = "HOOKS_CONTAINER_REQUESTS_CPU"
@@ -149,14 +156,22 @@ type Migration struct {
 	VirtV2vContainerLimitsMemory   string
 	VirtV2vContainerRequestsCpu    string
 	VirtV2vContainerRequestsMemory string
-	HooksContainerLimitsCpu        string
-	HooksContainerLimitsMemory     string
-	HooksContainerRequestsCpu      string
-	HooksContainerRequestsMemory   string
-	OvaContainerLimitsCpu          string
-	OvaContainerLimitsMemory       string
-	OvaContainerRequestsCpu        string
-	OvaContainerRequestsMemory     string
+	// Empty means the platform default; see virtV2vSeccompProfile.
+	VirtV2vSeccompProfileType string
+	// Relative to the kubelet seccomp root. Localhost only.
+	VirtV2vSeccompProfilePath string
+	// Empty leaves the pod's AppArmor field unset.
+	VirtV2vAppArmorProfileType string
+	// Names a profile already loaded on the node. Localhost only.
+	VirtV2vAppArmorProfilePath   string
+	HooksContainerLimitsCpu      string
+	HooksContainerLimitsMemory   string
+	HooksContainerRequestsCpu    string
+	HooksContainerRequestsMemory string
+	OvaContainerLimitsCpu        string
+	OvaContainerLimitsMemory     string
+	OvaContainerRequestsCpu      string
+	OvaContainerRequestsMemory   string
 	// VDDK image for guest conversion
 	VddkImage string
 	// TlsConnectionTimeout is the timeout for TLS connections in seconds
@@ -341,6 +356,9 @@ func (r *Migration) Load() (err error) {
 	} else {
 		r.VirtV2vContainerRequestsMemory = "1Gi"
 	}
+	if err = r.loadVirtV2vSecurityProfiles(); err != nil {
+		return liberr.Wrap(err)
+	}
 	if val, found := os.LookupEnv(HooksContainerLimitsCpu); found {
 		r.HooksContainerLimitsCpu = val
 	} else {
@@ -452,4 +470,62 @@ func unescapeGoTemplate(s string) string {
 	s = strings.ReplaceAll(s, `\}`, `}`)
 	s = strings.ReplaceAll(s, `\\`, `\`)
 	return s
+}
+
+// Names of the profiles shipped in hack/seccomp/.
+const (
+	DefaultUnshareSeccompProfilePath = "profiles/unshare.json"
+	DefaultUnshareAppArmorProfile    = "forklift-virt-v2v-unshare"
+)
+
+func (r *Migration) loadVirtV2vSecurityProfiles() error {
+	var err error
+
+	r.VirtV2vSeccompProfileType, r.VirtV2vSeccompProfilePath, err = securityProfile(
+		VirtV2vSeccompProfileType, VirtV2vSeccompProfilePath, DefaultUnshareSeccompProfilePath, true)
+	if err != nil {
+		return err
+	}
+
+	r.VirtV2vAppArmorProfileType, r.VirtV2vAppArmorProfilePath, err = securityProfile(
+		VirtV2vAppArmorProfileType, VirtV2vAppArmorProfilePath, DefaultUnshareAppArmorProfile, false)
+	return err
+}
+
+// isPath distinguishes a seccomp profile, a file under the kubelet seccomp root,
+// from an AppArmor one, a kernel profile name with no path shape to validate.
+func securityProfile(typeVar, pathVar, defaultPath string, isPath bool) (profileType, profilePath string, err error) {
+	profileType = strings.TrimSpace(os.Getenv(typeVar))
+	profilePath = strings.TrimSpace(os.Getenv(pathVar))
+
+	switch profileType {
+	case "":
+		if profilePath != "" {
+			err = fmt.Errorf("%s is set but %s is not", pathVar, typeVar)
+		}
+	case string(core.SeccompProfileTypeLocalhost):
+		if profilePath == "" {
+			profilePath = defaultPath
+		}
+		// The kubelet rejects the pod outright rather than clamping the path.
+		if isPath && (path.IsAbs(profilePath) || !filepath.IsLocal(profilePath)) {
+			err = fmt.Errorf("%s must be a relative path below the kubelet seccomp root, got %q",
+				pathVar, profilePath)
+		}
+	case string(core.SeccompProfileTypeRuntimeDefault), string(core.SeccompProfileTypeUnconfined):
+		if profilePath != "" {
+			err = fmt.Errorf("%s is only valid with %s=%s", pathVar, typeVar, core.SeccompProfileTypeLocalhost)
+		}
+	default:
+		err = fmt.Errorf("%s must be one of %s, %s or %s, got %q",
+			typeVar,
+			core.SeccompProfileTypeRuntimeDefault,
+			core.SeccompProfileTypeLocalhost,
+			core.SeccompProfileTypeUnconfined,
+			profileType)
+	}
+	if err != nil {
+		return "", "", err
+	}
+	return profileType, profilePath, nil
 }
