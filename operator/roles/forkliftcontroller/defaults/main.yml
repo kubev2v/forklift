@@ -4,6 +4,11 @@
 app_name: "{{ lookup('env', 'APP_NAME') or 'forklift' }}"
 app_namespace: "{{ lookup( 'env', 'WATCH_NAMESPACE') or 'konveyor-forklift' }}"
 
+# Feature defaults
+# NetworkPolicies: auto-enabled on OCP >= network_policies_min_ocp_version (see tasks/main.yml)
+feature_network_policies: false
+network_policies_min_ocp_version: "4.21.0"
+
 # Container images -- resolved from RELATED_IMAGE_* env vars injected by OLM/CSV.
 controller_image_fqin: "{{ lookup( 'env', 'CONTROLLER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_CONTROLLER') }}"
 validation_image_fqin: "{{ lookup( 'env', 'VALIDATION_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VALIDATION') }}"
@@ -104,6 +109,7 @@ forklift_resources:
   - ConfigMap
   - Service
   - Route
+  - NetworkPolicy
 
 
 # VDDK build config names (internal).
