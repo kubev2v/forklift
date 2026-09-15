@@ -35,6 +35,14 @@ func (r *Resolver) Path(object interface{}, id string) (path string, err error) 
 		r.UID = id
 		r.Link(provider)
 		path = r.SelfLink
+	case *CalicoNetwork:
+		r.UID = id
+		r.Link(provider)
+		path = r.SelfLink
+	case *CalicoIPPool:
+		r.UID = id
+		r.Link(provider)
+		path = r.SelfLink
 	case *NetworkAttachmentDefinition:
 		r.UID = id
 		r.Link(provider)
