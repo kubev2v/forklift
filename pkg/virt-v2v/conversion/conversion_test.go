@@ -3,10 +3,12 @@ package conversion
 
 import (
 	"errors"
+	"io"
 	"os"
 	"testing"
 
 	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/errorreporting"
 	"github.com/kubev2v/forklift/pkg/virt-v2v/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -40,6 +42,134 @@ var _ = Describe("Conversion", func() {
 			CommandBuilder: mockCommandBuilder,
 			fileSystem:     mockFileSystem,
 		}
+	})
+
+	Describe("writeTerminationFailure", func() {
+		It("writes the canonical known failure payload", func() {
+			output := "virt-v2v: error: filesystem was mounted read-only, even though we asked for it to be mounted read-write. " +
+				"This usually means that the filesystem was not cleanly unmounted."
+			failure := errorreporting.Classify(output)
+			payload, err := errorreporting.Encode(failure)
+			Expect(err).ToNot(HaveOccurred())
+
+			mockFileSystem.EXPECT().WriteFile("/dev/termination-log", payload, os.FileMode(0644)).Return(nil)
+
+			conversion.writeTerminationFailure([]byte(output), nil)
+		})
+
+		It("does not write a payload for an unknown failure", func() {
+			conversion.writeTerminationFailure(nil, []byte("virt-v2v: error: unknown failure"))
+		})
+	})
+
+	Describe("RunVirtV2v", func() {
+		It("keeps the existing monitor path on success", func() {
+			monitorInput := make(chan io.Reader, 1)
+
+			mockCommandBuilder.EXPECT().New("virt-v2v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-os", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-on", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+
+			mockCommandBuilder.EXPECT().New("/usr/local/bin/virt-v2v-monitor").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+			mockCommandExecutor.EXPECT().SetStdin(gomock.Any()).Do(func(input io.Reader) {
+				monitorInput <- input
+			})
+			mockCommandExecutor.EXPECT().Start().DoAndReturn(func() error {
+				go func() { _, _ = io.Copy(io.Discard, <-monitorInput) }()
+				return nil
+			})
+			mockCommandExecutor.EXPECT().SetStdout(gomock.Any())
+			mockCommandExecutor.EXPECT().SetStderr(gomock.Any())
+			mockCommandExecutor.EXPECT().Run().Return(nil)
+			mockCommandExecutor.EXPECT().Wait().Return(nil)
+
+			conversion.AppConfig = appConfig
+			Expect(conversion.RunVirtV2v()).To(Succeed())
+		})
+
+		It("captures a known failure and writes its termination payload", func() {
+			var stdout, stderr io.Writer
+			monitorInput := make(chan io.Reader, 1)
+			output := "virt-v2v: error: filesystem was mounted read-only, even though we asked for it to be mounted read-write. " +
+				"This usually means that the filesystem was not cleanly unmounted."
+			failure := errorreporting.Classify(output)
+			payload, err := errorreporting.Encode(failure)
+			Expect(err).ToNot(HaveOccurred())
+
+			mockCommandBuilder.EXPECT().New("virt-v2v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-os", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-on", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+
+			mockCommandBuilder.EXPECT().New("/usr/local/bin/virt-v2v-monitor").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+			mockCommandExecutor.EXPECT().SetStdin(gomock.Any()).Do(func(input io.Reader) {
+				monitorInput <- input
+			})
+			mockCommandExecutor.EXPECT().Start().DoAndReturn(func() error {
+				go func() { _, _ = io.Copy(io.Discard, <-monitorInput) }()
+				return nil
+			})
+			mockCommandExecutor.EXPECT().SetStdout(gomock.Any()).Do(func(writer io.Writer) { stdout = writer })
+			mockCommandExecutor.EXPECT().SetStderr(gomock.Any()).Do(func(writer io.Writer) { stderr = writer })
+			mockCommandExecutor.EXPECT().Run().DoAndReturn(func() error {
+				_, _ = stdout.Write([]byte("normal output"))
+				_, _ = stderr.Write([]byte(output))
+				return errors.New("conversion failed")
+			})
+			mockCommandExecutor.EXPECT().Wait().Return(nil)
+			mockFileSystem.EXPECT().WriteFile("/dev/termination-log", payload, os.FileMode(0644)).Return(nil)
+
+			conversion.AppConfig = appConfig
+			err = conversion.RunVirtV2v()
+			Expect(err).To(MatchError("run virt-v2v: conversion failed"))
+		})
+
+		It("wraps a monitor failure with operation context", func() {
+			monitorInput := make(chan io.Reader, 1)
+			monitorErr := errors.New("monitor failed")
+
+			mockCommandBuilder.EXPECT().New("virt-v2v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-os", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-on", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+
+			mockCommandBuilder.EXPECT().New("/usr/local/bin/virt-v2v-monitor").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+			mockCommandExecutor.EXPECT().SetStdin(gomock.Any()).Do(func(input io.Reader) {
+				monitorInput <- input
+			})
+			mockCommandExecutor.EXPECT().Start().DoAndReturn(func() error {
+				go func() { _, _ = io.Copy(io.Discard, <-monitorInput) }()
+				return nil
+			})
+			mockCommandExecutor.EXPECT().SetStdout(gomock.Any())
+			mockCommandExecutor.EXPECT().SetStderr(gomock.Any())
+			mockCommandExecutor.EXPECT().Run().Return(nil)
+			mockCommandExecutor.EXPECT().Wait().Return(monitorErr)
+
+			conversion.AppConfig = appConfig
+			err := conversion.RunVirtV2v()
+			Expect(err).To(MatchError("wait for virt-v2v-monitor: monitor failed"))
+			Expect(errors.Is(err, monitorErr)).To(BeTrue())
+		})
 	})
 
 	Describe("RunVirtV2VInspection", func() {

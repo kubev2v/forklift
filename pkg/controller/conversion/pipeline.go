@@ -619,7 +619,7 @@ func (p *ConversionPipeline) podHandler() (podSucceeded bool, err error) {
 	case core.PodSucceeded:
 		return true, nil
 	case core.PodFailed:
-		return false, liberr.New("conversion pod failed", "pod", pod.Name, "phase", pod.Status.Phase)
+		return false, conversionPodFailure(pod)
 	case core.PodUnknown:
 		return false, liberr.New("conversion pod in unknown state", "pod", pod.Name)
 	case core.PodPending:
