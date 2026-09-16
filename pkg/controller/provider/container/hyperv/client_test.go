@@ -3,6 +3,7 @@ package hyperv
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv/types"
 	"github.com/kubev2v/forklift/pkg/lib/hyperv/driver"
+	ps "github.com/kubev2v/forklift/pkg/lib/hyperv/powershell"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -1445,5 +1447,188 @@ func TestDiskAdapter_OverwritesWhenFullRefresh(t *testing.T) {
 	// operation, and the initial full refresh already captured it.
 	if !existing.RCTEnabled {
 		t.Error("RCTEnabled preservation should keep previous true value")
+	}
+}
+
+// TestEnrichDiskCapacityFallbackMissingUNCDisk tests that missing UNC disks
+// use the fallback host for capacity queries.
+func TestEnrichDiskCapacityFallbackMissingUNCDisk(t *testing.T) {
+	// Setup: Create a client with a mock driver that responds to fallback queries.
+	client := &Client{
+		driver: &mockDriver{
+			computerInfo: &driver.ComputerInfoData{DNSHostName: "hyperv-host"},
+			runOnNodeFn: func(command, computerName string) (string, error) {
+				// Fallback query on hyperv-host should return the capacity
+				if computerName == "hyperv-host" && strings.Contains(command, "Get-VHD") {
+					return "1099511627776", nil // 1 TB
+				}
+				return "", nil
+			},
+		},
+		vmCache: []types.VM{
+			{
+				UUID: "test-vm-uuid",
+				Disks: []types.Disk{
+					{
+						WindowsPath: "\\\\smb-server\\share\\disk1.vhdx",
+						Capacity:    0, // Missing from per-node batch
+					},
+				},
+			},
+		},
+		vmCached: true,
+		Log:      testLogger(),
+	}
+
+	// Act: EnrichDiskCapacity should query the fallback host for the missing UNC disk
+	err := client.EnrichDiskCapacity()
+	if err != nil {
+		t.Fatalf("EnrichDiskCapacity failed: %v", err)
+	}
+
+	// Assert: The disk capacity should be populated from the fallback host
+	if client.vmCache[0].Disks[0].Capacity != 1099511627776 {
+		t.Errorf("Expected capacity 1099511627776, got %d", client.vmCache[0].Disks[0].Capacity)
+	}
+}
+
+// TestEnrichDiskCapacityFallbackZeroCapacity tests that UNC disks with zero
+// capacity from the per-node batch are retried through the fallback host.
+func TestEnrichDiskCapacityFallbackZeroCapacity(t *testing.T) {
+	fallbackHostQueried := false
+	diskPath := "\\\\smb-server\\share\\disk1.vhdx"
+
+	client := &Client{
+		driver: &mockDriver{
+			computerInfo: &driver.ComputerInfoData{DNSHostName: "hyperv-host"},
+			runOnNodeFn: func(command, computerName string) (string, error) {
+				// Simulate per-node batch returning the disk with zero capacity
+				if command == ps.BatchGetVHDCapacity {
+					batchResult := map[string]vhdCapacity{
+						diskPath: {Size: 0, RCTEnabled: false},
+					}
+					data, err := json.Marshal(batchResult)
+					if err != nil {
+						return "", err
+					}
+					return string(data), nil
+				}
+
+				// Track if fallback host (hyperv-host) is queried for disk capacity
+				if computerName == "hyperv-host" && strings.Contains(command, "Get-VHD") {
+					fallbackHostQueried = true
+					return "2199023255552", nil // 2 TB from fallback
+				}
+				return "", nil
+			},
+		},
+		vmCache: []types.VM{
+			{
+				UUID:      "test-vm-uuid",
+				OwnerNode: "node-a",
+				Disks: []types.Disk{
+					{
+						WindowsPath: diskPath,
+						Capacity:    0, // Will be populated by batch with zero, then retried by fallback
+					},
+				},
+			},
+		},
+		vmCached: true,
+		Log:      testLogger(),
+	}
+
+	err := client.EnrichDiskCapacity()
+	if err != nil {
+		t.Fatalf("EnrichDiskCapacity failed: %v", err)
+	}
+
+	// Verify fallback host was queried for the zero-capacity disk
+	if !fallbackHostQueried {
+		t.Error("Expected fallback host to be queried for zero-capacity disk")
+	}
+
+	// Verify capacity was updated from fallback response (not the batch's zero value)
+	if client.vmCache[0].Disks[0].Capacity != 2199023255552 {
+		t.Errorf("Expected capacity 2199023255552 from fallback, got %d", client.vmCache[0].Disks[0].Capacity)
+	}
+}
+
+// TestEnrichDiskCapacitySkipsNonUNCDisk tests that missing non-UNC disks
+// are not retried via the fallback host.
+func TestEnrichDiskCapacitySkipsNonUNCDisk(t *testing.T) {
+	fallbackCalled := false
+	client := &Client{
+		driver: &mockDriver{
+			computerInfo: &driver.ComputerInfoData{DNSHostName: "hyperv-host"},
+			runOnNodeFn: func(command, computerName string) (string, error) {
+				// Track if fallback host is queried
+				if computerName == "hyperv-host" {
+					fallbackCalled = true
+					return "1099511627776", nil
+				}
+				return "", nil
+			},
+		},
+		vmCache: []types.VM{
+			{
+				UUID: "test-vm-uuid",
+				Disks: []types.Disk{
+					{
+						WindowsPath: "C:\\Hyper-V\\Virtual Hard Disks\\disk1.vhdx", // Local path, not UNC
+						Capacity:    0,
+					},
+				},
+			},
+		},
+		vmCached: true,
+		Log:      testLogger(),
+	}
+
+	err := client.EnrichDiskCapacity()
+	if err != nil {
+		t.Fatalf("EnrichDiskCapacity failed: %v", err)
+	}
+
+	// Fallback should NOT be called for non-UNC paths
+	if fallbackCalled {
+		t.Error("Fallback should not be used for non-UNC disk paths")
+	}
+	// Capacity should remain 0 (unchanged)
+	if client.vmCache[0].Disks[0].Capacity != 0 {
+		t.Errorf("Non-UNC disk capacity should remain 0, got %d", client.vmCache[0].Disks[0].Capacity)
+	}
+}
+
+// TestEnrichDiskCapacitySkipsMissingDNSHostName tests that the fallback is
+// skipped when DNSHostName cannot be determined.
+func TestEnrichDiskCapacitySkipsMissingDNSHostName(t *testing.T) {
+	client := &Client{
+		driver: &mockDriver{
+			computerInfo: &driver.ComputerInfoData{DNSHostName: ""}, // Empty hostname
+		},
+		vmCache: []types.VM{
+			{
+				UUID: "test-vm-uuid",
+				Disks: []types.Disk{
+					{
+						WindowsPath: "\\\\smb-server\\share\\disk1.vhdx",
+						Capacity:    0,
+					},
+				},
+			},
+		},
+		vmCached: true,
+		Log:      testLogger(),
+	}
+
+	err := client.EnrichDiskCapacity()
+	if err != nil {
+		t.Fatalf("EnrichDiskCapacity failed: %v", err)
+	}
+
+	// Capacity should remain 0 when fallback is skipped
+	if client.vmCache[0].Disks[0].Capacity != 0 {
+		t.Errorf("Capacity should remain 0 when fallback is skipped, got %d", client.vmCache[0].Disks[0].Capacity)
 	}
 }

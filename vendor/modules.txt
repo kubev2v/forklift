@@ -516,7 +516,7 @@ github.com/klauspost/cpuid/v2
 # github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0
 ## explicit; go 1.20
 github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1
-# github.com/kubev2v/vm-migration-detective v0.0.0-20260902041931-9ed26d672e4d
+# github.com/kubev2v/vm-migration-detective v0.0.0-20260908083350-a89447103cf3
 ## explicit; go 1.25.0
 github.com/kubev2v/vm-migration-detective/internal/checks
 github.com/kubev2v/vm-migration-detective/internal/cmdbuilder
