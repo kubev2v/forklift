@@ -1000,6 +1000,15 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	planUsesOffload := checkMixedUsage && plan.IsUsingOffloadPlugin()
 	netAppShift := plan.HasNetAppShiftDestination()
 
+	sourceProvider := plan.Provider.Source
+	if sourceProvider == nil {
+		return nil
+	}
+	pAdapter, err := adapter.New(sourceProvider)
+	if err != nil {
+		return err
+	}
+
 	// Referenced VMs.
 	for i := range plan.Spec.VMs {
 		vm := &plan.Spec.VMs[i]
@@ -1023,15 +1032,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			continue
 		}
 		// Source.
-		provider := plan.Referenced.Provider.Source
-		if provider == nil {
-			return nil
-		}
-		inventory, pErr := web.NewClient(provider)
-		if pErr != nil {
-			return liberr.Wrap(pErr)
-		}
-		v, pErr := inventory.VM(ref)
+		v, pErr := ctx.Source.Inventory.VM(ref)
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
 				notFound.Items = append(notFound.Items, ref.String())
@@ -1075,7 +1076,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				if vsphereVM.Snapshot.ID != "" {
 					shiftSnapshotVMs.Items = append(shiftSnapshotVMs.Items, ref.String())
 				}
-				if label, sErr := hasShiftDiskMissingNAS(vsphereVM, plan.Map.Storage, inventory, ctx.Destination.Client); sErr != nil {
+				if label, sErr := hasShiftDiskMissingNAS(vsphereVM, plan.Map.Storage, ctx.Source.Inventory, ctx.Destination.Client); sErr != nil {
 					return sErr
 				} else if label != "" {
 					shiftNASMissing.Items = append(shiftNASMissing.Items, label)
@@ -1111,15 +1112,6 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 					}
 				}
 			}
-		}
-		pAdapter, err := adapter.New(provider)
-		if err != nil {
-			return err
-		}
-		var ctx *plancontext.Context
-		ctx, err = plancontext.New(r, plan, r.Log)
-		if err != nil {
-			return err
 		}
 		validator, err := pAdapter.Validator(ctx)
 		if err != nil {
@@ -1303,13 +1295,8 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			}
 		}
 		// Destination.
-		provider = plan.Referenced.Provider.Destination
-		if provider == nil {
+		if plan.Provider.Destination == nil {
 			return nil
-		}
-		inventory, pErr = web.NewClient(provider)
-		if pErr != nil {
-			return liberr.Wrap(pErr)
 		}
 		vmName := ref.Name
 		if vm.TargetName != "" {
@@ -1320,7 +1307,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			Name:      vmName,
 			Namespace: plan.Spec.TargetNamespace,
 		}
-		_, pErr = inventory.VM(vmRef)
+		_, pErr = ctx.Destination.Inventory.VM(vmRef)
 		if pErr == nil {
 			if _, found := plan.Status.Migration.FindVM(*ref); !found {
 				// This VM is preexisting or is being managed by a
