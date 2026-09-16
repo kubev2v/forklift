@@ -100,6 +100,12 @@ func (c *Conversion) addCommonArgs(cmd utils.CommandBuilder) error {
 
 // addConversionExtraArgs adds extra args that apply ONLY to virt-v2v and virt-v2v-in-place
 func (c *Conversion) addConversionExtraArgs(cmd utils.CommandBuilder) {
+	if c.SelinuxRelabelAtBoot {
+		cmd.AddFlag("--selinux-relabel-at-boot")
+	}
+	for _, dir := range c.SelinuxRelabelExclude {
+		cmd.AddArg("--selinux-relabel-exclude", dir)
+	}
 	if c.ExtraArgs != nil {
 		cmd.AddExtraArgs(c.ExtraArgs...)
 	}
@@ -203,6 +209,7 @@ func (c *Conversion) addVirtV2vArgs(cmd utils.CommandBuilder) (err error) {
 		AddArg("-o", "kubevirt").
 		AddArg("-os", c.Workdir).
 		AddArg("-on", outputName)
+	c.addConversionExtraArgs(cmd)
 	switch c.Source {
 	case config.VSPHERE:
 		err = c.addVirtV2vVsphereArgs(cmd)
@@ -230,7 +237,6 @@ func (c *Conversion) addVirtV2vVsphereArgs(cmd utils.CommandBuilder) (err error)
 	if err != nil {
 		return err
 	}
-	c.addConversionExtraArgs(cmd)
 	if c.addVsphereInputTransport(cmd) == vsphereTransportVddk {
 		var extraArgs = c.ExtraArgs
 		if _, err := os.Stat(c.VddkConfFile); !errors.Is(err, os.ErrNotExist) && len(extraArgs) == 0 {

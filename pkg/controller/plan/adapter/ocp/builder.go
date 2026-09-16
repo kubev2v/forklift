@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strings"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
