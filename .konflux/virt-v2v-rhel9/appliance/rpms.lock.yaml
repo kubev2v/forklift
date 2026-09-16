@@ -74,20 +74,20 @@ arches:
     name: geolite2-country
     evr: 20191217-6.el9
     sourcerpm: geolite2-20191217-6.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/appstream/os/Packages/g/gnutls-dane-3.8.3-6.el9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/appstream/os/Packages/g/gnutls-dane-3.8.3-6.el9_6.2.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 21005
-    checksum: sha256:313eebc173895910227e2fe1fe5a6ec388df9f88b276546a2e6a8f1fe149fbba
+    size: 18206
+    checksum: sha256:cfe0fdb3956389e8590fd3c3d571c4933a2eb052fb860d33825e2206be002e43
     name: gnutls-dane
-    evr: 3.8.3-6.el9
-    sourcerpm: gnutls-3.8.3-6.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/appstream/os/Packages/g/gnutls-utils-3.8.3-6.el9.x86_64.rpm
+    evr: 3.8.3-6.el9_6.2
+    sourcerpm: gnutls-3.8.3-6.el9_6.2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/appstream/os/Packages/g/gnutls-utils-3.8.3-6.el9_6.2.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 299745
-    checksum: sha256:f023263ed30906562c5c6799da8bd39dc728d4ea665ee9766df52ace8a9e2af6
+    size: 294260
+    checksum: sha256:20a828be828803240a326ac70f8c6430970bf2a251b9e730ea30b1971871b973
     name: gnutls-utils
-    evr: 3.8.3-6.el9
-    sourcerpm: gnutls-3.8.3-6.el9.src.rpm
+    evr: 3.8.3-6.el9_6.2
+    sourcerpm: gnutls-3.8.3-6.el9_6.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/appstream/os/Packages/h/hexedit-1.6-1.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 46084
@@ -1271,20 +1271,20 @@ arches:
     name: syslinux-nonlinux
     evr: 6.04-0.20.el9
     sourcerpm: syslinux-6.04-0.20.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/baseos/os/Packages/s/systemd-container-252-51.el9_6.1.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/baseos/os/Packages/s/systemd-container-252-51.el9_6.2.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 602417
-    checksum: sha256:eec6e84528434615355f81300a6b86e34b97cbb603eacd5efb8121c27cd549ef
+    size: 598599
+    checksum: sha256:31a4a1c36c68e29f8ccb808e2a974a982766020dede28136d2eb5ceddfa85306
     name: systemd-container
-    evr: 252-51.el9_6.1
-    sourcerpm: systemd-252-51.el9_6.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/baseos/os/Packages/s/systemd-udev-252-51.el9_6.1.x86_64.rpm
+    evr: 252-51.el9_6.2
+    sourcerpm: systemd-252-51.el9_6.2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/baseos/os/Packages/s/systemd-udev-252-51.el9_6.2.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 2107071
-    checksum: sha256:210e8af5f30883a470b6e22295848d977197b93b4a91dea61bfa02eeeb5bcc8a
+    size: 2103920
+    checksum: sha256:32a4b99610721dda5c2df26490a599aeb1b42ccfc14727b4e8ce9ac16a8a025f
     name: systemd-udev
-    evr: 252-51.el9_6.1
-    sourcerpm: systemd-252-51.el9_6.1.src.rpm
+    evr: 252-51.el9_6.2
+    sourcerpm: systemd-252-51.el9_6.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/baseos/os/Packages/t/tpm2-tools-5.2-4.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 828074
