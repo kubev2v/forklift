@@ -19,6 +19,17 @@ import (
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
+	"github.com/kubev2v/forklift/pkg/templateutil"
+	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
+	export "kubevirt.io/api/export/v1beta1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func newBuilder(plan *api.Plan) *Builder {

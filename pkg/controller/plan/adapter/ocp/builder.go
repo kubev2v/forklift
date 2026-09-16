@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	cnv "kubevirt.io/api/core/v1"
-	export "kubevirt.io/api/export/v1alpha1"
+	export "kubevirt.io/api/export/v1beta1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
