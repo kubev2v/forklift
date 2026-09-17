@@ -215,6 +215,10 @@ stringData:
 
 **Note:** For the "host" provider (same cluster), no secret is required. The `ca.crt` is automatically populated by ACM-managed secrets.
 
+For an end-to-end remote Provider setup, including the recommended dedicated
+ServiceAccount, CA collection, and workload-validation RBAC, see [Remote
+OpenShift Virtualization Provider setup](../remote-openshift-virtualization-provider.md).
+
 ---
 
 ## OVA

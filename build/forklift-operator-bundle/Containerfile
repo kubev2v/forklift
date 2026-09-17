@@ -26,6 +26,7 @@ ARG CLI_DOWNLOAD_IMAGE="quay.io/kubev2v/forklift-cli-download:latest"
 ARG OVA_PROVIDER_SERVER_IMAGE="quay.io/kubev2v/forklift-ova-provider-server:latest"
 ARG HYPERV_PROVIDER_SERVER_IMAGE="quay.io/kubev2v/forklift-hyperv-provider-server:latest"
 ARG VALIDATION_IMAGE="quay.io/kubev2v/forklift-validation:latest"
+ARG VIRT_VALIDATION_IMAGE="registry.invalid/kubev2v/forklift-virt-validation@sha256:0000000000000000000000000000000000000000000000000000000000000000"
 ARG OVA_PROXY_IMAGE="quay.io/kubev2v/forklift-ova-proxy:latest"
 
 COPY ./operator /repo
