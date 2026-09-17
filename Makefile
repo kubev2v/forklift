@@ -135,6 +135,9 @@ OVA_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG
 CLI_DOWNLOAD_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG)
 VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-copy-offload-populator:$(REGISTRY_TAG)
 DEEP_INSPECTION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-deep-inspection:$(REGISTRY_TAG)
+# Built from a digest-pinned virt-cluster-validate image supplied by CI/release.
+VIRT_VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-validation:$(REGISTRY_TAG)
+VIRT_CLUSTER_VALIDATE_IMAGE ?= quay.io/tiraboschi/virt-cluster-validate@sha256:8ad07476146aaa8549e2581bd63dceb84285fd47addfab05a288b19e16909d59
 
 ### OLM
 OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG)
@@ -333,6 +336,14 @@ build-validation-image: check_container_runtime
 push-validation-image: build-validation-image
 	$(CONTAINER_CMD) push $(VALIDATION_IMAGE)$(PLATFORM_SUFFIX)
 
+build-virt-validation-image: check_container_runtime
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) \
+		--build-arg VIRT_CLUSTER_VALIDATE_IMAGE=$(VIRT_CLUSTER_VALIDATE_IMAGE) \
+		-t $(VIRT_VALIDATION_IMAGE)$(PLATFORM_SUFFIX) -f build/virt-validation/Containerfile .
+
+push-virt-validation-image: build-virt-validation-image
+	$(CONTAINER_CMD) push $(VIRT_VALIDATION_IMAGE)$(PLATFORM_SUFFIX)
+
 build-operator-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(OPERATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-operator/Containerfile .
 
@@ -381,6 +392,7 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg CONTROLLER_IMAGE=$(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg API_IMAGE=$(API_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VALIDATION_IMAGE=$(VALIDATION_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg VIRT_VALIDATION_IMAGE=$(VIRT_VALIDATION_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OPERATOR_IMAGE=$(OPERATOR_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) \
@@ -802,5 +814,3 @@ validate-commits-range:
 
 $(GOLANGCI_LINT_BIN):
 	$(MAKE) lint-install
-
-
