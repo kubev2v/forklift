@@ -54,6 +54,8 @@ spec:
           value: "{{ deep_inspection_image_fqin or lookup('env', 'DEEP_INSPECTION_IMAGE') or lookup('env', 'RELATED_IMAGE_DEEP_INSPECTION') }}"
         - name: DEEP_INSPECTION_IMAGE_XFS
           value: "{{ deep_inspection_image_xfs_fqin or lookup('env', 'DEEP_INSPECTION_IMAGE_XFS') or lookup('env', 'RELATED_IMAGE_DEEP_INSPECTION_XFS') }}"
+        - name: VIRT_VALIDATION_IMAGE
+          value: "{{ virt_validation_image_fqin or lookup('env', 'VIRT_VALIDATION_IMAGE') or lookup('env', 'RELATED_IMAGE_VIRT_VALIDATION') }}"
         - name: API_PORT
           value: "8443"
         - name: METRICS_PORT
