@@ -211,7 +211,7 @@ func (p *Provider) HasReconciled() bool {
 
 // This provider requires VM guest conversion.
 func (p *Provider) RequiresConversion() bool {
-	return p.Type() == VSphere || p.Type() == Ova || p.Type() == HyperV || p.Type() == EC2 || p.Type() == Azure
+	return p.Type() == VSphere || p.Type() == Ova || p.Type() == HyperV || p.Type() == EC2 || p.Type() == Azure || p.Type() == Nutanix
 }
 
 // This provider support the vddk aio parameters.

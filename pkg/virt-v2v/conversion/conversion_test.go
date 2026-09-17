@@ -799,7 +799,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("/original/path/disk.vmdk"))
@@ -823,7 +823,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("/dev/original-block"))
@@ -852,7 +852,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdb"))
@@ -871,7 +871,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).ToNot(ContainSubstring("/var/tmp/v2v/vm-sda"))
 			},
@@ -890,7 +890,7 @@ var _ = Describe("Conversion", func() {
       <source file='/original/path/disk.vmdk'/>
     <!-- Missing closing tags -->`
 
-				_, err := conversion.updateDiskPaths(invalidXML)
+				_, err := conversion.UpdateDiskPaths(invalidXML)
 				Expect(err).To(HaveOccurred())
 			},
 		)
@@ -915,7 +915,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				// First disk should be updated
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
@@ -945,7 +945,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("cdrom.iso"))
@@ -978,7 +978,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdb"))
@@ -1007,7 +1007,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).ToNot(ContainSubstring("cdrom1.iso"))
 				Expect(result).ToNot(ContainSubstring("cdrom2.iso"))
@@ -1035,7 +1035,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("cdrom.iso"))
@@ -1081,7 +1081,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdb"))
@@ -1106,7 +1106,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-			result, err := conversion.updateDiskPaths(domainXML)
+			result, err := conversion.UpdateDiskPaths(domainXML)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 			Expect(result).To(ContainSubstring(`type="qcow2"`))
@@ -1133,7 +1133,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-			result, err := conversion.updateDiskPaths(domainXML)
+			result, err := conversion.UpdateDiskPaths(domainXML)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 			Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdb"))
@@ -1165,7 +1165,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("cdrom"))
