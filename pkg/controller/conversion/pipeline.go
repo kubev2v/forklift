@@ -678,15 +678,22 @@ func (p *ConversionPipeline) runStageWaitingForSnapshotRemoval() (stageDone bool
 	return true, nil
 }
 
+// checkPendingPodTimeout fails only pods that remain unschedulable past the configured timeout.
 func (p *ConversionPipeline) checkPendingPodTimeout(pod *core.Pod) error {
 	timeout := pendingPodTimeout()
 	if timeout == 0 {
 		return nil
 	}
-	if pod.CreationTimestamp.IsZero() {
+	// Init container image pulls keep phase Pending after scheduling; only fail
+	// pods that cannot be scheduled.
+	if podScheduled(pod) {
 		return nil
 	}
-	elapsed := time.Since(pod.CreationTimestamp.Time)
+	since := unschedulableSince(pod)
+	if since.IsZero() {
+		return nil
+	}
+	elapsed := time.Since(since)
 	if elapsed < timeout {
 		return nil
 	}
@@ -696,6 +703,30 @@ func (p *ConversionPipeline) checkPendingPodTimeout(pod *core.Pod) error {
 			pod.Name, elapsed.Truncate(time.Second), reason))
 }
 
+// podScheduled reports whether the scheduler has assigned the pod to a node.
+func podScheduled(pod *core.Pod) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == core.PodScheduled && cond.Status == core.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+// unschedulableSince returns when the pod became unschedulable, or creation time as fallback.
+func unschedulableSince(pod *core.Pod) time.Time {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == core.PodScheduled && cond.Status == core.ConditionFalse {
+			return cond.LastTransitionTime.Time
+		}
+	}
+	if !pod.CreationTimestamp.IsZero() {
+		return pod.CreationTimestamp.Time
+	}
+	return time.Time{}
+}
+
+// pendingPodReason summarizes why a conversion pod is still pending.
 func pendingPodReason(pod *core.Pod) string {
 	for _, cond := range pod.Status.Conditions {
 		if cond.Type == core.PodScheduled && cond.Status == core.ConditionFalse {
