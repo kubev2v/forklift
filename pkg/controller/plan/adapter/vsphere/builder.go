@@ -630,8 +630,20 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	if err != nil {
 		return
 	}
-
-	canUseInstanceUUID := r.canUseInstanceUUID()
+	if hostDef, found := r.hosts[hostID]; found {
+		hostURL := liburl.URL{
+			Scheme: "https",
+			Host:   formatHostAddress(hostDef.Spec.IpAddress),
+			Path:   vim25.Path,
+		}
+		url = hostURL.String()
+		h, nErr := r.host(hostID)
+		if nErr != nil {
+			err = nErr
+			return
+		}
+		thumbprint = h.Thumbprint
+	}
 
 	// Build datastore map for more efficient lookups
 	dsMap, err := r.buildDatastoreMap()
