@@ -174,7 +174,7 @@ type PlanSpec struct {
 	//   - .SourcePVCNamespace: namespace of the PVC in the source cluster
 	//
 	// Default behavior when not set:
-	//   - VMware: generates names like "{{trunc 4 .PlanName}}-{{trunc 4 .TargetVmName}}-disk-{{.DiskIndex}}"
+	//   - VMware: generates names like "{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}"
 	//   - OpenShift: uses the original source PVC name ("{{.SourcePVCName}}")
 	//
 	// Note:
