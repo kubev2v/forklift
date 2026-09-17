@@ -97,11 +97,21 @@ func setCDICACerts(object *core.ConfigMap, cacert []byte) {
 	object.BinaryData["tls.crt"] = cacert
 }
 
+// configMapHasCert reports whether the ConfigMap already carries CA material.
 func configMapHasCert(configMap *core.ConfigMap) bool {
 	if configMap == nil || len(configMap.BinaryData) == 0 {
 		return false
 	}
 	return len(configMap.BinaryData["ca.pem"]) > 0 || len(configMap.BinaryData["tls.crt"]) > 0
+}
+
+// configMapBundleMatches reports whether both CDI cert keys match the bundle.
+func configMapBundleMatches(configMap *core.ConfigMap, bundle []byte) bool {
+	if configMap == nil || len(bundle) == 0 {
+		return false
+	}
+	return bytes.Equal(configMap.BinaryData["ca.pem"], bundle) &&
+		bytes.Equal(configMap.BinaryData["tls.crt"], bundle)
 }
 
 // ensureImportCertConfigMap updates the CDI cert ConfigMap for Nutanix HTTP
@@ -124,11 +134,14 @@ func (r *Builder) ensureImportCertConfigMap(
 		return err
 	}
 
-	bundle := r.buildImportCertBundle(secret, urls)
+	bundle, err := r.buildImportCertBundle(secret, urls)
+	if err != nil {
+		return err
+	}
 	if len(bundle) == 0 {
 		return nil
 	}
-	if configMapHasCert(configMap) && bytes.Equal(configMap.BinaryData["ca.pem"], bundle) {
+	if configMapBundleMatches(configMap, bundle) {
 		return nil
 	}
 
@@ -183,6 +196,7 @@ func (r *Builder) importCertURLs(client *Client, vmRef ref.Ref, vm *model.VM) ([
 	return urls, nil
 }
 
+// appendUniqueImportCertURL appends rawURL when its TLS host has not been seen.
 func appendUniqueImportCertURL(urls []string, seen map[string]struct{}, rawURL string) ([]string, error) {
 	host, err := importCertTLSHost(rawURL)
 	if err != nil {
@@ -195,6 +209,7 @@ func appendUniqueImportCertURL(urls []string, seen map[string]struct{}, rawURL s
 	return append(urls, strings.TrimRight(rawURL, "/")), nil
 }
 
+// importCertTLSHost returns the host portion of an HTTPS import URL.
 func importCertTLSHost(rawURL string) (string, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
@@ -211,26 +226,27 @@ func importCertTLSHost(rawURL string) (string, error) {
 
 // buildImportCertBundle merges ca.crt from the provider secret with leaf
 // certificates fetched from each import URL when insecureSkipVerify is set.
-// Fetch failures are logged and skipped so a partial bundle can still be used.
-func (r *Builder) buildImportCertBundle(secret *core.Secret, urls []string) []byte {
+// Any fetch failure is returned to the caller so the ConfigMap is not updated
+// with an incomplete trust bundle.
+func (r *Builder) buildImportCertBundle(secret *core.Secret, urls []string) ([]byte, error) {
 	var chunks [][]byte
 	if cacert, found := libutil.GetCACert(secret); found && len(cacert) > 0 {
 		chunks = append(chunks, cacert)
 	}
 	if !providerbase.GetInsecureSkipVerifyFlag(secret) {
-		return mergePEMCertificates(chunks...)
+		return mergePEMCertificates(chunks...), nil
 	}
 	for _, rawURL := range urls {
 		cacert, err := r.fetchCertFromURL(rawURL, secret)
 		if err != nil {
-			r.Log.Error(err, "Failed to fetch Nutanix import certificate", "url", rawURL)
-			continue
+			return nil, liberr.Wrap(err, "url", rawURL)
 		}
 		chunks = append(chunks, cacert)
 	}
-	return mergePEMCertificates(chunks...)
+	return mergePEMCertificates(chunks...), nil
 }
 
+// mergePEMCertificates concatenates PEM blocks and deduplicates certificates.
 func mergePEMCertificates(chunks ...[]byte) []byte {
 	seen := map[string]struct{}{}
 	var out []byte

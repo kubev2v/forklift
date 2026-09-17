@@ -113,6 +113,36 @@ func TestMergePEMCertificatesDedupes(t *testing.T) {
 	}
 }
 
+func TestConfigMapBundleMatchesRequiresTlsCrt(t *testing.T) {
+	bundle := []byte("-----BEGIN CERTIFICATE-----\nbundle\n-----END CERTIFICATE-----\n")
+	configMap := &core.ConfigMap{
+		BinaryData: map[string][]byte{
+			"ca.pem":  bundle,
+			"tls.crt": []byte("stale"),
+		},
+	}
+	if configMapBundleMatches(configMap, bundle) {
+		t.Fatal("expected mismatch when tls.crt is stale")
+	}
+	configMap.BinaryData["tls.crt"] = bundle
+	if !configMapBundleMatches(configMap, bundle) {
+		t.Fatal("expected match when both keys equal bundle")
+	}
+}
+
+func TestBuildImportCertBundleFetchFailure(t *testing.T) {
+	secret := &core.Secret{
+		Data: map[string][]byte{
+			"insecureSkipVerify": []byte("true"),
+		},
+	}
+	builder := &Builder{}
+	_, err := builder.buildImportCertBundle(secret, []string{"https://127.0.0.1:1"})
+	if err == nil {
+		t.Fatal("expected error when certificate fetch fails")
+	}
+}
+
 func TestBuildImportCertBundleSecureUsesProviderCAOnly(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	t.Cleanup(server.Close)
@@ -124,7 +154,10 @@ func TestBuildImportCertBundleSecureUsesProviderCAOnly(t *testing.T) {
 		},
 	}
 	builder := &Builder{}
-	bundle := builder.buildImportCertBundle(secret, []string{server.URL})
+	bundle, err := builder.buildImportCertBundle(secret, []string{server.URL})
+	if err != nil {
+		t.Fatalf("buildImportCertBundle: %v", err)
+	}
 	if !bytes.Equal(bundle, providerCA) {
 		t.Fatalf("expected provider ca.crt only, got %q", bundle)
 	}
@@ -142,7 +175,10 @@ func TestBuildImportCertBundleMergesProviderAndFetch(t *testing.T) {
 		},
 	}
 	builder := &Builder{}
-	bundle := builder.buildImportCertBundle(secret, []string{server.URL})
+	bundle, err := builder.buildImportCertBundle(secret, []string{server.URL})
+	if err != nil {
+		t.Fatalf("buildImportCertBundle: %v", err)
+	}
 	if !bytes.Contains(bundle, []byte("provider")) {
 		t.Fatal("expected provider ca.crt in bundle")
 	}
