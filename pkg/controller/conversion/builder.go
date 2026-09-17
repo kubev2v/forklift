@@ -52,6 +52,51 @@ func (b *Builder) BuildVirtV2vPod(vm *plan.VMStatus, volumes []core.Volume, volu
 	return
 }
 
+// libguestfs' passt sandbox calls unshare(CLONE_NEWUSER), which the runtime
+// default profile permits only under CAP_SYS_ADMIN -- a capability these pods
+// drop -- so conversion dies at appliance launch. OpenShift nodes carry a
+// permitting profile; elsewhere an admin must install one and name it, since a
+// Localhost profile absent from a node makes the kubelet refuse the pod.
+func virtV2vSeccompProfile() core.SeccompProfile {
+	profileType := Settings.Migration.VirtV2vSeccompProfileType
+	if profileType == "" {
+		if !settings.Settings.OpenShift {
+			return core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}
+		}
+		profileType = string(core.SeccompProfileTypeLocalhost)
+	}
+
+	profile := core.SeccompProfile{Type: core.SeccompProfileType(profileType)}
+	if profile.Type == core.SeccompProfileTypeLocalhost {
+		localhostProfile := Settings.Migration.VirtV2vSeccompProfilePath
+		if localhostProfile == "" {
+			localhostProfile = settings.DefaultUnshareSeccompProfilePath
+		}
+		profile.LocalhostProfile = &localhostProfile
+	}
+	return profile
+}
+
+// The second barrier, independent of seccomp: passt goes on to remount / and
+// pivot_root, which the runtime default AppArmor profile denies outright. nil
+// leaves the field unset, which is what nodes not enforcing AppArmor want.
+func virtV2vAppArmorProfile() *core.AppArmorProfile {
+	profileType := Settings.Migration.VirtV2vAppArmorProfileType
+	if profileType == "" {
+		return nil
+	}
+
+	profile := &core.AppArmorProfile{Type: core.AppArmorProfileType(profileType)}
+	if profile.Type == core.AppArmorProfileTypeLocalhost {
+		localhostProfile := Settings.Migration.VirtV2vAppArmorProfilePath
+		if localhostProfile == "" {
+			localhostProfile = settings.DefaultUnshareAppArmorProfile
+		}
+		profile.LocalhostProfile = &localhostProfile
+	}
+	return profile
+}
+
 // GetVirtV2vPodSpec builds the barebones pod spec.
 func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, volumeMounts []core.VolumeMount, volumeDevices []core.VolumeDevice, v2vSecret *core.Secret, inPlace bool) (pod *core.Pod, environment []core.EnvVar, err error) {
 	cfg := &b.Config
@@ -148,14 +193,7 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 		maps.Copy(annotations, cfg.TransferNetworkAnnotations)
 	}
 
-	seccompProfile := core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}
-	if settings.Settings.OpenShift {
-		unshare := "profiles/unshare.json"
-		seccompProfile = core.SeccompProfile{
-			Type:             core.SeccompProfileTypeLocalhost,
-			LocalhostProfile: &unshare,
-		}
-	}
+	seccompProfile := virtV2vSeccompProfile()
 
 	podLabels := make(map[string]string)
 	if cfg.PodLabels != nil {
@@ -180,10 +218,11 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 		},
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
-				FSGroup:        &fsGroup,
-				RunAsUser:      &user,
-				RunAsNonRoot:   &nonRoot,
-				SeccompProfile: &seccompProfile,
+				FSGroup:         &fsGroup,
+				RunAsUser:       &user,
+				RunAsNonRoot:    &nonRoot,
+				SeccompProfile:  &seccompProfile,
+				AppArmorProfile: virtV2vAppArmorProfile(),
 			},
 			NodeSelector:   podNodeSelector,
 			Affinity:       cfg.Affinity,
@@ -329,14 +368,7 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 		maps.Copy(annotations, cfg.PodAnnotations)
 	}
 
-	seccompProfile := core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}
-	if settings.Settings.OpenShift {
-		unshare := "profiles/unshare.json"
-		seccompProfile = core.SeccompProfile{
-			Type:             core.SeccompProfileTypeLocalhost,
-			LocalhostProfile: &unshare,
-		}
-	}
+	seccompProfile := virtV2vSeccompProfile()
 
 	podLabels := make(map[string]string)
 	if cfg.PodLabels != nil {
@@ -358,10 +390,11 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 		},
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
-				FSGroup:        &fsGroup,
-				RunAsUser:      &runAsUser,
-				RunAsNonRoot:   &nonRoot,
-				SeccompProfile: &seccompProfile,
+				FSGroup:         &fsGroup,
+				RunAsUser:       &runAsUser,
+				RunAsNonRoot:    &nonRoot,
+				SeccompProfile:  &seccompProfile,
+				AppArmorProfile: virtV2vAppArmorProfile(),
 			},
 			NodeSelector:   podNodeSelector,
 			Affinity:       cfg.Affinity,
