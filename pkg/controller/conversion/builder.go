@@ -239,6 +239,7 @@ func (b *Builder) BuildVirtV2vConversionPod(pod *core.Pod, environment []core.En
 	pod.GenerateName = b.Config.GenerateName
 	pod.Labels[convctx.LabelApp] = "virt-v2v"
 	pod.Spec.Containers[0].Name = "virt-v2v"
+	pod.Spec.Containers[0].TerminationMessagePolicy = core.TerminationMessageFallbackToLogsOnError
 	pod.Spec.Containers[0].Env = environment
 	return nil
 }
