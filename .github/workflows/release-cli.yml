@@ -32,7 +32,7 @@ jobs:
 
       - name: Set up Go
         if: steps.check_assets.outputs.assets_exist != 'true'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: cmd/kubectl-mtv/go.mod
           check-latest: true
