@@ -795,117 +795,6 @@ func (r *Client) ListStorages() ([]types.Storage, error) {
 	return []types.Storage{storage}, nil
 }
 
-// vhdCapacity holds the Get-VHD output for a single disk path.
-type vhdCapacity struct {
-	Size       int64 `json:"S"`
-	RCTEnabled bool  `json:"R"`
-}
-
-// EnrichDiskCapacity runs Get-VHD in parallel across cluster nodes and
-// updates cached VMs' Capacity and RCTEnabled in place. Standalone VMs
-// (OwnerNode == "") are queried on the entry-point host ("__local__").
-func (r *Client) EnrichDiskCapacity() error {
-	if !r.vmCached || len(r.vmCache) == 0 {
-		return nil
-	}
-
-	// Build a per-node list of VMs for disk enrichment.
-	nodeVMs := make(map[string][]int) // node → indices into vmCache
-	for i, vm := range r.vmCache {
-		node := vm.OwnerNode
-		if node == "" {
-			node = "__local__"
-		}
-		nodeVMs[node] = append(nodeVMs[node], i)
-	}
-
-	type nodeCapResult struct {
-		node string
-		caps map[string]vhdCapacity
-	}
-	ch := make(chan nodeCapResult, len(nodeVMs))
-	for node := range nodeVMs {
-		go func(n string) {
-			var out string
-			var err error
-			if n == "__local__" {
-				out, err = r.driver.ExecuteCommandWithTimeout(ps.BatchGetVHDCapacity, longCommandTimeout)
-			} else {
-				out, err = r.driver.RunOnNodeWithTimeout(ps.BatchGetVHDCapacity, n, longCommandTimeout)
-			}
-			if err != nil {
-				r.Log.Info("VHD capacity enrichment failed, will be filled on next refresh",
-					"node", n, "error", err)
-				ch <- nodeCapResult{node: n}
-				return
-			}
-			out = strings.TrimSpace(out)
-			if out == "" || out == "{}" || out == "null" {
-				ch <- nodeCapResult{node: n}
-				return
-			}
-			var caps map[string]vhdCapacity
-			if err := json.Unmarshal([]byte(out), &caps); err != nil {
-				r.Log.Info("Parse VHD capacity failed", "node", n, "error", err)
-				ch <- nodeCapResult{node: n}
-				return
-			}
-			ch <- nodeCapResult{node: n, caps: caps}
-		}(node)
-	}
-
-	allCaps := make(map[string]vhdCapacity)
-	for range nodeVMs {
-		res := <-ch
-		if res.caps == nil {
-			continue
-		}
-		for _, idx := range nodeVMs[res.node] {
-			for d := range r.vmCache[idx].Disks {
-				diskPath := r.vmCache[idx].Disks[d].WindowsPath
-				if c, ok := res.caps[diskPath]; ok {
-					r.vmCache[idx].Disks[d].Capacity = c.Size
-					r.vmCache[idx].Disks[d].RCTEnabled = c.RCTEnabled
-					allCaps[diskPath] = c
-				}
-			}
-		}
-	}
-
-	// Fallback for SMB disks that were not found or have zero capacity.
-	// Get the fallback host (the entry-point host we're connected to) for SMB disk queries.
-	localInfo, err := r.getLocalComputerInfo()
-	if err != nil || localInfo == nil || localInfo.DNSHostName == "" {
-		r.Log.Info("Cannot determine fallback host for SMB disk enrichment", "error", err)
-		return nil
-	}
-	fallbackHost := localInfo.DNSHostName
-
-	for i := range r.vmCache {
-		for d := range r.vmCache[i].Disks {
-			diskPath := r.vmCache[i].Disks[d].WindowsPath
-			if _, found := allCaps[diskPath]; !found && strings.HasPrefix(diskPath, `\\`) {
-				// Disk wasn't found in per-node results, query from fallback host
-				capacity := r.getDiskCapacity(diskPath, fallbackHost)
-				if capacity > 0 {
-					r.vmCache[i].Disks[d].Capacity = capacity
-					r.vmCache[i].Disks[d].RCTEnabled = r.getDiskRCTEnabled(diskPath, fallbackHost)
-					r.Log.V(2).Info("Retrieved missing disk capacity from fallback host", "path", diskPath, "capacity", capacity)
-				}
-			} else if r.vmCache[i].Disks[d].Capacity == 0 && strings.HasPrefix(diskPath, `\\`) {
-				// Disk found but capacity is 0 and it's SMB, retry from fallback host
-				capacity := r.getDiskCapacity(diskPath, fallbackHost)
-				if capacity > 0 {
-					r.vmCache[i].Disks[d].Capacity = capacity
-					r.vmCache[i].Disks[d].RCTEnabled = r.getDiskRCTEnabled(diskPath, fallbackHost)
-					r.Log.V(2).Info("Retrieved SMB disk capacity from fallback host", "path", diskPath, "capacity", capacity)
-				}
-			}
-		}
-	}
-	return nil
-}
-
 // ListDisks returns all disks from all VMs.
 func (r *Client) ListDisks() ([]types.Disk, error) {
 	vms, err := r.ListVMs()
@@ -1067,7 +956,7 @@ func (r *Client) extractNICs(domain driver.Domain, vmOwnerNode string, networks 
 // collectPerVMDisks fetches disk info for a single VM on a specific node.
 // Used as fallback in cluster mode when the batch script fails.
 func (r *Client) collectPerVMDisks(vmName, vmUUID, computerName string) []types.Disk {
-	stdout, err := r.driver.RunOnNodeWithTimeout(ps.BuildCommand(ps.GetVMDisks, vmName), computerName, longCommandTimeout)
+	stdout, err := r.driver.RunOnNode(ps.BuildCommand(ps.GetVMDisks, vmName), computerName)
 	if err != nil {
 		r.Log.Error(err, "Failed to get disks per-VM", "vm", vmName)
 		return []types.Disk{}
@@ -1109,7 +998,7 @@ func (r *Client) collectPerVMDisks(vmName, vmUUID, computerName string) []types.
 // collectPerVMNICs fetches NIC info for a single VM on a specific node.
 // Used as fallback in cluster mode when the batch script fails.
 func (r *Client) collectPerVMNICs(vmName, computerName string, networks []types.Network) []types.NIC {
-	stdout, err := r.driver.RunOnNodeWithTimeout(ps.BuildCommand(ps.GetVMNICs, vmName), computerName, longCommandTimeout)
+	stdout, err := r.driver.RunOnNode(ps.BuildCommand(ps.GetVMNICs, vmName), computerName)
 	if err != nil {
 		r.Log.Error(err, "Failed to get NICs per-VM", "vm", vmName)
 		return []types.NIC{}
@@ -1156,7 +1045,7 @@ func formatMAC(mac string) string {
 
 func (r *Client) collectGuestOS(vmName, computerName string) (string, error) {
 	script := ps.BuildCommand(ps.GetGuestOS, vmName)
-	stdout, err := r.driver.RunOnNodeWithTimeout(script, computerName, longCommandTimeout)
+	stdout, err := r.driver.RunOnNode(script, computerName)
 	if err != nil {
 		return "", err
 	}
@@ -1165,7 +1054,7 @@ func (r *Client) collectGuestOS(vmName, computerName string) (string, error) {
 
 func (r *Client) collectSecurityInfo(vmName, computerName string) (*securityInfo, error) {
 	script := ps.BuildCommand(ps.GetVMSecurityInfo, vmName, vmName, vmName)
-	stdout, err := r.driver.RunOnNodeWithTimeout(script, computerName, longCommandTimeout)
+	stdout, err := r.driver.RunOnNode(script, computerName)
 	if err != nil {
 		return nil, err
 	}
@@ -1184,7 +1073,7 @@ func (r *Client) collectSecurityInfo(vmName, computerName string) (*securityInfo
 
 func (r *Client) collectHasCheckpoint(vmName, computerName string) (bool, error) {
 	script := ps.BuildCommand(ps.GetVMHasCheckpoint, vmName)
-	stdout, err := r.driver.RunOnNodeWithTimeout(script, computerName, longCommandTimeout)
+	stdout, err := r.driver.RunOnNode(script, computerName)
 	if err != nil {
 		return false, err
 	}
@@ -1197,7 +1086,7 @@ func (r *Client) collectHasCheckpoint(vmName, computerName string) (bool, error)
 
 func (r *Client) collectGuestNetworkConfig(vmName string, nics []types.NIC, computerName string) ([]types.GuestNetwork, error) {
 	script := ps.BuildCommand(ps.GetGuestNetworkConfig, vmName)
-	stdout, err := r.driver.RunOnNodeWithTimeout(script, computerName, longCommandTimeout)
+	stdout, err := r.driver.RunOnNode(script, computerName)
 	if err != nil {
 		return nil, err
 	}
@@ -1326,18 +1215,15 @@ func (r *Client) mapWindowsPathToSMB(windowsPath, smbWindowsPrefix string) strin
 	return ""
 }
 
-// getDiskCapacity queries Get-VHD on the specified node to retrieve disk capacity.
-// If computerName is empty, the command runs on the connected WinRM host.
 func (r *Client) getDiskCapacity(windowsPath, computerName string) int64 {
 	command := ps.BuildCommand(ps.GetDiskCapacity, windowsPath)
-	stdout, err := r.driver.RunOnNodeWithTimeout(command, computerName, longCommandTimeout)
+	stdout, err := r.driver.RunOnNode(command, computerName)
 	if err != nil {
-		r.Log.Error(err, "Failed to get disk capacity", "path", windowsPath, "computerName", computerName)
+		r.Log.Error(err, "Failed to get disk capacity", "path", windowsPath)
 		return 0
 	}
 	var capacity int64
 	if _, err := fmt.Sscanf(strings.TrimSpace(stdout), "%d", &capacity); err != nil {
-		r.Log.Error(err, "Failed to parse disk capacity", "path", windowsPath, "output", strings.TrimSpace(stdout))
 		return 0
 	}
 	return capacity
@@ -1345,9 +1231,9 @@ func (r *Client) getDiskCapacity(windowsPath, computerName string) int64 {
 
 func (r *Client) getDiskRCTEnabled(windowsPath, computerName string) bool {
 	command := ps.BuildCommand(ps.GetDiskRCTEnabled, windowsPath)
-	stdout, err := r.driver.RunOnNodeWithTimeout(command, computerName, longCommandTimeout)
+	stdout, err := r.driver.RunOnNode(command, computerName)
 	if err != nil {
-		r.Log.Error(err, "Failed to get disk RCT status", "path", windowsPath, "computerName", computerName)
+		r.Log.Error(err, "Failed to get disk RCT status", "path", windowsPath)
 		return false
 	}
 	result, _ := strconv.ParseBool(strings.TrimSpace(stdout))
