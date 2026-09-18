@@ -8,6 +8,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/settings"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/session"
@@ -65,6 +66,27 @@ var requiredPrivileges = []privilegeGroup{
 			"Datastore.FileManagement",
 		},
 	},
+}
+
+// getRequiredPrivileges returns the effective set of required privileges,
+// including conditional privileges based on feature flags.
+func getRequiredPrivileges() []privilegeGroup {
+	base := make([]privilegeGroup, len(requiredPrivileges))
+	copy(base, requiredPrivileges)
+
+	// Add post-migration tagging privileges only when the feature is enabled.
+	if settings.Settings.PostMigrationTaggingEnabled {
+		base = append(base, privilegeGroup{
+			Description: "Post-Migration VM Tagging",
+			Privileges: []string{
+				"InventoryService.Tagging.CreateCategory",
+				"InventoryService.Tagging.CreateTag",
+				"InventoryService.Tagging.AttachTag",
+			},
+		})
+	}
+
+	return base
 }
 
 // pruneToAvailablePrivileges intersects required privilege groups against the
@@ -156,7 +178,7 @@ func checkPermissionsWithClient(ctx context.Context, client *govmomi.Client) ([]
 		available[priv.PrivId] = true
 	}
 
-	pruned := pruneToAvailablePrivileges(requiredPrivileges, available)
+	pruned := pruneToAvailablePrivileges(getRequiredPrivileges(), available)
 	if len(pruned) == 0 {
 		return nil, nil
 	}
