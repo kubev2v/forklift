@@ -12,6 +12,9 @@ import (
 	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	hvmodel "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
+	webbase "github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	hvweb "github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,6 +29,17 @@ import (
 )
 
 var KubeVirtLog = logging.WithName("kubevirt-test")
+
+// hypervInventoryStub is a web.Client that only implements VM(), used to
+// supply Hyper-V disk SMB paths for CreateDeepInspectionConversionHyperV tests.
+type hypervInventoryStub struct {
+	webbase.Client
+	vm *hvweb.VM
+}
+
+func (s *hypervInventoryStub) VM(_ *webbase.Ref) (interface{}, error) {
+	return s.vm, nil
+}
 
 var _ = ginkgo.Describe("kubevirt tests", func() {
 	ginkgo.Describe("getPVCs", func() {
@@ -914,7 +928,214 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			Expect(cr).To(BeNil())
 		})
 	})
+
+	ginkgo.Describe("CreateDeepInspectionConversionHyperV", func() {
+		ginkgo.It("places the Conversion, connection secret, and SMB PVC on the destination cluster in the target namespace", func() {
+			const (
+				vmID           = "hv-vm-1"
+				planNamespace  = "openshift-mtv"
+				targetNS       = "migrations"
+				destProviderNS = "openshift-mtv"
+			)
+
+			scheme := runtime.NewScheme()
+			_ = v1.AddToScheme(scheme)
+			_ = v1beta1.SchemeBuilder.AddToScheme(scheme)
+			mgmtClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+			destClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+			hvType := v1beta1.HyperV
+			srcProvider := &v1beta1.Provider{
+				ObjectMeta: metav1.ObjectMeta{Name: "hyperv", Namespace: planNamespace},
+				Spec:       v1beta1.ProviderSpec{Type: &hvType},
+			}
+			destProvider := &v1beta1.Provider{
+				ObjectMeta: metav1.ObjectMeta{Name: "host", Namespace: destProviderNS},
+			}
+
+			kubevirt := &KubeVirt{
+				Context: &plancontext.Context{
+					Client: mgmtClient,
+					Destination: plancontext.Destination{
+						Client:   destClient,
+						Provider: destProvider,
+					},
+					Log:       KubeVirtLog,
+					Migration: createMigration(),
+					Plan:      createPlanKubevirt(nil),
+					Source: plancontext.Source{
+						Provider: srcProvider,
+						Secret: &v1.Secret{
+							Data: map[string][]byte{"smbUrl": []byte("//hyperv.example/share")},
+						},
+						Inventory: &hypervInventoryStub{
+							vm: &hvweb.VM{
+								VM1: hvweb.VM1{
+									Disks: []hvmodel.Disk{{SMBPath: "/hyperv/system.vhdx"}},
+								},
+							},
+						},
+					},
+				},
+			}
+			kubevirt.Plan.ObjectMeta = metav1.ObjectMeta{
+				Name:      "hv-plan",
+				Namespace: planNamespace,
+				UID:       "plan-uid",
+			}
+			kubevirt.Plan.Spec.TargetNamespace = targetNS
+			kubevirt.Plan.Provider.Source = srcProvider
+
+			vm := &plan.VMStatus{}
+			vm.ID = vmID
+			vm.Ref = ref.Ref{ID: vmID}
+
+			cr, err := kubevirt.CreateDeepInspectionConversionHyperV(vm, "hv-plan", "plan-uid")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cr).ToNot(BeNil())
+
+			Expect(cr.Namespace).To(Equal(planNamespace))
+			Expect(cr.Spec.TargetNamespace).To(Equal(targetNS))
+			Expect(cr.Spec.Destination.Name).To(Equal(destProvider.Name))
+			Expect(cr.Spec.Destination.Namespace).To(Equal(destProviderNS))
+			Expect(cr.Spec.Connection.Secret.Namespace).To(Equal(targetNS))
+			Expect(cr.Spec.ExtraVolumes).ToNot(BeEmpty())
+			Expect(cr.Spec.ExtraVolumes[0].PersistentVolumeClaim).ToNot(BeNil())
+
+			pvcList := &v1.PersistentVolumeClaimList{}
+			Expect(destClient.List(context.TODO(), pvcList, client.InNamespace(targetNS))).To(Succeed())
+			Expect(pvcList.Items).ToNot(BeEmpty())
+			Expect(cr.Spec.ExtraVolumes[0].PersistentVolumeClaim.ClaimName).To(Equal(pvcList.Items[0].Name))
+
+			secretList := &v1.SecretList{}
+			Expect(destClient.List(context.TODO(), secretList, client.InNamespace(targetNS))).To(Succeed())
+			// Two secrets on destination: SMB CSI credential + connection secret
+			Expect(secretList.Items).To(HaveLen(2))
+			// Find the connection secret (the one referenced by the Conversion CR)
+			var connSecretFound, csiSecretFound bool
+			for _, s := range secretList.Items {
+				if s.Name == cr.Spec.Connection.Secret.Name {
+					connSecretFound = true
+				}
+				if s.Labels["hyperv"] == "smb-csi-secret" {
+					csiSecretFound = true
+					Expect(s.Data).To(HaveKey("username"))
+					Expect(s.Data).To(HaveKey("password"))
+				}
+			}
+			Expect(connSecretFound).To(BeTrue(), "connection secret should exist on destination")
+			Expect(csiSecretFound).To(BeTrue(), "SMB CSI credential secret should exist on destination")
+
+			mgmtSecrets := &v1.SecretList{}
+			Expect(mgmtClient.List(context.TODO(), mgmtSecrets, client.InNamespace(planNamespace))).To(Succeed())
+			Expect(mgmtSecrets.Items).To(BeEmpty())
+
+			mgmtConvs := &v1beta1.ConversionList{}
+			Expect(mgmtClient.List(context.TODO(), mgmtConvs, client.InNamespace(planNamespace))).To(Succeed())
+			Expect(mgmtConvs.Items).To(HaveLen(1))
+			destConvs := &v1beta1.ConversionList{}
+			Expect(destClient.List(context.TODO(), destConvs)).To(Succeed())
+			Expect(destConvs.Items).To(BeEmpty())
+
+			diPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "di-pod",
+					Namespace: targetNS,
+					Labels: map[string]string{
+						convctx.LabelVM:             vmID,
+						convctx.LabelConversionType: string(v1beta1.DeepInspection),
+					},
+				},
+			}
+			Expect(destClient.Create(context.TODO(), diPod)).To(Succeed())
+			mgmtLeftover := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mgmt-di-pod",
+					Namespace: planNamespace,
+					Labels: map[string]string{
+						convctx.LabelVM:             vmID,
+						convctx.LabelConversionType: string(v1beta1.DeepInspection),
+					},
+				},
+			}
+			Expect(mgmtClient.Create(context.TODO(), mgmtLeftover)).To(Succeed())
+
+			destPods := &v1.PodList{}
+			Expect(destClient.List(context.TODO(), destPods, client.InNamespace(targetNS))).To(Succeed())
+			Expect(destPods.Items).To(HaveLen(1))
+			Expect(destPods.Items[0].Name).To(Equal(diPod.Name))
+
+			Expect(kubevirt.DeleteConversion(cr)).To(Succeed())
+
+			err = destClient.Get(context.TODO(), client.ObjectKey{Namespace: targetNS, Name: diPod.Name}, &v1.Pod{})
+			Expect(k8serr.IsNotFound(err)).To(BeTrue())
+			Expect(destClient.List(context.TODO(), secretList, client.InNamespace(targetNS))).To(Succeed())
+			// Only the SMB CSI secret remains; the connection secret was deleted with the Conversion CR
+			Expect(secretList.Items).To(HaveLen(1))
+			Expect(secretList.Items[0].Labels["hyperv"]).To(Equal("smb-csi-secret"))
+			err = mgmtClient.Get(context.TODO(), client.ObjectKey{Namespace: planNamespace, Name: cr.Name}, &v1beta1.Conversion{})
+			Expect(k8serr.IsNotFound(err)).To(BeTrue())
+			Expect(mgmtClient.Get(context.TODO(), client.ObjectKey{Namespace: planNamespace, Name: mgmtLeftover.Name}, &v1.Pod{})).
+				To(Succeed())
+		})
+	})
+
+	ginkgo.Describe("buildHyperVPreCopyInitContainer", func() {
+		kv := &KubeVirt{}
+
+		ginkgo.It("sets ordered DISK_PATHS and TARGET_DEVICES", func() {
+			res := &conversionResources{
+				podConfig: convctx.PodConfig{
+					Environment: []v1.EnvVar{
+						{Name: "V2V_diskPath", Value: "/hyperv/system.vhdx,/hyperv/data.vhdx"},
+					},
+				},
+				devices: []v1.VolumeDevice{
+					{Name: "disk-0", DevicePath: "/dev/block0"},
+					{Name: "disk-1", DevicePath: "/dev/block1"},
+				},
+			}
+			c, err := kv.buildHyperVPreCopyInitContainer(res)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(c.Name).To(Equal("hyperv-disk-copy"))
+			Expect(envValue(c.Env, "DISK_PATHS")).To(Equal("/hyperv/system.vhdx,/hyperv/data.vhdx"))
+			Expect(envValue(c.Env, "TARGET_DEVICES")).To(Equal("/dev/block0,/dev/block1"))
+			Expect(c.Args[0]).To(ContainSubstring("DISK_PATHS and TARGET_DEVICES must be non-empty"))
+		})
+
+		ginkgo.It("fails before qemu-img when disk and device lists are missing or unequal", func() {
+			_, err := kv.buildHyperVPreCopyInitContainer(&conversionResources{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("DISK_PATHS is empty"))
+
+			_, err = kv.buildHyperVPreCopyInitContainer(&conversionResources{
+				podConfig: convctx.PodConfig{
+					Environment: []v1.EnvVar{{Name: "V2V_diskPath", Value: "/hyperv/a.vhdx,/hyperv/b.vhdx"}},
+				},
+				devices: []v1.VolumeDevice{{Name: "disk-0", DevicePath: "/dev/block0"}},
+			})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("2 disk paths vs 1 target devices"))
+
+			_, err = kv.buildHyperVPreCopyInitContainer(&conversionResources{
+				podConfig: convctx.PodConfig{
+					Environment: []v1.EnvVar{{Name: "V2V_diskPath", Value: "/hyperv/a.vhdx"}},
+				},
+			})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("TARGET_DEVICES is empty"))
+		})
+	})
 })
+
+func envValue(env []v1.EnvVar, name string) string {
+	for _, e := range env {
+		if e.Name == name {
+			return e.Value
+		}
+	}
+	return ""
+}
 
 func createKubeVirtWithProvider(providerType v1beta1.ProviderType, objs ...runtime.Object) *KubeVirt {
 	kv := createKubeVirt(objs...)
@@ -928,6 +1149,38 @@ func createKubeVirtWithProvider(providerType v1beta1.ProviderType, objs ...runti
 	}
 	kv.Plan.ObjectMeta = metav1.ObjectMeta{Name: "test-plan", Namespace: "test", UID: "plan-uid"}
 	kv.Plan.Spec.TargetNamespace = "target-ns"
+	return kv
+}
+
+func createKubeVirtWithHyperVProvider(objs ...runtime.Object) *KubeVirt {
+	hvType := v1beta1.HyperV
+	kv := createKubeVirt(objs...)
+	kv.Source = plancontext.Source{
+		Provider: &v1beta1.Provider{
+			ObjectMeta: metav1.ObjectMeta{Name: "hv-provider", Namespace: "test", UID: "hv-uid"},
+			Spec: v1beta1.ProviderSpec{
+				Type: &hvType,
+				Secret: v1.ObjectReference{
+					Name:      "hv-secret",
+					Namespace: "test",
+				},
+			},
+		},
+		Secret: &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "hv-secret", Namespace: "test"},
+			Data: map[string][]byte{
+				"username":    []byte("hvadmin"),
+				"password":    []byte("hvpass"),
+				"smbUrl":      []byte("//192.168.1.100/VMShare"),
+				"smbUser":     []byte("smbuser"),
+				"smbPassword": []byte("smbpass"),
+			},
+		},
+	}
+	kv.Plan.ObjectMeta = metav1.ObjectMeta{Name: "test-plan", Namespace: "test", UID: "plan-uid"}
+	kv.Plan.Spec.TargetNamespace = "target-ns"
+	kv.Plan.Spec.Provider.Source = v1.ObjectReference{Name: "hv-provider", Namespace: "test"}
+	kv.Plan.Provider.Source = kv.Source.Provider
 	return kv
 }
 
@@ -1177,6 +1430,87 @@ var _ = ginkgo.Describe("PVC name template", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(objectMeta.GenerateName).To(Equal("test-plan-vm-1-"))
 			Expect(objectMeta.Name).To(BeEmpty())
+		})
+	})
+
+	ginkgo.Describe("EnsureSMBCSISecret", func() {
+		ginkgo.It("should create SMB CSI credential secret on destination cluster", func() {
+			kv := createKubeVirtWithHyperVProvider()
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+
+			secretName, secretNS, err := kv.EnsureSMBCSISecret(vm)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(secretName).ToNot(BeEmpty())
+			Expect(secretNS).To(Equal("target-ns"))
+
+			// Verify the secret exists on the destination and contains SMB credentials
+			secretList := &v1.SecretList{}
+			err = kv.Destination.List(context.Background(), secretList,
+				&client.ListOptions{Namespace: "target-ns"})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(secretList.Items).To(HaveLen(1))
+			Expect(secretList.Items[0].Data["username"]).To(Equal([]byte("smbuser")))
+			Expect(secretList.Items[0].Data["password"]).To(Equal([]byte("smbpass")))
+		})
+
+		ginkgo.It("should use HyperV credentials when dedicated SMB credentials are absent", func() {
+			kv := createKubeVirtWithHyperVProvider()
+			// Remove dedicated SMB creds so it falls back to HyperV creds
+			delete(kv.Source.Secret.Data, "smbUser")
+			delete(kv.Source.Secret.Data, "smbPassword")
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+
+			secretName, _, err := kv.EnsureSMBCSISecret(vm)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(secretName).ToNot(BeEmpty())
+
+			secretList := &v1.SecretList{}
+			err = kv.Destination.List(context.Background(), secretList,
+				&client.ListOptions{Namespace: "target-ns"})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(secretList.Items).To(HaveLen(1))
+			Expect(secretList.Items[0].Data["username"]).To(Equal([]byte("hvadmin")))
+			Expect(secretList.Items[0].Data["password"]).To(Equal([]byte("hvpass")))
+		})
+
+		ginkgo.It("should be idempotent (update existing secret)", func() {
+			kv := createKubeVirtWithHyperVProvider()
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+
+			name1, _, err := kv.EnsureSMBCSISecret(vm)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Change the source password and re-ensure
+			kv.Source.Secret.Data["smbPassword"] = []byte("newpass")
+			name2, _, err := kv.EnsureSMBCSISecret(vm)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(name2).To(Equal(name1))
+
+			// Verify it updated
+			secretList := &v1.SecretList{}
+			err = kv.Destination.List(context.Background(), secretList,
+				&client.ListOptions{Namespace: "target-ns"})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(secretList.Items).To(HaveLen(1))
+			Expect(secretList.Items[0].Data["password"]).To(Equal([]byte("newpass")))
+		})
+	})
+
+	ginkgo.Describe("BuildPVForSMB", func() {
+		ginkgo.It("should reference the destination-cluster CSI secret in NodeStageSecretRef", func() {
+			kv := createKubeVirtWithHyperVProvider()
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+
+			pv := kv.BuildPVForSMB(vm, "dest-smb-secret", "target-ns")
+			Expect(pv).ToNot(BeNil())
+			Expect(pv.Spec.CSI).ToNot(BeNil())
+			Expect(pv.Spec.CSI.NodeStageSecretRef).ToNot(BeNil())
+			Expect(pv.Spec.CSI.NodeStageSecretRef.Name).To(Equal("dest-smb-secret"))
+			Expect(pv.Spec.CSI.NodeStageSecretRef.Namespace).To(Equal("target-ns"))
 		})
 	})
 })

@@ -1261,6 +1261,13 @@ spec:
                     "net-{{.NetworkIndex}}"
                     "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
                 type: string
+              preCopySourceDisks:
+                description: |-
+                  PreCopySourceDisks enables two-phase disk transfer for Hyper-V migrations.
+                  When true, an init container converts the source VHDX files to raw format
+                  directly on the target block device using qemu-img, then virt-v2v performs
+                  only in-place guest customization.
+                type: boolean
               preserveClusterCpuModel:
                 description: Preserve the CPU model and flags the VM runs with in
                   its oVirt cluster.

@@ -201,6 +201,14 @@ type ConversionSpec struct {
 	// Extra volume mounts to add to the conversion pod container.
 	// +optional
 	ExtraMounts []core.VolumeMount `json:"extraMounts,omitempty"`
+	// Extra init containers to prepend to the pod's init container list.
+	// +optional
+	ExtraInitContainers []core.Container `json:"extraInitContainers,omitempty"`
+}
+
+// IsHyperV returns true when this Conversion targets a Hyper-V source.
+func (r *ConversionSpec) IsHyperV() bool {
+	return r.Settings["V2V_SOURCE"] == "hyperv"
 }
 
 // InspectionConcern is a single issue reported by the deep-inspection process.
