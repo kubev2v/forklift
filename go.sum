@@ -411,8 +411,6 @@ github.com/kubev2v/gophercloud v0.0.0-20230629135522-9d701a75c760 h1:2+joXldqFBM
 github.com/kubev2v/gophercloud v0.0.0-20230629135522-9d701a75c760/go.mod h1:aAVqcocTSXh2vYFZ1JTvx4EQmfgzxRcNupUfxZbBNDM=
 github.com/kubev2v/vm-migration-detective v0.0.0-20260908083350-a89447103cf3 h1:LyIswgk0L2AS5Idn176yZxbez6RWDXEt7Xq0Y4dE2u8=
 github.com/kubev2v/vm-migration-detective v0.0.0-20260908083350-a89447103cf3/go.mod h1:G/1I29xQDnu3LBZL/GUWrAGnECnVcktqMrGjvMK63ug=
-github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=
-github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/leodido/go-urn v1.4.0 h1:WT9HwE9SGECu3lg4d/dIA+jxlljEa1/ffXKmRjqdmIQ=
 github.com/leodido/go-urn v1.4.0/go.mod h1:bvxc+MVxLKB4z00jd1z+Dvzr47oO32F/QSNjSBOlFxI=
 github.com/magiconair/properties v1.8.0/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
