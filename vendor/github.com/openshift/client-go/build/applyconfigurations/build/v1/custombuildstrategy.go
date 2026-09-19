@@ -3,22 +3,37 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// CustomBuildStrategyApplyConfiguration represents an declarative configuration of the CustomBuildStrategy type for use
+// CustomBuildStrategyApplyConfiguration represents a declarative configuration of the CustomBuildStrategy type for use
 // with apply.
+//
+// CustomBuildStrategy defines input parameters specific to Custom build.
 type CustomBuildStrategyApplyConfiguration struct {
-	From               *v1.ObjectReference            `json:"from,omitempty"`
-	PullSecret         *v1.LocalObjectReference       `json:"pullSecret,omitempty"`
-	Env                []v1.EnvVar                    `json:"env,omitempty"`
-	ExposeDockerSocket *bool                          `json:"exposeDockerSocket,omitempty"`
-	ForcePull          *bool                          `json:"forcePull,omitempty"`
-	Secrets            []SecretSpecApplyConfiguration `json:"secrets,omitempty"`
-	BuildAPIVersion    *string                        `json:"buildAPIVersion,omitempty"`
+	// from is reference to an DockerImage, ImageStreamTag, or ImageStreamImage from which
+	// the container image should be pulled
+	From *corev1.ObjectReference `json:"from,omitempty"`
+	// pullSecret is the name of a Secret that would be used for setting up
+	// the authentication for pulling the container images from the private Docker
+	// registries
+	PullSecret *corev1.LocalObjectReference `json:"pullSecret,omitempty"`
+	// env contains additional environment variables you want to pass into a builder container.
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// exposeDockerSocket will allow running Docker commands (and build container images) from
+	// inside the container.
+	// TODO: Allow admins to enforce 'false' for this option
+	ExposeDockerSocket *bool `json:"exposeDockerSocket,omitempty"`
+	// forcePull describes if the controller should configure the build pod to always pull the images
+	// for the builder or only pull if it is not present locally
+	ForcePull *bool `json:"forcePull,omitempty"`
+	// secrets is a list of additional secrets that will be included in the build pod
+	Secrets []SecretSpecApplyConfiguration `json:"secrets,omitempty"`
+	// buildAPIVersion is the requested API version for the Build object serialized and passed to the custom builder
+	BuildAPIVersion *string `json:"buildAPIVersion,omitempty"`
 }
 
-// CustomBuildStrategyApplyConfiguration constructs an declarative configuration of the CustomBuildStrategy type for use with
+// CustomBuildStrategyApplyConfiguration constructs a declarative configuration of the CustomBuildStrategy type for use with
 // apply.
 func CustomBuildStrategy() *CustomBuildStrategyApplyConfiguration {
 	return &CustomBuildStrategyApplyConfiguration{}
@@ -27,7 +42,7 @@ func CustomBuildStrategy() *CustomBuildStrategyApplyConfiguration {
 // WithFrom sets the From field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the From field is set to the value of the last call.
-func (b *CustomBuildStrategyApplyConfiguration) WithFrom(value v1.ObjectReference) *CustomBuildStrategyApplyConfiguration {
+func (b *CustomBuildStrategyApplyConfiguration) WithFrom(value corev1.ObjectReference) *CustomBuildStrategyApplyConfiguration {
 	b.From = &value
 	return b
 }
@@ -35,7 +50,7 @@ func (b *CustomBuildStrategyApplyConfiguration) WithFrom(value v1.ObjectReferenc
 // WithPullSecret sets the PullSecret field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PullSecret field is set to the value of the last call.
-func (b *CustomBuildStrategyApplyConfiguration) WithPullSecret(value v1.LocalObjectReference) *CustomBuildStrategyApplyConfiguration {
+func (b *CustomBuildStrategyApplyConfiguration) WithPullSecret(value corev1.LocalObjectReference) *CustomBuildStrategyApplyConfiguration {
 	b.PullSecret = &value
 	return b
 }
@@ -43,7 +58,7 @@ func (b *CustomBuildStrategyApplyConfiguration) WithPullSecret(value v1.LocalObj
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
-func (b *CustomBuildStrategyApplyConfiguration) WithEnv(values ...v1.EnvVar) *CustomBuildStrategyApplyConfiguration {
+func (b *CustomBuildStrategyApplyConfiguration) WithEnv(values ...corev1.EnvVar) *CustomBuildStrategyApplyConfiguration {
 	for i := range values {
 		b.Env = append(b.Env, values[i])
 	}

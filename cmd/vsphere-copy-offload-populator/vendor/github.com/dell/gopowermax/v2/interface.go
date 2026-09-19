@@ -1,5 +1,5 @@
 /*
- Copyright © 2020 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -31,19 +31,21 @@ type ConfigConnect struct {
 	Endpoint string
 	Version  string
 	Username string
-	Password string
+	Password string `json:"-"`
 }
 
 // ISCSITarget is a structure representing a target IQN and associated IP addresses
 type ISCSITarget struct {
-	IQN       string
-	PortalIPs []string
+	IQN        string
+	PortalIPs  []string
+	PortStatus string
 }
 
 // NVMeTCPTarget is a structure representing a target NQN and associated IP addresses
 type NVMeTCPTarget struct {
-	NQN       string
-	PortalIPs []string
+	NQN        string
+	PortalIPs  []string
+	PortStatus string
 }
 
 const (
@@ -52,6 +54,11 @@ const (
 	DefaultAPIVersion = "100"
 	// APIVersion91 is the API version corresponding to 91
 	APIVersion91 = "91"
+
+	// PortStatusOn indicates the port is online
+	PortStatusOn = "ON"
+	// PortStatusOff indicates the port is offline
+	PortStatusOff = "OFF"
 )
 
 // Pmax interface has all the externally available functions provided by the pmax client library for the Powermax accessed through Unisphere.
@@ -60,6 +67,15 @@ type Pmax interface {
 
 	// Authenticate causes authentication and tests the connection
 	Authenticate(ctx context.Context, configConnect *ConfigConnect) error
+
+	// SetToken sets the Auth token for the HTTP client
+	SetToken(token string)
+
+	// SetCustomHTTPHeaders sets custom HTTP headers that will be sent with every request
+	SetCustomHTTPHeaders(headers http.Header)
+
+	// GetCustomHTTPHeaders returns the current custom HTTP headers
+	GetCustomHTTPHeaders() http.Header
 
 	// WithSymmetrixID set a default symmetrix ID for the admin client,
 	// for it to be added to the request header.
@@ -100,11 +116,23 @@ type Pmax interface {
 	// GetVolumeByID returns a Volume given the volumeID.
 	GetVolumeByID(ctx context.Context, symID string, volumeID string) (*types.Volume, error)
 
+	// GetVolumesByIdentifier returns a Volume given the volume identifier.
+	GetVolumesByIdentifier(ctx context.Context, symID string, identifier string) (*types.Volumev1, error)
+
+	// GetVolumesByIdentifierMatch returns a Volume structure given the symmetrix ID and volume identifier that matches the regex.
+	GetVolumesByIdentifierMatch(ctx context.Context, symID string, identifierMatcher string) (*types.Volumev1, error)
+
+	// GetVolumesCapacityBulk returns capacity information for all volumes on the array in a single bulk operation.
+	GetVolumesCapacityBulk(ctx context.Context, symID string) (*types.Volumev1, error)
+
 	// GetStorageGroupIDList returns a list of all the StorageGroup ids.
 	GetStorageGroupIDList(ctx context.Context, symID, storageGroupIDMatch string, like bool) (*types.StorageGroupIDList, error)
 
 	// GetStorageGroup returns a storage group given the StorageGroup id.
 	GetStorageGroup(ctx context.Context, symID string, storageGroupID string) (*types.StorageGroup, error)
+
+	// GetStorageGroupVolumeCounts returns a StorageGroupVolumeCounts object, which contains a list of storage groups with their respective volume counts
+	GetStorageGroupVolumeCounts(ctx context.Context, symID string, prefix string) (*types.StorageGroupVolumeCounts, error)
 
 	// GetStorageGroupSnapshotPolicy returns a storage group snapshot policy details.
 	GetStorageGroupSnapshotPolicy(ctx context.Context, symID, snapshotPolicyID, storageGroupID string) (*types.StorageGroupSnapshotPolicy, error)
@@ -138,6 +166,10 @@ type Pmax interface {
 	// This will add volume in both Local and Remote Storage group
 	// This is done synchronously and no jobs are created. HTTP header argument is optional
 	CreateVolumeInProtectedStorageGroupS(ctx context.Context, symID, remoteSymID, storageGroupID string, remoteStorageGroupID string, volumeName string, volumeSize interface{}, volOpts map[string]interface{}, opts ...http.Header) (*types.Volume, error)
+
+	// CreateVolume creates volumes using the enhanced Create Volume API with flexible volume creation options.
+	// HTTP header argument is optional and can be used to pass authorization metadata.
+	CreateVolume(ctx context.Context, systemID string, req types.CreateVolumesRequest, opts ...http.Header) (*types.CreateVolumesResponse, error)
 
 	// GetStorageGroupSnapshots Gets All Storage Group Snapshots
 	GetStorageGroupSnapshots(ctx context.Context, symID string, storageGroupID string, excludeManualSnaps bool, excludeSlSnaps bool) (*types.StorageGroupSnapshot, error)
@@ -206,6 +238,10 @@ type Pmax interface {
 	// host id and the port id and returns the masking view object
 	CreateMaskingView(ctx context.Context, symID string, maskingViewID string, storageGroupID string, hostOrhostGroupID string, isHost bool, portGroupID string) (*types.MaskingView, error)
 
+	// PublishMaskingViews publishes masking views with optional storage group, host, and port group configurations
+	// This API creates or updates masking views and their associated components in a single operation
+	PublishMaskingViews(ctx context.Context, symID string, param *types.PublishMaskingViewsParam) (*types.PublishMaskingViewResponse, error)
+
 	// CreatePortGroup creates a port group given the Port Group id and a list of dir/port ids
 	CreatePortGroup(ctx context.Context, symID string, portGroupID string, dirPorts []types.PortKey, protocol string) (*types.PortGroup, error)
 
@@ -253,6 +289,14 @@ type Pmax interface {
 	GetDirectorIDList(ctx context.Context, symID string) (*types.DirectorIDList, error)
 	// GetPortList returns a list of all the ports on a specified director/array.
 	GetPortList(ctx context.Context, symID string, directorID string, query string) (*types.PortList, error)
+
+	// GetPorts returns a list of all the ports on a specified director/array-Enhanced API.
+	GetPorts(ctx context.Context, symID string) (*types.PortV1, error)
+
+	// GetPortGroupListByType returns a list of all the Port Group ids.
+	GetPortGroupListByType(ctx context.Context, symID string, portGroupType string) (*types.PortGroupListResult, error)
+	// GetPortListByProtocol returns a list of ports associated with a given protocol for a specified Symmetrix array.
+	GetPortListByProtocol(ctx context.Context, symID string, protocol string) (*types.PortList, error)
 	// GetPort returns port details.
 	GetPort(ctx context.Context, symID string, directorID string, portID string) (*types.Port, error)
 	// GetListOfTargetAddresses returns an array of all IP addresses which expose iscsi targets.
@@ -261,6 +305,8 @@ type Pmax interface {
 	GetNVMeTCPTargets(ctx context.Context, symID string) ([]NVMeTCPTarget, error)
 	// GetISCSITargets returns a list of ISCSI Targets for a given sym id
 	GetISCSITargets(ctx context.Context, symID string) ([]ISCSITarget, error)
+	// GetISCSIEndpoints returns a list of ISCSI Targets for a given sym id
+	GetISCSIEndpoints(ctx context.Context, symID string) ([]ISCSITarget, error)
 	// CreateHostGroup creates a hostGroup from a list of hostIDs (and optional HostFlags) and  returns a types.HostGroup.
 	CreateHostGroup(ctx context.Context, symID string, hostGroupID string, hostIDs []string, hostFlags *types.HostFlags) (*types.HostGroup, error)
 	// GetHostGroupList returns a list of all the HostGroup ids.
@@ -366,6 +412,8 @@ type Pmax interface {
 
 	// GetStorageGroupMetrics returns the list of required metrics
 	GetStorageGroupMetrics(ctx context.Context, symID string, storageGroupID string, metricsQuery []string, firstAvailableDate int64, lastAvailableTime int64) (*types.StorageGroupMetricsIterator, error)
+	// GetStorageGroupMetricsBulk returns all Storage Group performance metrics in a single GET call
+	GetStorageGroupMetricsBulk(ctx context.Context, symID string) (*types.StorageGroupPerfCategoryResult, error)
 	// GetVolumesMetrics returns the list of volume metrics for specific storage groups
 	GetVolumesMetrics(ctx context.Context, symID string, storageGroups string, metricsQuery []string, firstAvailableDate int64, lastAvailableTime int64) (*types.VolumeMetricsIterator, error)
 	// GetStorageGroupPerfKeys returns the performance keys of storage group
@@ -387,6 +435,10 @@ type Pmax interface {
 	DeleteMigrationEnvironment(ctx context.Context, localSymID, remoteSymID string) error
 	// GetMigrationEnvironment returns a migration environment
 	GetMigrationEnvironment(ctx context.Context, localSymID, remoteSymID string) (*types.MigrationEnv, error)
+	// MigrateStorageGroup creates a Storage Group given the storageGroupID (name), srpID (storage resource pool), service level, and boolean for thick volumes.
+	// If srpID is "None" then serviceLevel and thickVolumes settings are ignored
+	MigrateStorageGroup(ctx context.Context, symID, storageGroupID, srpID, serviceLevel string, thickVolumes bool) (*types.StorageGroup, error)
+
 	// GetStorageGroupMigration returns migration sessions on the array
 	GetStorageGroupMigration(ctx context.Context, localSymID string) (*types.MigrationStorageGroups, error)
 	// GetStorageGroupMigrationByID returns migration details for a storage group
@@ -434,7 +486,18 @@ type Pmax interface {
 	DeleteNASServer(ctx context.Context, symID, nasID string) error
 	// GetFileInterfaceByID gets a FileInterface
 	GetFileInterfaceByID(ctx context.Context, symID, interfaceID string) (*types.FileInterface, error)
-
 	// RefreshSymmetrix refreshes cache on the symID
 	RefreshSymmetrix(ctx context.Context, symID string) error
+
+	// GetNFSServerList get NFS Server list on a symID
+	GetNFSServerList(ctx context.Context, symID string) (*types.NFSServerIterator, error)
+
+	// GetNFSServerByID fetch specific NFS server on symID
+	GetNFSServerByID(ctx context.Context, symID, nfsID string) (*types.NFSServer, error)
+
+	// GetVersionDetails fetch array API version details
+	GetVersionDetails(ctx context.Context) (*types.VersionDetails, error)
+
+	// CloneVolumeFromVolume is an enhanced for volume clone.
+	CloneVolumeFromVolume(ctx context.Context, symID string, replicaPair types.ReplicationRequest) error
 }

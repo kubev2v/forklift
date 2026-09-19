@@ -14,7 +14,24 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/internal/json"
+	"github.com/modelcontextprotocol/go-sdk/internal/mcpgodebug"
 )
+
+// nomethodnotfoundcodeinerror is a compatibility parameter that restores the
+// pre-fix behavior of [processResult], where wrapped [ErrNotHandled] or
+// [ErrMethodNotFound] errors returned by request handlers were not
+// recognized as "method not found" signals. The original switch statement
+// compared sentinel errors with ==, which never matched errors returned via
+// fmt.Errorf("%w: ...", ErrNotHandled, ...) — including the ones produced
+// by checkRequest. As a result the wire error response carried code 0
+// instead of code -32601. The fix uses errors.Is to recognize wrapped
+// sentinels and append the method name to the message.
+//
+// To restore the previous behavior, set MCPGODEBUG=nomethodnotfoundcodeinerror=1.
+// This option will be removed in a future SDK version.
+// See the documentation for the mcpgodebug package for instructions on how
+// to use it.
+var nomethodnotfoundcodeinerror = mcpgodebug.Value("nomethodnotfoundcodeinerror")
 
 // Connection manages the jsonrpc2 protocol, connecting responses back to their
 // calls. Connection is bidirectional; it does not have a designated server or
@@ -141,12 +158,12 @@ func (s *inFlightState) shuttingDown(errClosing error) error {
 	if s.readErr != nil {
 		// If the read side of the connection is broken, we cannot read new call
 		// requests, and cannot read responses to our outgoing calls.
-		return fmt.Errorf("%w: %v", errClosing, s.readErr)
+		return fmt.Errorf("%w: %w", errClosing, s.readErr)
 	}
 	if s.writeErr != nil {
 		// If the write side of the connection is broken, we cannot write responses
 		// for incoming calls, and cannot write requests for outgoing calls.
-		return fmt.Errorf("%w: %v", errClosing, s.writeErr)
+		return fmt.Errorf("%w: %w", errClosing, s.writeErr)
 	}
 	return nil
 }
@@ -155,7 +172,7 @@ func (s *inFlightState) shuttingDown(errClosing error) error {
 type incomingRequest struct {
 	*Request // the request being processed
 	ctx      context.Context
-	cancel   context.CancelFunc
+	cancel   context.CancelCauseFunc
 }
 
 // Reader abstracts the transport mechanics from the JSON RPC protocol.
@@ -191,12 +208,30 @@ type ConnectionConfig struct {
 	Bind            func(*Connection) Handler // required
 	OnDone          func()                    // optional
 	OnInternalError func(error)               // optional
+
+	// PropagateCancellation controls whether cancellation of the context
+	// passed to [NewConnection] is observable by request handlers.
+	//
+	// By default (false), the connection wraps that context (see [notDone])
+	// so handlers' Done channels do not fire when the connection's root
+	// context is cancelled. Cancellation of an in-flight handler is then
+	// expected to flow only through the jsonrpc2 layer's explicit channels
+	// (the [Preempter] reacting to the peer's cancel notification, or a
+	// transport read/write failure cancelling every in-flight request).
+	//
+	// Set this true when cancellation of the connection's context is itself
+	// a meaningful signal that handlers should react to (for example, when
+	// the connection is tied to a carrier that owns it and whose end means
+	// the request is cancelled).
+	PropagateCancellation bool // optional
 }
 
 // NewConnection creates a new [Connection] object and starts processing
 // incoming messages.
 func NewConnection(ctx context.Context, cfg ConnectionConfig) *Connection {
-	ctx = notDone{ctx}
+	if !cfg.PropagateCancellation {
+		ctx = notDone{ctx}
+	}
 
 	c := &Connection{
 		state:           inFlightState{closer: cfg.Closer},
@@ -423,7 +458,7 @@ func (c *Connection) Cancel(id ID) {
 		req = s.incomingByID[id]
 	})
 	if req != nil {
-		req.cancel()
+		req.cancel(nil)
 	}
 }
 
@@ -513,6 +548,16 @@ func (c *Connection) readIncoming(ctx context.Context, reader Reader, preempter 
 			ac.retire(&Response{ID: id, Error: err})
 		}
 		s.outgoingCalls = nil
+
+		// Cancel any incoming requests still in flight: with the reader gone we
+		// cannot receive cancellation notifications, and likely cannot write a
+		// response either, so parked handlers have nothing useful left to do.
+		// The read error (typically io.EOF from the peer disconnecting) is the
+		// cause, rather than a directional ErrServerClosing/ErrClientClosing
+		// sentinel: at this layer the connection has no designated end.
+		for _, r := range s.incomingByID {
+			r.cancel(err)
+		}
 	})
 }
 
@@ -521,7 +566,7 @@ func (c *Connection) readIncoming(ctx context.Context, reader Reader, preempter 
 func (c *Connection) acceptRequest(ctx context.Context, msg *Request, preempter Preempter) {
 	// In theory notifications cannot be cancelled, but we build them a cancel
 	// context anyway.
-	reqCtx, cancel := context.WithCancel(ctx)
+	reqCtx, cancel := context.WithCancelCause(ctx)
 	req := &incomingRequest{
 		Request: msg,
 		ctx:     reqCtx,
@@ -622,15 +667,14 @@ func (c *Connection) handleAsync() {
 			return
 		}
 
-		// Only deliver to the Handler if not already canceled.
+		// Only deliver to the Handler if not already canceled. If the request
+		// was canceled with a cause (e.g. a write failure cancels every
+		// in-flight request), report that cause rather than the bare
+		// context.Canceled.
 		if err := req.ctx.Err(); err != nil {
-			c.updateInFlight(func(s *inFlightState) {
-				if s.writeErr != nil {
-					// Assume that req.ctx was canceled due to s.writeErr.
-					// TODO(#51365): use a Context API to plumb this through req.ctx.
-					err = fmt.Errorf("%w: %v", ErrServerClosing, s.writeErr)
-				}
-			})
+			if cause := context.Cause(req.ctx); cause != nil {
+				err = cause
+			}
 			c.processResult("handleAsync", req, nil, err)
 			continue
 		}
@@ -648,9 +692,7 @@ func (c *Connection) handleAsync() {
 
 // processResult processes the result of a request and, if appropriate, sends a response.
 func (c *Connection) processResult(from any, req *incomingRequest, result any, err error) error {
-	switch err {
-	case ErrNotHandled, ErrMethodNotFound:
-		// Add detail describing the unhandled method.
+	if nomethodnotfoundcodeinerror != "1" && (errors.Is(err, ErrNotHandled) || errors.Is(err, ErrMethodNotFound)) {
 		err = fmt.Errorf("%w: %q", ErrMethodNotFound, req.Method)
 	}
 
@@ -693,7 +735,7 @@ func (c *Connection) processResult(from any, req *incomingRequest, result any, e
 	}
 
 	// Cancel the request to free any associated resources.
-	req.cancel()
+	req.cancel(nil)
 	c.updateInFlight(func(s *inFlightState) {
 		if s.incoming == 0 {
 			panic("jsonrpc2: processResult called when incoming count is already zero")
@@ -709,9 +751,12 @@ func (c *Connection) write(ctx context.Context, msg Message) error {
 	var err error
 	// Fail writes immediately if the connection is shutting down.
 	//
-	// TODO(rfindley): should we allow cancellation notifications through? It
-	// could be the case that writes can still succeed.
+	// Allow outgoing "notifications" forwarded by the Notify method.
+	// This will allow to send the cancelled notification when the client is shutting down.
 	c.updateInFlight(func(s *inFlightState) {
+		if req, ok := msg.(*Request); ok && !req.IsCall() && s.outgoingNotifications > 0 {
+			return
+		}
 		err = s.shuttingDown(ErrServerClosing)
 	})
 	if err == nil {
@@ -733,7 +778,7 @@ func (c *Connection) write(ctx context.Context, msg Message) error {
 			if s.writeErr == nil {
 				s.writeErr = err
 				for _, r := range s.incomingByID {
-					r.cancel()
+					r.cancel(fmt.Errorf("%w: %v", ErrServerClosing, err))
 				}
 			}
 		})
@@ -756,6 +801,15 @@ func (c *Connection) internalErrorf(format string, args ...any) error {
 }
 
 // notDone is a context.Context wrapper that returns a nil Done channel.
+//
+// Request handlers' contexts are derived from the connection's root context,
+// which by default is wrapped in notDone so a transport-level cancellation
+// does not implicitly cancel every in-flight handler. Cancellation of an
+// in-flight handler is instead expected to flow only through the jsonrpc2
+// layer's explicit channels: the [Preempter] calling [Connection.Cancel] in
+// response to the peer's cancel notification, or the transport itself
+// failing (the read loop exits on EOF or a write fails) — both of which
+// cancel every in-flight incoming request in turn.
 type notDone struct{ ctx context.Context }
 
 func (ic notDone) Value(key any) any {

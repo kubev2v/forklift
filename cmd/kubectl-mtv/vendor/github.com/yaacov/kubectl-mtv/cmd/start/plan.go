@@ -98,7 +98,7 @@ them in Kubernetes. This is useful for debugging, validation, and inspection.`,
 					return fmt.Errorf("failed to get all plan names: %v", err)
 				}
 				if len(planNames) == 0 {
-					fmt.Fprintf(cmd.OutOrStdout(), "No plans found in namespace %s\n", namespace)
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No plans found in namespace %s\n", namespace)
 					return nil
 				}
 			}

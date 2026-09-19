@@ -50,12 +50,19 @@ var pretouchType func(_vt reflect.Type, opts option.CompileOptions, v uint8) (ma
 func pretouchTypeVM(_vt reflect.Type, opts option.CompileOptions, v uint8) (map[reflect.Type]uint8, error) {
 	/* compile function */
 	compiler := NewCompiler().apply(opts)
+	encoder := func(vt *rt.GoType, ex ...interface{}) (interface{}, error) {
+		pp, err := compiler.Compile(vt.Pack(), ex[0].(bool))
+		if err != nil {
+			return nil, err
+		}
+		return &pp, nil
+	}
 
 	/* find or compile */
 	vt := rt.UnpackType(_vt)
 	if val := vars.GetProgram(vt); val != nil {
 		return nil, nil
-	} else if _, err := vars.ComputeProgram(vt, makeEncoderVM, v == 1); err == nil {
+	} else if _, err := vars.ComputeProgram(vt, encoder, v == 1); err == nil {
 		return compiler.rec, nil
 	} else {
 		return nil, err
@@ -287,6 +294,12 @@ func (self *Compiler) compileMapBody(p *ir.Program, sp int, vt reflect.Type) {
 }
 
 func (self *Compiler) compileMapBodyKey(p *ir.Program, vk reflect.Type) {
+	// followed as `encoding/json/emcode.go:resolveKeyName
+	if vk.Kind() == reflect.String {
+		self.compileString(p, vk)
+		return
+	}
+
 	if !vk.Implements(vars.EncodingTextMarshalerType) {
 		self.compileMapBodyTextKey(p, vk)
 	} else {
@@ -463,8 +476,15 @@ func (self *Compiler) compileStructBody(p *ir.Program, sp int, vt reflect.Type) 
 
 		/* check for "omitempty" option */
 		if fv.Type.Kind() != reflect.Struct && fv.Type.Kind() != reflect.Array && (fv.Opts&resolver.F_omitempty) != 0 {
-			s = append(s, p.PC())
-			self.compileStructFieldEmpty(p, fv.Type)
+			if self.opts.EncOnlyOmitNull {
+				x := p.PC()
+				if self.compileStructFieldOmitNilPtr(p, fv.Type) {
+					s = append(s, x)
+				}
+			} else {
+				s = append(s, p.PC())
+				self.compileStructFieldEmpty(p, fv.Type)
+			}
 		}
 		/* check for "omitzero" option */
 		if fv.Opts&resolver.F_omitzero != 0 {
@@ -501,7 +521,7 @@ func (self *Compiler) compileStructBody(p *ir.Program, sp int, vt reflect.Type) 
 
 func (self *Compiler) compileStructFieldStr(p *ir.Program, sp int, vt reflect.Type) {
 	// NOTICE: according to encoding/json, Marshaler type has higher priority than string option
-	// see issue: 
+	// see issue:
 	if self.tryCompileMarshaler(p, vt, self.pv) {
 		return
 	}
@@ -625,6 +645,25 @@ func (self *Compiler) compileStructFieldEmpty(p *ir.Program, vt reflect.Type) {
 	}
 }
 
+func (self *Compiler) compileStructFieldOmitNilPtr(p *ir.Program, vt reflect.Type) bool {
+	switch vt.Kind() {
+	case reflect.Interface:
+		p.Add(ir.OP_is_nil)
+		return true
+	case reflect.Map:
+		p.Add(ir.OP_is_nil)
+		return true
+	case reflect.Ptr:
+		p.Add(ir.OP_is_nil)
+		return true
+	case reflect.Slice:
+		p.Add(ir.OP_is_nil)
+		return true
+	default:
+		return false
+	}
+}
+
 func (self *Compiler) compileStructFieldQuoted(p *ir.Program, sp int, vt reflect.Type) {
 	p.Int(ir.OP_byte, '"')
 	self.compileOne(p, sp, vt, self.pv)
@@ -654,7 +693,6 @@ func (self *Compiler) compileUnsupportedType(p *ir.Program, vt reflect.Type) {
 	p.Rtt(ir.OP_unsupported, vt)
 }
 
-
 func (self *Compiler) compileMarshaler(p *ir.Program, op ir.Op, vt reflect.Type, mt reflect.Type) {
 	pc := p.PC()
 	vk := vt.Kind()
@@ -681,7 +719,7 @@ func addMarshalerOp(p *ir.Program, op ir.Op, vt reflect.Type, mt reflect.Type) {
 		itab := rt.GetItab(rt.IfaceType(rt.UnpackType(mt)), rt.UnpackType(vt), true)
 		p.Vtab(op, vt, itab)
 	} else {
-		// OPT: get itab here 
+		// OPT: get itab here
 		p.Rtt(op, vt)
 	}
 }

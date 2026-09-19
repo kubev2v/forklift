@@ -1,11 +1,12 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -92,6 +93,7 @@ func (s *DistributedVirtualSwitch) AddDVPortgroupTask(ctx *Context, c *types.Add
 				VmVnicNetworkResourcePoolKey: spec.VmVnicNetworkResourcePoolKey,
 				LogicalSwitchUuid:            spec.LogicalSwitchUuid,
 				SegmentId:                    spec.SegmentId,
+				SubnetId:                     spec.SubnetId,
 				BackingType:                  spec.BackingType,
 			}
 
@@ -350,11 +352,8 @@ func (s *DistributedVirtualSwitch) filterDVPortsByPortgroupKey(
 		filtered := []types.DistributedVirtualPort{}
 
 		for _, p := range ports {
-			for _, pgk := range criteria.PortgroupKey {
-				if p.PortgroupKey == pgk {
-					filtered = append(filtered, p)
-					break
-				}
+			if slices.Contains(criteria.PortgroupKey, p.PortgroupKey) {
+				filtered = append(filtered, p)
 			}
 		}
 		return filtered
@@ -364,13 +363,7 @@ func (s *DistributedVirtualSwitch) filterDVPortsByPortgroupKey(
 	filtered := []types.DistributedVirtualPort{}
 
 	for _, p := range ports {
-		found := false
-		for _, pgk := range criteria.PortgroupKey {
-			if p.PortgroupKey == pgk {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(criteria.PortgroupKey, p.PortgroupKey)
 
 		if !found {
 			filtered = append(filtered, p)
@@ -390,11 +383,8 @@ func (s *DistributedVirtualSwitch) filterDVPortsByPortKey(
 	filtered := []types.DistributedVirtualPort{}
 
 	for _, p := range ports {
-		for _, pk := range criteria.PortKey {
-			if p.Key == pk {
-				filtered = append(filtered, p)
-				break
-			}
+		if slices.Contains(criteria.PortKey, p.Key) {
+			filtered = append(filtered, p)
 		}
 	}
 

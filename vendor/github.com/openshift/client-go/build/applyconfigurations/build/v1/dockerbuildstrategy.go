@@ -4,24 +4,53 @@ package v1
 
 import (
 	buildv1 "github.com/openshift/api/build/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// DockerBuildStrategyApplyConfiguration represents an declarative configuration of the DockerBuildStrategy type for use
+// DockerBuildStrategyApplyConfiguration represents a declarative configuration of the DockerBuildStrategy type for use
 // with apply.
+//
+// DockerBuildStrategy defines input parameters specific to container image build.
 type DockerBuildStrategyApplyConfiguration struct {
-	From                    *v1.ObjectReference              `json:"from,omitempty"`
-	PullSecret              *v1.LocalObjectReference         `json:"pullSecret,omitempty"`
-	NoCache                 *bool                            `json:"noCache,omitempty"`
-	Env                     []v1.EnvVar                      `json:"env,omitempty"`
-	ForcePull               *bool                            `json:"forcePull,omitempty"`
-	DockerfilePath          *string                          `json:"dockerfilePath,omitempty"`
-	BuildArgs               []v1.EnvVar                      `json:"buildArgs,omitempty"`
+	// from is a reference to an DockerImage, ImageStreamTag, or ImageStreamImage which overrides
+	// the FROM image in the Dockerfile for the build. If the Dockerfile uses multi-stage builds,
+	// this will replace the image in the last FROM directive of the file.
+	From *corev1.ObjectReference `json:"from,omitempty"`
+	// pullSecret is the name of a Secret that would be used for setting up
+	// the authentication for pulling the container images from the private Docker
+	// registries
+	PullSecret *corev1.LocalObjectReference `json:"pullSecret,omitempty"`
+	// noCache if set to true indicates that the container image build must be executed with the
+	// --no-cache=true flag
+	NoCache *bool `json:"noCache,omitempty"`
+	// env contains additional environment variables you want to pass into a builder container.
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// forcePull describes if the builder should pull the images from registry prior to building.
+	ForcePull *bool `json:"forcePull,omitempty"`
+	// dockerfilePath is the path of the Dockerfile that will be used to build the container image,
+	// relative to the root of the context (contextDir).
+	// Defaults to `Dockerfile` if unset.
+	DockerfilePath *string `json:"dockerfilePath,omitempty"`
+	// buildArgs contains build arguments that will be resolved in the Dockerfile.  See
+	// https://docs.docker.com/engine/reference/builder/#/arg for more details.
+	// NOTE: Only the 'name' and 'value' fields are supported. Any settings on the 'valueFrom' field
+	// are ignored.
+	BuildArgs []corev1.EnvVar `json:"buildArgs,omitempty"`
+	// imageOptimizationPolicy describes what optimizations the system can use when building images
+	// to reduce the final size or time spent building the image. The default policy is 'None' which
+	// means the final build image will be equivalent to an image created by the container image build API.
+	// The experimental policy 'SkipLayers' will avoid commiting new layers in between each
+	// image step, and will fail if the Dockerfile cannot provide compatibility with the 'None'
+	// policy. An additional experimental policy 'SkipLayersAndWarn' is the same as
+	// 'SkipLayers' but simply warns if compatibility cannot be preserved.
 	ImageOptimizationPolicy *buildv1.ImageOptimizationPolicy `json:"imageOptimizationPolicy,omitempty"`
-	Volumes                 []BuildVolumeApplyConfiguration  `json:"volumes,omitempty"`
+	// volumes is a list of input volumes that can be mounted into the builds runtime environment.
+	// Only a subset of Kubernetes Volume sources are supported by builds.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes
+	Volumes []BuildVolumeApplyConfiguration `json:"volumes,omitempty"`
 }
 
-// DockerBuildStrategyApplyConfiguration constructs an declarative configuration of the DockerBuildStrategy type for use with
+// DockerBuildStrategyApplyConfiguration constructs a declarative configuration of the DockerBuildStrategy type for use with
 // apply.
 func DockerBuildStrategy() *DockerBuildStrategyApplyConfiguration {
 	return &DockerBuildStrategyApplyConfiguration{}
@@ -30,7 +59,7 @@ func DockerBuildStrategy() *DockerBuildStrategyApplyConfiguration {
 // WithFrom sets the From field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the From field is set to the value of the last call.
-func (b *DockerBuildStrategyApplyConfiguration) WithFrom(value v1.ObjectReference) *DockerBuildStrategyApplyConfiguration {
+func (b *DockerBuildStrategyApplyConfiguration) WithFrom(value corev1.ObjectReference) *DockerBuildStrategyApplyConfiguration {
 	b.From = &value
 	return b
 }
@@ -38,7 +67,7 @@ func (b *DockerBuildStrategyApplyConfiguration) WithFrom(value v1.ObjectReferenc
 // WithPullSecret sets the PullSecret field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PullSecret field is set to the value of the last call.
-func (b *DockerBuildStrategyApplyConfiguration) WithPullSecret(value v1.LocalObjectReference) *DockerBuildStrategyApplyConfiguration {
+func (b *DockerBuildStrategyApplyConfiguration) WithPullSecret(value corev1.LocalObjectReference) *DockerBuildStrategyApplyConfiguration {
 	b.PullSecret = &value
 	return b
 }
@@ -54,7 +83,7 @@ func (b *DockerBuildStrategyApplyConfiguration) WithNoCache(value bool) *DockerB
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
-func (b *DockerBuildStrategyApplyConfiguration) WithEnv(values ...v1.EnvVar) *DockerBuildStrategyApplyConfiguration {
+func (b *DockerBuildStrategyApplyConfiguration) WithEnv(values ...corev1.EnvVar) *DockerBuildStrategyApplyConfiguration {
 	for i := range values {
 		b.Env = append(b.Env, values[i])
 	}
@@ -80,7 +109,7 @@ func (b *DockerBuildStrategyApplyConfiguration) WithDockerfilePath(value string)
 // WithBuildArgs adds the given value to the BuildArgs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the BuildArgs field.
-func (b *DockerBuildStrategyApplyConfiguration) WithBuildArgs(values ...v1.EnvVar) *DockerBuildStrategyApplyConfiguration {
+func (b *DockerBuildStrategyApplyConfiguration) WithBuildArgs(values ...corev1.EnvVar) *DockerBuildStrategyApplyConfiguration {
 	for i := range values {
 		b.BuildArgs = append(b.BuildArgs, values[i])
 	}

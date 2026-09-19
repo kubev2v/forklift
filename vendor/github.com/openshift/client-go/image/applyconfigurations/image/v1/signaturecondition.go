@@ -3,23 +3,31 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/image/v1"
+	imagev1 "github.com/openshift/api/image/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// SignatureConditionApplyConfiguration represents an declarative configuration of the SignatureCondition type for use
+// SignatureConditionApplyConfiguration represents a declarative configuration of the SignatureCondition type for use
 // with apply.
+//
+// SignatureCondition describes an image signature condition of particular kind at particular probe time.
 type SignatureConditionApplyConfiguration struct {
-	Type               *v1.SignatureConditionType `json:"type,omitempty"`
-	Status             *corev1.ConditionStatus    `json:"status,omitempty"`
-	LastProbeTime      *metav1.Time               `json:"lastProbeTime,omitempty"`
-	LastTransitionTime *metav1.Time               `json:"lastTransitionTime,omitempty"`
-	Reason             *string                    `json:"reason,omitempty"`
-	Message            *string                    `json:"message,omitempty"`
+	// type of signature condition, Complete or Failed.
+	Type *imagev1.SignatureConditionType `json:"type,omitempty"`
+	// status of the condition, one of True, False, Unknown.
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
+	// Last time the condition was checked.
+	LastProbeTime *metav1.Time `json:"lastProbeTime,omitempty"`
+	// Last time the condition transit from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// (brief) reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// Human readable message indicating details about last transition.
+	Message *string `json:"message,omitempty"`
 }
 
-// SignatureConditionApplyConfiguration constructs an declarative configuration of the SignatureCondition type for use with
+// SignatureConditionApplyConfiguration constructs a declarative configuration of the SignatureCondition type for use with
 // apply.
 func SignatureCondition() *SignatureConditionApplyConfiguration {
 	return &SignatureConditionApplyConfiguration{}
@@ -28,7 +36,7 @@ func SignatureCondition() *SignatureConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *SignatureConditionApplyConfiguration) WithType(value v1.SignatureConditionType) *SignatureConditionApplyConfiguration {
+func (b *SignatureConditionApplyConfiguration) WithType(value imagev1.SignatureConditionType) *SignatureConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

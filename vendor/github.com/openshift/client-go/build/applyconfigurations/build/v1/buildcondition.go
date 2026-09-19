@@ -3,23 +3,31 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/build/v1"
+	buildv1 "github.com/openshift/api/build/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BuildConditionApplyConfiguration represents an declarative configuration of the BuildCondition type for use
+// BuildConditionApplyConfiguration represents a declarative configuration of the BuildCondition type for use
 // with apply.
+//
+// BuildCondition describes the state of a build at a certain point.
 type BuildConditionApplyConfiguration struct {
-	Type               *v1.BuildConditionType  `json:"type,omitempty"`
-	Status             *corev1.ConditionStatus `json:"status,omitempty"`
-	LastUpdateTime     *metav1.Time            `json:"lastUpdateTime,omitempty"`
-	LastTransitionTime *metav1.Time            `json:"lastTransitionTime,omitempty"`
-	Reason             *string                 `json:"reason,omitempty"`
-	Message            *string                 `json:"message,omitempty"`
+	// type of build condition.
+	Type *buildv1.BuildConditionType `json:"type,omitempty"`
+	// status of the condition, one of True, False, Unknown.
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
+	// The last time this condition was updated.
+	LastUpdateTime *metav1.Time `json:"lastUpdateTime,omitempty"`
+	// The last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message *string `json:"message,omitempty"`
 }
 
-// BuildConditionApplyConfiguration constructs an declarative configuration of the BuildCondition type for use with
+// BuildConditionApplyConfiguration constructs a declarative configuration of the BuildCondition type for use with
 // apply.
 func BuildCondition() *BuildConditionApplyConfiguration {
 	return &BuildConditionApplyConfiguration{}
@@ -28,7 +36,7 @@ func BuildCondition() *BuildConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *BuildConditionApplyConfiguration) WithType(value v1.BuildConditionType) *BuildConditionApplyConfiguration {
+func (b *BuildConditionApplyConfiguration) WithType(value buildv1.BuildConditionType) *BuildConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

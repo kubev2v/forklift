@@ -2,14 +2,18 @@
 
 package v1
 
-// SourceControlUserApplyConfiguration represents an declarative configuration of the SourceControlUser type for use
+// SourceControlUserApplyConfiguration represents a declarative configuration of the SourceControlUser type for use
 // with apply.
+//
+// SourceControlUser defines the identity of a user of source control
 type SourceControlUserApplyConfiguration struct {
-	Name  *string `json:"name,omitempty"`
+	// name of the source control user
+	Name *string `json:"name,omitempty"`
+	// email of the source control user
 	Email *string `json:"email,omitempty"`
 }
 
-// SourceControlUserApplyConfiguration constructs an declarative configuration of the SourceControlUser type for use with
+// SourceControlUserApplyConfiguration constructs a declarative configuration of the SourceControlUser type for use with
 // apply.
 func SourceControlUser() *SourceControlUserApplyConfiguration {
 	return &SourceControlUserApplyConfiguration{}

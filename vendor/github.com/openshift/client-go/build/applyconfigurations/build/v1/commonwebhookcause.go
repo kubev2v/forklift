@@ -2,14 +2,20 @@
 
 package v1
 
-// CommonWebHookCauseApplyConfiguration represents an declarative configuration of the CommonWebHookCause type for use
+// CommonWebHookCauseApplyConfiguration represents a declarative configuration of the CommonWebHookCause type for use
 // with apply.
+//
+// CommonWebHookCause factors out the identical format of these webhook
+// causes into struct so we can share it in the specific causes;  it is too late for
+// GitHub and Generic but we can leverage this pattern with GitLab and Bitbucket.
 type CommonWebHookCauseApplyConfiguration struct {
+	// revision is the git source revision information of the trigger.
 	Revision *SourceRevisionApplyConfiguration `json:"revision,omitempty"`
-	Secret   *string                           `json:"secret,omitempty"`
+	// secret is the obfuscated webhook secret that triggered a build.
+	Secret *string `json:"secret,omitempty"`
 }
 
-// CommonWebHookCauseApplyConfiguration constructs an declarative configuration of the CommonWebHookCause type for use with
+// CommonWebHookCauseApplyConfiguration constructs a declarative configuration of the CommonWebHookCause type for use with
 // apply.
 func CommonWebHookCause() *CommonWebHookCauseApplyConfiguration {
 	return &CommonWebHookCauseApplyConfiguration{}

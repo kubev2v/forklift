@@ -69,7 +69,7 @@ func newCors(config Config) *cors {
 }
 
 func (cors *cors) applyCors(c *gin.Context) {
-	origin := c.Request.Header.Get("Origin")
+	origin := c.Request.Header.Get(headerOrigin)
 	if len(origin) == 0 {
 		// request is not a CORS request
 		return
@@ -87,7 +87,7 @@ func (cors *cors) applyCors(c *gin.Context) {
 		return
 	}
 
-	if c.Request.Method == "OPTIONS" {
+	if c.Request.Method == http.MethodOptions {
 		cors.handlePreflight(c)
 		defer c.AbortWithStatus(cors.optionsResponseStatusCode)
 	} else {

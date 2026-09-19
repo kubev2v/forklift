@@ -1,3 +1,19 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package priorityqueue
 
 import (
@@ -6,6 +22,7 @@ import (
 
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/clock"
+	"sigs.k8s.io/controller-runtime/pkg/internal/metrics"
 )
 
 // This file is mostly a copy of unexported code from
@@ -14,8 +31,9 @@ import (
 // The only two differences are the addition of mapLock in defaultQueueMetrics and converging retryMetrics into queueMetrics.
 
 type queueMetrics[T comparable] interface {
-	add(item T)
-	get(item T)
+	add(item T, priority int)
+	get(item T, priority int)
+	updateDepthWithPriorityMetric(oldPriority, newPriority int)
 	done(item T)
 	updateUnfinishedWork()
 	retry()
@@ -25,9 +43,9 @@ func newQueueMetrics[T comparable](mp workqueue.MetricsProvider, name string, cl
 	if len(name) == 0 {
 		return noMetrics[T]{}
 	}
-	return &defaultQueueMetrics[T]{
+
+	dqm := &defaultQueueMetrics[T]{
 		clock:                   clock,
-		depth:                   mp.NewDepthMetric(name),
 		adds:                    mp.NewAddsMetric(name),
 		latency:                 mp.NewLatencyMetric(name),
 		workDuration:            mp.NewWorkDurationMetric(name),
@@ -37,6 +55,13 @@ func newQueueMetrics[T comparable](mp workqueue.MetricsProvider, name string, cl
 		processingStartTimes:    map[T]time.Time{},
 		retries:                 mp.NewRetriesMetric(name),
 	}
+
+	if mpp, ok := mp.(metrics.MetricsProviderWithPriority); ok {
+		dqm.depthWithPriority = mpp.NewDepthMetricWithPriority(name)
+	} else {
+		dqm.depth = mp.NewDepthMetric(name)
+	}
+	return dqm
 }
 
 // defaultQueueMetrics expects the caller to lock before setting any metrics.
@@ -44,7 +69,8 @@ type defaultQueueMetrics[T comparable] struct {
 	clock clock.Clock
 
 	// current depth of a workqueue
-	depth workqueue.GaugeMetric
+	depth             workqueue.GaugeMetric
+	depthWithPriority metrics.DepthMetricWithPriority
 	// total number of adds handled by a workqueue
 	adds workqueue.CounterMetric
 	// how long an item stays in a workqueue
@@ -64,13 +90,17 @@ type defaultQueueMetrics[T comparable] struct {
 }
 
 // add is called for ready items only
-func (m *defaultQueueMetrics[T]) add(item T) {
+func (m *defaultQueueMetrics[T]) add(item T, priority int) {
 	if m == nil {
 		return
 	}
 
 	m.adds.Inc()
-	m.depth.Inc()
+	if m.depthWithPriority != nil {
+		m.depthWithPriority.Inc(priority)
+	} else {
+		m.depth.Inc()
+	}
 
 	m.mapLock.Lock()
 	defer m.mapLock.Unlock()
@@ -80,12 +110,16 @@ func (m *defaultQueueMetrics[T]) add(item T) {
 	}
 }
 
-func (m *defaultQueueMetrics[T]) get(item T) {
+func (m *defaultQueueMetrics[T]) get(item T, priority int) {
 	if m == nil {
 		return
 	}
 
-	m.depth.Dec()
+	if m.depthWithPriority != nil {
+		m.depthWithPriority.Dec(priority)
+	} else {
+		m.depth.Dec()
+	}
 
 	m.mapLock.Lock()
 	defer m.mapLock.Unlock()
@@ -94,6 +128,13 @@ func (m *defaultQueueMetrics[T]) get(item T) {
 	if startTime, exists := m.addTimes[item]; exists {
 		m.latency.Observe(m.sinceInSeconds(startTime))
 		delete(m.addTimes, item)
+	}
+}
+
+func (m *defaultQueueMetrics[T]) updateDepthWithPriorityMetric(oldPriority, newPriority int) {
+	if m.depthWithPriority != nil {
+		m.depthWithPriority.Dec(oldPriority)
+		m.depthWithPriority.Inc(newPriority)
 	}
 }
 
@@ -139,8 +180,9 @@ func (m *defaultQueueMetrics[T]) retry() {
 
 type noMetrics[T any] struct{}
 
-func (noMetrics[T]) add(item T)            {}
-func (noMetrics[T]) get(item T)            {}
-func (noMetrics[T]) done(item T)           {}
-func (noMetrics[T]) updateUnfinishedWork() {}
-func (noMetrics[T]) retry()                {}
+func (noMetrics[T]) add(item T, priority int)                                   {}
+func (noMetrics[T]) get(item T, priority int)                                   {}
+func (noMetrics[T]) updateDepthWithPriorityMetric(oldPriority, newPriority int) {}
+func (noMetrics[T]) done(item T)                                                {}
+func (noMetrics[T]) updateUnfinishedWork()                                      {}
+func (noMetrics[T]) retry()                                                     {}

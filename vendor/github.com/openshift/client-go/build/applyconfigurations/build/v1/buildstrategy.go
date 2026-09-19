@@ -3,20 +3,28 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/build/v1"
+	buildv1 "github.com/openshift/api/build/v1"
 )
 
-// BuildStrategyApplyConfiguration represents an declarative configuration of the BuildStrategy type for use
+// BuildStrategyApplyConfiguration represents a declarative configuration of the BuildStrategy type for use
 // with apply.
+//
+// BuildStrategy contains the details of how to perform a build.
 type BuildStrategyApplyConfiguration struct {
-	Type                    *v1.BuildStrategyType                           `json:"type,omitempty"`
-	DockerStrategy          *DockerBuildStrategyApplyConfiguration          `json:"dockerStrategy,omitempty"`
-	SourceStrategy          *SourceBuildStrategyApplyConfiguration          `json:"sourceStrategy,omitempty"`
-	CustomStrategy          *CustomBuildStrategyApplyConfiguration          `json:"customStrategy,omitempty"`
+	// type is the kind of build strategy.
+	Type *buildv1.BuildStrategyType `json:"type,omitempty"`
+	// dockerStrategy holds the parameters to the container image build strategy.
+	DockerStrategy *DockerBuildStrategyApplyConfiguration `json:"dockerStrategy,omitempty"`
+	// sourceStrategy holds the parameters to the Source build strategy.
+	SourceStrategy *SourceBuildStrategyApplyConfiguration `json:"sourceStrategy,omitempty"`
+	// customStrategy holds the parameters to the Custom build strategy
+	CustomStrategy *CustomBuildStrategyApplyConfiguration `json:"customStrategy,omitempty"`
+	// jenkinsPipelineStrategy holds the parameters to the Jenkins Pipeline build strategy.
+	// Deprecated: use OpenShift Pipelines
 	JenkinsPipelineStrategy *JenkinsPipelineBuildStrategyApplyConfiguration `json:"jenkinsPipelineStrategy,omitempty"`
 }
 
-// BuildStrategyApplyConfiguration constructs an declarative configuration of the BuildStrategy type for use with
+// BuildStrategyApplyConfiguration constructs a declarative configuration of the BuildStrategy type for use with
 // apply.
 func BuildStrategy() *BuildStrategyApplyConfiguration {
 	return &BuildStrategyApplyConfiguration{}
@@ -25,7 +33,7 @@ func BuildStrategy() *BuildStrategyApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *BuildStrategyApplyConfiguration) WithType(value v1.BuildStrategyType) *BuildStrategyApplyConfiguration {
+func (b *BuildStrategyApplyConfiguration) WithType(value buildv1.BuildStrategyType) *BuildStrategyApplyConfiguration {
 	b.Type = &value
 	return b
 }

@@ -3,23 +3,31 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/image/v1"
+	imagev1 "github.com/openshift/api/image/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TagEventConditionApplyConfiguration represents an declarative configuration of the TagEventCondition type for use
+// TagEventConditionApplyConfiguration represents a declarative configuration of the TagEventCondition type for use
 // with apply.
+//
+// TagEventCondition contains condition information for a tag event.
 type TagEventConditionApplyConfiguration struct {
-	Type               *v1.TagEventConditionType `json:"type,omitempty"`
-	Status             *corev1.ConditionStatus   `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time              `json:"lastTransitionTime,omitempty"`
-	Reason             *string                   `json:"reason,omitempty"`
-	Message            *string                   `json:"message,omitempty"`
-	Generation         *int64                    `json:"generation,omitempty"`
+	// type of tag event condition, currently only ImportSuccess
+	Type *imagev1.TagEventConditionType `json:"type,omitempty"`
+	// status of the condition, one of True, False, Unknown.
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
+	// lastTransitionTime is the time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// reason is a brief machine readable explanation for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// message is a human readable description of the details about last transition, complementing reason.
+	Message *string `json:"message,omitempty"`
+	// generation is the spec tag generation that this status corresponds to
+	Generation *int64 `json:"generation,omitempty"`
 }
 
-// TagEventConditionApplyConfiguration constructs an declarative configuration of the TagEventCondition type for use with
+// TagEventConditionApplyConfiguration constructs a declarative configuration of the TagEventCondition type for use with
 // apply.
 func TagEventCondition() *TagEventConditionApplyConfiguration {
 	return &TagEventConditionApplyConfiguration{}
@@ -28,7 +36,7 @@ func TagEventCondition() *TagEventConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *TagEventConditionApplyConfiguration) WithType(value v1.TagEventConditionType) *TagEventConditionApplyConfiguration {
+func (b *TagEventConditionApplyConfiguration) WithType(value imagev1.TagEventConditionType) *TagEventConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

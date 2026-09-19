@@ -155,8 +155,8 @@ func exit(t *TLS, status int32, audit bool) {
 		CoverCReport(buf)
 		buf.Flush()
 	}
-	for _, v := range atExit {
-		v()
+	for i := len(atExit) - 1; i >= 0; i-- {
+		atExit[i]()
 	}
 	if audit {
 		t.Close()
@@ -206,14 +206,6 @@ func Xsetbuf(t *TLS, stream, buf uintptr) {
 		trc("t=%v buf=%v, (%v:)", t, buf, origin(2))
 	}
 	//TODO panic(todo(""))
-}
-
-// size_t confstr(int name, char *buf, size_t len);
-func Xconfstr(t *TLS, name int32, buf uintptr, len types.Size_t) types.Size_t {
-	if __ccgo_strace {
-		trc("t=%v name=%v buf=%v len=%v, (%v:)", t, name, buf, len, origin(2))
-	}
-	panic(todo(""))
 }
 
 // int puts(const char *s);
@@ -288,6 +280,10 @@ func X__builtin_clzl(t *TLS, n ulong) int32 {
 	if __ccgo_strace {
 		trc("t=%v n=%v, (%v:)", t, n, origin(2))
 	}
+	if unsafe.Sizeof(n) == 4 {
+		return int32(mbits.LeadingZeros32(uint32(n)))
+	}
+
 	return int32(mbits.LeadingZeros64(uint64(n)))
 }
 
@@ -525,6 +521,14 @@ func X__builtin_popcount(t *TLS, x uint32) int32 {
 
 // int __builtin_popcountl (unsigned long x)
 func X__builtin_popcountl(t *TLS, x ulong) int32 {
+	if __ccgo_strace {
+		trc("t=%v x=%v, (%v:)", t, x, origin(2))
+	}
+	return int32(mbits.OnesCount64(uint64(x)))
+}
+
+// int __builtin_popcountll (unsigned long long)
+func X__builtin_popcountll(t *TLS, x uint64) int32 {
 	if __ccgo_strace {
 		trc("t=%v x=%v, (%v:)", t, x, origin(2))
 	}
@@ -949,6 +953,15 @@ func X__builtin___vsnprintf_chk(t *TLS, str uintptr, maxlen types.Size_t, flag i
 	return Xsnprintf(t, str, maxlen, format, args)
 }
 
+// int __builtin___vsprintf_chk(char *s, int flag, size_t os, const char *format, va_list ap);
+func X__builtin___vsprintf_chk(t *TLS, s uintptr, flag int32, os types.Size_t, format, args uintptr) (r int32) {
+	if __ccgo_strace {
+		trc("t=%v s=%v flag=%v os=%v args=%v, (%v:)", t, s, flag, os, args, origin(2))
+		defer func() { trc("-> %v", r) }()
+	}
+	return Xvsprintf(t, s, format, args)
+}
+
 // int abs(int j);
 func Xabs(t *TLS, j int32) int32 {
 	if __ccgo_strace {
@@ -1321,6 +1334,237 @@ func X__builtin_round(t *TLS, x float64) float64 {
 	return math.Round(x)
 }
 
+// See https://gitlab.com/cznic/libc/-/issues/56 for the functions below.
+
+// double erf(double x)
+func Xerf(t *TLS, x float64) float64 {
+	if __ccgo_strace {
+		trc("t=%v x=%v, (%v:)", t, x, origin(2))
+	}
+	return math.Erf(x)
+}
+
+// double erfc(double x)
+func Xerfc(t *TLS, x float64) float64 {
+	if __ccgo_strace {
+		trc("t=%v x=%v, (%v:)", t, x, origin(2))
+	}
+	return math.Erfc(x)
+}
+
+// double exp2(double x)
+func Xexp2(t *TLS, x float64) float64 {
+	if __ccgo_strace {
+		trc("t=%v x=%v, (%v:)", t, x, origin(2))
+	}
+	return math.Exp2(x)
+}
+
+// double fdim(double x, double y)
+func Xfdim(t *TLS, x, y float64) float64 {
+	if __ccgo_strace {
+		trc("t=%v x=%v y=%v, (%v:)", t, x, y, origin(2))
+	}
+	if math.IsNaN(x) || math.IsNaN(y) {
+		return math.NaN()
+	}
+
+	if x > y {
+		return x - y
+	}
+
+	return 0
+}
+
+// double fma(double x, double y, double z)
+func Xfma(t *TLS, x, y, z float64) float64 {
+	if __ccgo_strace {
+		trc("t=%v x=%v y=%v z=%v, (%v:)", t, x, y, z, origin(2))
+	}
+	return math.FMA(x, y, z)
+}
+
+func X__builtin_fma(t *TLS, x, y, z float64) float64 {
+	return Xfma(t, x, y, z)
+}
+
+// int ilogb(double x)
+func Xilogb(t *TLS, x float64) int32 {
+	if __ccgo_strace {
+		trc("t=%v x=%v, (%v:)", t, x, origin(2))
+	}
+	switch {
+	case math.IsNaN(x), x == 0:
+		return math.MinInt32 // FP_ILOGBNAN, FP_ILOGB0
+	case math.IsInf(x, 0):
+		return math.MaxInt32
+	}
+
+	return int32(math.Ilogb(x))
+}
+
+// double lgamma(double x)
+//
+// The sign of gamma(x) is not reported, this port has no signgam.
+func Xlgamma(t *TLS, x float64) float64 {
+	if __ccgo_strace {
+		trc("t=%v x=%v, (%v:)", t, x, origin(2))
+	}
+	r, _ := math.Lgamma(x)
+	return r
+}
+
+// double logb(double x)
+func Xlogb(t *TLS, x float64) float64 {
+	if __ccgo_strace {
+		trc("t=%v x=%v, (%v:)", t, x, origin(2))
+	}
+	return math.Logb(x)
+}
+
+// double nextafter(double x, double y)
+func Xnextafter(t *TLS, x, y float64) float64 {
+	if __ccgo_strace {
+		trc("t=%v x=%v y=%v, (%v:)", t, x, y, origin(2))
+	}
+	return math.Nextafter(x, y)
+}
+
+// float nextafterf(float x, float y)
+func Xnextafterf(t *TLS, x, y float32) float32 {
+	if __ccgo_strace {
+		trc("t=%v x=%v y=%v, (%v:)", t, x, y, origin(2))
+	}
+	return math.Nextafter32(x, y)
+}
+
+// double nexttoward(double x, long double y)
+func Xnexttoward(t *TLS, x, y float64) float64 {
+	if __ccgo_strace {
+		trc("t=%v x=%v y=%v, (%v:)", t, x, y, origin(2))
+	}
+	return math.Nextafter(x, y)
+}
+
+// double remainder(double x, double y)
+func Xremainder(t *TLS, x, y float64) float64 {
+	if __ccgo_strace {
+		trc("t=%v x=%v y=%v, (%v:)", t, x, y, origin(2))
+	}
+	return math.Remainder(x, y)
+}
+
+// double remquo(double x, double y, int *quo)
+//
+// Transliterated from musl src/math/remquo.c.
+func Xremquo(t *TLS, x, y float64, quo uintptr) float64 {
+	if __ccgo_strace {
+		trc("t=%v x=%v y=%v quo=%v, (%v:)", t, x, y, quo, origin(2))
+	}
+	ux := math.Float64bits(x)
+	uy := math.Float64bits(y)
+	ex := int(ux >> 52 & 0x7ff)
+	ey := int(uy >> 52 & 0x7ff)
+	sx := ux >> 63
+	sy := uy >> 63
+	var q uint32
+	var i uint64
+	uxi := ux
+
+	*(*int32)(unsafe.Pointer(quo)) = 0
+	if uy<<1 == 0 || math.IsNaN(y) || ex == 0x7ff {
+		return (x * y) / (x * y)
+	}
+
+	if ux<<1 == 0 {
+		return x
+	}
+
+	// normalize x and y
+	if ex == 0 {
+		for i = uxi << 12; i>>63 == 0; i <<= 1 {
+			ex--
+		}
+		uxi <<= uint(-ex + 1)
+	} else {
+		uxi &= ^uint64(0) >> 12
+		uxi |= 1 << 52
+	}
+	if ey == 0 {
+		for i = uy << 12; i>>63 == 0; i <<= 1 {
+			ey--
+		}
+		uy <<= uint(-ey + 1)
+	} else {
+		uy &= ^uint64(0) >> 12
+		uy |= 1 << 52
+	}
+
+	if ex < ey {
+		if ex+1 != ey {
+			return x
+		}
+	} else {
+		// x mod y
+		for ; ex > ey; ex-- {
+			i = uxi - uy
+			if i>>63 == 0 {
+				uxi = i
+				q++
+			}
+			uxi <<= 1
+			q <<= 1
+		}
+		i = uxi - uy
+		if i>>63 == 0 {
+			uxi = i
+			q++
+		}
+		if uxi == 0 {
+			ex = -60
+		} else {
+			for ; uxi>>52 == 0; uxi <<= 1 {
+				ex--
+			}
+		}
+	}
+
+	// scale result and decide between |x| and |x|-|y|
+	if ex > 0 {
+		uxi -= 1 << 52
+		uxi |= uint64(ex) << 52
+	} else {
+		uxi >>= uint(-ex + 1)
+	}
+	x = math.Float64frombits(uxi)
+	if sy != 0 {
+		y = -y
+	}
+	if ex == ey || (ex+1 == ey && (2*x > y || (2*x == y && q%2 != 0))) {
+		x -= y
+		q++
+	}
+	q &= 0x7fffffff
+	if sx^sy != 0 {
+		*(*int32)(unsafe.Pointer(quo)) = -int32(q)
+	} else {
+		*(*int32)(unsafe.Pointer(quo)) = int32(q)
+	}
+	if sx != 0 {
+		return -x
+	}
+
+	return x
+}
+
+// double tgamma(double x)
+func Xtgamma(t *TLS, x float64) float64 {
+	if __ccgo_strace {
+		trc("t=%v x=%v, (%v:)", t, x, origin(2))
+	}
+	return math.Gamma(x)
+}
+
 func X__builtin_roundf(t *TLS, x float32) float32 {
 	if __ccgo_strace {
 		trc("t=%v x=%v, (%v:)", t, x, origin(2))
@@ -1524,22 +1768,6 @@ func Xstrcmp(t *TLS, s1, s2 uintptr) int32 {
 			return int32(ch1) - int32(ch2)
 		}
 	}
-}
-
-// size_t strlen(const char *s)
-func Xstrlen(t *TLS, s uintptr) (r types.Size_t) {
-	if __ccgo_strace {
-		trc("t=%v s=%v, (%v:)", t, s, origin(2))
-		defer func() { trc("-> %v", r) }()
-	}
-	if s == 0 {
-		return 0
-	}
-
-	for ; *(*int8)(unsafe.Pointer(s)) != 0; s++ {
-		r++
-	}
-	return r
 }
 
 // char *strcat(char *dest, const char *src)
@@ -2189,6 +2417,22 @@ func AtomicStorePFloat64(addr uintptr, val float64) {
 	atomic.StoreUint64((*uint64)(unsafe.Pointer(addr)), math.Float64bits(val))
 }
 
+func AtomicStorePInt8(addr uintptr, val int8) {
+	a_store_8(addr, byte(val))
+}
+
+func AtomicStorePInt16(addr uintptr, val int16) {
+	a_store_16(addr, uint16(val))
+}
+
+func AtomicStorePUint8(addr uintptr, val uint8) {
+	a_store_8(addr, val)
+}
+
+func AtomicStorePUint16(addr uintptr, val uint16) {
+	a_store_16(addr, val)
+}
+
 func AtomicAddInt32(addr *int32, delta int32) (new int32)     { return atomic.AddInt32(addr, delta) }
 func AtomicAddInt64(addr *int64, delta int64) (new int64)     { return atomic.AddInt64(addr, delta) }
 func AtomicAddUint32(addr *uint32, delta uint32) (new uint32) { return atomic.AddUint32(addr, delta) }
@@ -2251,33 +2495,6 @@ func Xmblen(t *TLS, s uintptr, n types.Size_t) int32 {
 	panic(todo(""))
 }
 
-// ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
-func Xreadv(t *TLS, fd int32, iov uintptr, iovcnt int32) types.Ssize_t {
-	if __ccgo_strace {
-		trc("t=%v fd=%v iov=%v iovcnt=%v, (%v:)", t, fd, iov, iovcnt, origin(2))
-	}
-	panic(todo(""))
-}
-
-// int openpty(int *amaster, int *aslave, char *name,
-//
-//	const struct termios *termp,
-//	const struct winsize *winp);
-func Xopenpty(t *TLS, amaster, aslave, name, termp, winp uintptr) int32 {
-	if __ccgo_strace {
-		trc("t=%v winp=%v, (%v:)", t, winp, origin(2))
-	}
-	panic(todo(""))
-}
-
-// pid_t setsid(void);
-func Xsetsid(t *TLS) types.Pid_t {
-	if __ccgo_strace {
-		trc("t=%v, (%v:)", t, origin(2))
-	}
-	panic(todo(""))
-}
-
 // int pselect(int nfds, fd_set *readfds, fd_set *writefds,
 //
 //	fd_set *exceptfds, const struct timespec *timeout,
@@ -2285,14 +2502,6 @@ func Xsetsid(t *TLS) types.Pid_t {
 func Xpselect(t *TLS, nfds int32, readfds, writefds, exceptfds, timeout, sigmask uintptr) int32 {
 	if __ccgo_strace {
 		trc("t=%v nfds=%v sigmask=%v, (%v:)", t, nfds, sigmask, origin(2))
-	}
-	panic(todo(""))
-}
-
-// int kill(pid_t pid, int sig);
-func Xkill(t *TLS, pid types.Pid_t, sig int32) int32 {
-	if __ccgo_strace {
-		trc("t=%v pid=%v sig=%v, (%v:)", t, pid, sig, origin(2))
 	}
 	panic(todo(""))
 }
@@ -2429,11 +2638,12 @@ func X__sync_sub_and_fetch_uint32(t *TLS, p uintptr, v uint32) uint32 {
 }
 
 // int sched_yield(void);
-func Xsched_yield(t *TLS) {
+func Xsched_yield(t *TLS) int32 {
 	if __ccgo_strace {
 		trc("t=%v, (%v:)", t, origin(2))
 	}
 	runtime.Gosched()
+	return 0
 }
 
 // int getc(FILE *stream);
@@ -2449,9 +2659,16 @@ func Xfgets(t *TLS, s uintptr, size int32, stream uintptr) uintptr {
 	if __ccgo_strace {
 		trc("t=%v s=%v size=%v stream=%v, (%v:)", t, s, size, stream, origin(2))
 	}
+	if size < 1 {
+		return 0
+	}
+	if size == 1 {
+		*(*byte)(unsafe.Pointer(s)) = 0
+		return s
+	}
 	var b []byte
 out:
-	for ; size > 0; size-- {
+	for ; size > 1; size-- {
 		switch c := Xfgetc(t, stream); c {
 		case '\n':
 			b = append(b, byte(c))
@@ -3570,4 +3787,43 @@ func Xcbrtl(tls *TLS, x float64) (r float64) {
 		defer func() { trc("-> %v", r) }()
 	}
 	return Xcbrt(tls, x)
+}
+
+// putenvNarrow stores the "name=value" string kv in the environment getenv
+// reads, replacing an existing entry of the same name.
+func putenvNarrow(t *TLS, kv string) {
+	x := strings.IndexByte(kv, '=')
+	if x <= 0 {
+		return
+	}
+
+	p := Environ()
+	n := 0
+	for ; ; n++ {
+		q := *(*uintptr)(unsafe.Pointer(p + uintptr(n)*uintptrSize))
+		if q == 0 {
+			break
+		}
+
+		s := GoString(q)
+		if len(s) > x && s[x] == '=' && s[:x] == kv[:x] {
+			ns := Xcalloc(t, 1, types.Size_t(len(kv)+1))
+			copy(unsafe.Slice((*byte)(unsafe.Pointer(ns)), len(kv)), kv)
+			Xfree(t, q)
+			*(*uintptr)(unsafe.Pointer(p + uintptr(n)*uintptrSize)) = ns
+			return
+		}
+	}
+
+	// Append: n entries plus the terminator become n+2 slots.
+	np := Xrealloc(t, p, types.Size_t((n+2)*int(uintptrSize)))
+	if np == 0 {
+		panic("OOM")
+	}
+
+	ns := Xcalloc(t, 1, types.Size_t(len(kv)+1))
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(ns)), len(kv)), kv)
+	*(*uintptr)(unsafe.Pointer(np + uintptr(n)*uintptrSize)) = ns
+	*(*uintptr)(unsafe.Pointer(np + uintptr(n+1)*uintptrSize)) = 0
+	Xenviron = np
 }

@@ -120,6 +120,8 @@ func buildSettingsSection(b *describe.Builder, provider *unstructured.Unstructur
 		addVSphereSettings(b, provider)
 	case "ec2":
 		addEC2Settings(b, provider)
+	case "azure":
+		addAzureSettings(b, provider)
 	}
 }
 
@@ -147,6 +149,21 @@ func addEC2Settings(b *describe.Builder, provider *unstructured.Unstructured) {
 	}
 	if val, found, _ := unstructured.NestedString(provider.Object, "spec", "settings", "targetAZ"); found && val != "" {
 		b.Field("Target AZ", val)
+	}
+}
+
+func addAzureSettings(b *describe.Builder, provider *unstructured.Unstructured) {
+	if val, found, _ := unstructured.NestedString(provider.Object, "spec", "settings", "targetRegion"); found && val != "" {
+		b.Field("Target Region", val)
+	}
+	if val, found, _ := unstructured.NestedString(provider.Object, "spec", "settings", "snapshotSku"); found && val != "" {
+		b.Field("Snapshot SKU", val)
+	}
+	if val, found, _ := unstructured.NestedString(provider.Object, "spec", "settings", "snapshotResourceGroup"); found && val != "" {
+		b.Field("Snapshot Resource Group", val)
+	}
+	if val, found, _ := unstructured.NestedString(provider.Object, "spec", "settings", "volumeSnapshotClassName"); found && val != "" {
+		b.Field("Volume Snapshot Class", val)
 	}
 }
 

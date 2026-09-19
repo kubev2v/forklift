@@ -44,7 +44,7 @@ func captureOutput(renderFunc RenderFunc) tui.DataFetcher {
 		}()
 
 		defer func() {
-			w.Close()
+			_ = w.Close()
 			os.Stdout = oldStdout
 			output = <-outputChan
 

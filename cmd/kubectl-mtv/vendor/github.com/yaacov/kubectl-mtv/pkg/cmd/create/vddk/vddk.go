@@ -84,7 +84,7 @@ func BuildImage(tarGzPath, tag, buildDir, runtimePreference, platform, dockerfil
 		if err != nil {
 			return fmt.Errorf("failed to create temp dir: %w", err)
 		}
-		defer os.RemoveAll(tmp)
+		defer func() { _ = os.RemoveAll(tmp) }()
 		buildDir = tmp
 	}
 	fmt.Printf("Using build directory: %s\n", buildDir)

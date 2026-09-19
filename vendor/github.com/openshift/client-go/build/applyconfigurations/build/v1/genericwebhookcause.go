@@ -2,14 +2,20 @@
 
 package v1
 
-// GenericWebHookCauseApplyConfiguration represents an declarative configuration of the GenericWebHookCause type for use
+// GenericWebHookCauseApplyConfiguration represents a declarative configuration of the GenericWebHookCause type for use
 // with apply.
+//
+// GenericWebHookCause holds information about a generic WebHook that
+// triggered a build.
 type GenericWebHookCauseApplyConfiguration struct {
+	// revision is an optional field that stores the git source revision
+	// information of the generic webhook trigger when it is available.
 	Revision *SourceRevisionApplyConfiguration `json:"revision,omitempty"`
-	Secret   *string                           `json:"secret,omitempty"`
+	// secret is the obfuscated webhook secret that triggered a build.
+	Secret *string `json:"secret,omitempty"`
 }
 
-// GenericWebHookCauseApplyConfiguration constructs an declarative configuration of the GenericWebHookCause type for use with
+// GenericWebHookCauseApplyConfiguration constructs a declarative configuration of the GenericWebHookCause type for use with
 // apply.
 func GenericWebHookCause() *GenericWebHookCauseApplyConfiguration {
 	return &GenericWebHookCauseApplyConfiguration{}

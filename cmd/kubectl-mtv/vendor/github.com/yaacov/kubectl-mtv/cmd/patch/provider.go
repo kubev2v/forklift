@@ -113,6 +113,7 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	cmd.Flags().StringVar(&opts.AzureTargetRegion, "azure-target-region", "", "Target region for cross-region migrations")
 	cmd.Flags().StringVar(&opts.AzureSnapshotSku, "azure-snapshot-sku", "", "Snapshot SKU (Standard_LRS, Standard_ZRS, Premium_LRS)")
 	cmd.Flags().StringVar(&opts.AzureSnapshotResourceGroup, "azure-snapshot-resource-group", "", "Resource group for snapshots")
+	cmd.Flags().StringVar(&opts.AzureVolumeSnapshotClass, "azure-volume-snapshot-class", "", "VolumeSnapshotClass name override")
 
 	cmd.Flags().StringVar(&opts.NutanixPrismType, "nutanix-prism-type", "", "Nutanix Prism endpoint type (central or element)")
 	cmd.Flags().StringVar(&opts.NutanixClusterUUID, "nutanix-cluster-uuid", "", "Nutanix cluster UUID (used with Prism Central)")

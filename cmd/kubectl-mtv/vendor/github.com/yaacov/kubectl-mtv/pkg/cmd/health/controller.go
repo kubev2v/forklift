@@ -135,10 +135,11 @@ func extractFeatureFlags(spec map[string]interface{}) FeatureFlags {
 			result = v
 			return &result
 		case string:
-			if v == "true" {
+			switch v {
+			case "true":
 				result = true
 				return &result
-			} else if v == "false" {
+			case "false":
 				result = false
 				return &result
 			}

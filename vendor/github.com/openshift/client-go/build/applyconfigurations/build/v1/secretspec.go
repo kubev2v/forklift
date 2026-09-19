@@ -3,17 +3,21 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// SecretSpecApplyConfiguration represents an declarative configuration of the SecretSpec type for use
+// SecretSpecApplyConfiguration represents a declarative configuration of the SecretSpec type for use
 // with apply.
+//
+// SecretSpec specifies a secret to be included in a build pod and its corresponding mount point
 type SecretSpecApplyConfiguration struct {
-	SecretSource *v1.LocalObjectReference `json:"secretSource,omitempty"`
-	MountPath    *string                  `json:"mountPath,omitempty"`
+	// secretSource is a reference to the secret
+	SecretSource *corev1.LocalObjectReference `json:"secretSource,omitempty"`
+	// mountPath is the path at which to mount the secret
+	MountPath *string `json:"mountPath,omitempty"`
 }
 
-// SecretSpecApplyConfiguration constructs an declarative configuration of the SecretSpec type for use with
+// SecretSpecApplyConfiguration constructs a declarative configuration of the SecretSpec type for use with
 // apply.
 func SecretSpec() *SecretSpecApplyConfiguration {
 	return &SecretSpecApplyConfiguration{}
@@ -22,7 +26,7 @@ func SecretSpec() *SecretSpecApplyConfiguration {
 // WithSecretSource sets the SecretSource field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SecretSource field is set to the value of the last call.
-func (b *SecretSpecApplyConfiguration) WithSecretSource(value v1.LocalObjectReference) *SecretSpecApplyConfiguration {
+func (b *SecretSpecApplyConfiguration) WithSecretSource(value corev1.LocalObjectReference) *SecretSpecApplyConfiguration {
 	b.SecretSource = &value
 	return b
 }

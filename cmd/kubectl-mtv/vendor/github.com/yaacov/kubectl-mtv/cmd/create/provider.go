@@ -44,7 +44,7 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 
 	// Azure specific flags
 	var azureTenantID, azureSubscriptionID, azureClientID, azureClientSecret string
-	var azureResourceGroup, azureTargetRegion, azureSnapshotSku, azureSnapshotResourceGroup string
+	var azureResourceGroup, azureTargetRegion, azureSnapshotSku, azureSnapshotResourceGroup, azureVolumeSnapshotClass string
 
 	// Nutanix specific flags
 	var nutanixPrismType, nutanixClusterUUID string
@@ -203,6 +203,7 @@ Credentials can be provided directly via flags or through an existing Kubernetes
 				AzureTargetRegion:          azureTargetRegion,
 				AzureSnapshotSku:           azureSnapshotSku,
 				AzureSnapshotResourceGroup: azureSnapshotResourceGroup,
+				AzureVolumeSnapshotClass:   azureVolumeSnapshotClass,
 				NutanixPrismType:           nutanixPrismType,
 				NutanixClusterUUID:         nutanixClusterUUID,
 				DryRun:                     dryRun,
@@ -260,10 +261,11 @@ Credentials can be provided directly via flags or through an existing Kubernetes
 	cmd.Flags().StringVar(&azureSubscriptionID, "azure-subscription-id", "", "Azure subscription ID containing source VMs")
 	cmd.Flags().StringVar(&azureClientID, "azure-client-id", "", "Azure service principal application (client) ID")
 	cmd.Flags().StringVar(&azureClientSecret, "azure-client-secret", "", "Azure service principal secret")
-	cmd.Flags().StringVar(&azureResourceGroup, "azure-resource-group", "", "Azure resource group containing source VMs (required for azure type)")
+	cmd.Flags().StringVar(&azureResourceGroup, "azure-resource-group", "", "Azure resource group containing source VMs (optional; omit to inventory the whole subscription)")
 	cmd.Flags().StringVar(&azureTargetRegion, "azure-target-region", "", "Target region for cross-region migrations (optional)")
 	cmd.Flags().StringVar(&azureSnapshotSku, "azure-snapshot-sku", "", "Snapshot SKU (Standard_LRS, Standard_ZRS, Premium_LRS; default: Standard_ZRS)")
-	cmd.Flags().StringVar(&azureSnapshotResourceGroup, "azure-snapshot-resource-group", "", "Resource group for snapshots (defaults to source resource group)")
+	cmd.Flags().StringVar(&azureSnapshotResourceGroup, "azure-snapshot-resource-group", "", "Resource group for snapshots (required when --azure-resource-group is omitted)")
+	cmd.Flags().StringVar(&azureVolumeSnapshotClass, "azure-volume-snapshot-class", "", "VolumeSnapshotClass name override (auto-discovered from disk.csi.azure.com if omitted)")
 
 	// Nutanix specific flags
 	cmd.Flags().StringVar(&nutanixPrismType, "nutanix-prism-type", "", "Nutanix Prism endpoint type (central or element)")

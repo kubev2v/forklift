@@ -3,18 +3,29 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// ImageChangeTriggerApplyConfiguration represents an declarative configuration of the ImageChangeTrigger type for use
+// ImageChangeTriggerApplyConfiguration represents a declarative configuration of the ImageChangeTrigger type for use
 // with apply.
+//
+// ImageChangeTrigger allows builds to be triggered when an ImageStream changes
 type ImageChangeTriggerApplyConfiguration struct {
-	LastTriggeredImageID *string             `json:"lastTriggeredImageID,omitempty"`
-	From                 *v1.ObjectReference `json:"from,omitempty"`
-	Paused               *bool               `json:"paused,omitempty"`
+	// lastTriggeredImageID is used internally by the ImageChangeController to save last
+	// used image ID for build
+	// This field is deprecated and will be removed in a future release.
+	// Deprecated
+	LastTriggeredImageID *string `json:"lastTriggeredImageID,omitempty"`
+	// from is a reference to an ImageStreamTag that will trigger a build when updated
+	// It is optional. If no From is specified, the From image from the build strategy
+	// will be used. Only one ImageChangeTrigger with an empty From reference is allowed in
+	// a build configuration.
+	From *corev1.ObjectReference `json:"from,omitempty"`
+	// paused is true if this trigger is temporarily disabled. Optional.
+	Paused *bool `json:"paused,omitempty"`
 }
 
-// ImageChangeTriggerApplyConfiguration constructs an declarative configuration of the ImageChangeTrigger type for use with
+// ImageChangeTriggerApplyConfiguration constructs a declarative configuration of the ImageChangeTrigger type for use with
 // apply.
 func ImageChangeTrigger() *ImageChangeTriggerApplyConfiguration {
 	return &ImageChangeTriggerApplyConfiguration{}
@@ -31,7 +42,7 @@ func (b *ImageChangeTriggerApplyConfiguration) WithLastTriggeredImageID(value st
 // WithFrom sets the From field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the From field is set to the value of the last call.
-func (b *ImageChangeTriggerApplyConfiguration) WithFrom(value v1.ObjectReference) *ImageChangeTriggerApplyConfiguration {
+func (b *ImageChangeTriggerApplyConfiguration) WithFrom(value corev1.ObjectReference) *ImageChangeTriggerApplyConfiguration {
 	b.From = &value
 	return b
 }

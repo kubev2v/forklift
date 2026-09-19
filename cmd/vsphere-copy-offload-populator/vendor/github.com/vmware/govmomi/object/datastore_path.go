@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package object
@@ -31,13 +31,13 @@ func (p *DatastorePath) FromString(s string) bool {
 
 	s = s[1:]
 
-	ix := strings.Index(s, "]")
-	if ix < 0 {
+	before, after, ok := strings.Cut(s, "]")
+	if !ok {
 		return false
 	}
 
-	p.Datastore = s[:ix]
-	p.Path = strings.TrimSpace(s[ix+1:])
+	p.Datastore = before
+	p.Path = strings.TrimSpace(after)
 
 	return true
 }

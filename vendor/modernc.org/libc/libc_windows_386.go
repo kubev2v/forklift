@@ -453,16 +453,9 @@ func Xpipe(t *TLS, pipefd uintptr) int32 {
 // int dup2(int oldfd, int newfd);
 func Xdup2(t *TLS, oldfd, newfd int32) int32 {
 	if __ccgo_strace {
-		trc("t=%v newfd=%v, (%v:)", t, newfd, origin(2))
+		trc("t=%v oldfd=%v newfd=%v, (%v:)", t, oldfd, newfd, origin(2))
 	}
-	panic(todo(""))
-	// 	n, _, err := unix.Syscall(unix.SYS_DUP2, uintptr(oldfd), uintptr(newfd), 0)
-	// 	if err != 0 {
-	// 		t.setErrno(err)
-	// 		return -1
-	// 	}
-	//
-	// 	return int32(n)
+	return dup2(t, oldfd, newfd)
 }
 
 // ssize_t readlink(const char *restrict path, char *restrict buf, size_t bufsize);
@@ -726,4 +719,16 @@ func Xstrspn(tls *TLS, s uintptr, c uintptr) size_t { /* strspn.c:6:8: */
 	for ; *(*int8)(unsafe.Pointer(s)) != 0 && *(*size_t)(unsafe.Pointer(bp + uintptr(size_t(*(*uint8)(unsafe.Pointer(s)))/(uint32(8)*uint32(unsafe.Sizeof(size_t(0)))))*4))&(size_t(size_t(1))<<(size_t(*(*uint8)(unsafe.Pointer(s)))%(uint32(8)*uint32(unsafe.Sizeof(size_t(0)))))) != 0; s++ {
 	}
 	return size_t((int32(s) - int32(a)) / 1)
+}
+
+// Defined in libc_windows_386.s
+func callStrtod(fn uintptr, s uintptr, p uintptr) float64
+
+func Xstrtod(t *TLS, s uintptr, p uintptr) float64 {
+	if __ccgo_strace {
+		trc("tls=%v s=%v p=%v, (%v:)", t, s, p, origin(2))
+	}
+	// We use the assembly bridge to call the function pointer directly.
+	// This ensures we capture the float return value from ST(0).
+	return callStrtod(procStrtod.Addr(), s, p)
 }

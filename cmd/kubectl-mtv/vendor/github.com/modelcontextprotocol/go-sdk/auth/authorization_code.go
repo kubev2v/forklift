@@ -14,7 +14,9 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 
+	"github.com/modelcontextprotocol/go-sdk/internal/authutil"
 	"github.com/modelcontextprotocol/go-sdk/internal/util"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 	"golang.org/x/oauth2"
@@ -49,6 +51,12 @@ type AuthorizationResult struct {
 	Code string
 	// State string returned by the authorization server.
 	State string
+	// Iss is the issuer identifier returned by the authorization server in the
+	// authorization response per [RFC 9207]. The AuthorizationCodeFetcher should
+	// populate this from the "iss" query parameter in the redirect URI if present.
+	//
+	// [RFC 9207]: https://www.rfc-editor.org/rfc/rfc9207
+	Iss string
 }
 
 // AuthorizationArgs is the input to [AuthorizationCodeFetcher].
@@ -90,6 +98,37 @@ type AuthorizationCodeHandlerConfig struct {
 	// See [AuthorizationCodeFetcher] for details.
 	AuthorizationCodeFetcher AuthorizationCodeFetcher
 
+	// ScopeFilter, if non-nil, is called with the scopes discovered from the
+	// protected resource metadata (or WWW-Authenticate challenge) and returns
+	// the scopes to request during authorization. It gives the client full
+	// control to narrow, extend, or reorder that set — e.g. dropping Gmail's
+	// gmail.metadata, which the Gmail API refuses to combine with the search "q"
+	// parameter even alongside gmail.readonly. It runs before offline_access
+	// (see RequestRefreshToken) and the step-up union, so neither is affected.
+	ScopeFilter func(discovered []string) []string
+
+	// RequestRefreshToken indicates that the client intends to use refresh
+	// tokens and is capable of storing them securely.
+	//
+	// When true and the Authorization Server metadata contains "offline_access"
+	// in its scopes_supported, the client adds "offline_access" to the
+	// requested scopes.
+	//
+	// When using Dynamic Client Registration, callers should include
+	// "refresh_token" in [DynamicClientRegistrationConfig].Metadata.GrantTypes
+	// directly to advertise refresh token support to the Authorization Server.
+	//
+	// When using Client ID Metadata Document, the document hosted at the
+	// Client ID URL should include "refresh_token" in its grant_types.
+	//
+	// See https://modelcontextprotocol.io/seps/2207-oidc-refresh-token-guidance.
+	RequestRefreshToken bool
+
+	// AcceptUnadvertisedIss accepts a matching RFC 9207 iss even when the
+	// authorization server metadata omits authorization_response_iss_parameter_supported.
+	// The zero value (false) keeps the historical reject-unadvertised-iss behavior.
+	AcceptUnadvertisedIss bool
+
 	// Client is an optional HTTP client to use for HTTP requests.
 	// It is used for the following requests:
 	//  - Fetching Protected Resource Metadata
@@ -102,6 +141,24 @@ type AuthorizationCodeHandlerConfig struct {
 	// https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices#server-side-request-forgery-ssrf
 	// If not provided, http.DefaultClient will be used.
 	Client *http.Client
+
+	// NewTokenSource is an optional function that can be set to construct the
+	// token source that will be used by the [AuthorizationCodeHandler]. If
+	// non-nil, it is called after the authorization code is successfully
+	// exchanged for a token in [AuthorizationCodeHandler.Authorize]
+	// to obtain the [oauth2.TokenSource] returned by
+	// [AuthorizationCodeHandler.TokenSource]. Implementations must use the
+	// provided context, which is properly configured for constructing a
+	// TokenSource. The default is to call [oauth2.Config.TokenSource].
+	NewTokenSource func(context.Context, *oauth2.Config, *oauth2.Token) (oauth2.TokenSource, error)
+
+	// InitialTokenSource is an optional field that can be set to inject the
+	// token source that will be used by the [AuthorizationCodeHandler]. If
+	// non-nil, it is set as the token source that will be returned by
+	// [AuthorizationCodeHandler.TokenSource] during handler initialization.
+	// The default is nil, which means no token source has been set initially,
+	// and will trigger a call to [AuthorizationCodeHandler.Authorize].
+	InitialTokenSource oauth2.TokenSource
 }
 
 // AuthorizationCodeHandler is an implementation of [OAuthHandler] that uses
@@ -109,13 +166,21 @@ type AuthorizationCodeHandlerConfig struct {
 type AuthorizationCodeHandler struct {
 	config *AuthorizationCodeHandlerConfig
 
+	// mu protects concurrent access to tokenSource and grantedScopes.
+	mu sync.RWMutex
+
 	// tokenSource is the token source to use for authorization.
 	tokenSource oauth2.TokenSource
+
+	// grantedScopes maps authorization server issuer to the list of scopes granted by that issuer.
+	grantedScopes map[string][]string
 }
 
 var _ OAuthHandler = (*AuthorizationCodeHandler)(nil)
 
 func (h *AuthorizationCodeHandler) TokenSource(ctx context.Context) (oauth2.TokenSource, error) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	return h.tokenSource, nil
 }
 
@@ -170,7 +235,11 @@ func NewAuthorizationCodeHandler(config *AuthorizationCodeHandlerConfig) (*Autho
 	if config.Client == nil {
 		config.Client = http.DefaultClient
 	}
-	return &AuthorizationCodeHandler{config: config}, nil
+	return &AuthorizationCodeHandler{
+		config:        config,
+		tokenSource:   config.InitialTokenSource,
+		grantedScopes: make(map[string][]string),
+	}, nil
 }
 
 func isNonRootHTTPSURL(u string) bool {
@@ -258,10 +327,32 @@ func (h *AuthorizationCodeHandler) Authorize(ctx context.Context, req *http.Requ
 		return err
 	}
 
-	scps := scopesFromChallenges(wwwChallenges)
-	if len(scps) == 0 && len(prm.ScopesSupported) > 0 {
-		scps = prm.ScopesSupported
+	requestedScopes := scopesFromChallenges(wwwChallenges)
+	if len(requestedScopes) == 0 && len(prm.ScopesSupported) > 0 {
+		requestedScopes = prm.ScopesSupported
 	}
+
+	// Let the client adjust the discovered scopes before offline_access and the
+	// step-up union below so neither is affected.
+	if h.config.ScopeFilter != nil {
+		requestedScopes = h.config.ScopeFilter(requestedScopes)
+	}
+
+	// SEP-2207: when the client desires refresh tokens and the Authorization
+	// Server advertises offline_access support, add it to the requested scopes.
+	if h.config.RequestRefreshToken &&
+		slices.Contains(asm.ScopesSupported, "offline_access") &&
+		!slices.Contains(requestedScopes, "offline_access") {
+		requestedScopes = append(requestedScopes, "offline_access")
+	}
+
+	// Accumulate scopes: union previously granted scopes with the newly
+	// challenged scopes so that step-up authorization does not lose
+	// permissions granted in earlier rounds (SEP-2350).
+	h.mu.RLock()
+	granted := h.grantedScopes[asm.Issuer]
+	h.mu.RUnlock()
+	requestedScopes = authutil.UnionScopes(granted, requestedScopes)
 
 	cfg := &oauth2.Config{
 		ClientID:     resolvedClientConfig.clientID,
@@ -273,7 +364,7 @@ func (h *AuthorizationCodeHandler) Authorize(ctx context.Context, req *http.Requ
 			AuthStyle: resolvedClientConfig.authStyle,
 		},
 		RedirectURL: h.config.RedirectURL,
-		Scopes:      scps,
+		Scopes:      requestedScopes,
 	}
 
 	authRes, err := h.getAuthorizationCode(ctx, cfg, prm.Resource)
@@ -281,8 +372,16 @@ func (h *AuthorizationCodeHandler) Authorize(ctx context.Context, req *http.Requ
 		// Purposefully leaving the error unwrappable so it can be handled by the caller.
 		return err
 	}
+	if err := validateIssuerResponse(authRes.Iss, asm.Issuer, asm.AuthorizationResponseIssParameterSupported, h.config.AcceptUnadvertisedIss); err != nil {
+		return err
+	}
 
-	return h.exchangeAuthorizationCode(ctx, cfg, authRes, prm.Resource)
+	err = h.exchangeAuthorizationCode(ctx, cfg, authRes, prm.Resource)
+	if err != nil {
+		return err
+	}
+
+	return h.updateGrantedScopes(asm.Issuer, requestedScopes)
 }
 
 // resourceMetadataURLFromChallenges returns a resource metadata URL from the given "WWW-Authenticate" header challenges,
@@ -456,6 +555,9 @@ func (h *AuthorizationCodeHandler) handleRegistration(ctx context.Context, asm *
 	// 2. Attempt to use pre-registered client configuration.
 	preCfg := h.config.PreregisteredClient
 	if preCfg != nil {
+		if preCfg.Issuer != "" && !authutil.IssuersEqual(preCfg.Issuer, asm.Issuer) {
+			return nil, fmt.Errorf("authorization server issuer %q does not match pre-registered credentials issuer %q", asm.Issuer, preCfg.Issuer)
+		}
 		authStyle := selectTokenAuthMethod(asm.TokenEndpointAuthMethodsSupported)
 		clientSecret := ""
 		if preCfg.ClientSecretAuth != nil {
@@ -518,6 +620,36 @@ func (h *AuthorizationCodeHandler) getAuthorizationCode(ctx context.Context, cfg
 	}, nil
 }
 
+// validateIssuerResponse validates the "iss" parameter in an authorization response
+// per [RFC 9207]. When the server advertises authorization_response_iss_parameter_supported,
+// iss is required and must match expectedIssuer. When it does not advertise support,
+// an empty iss is accepted; a present iss is compared to expectedIssuer (RFC 9207 §2.4)
+// and a mismatch is always rejected. A matching unadvertised iss is accepted only when
+// acceptUnadvertisedIss is true (local policy); the default is the historical reject.
+//
+// [RFC 9207]: https://www.rfc-editor.org/rfc/rfc9207
+func validateIssuerResponse(iss, expectedIssuer string, issParameterSupported, acceptUnadvertisedIss bool) error {
+	if issParameterSupported {
+		if iss == "" {
+			return fmt.Errorf("authorization server advertises RFC 9207 iss parameter support but none was received in the authorization response")
+		}
+		if iss != expectedIssuer {
+			return fmt.Errorf("authorization response issuer %q does not match expected issuer %q", iss, expectedIssuer)
+		}
+		return nil
+	}
+	if iss == "" {
+		return nil
+	}
+	if iss != expectedIssuer {
+		return fmt.Errorf("authorization response issuer %q does not match expected issuer %q", iss, expectedIssuer)
+	}
+	if !acceptUnadvertisedIss {
+		return fmt.Errorf("authorization server does not advertise RFC 9207 iss parameter support but iss was received in the authorization response")
+	}
+	return nil
+}
+
 // exchangeAuthorizationCode exchanges the authorization code for a token
 // and stores it in a token source.
 func (h *AuthorizationCodeHandler) exchangeAuthorizationCode(ctx context.Context, cfg *oauth2.Config, authResult *authResult, resourceURL string) error {
@@ -530,6 +662,52 @@ func (h *AuthorizationCodeHandler) exchangeAuthorizationCode(ctx context.Context
 	if err != nil {
 		return fmt.Errorf("token exchange failed: %w", err)
 	}
-	h.tokenSource = cfg.TokenSource(clientCtx, token)
+	// The token source outlives this authorization request: it is stored on the
+	// handler and used by the transport for the lifetime of the connection. The
+	// oauth2 library captures the context passed to TokenSource and reuses it for
+	// every subsequent token refresh (see golang.org/x/oauth2: tokenRefresher
+	// retains the context and passes it to each refresh round-trip). Binding it to
+	// the per-request ctx makes all later refreshes fail with "context canceled"
+	// once that request (or the connect operation that triggered authorization)
+	// completes. Use a background context that still carries the configured HTTP
+	// client so refreshes keep working for the life of the token source.
+	refreshCtx := context.WithValue(context.Background(), oauth2.HTTPClient, h.config.Client)
+	var ts oauth2.TokenSource
+	if h.config.NewTokenSource == nil {
+		ts = cfg.TokenSource(refreshCtx, token)
+	} else {
+		var err error
+		ts, err = h.config.NewTokenSource(refreshCtx, cfg, token)
+		if err != nil {
+			return fmt.Errorf("constructing token source failed: %w", err)
+		}
+	}
+	h.mu.Lock()
+	h.tokenSource = ts
+	h.mu.Unlock()
+	return nil
+}
+
+// updateGrantedScopes updates the granted scopes based on the token source and requested scopes.
+func (h *AuthorizationCodeHandler) updateGrantedScopes(issuer string, requestedScopes []string) error {
+	h.mu.RLock()
+	ts := h.tokenSource
+	h.mu.RUnlock()
+
+	if ts == nil {
+		return nil
+	}
+	tok, err := ts.Token()
+	if err != nil {
+		return err
+	}
+
+	h.mu.Lock()
+	if tokenScopes := authutil.ScopesFromToken(tok); tokenScopes == nil {
+		h.grantedScopes[issuer] = requestedScopes
+	} else {
+		h.grantedScopes[issuer] = tokenScopes
+	}
+	h.mu.Unlock()
 	return nil
 }

@@ -3,27 +3,48 @@
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ImageSignatureApplyConfiguration represents an declarative configuration of the ImageSignature type for use
+// ImageSignatureApplyConfiguration represents a declarative configuration of the ImageSignature type for use
 // with apply.
+//
+// ImageSignature holds a signature of an image. It allows to verify image identity and possibly other claims
+// as long as the signature is trusted. Based on this information it is possible to restrict runnable images
+// to those matching cluster-wide policy.
+// Mandatory fields should be parsed by clients doing image verification. The others are parsed from
+// signature's content by the server. They serve just an informative purpose.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 type ImageSignatureApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Type                             *string                                `json:"type,omitempty"`
-	Content                          []byte                                 `json:"content,omitempty"`
-	Conditions                       []SignatureConditionApplyConfiguration `json:"conditions,omitempty"`
-	ImageIdentity                    *string                                `json:"imageIdentity,omitempty"`
-	SignedClaims                     map[string]string                      `json:"signedClaims,omitempty"`
-	Created                          *metav1.Time                           `json:"created,omitempty"`
-	IssuedBy                         *SignatureIssuerApplyConfiguration     `json:"issuedBy,omitempty"`
-	IssuedTo                         *SignatureSubjectApplyConfiguration    `json:"issuedTo,omitempty"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	// Required: Describes a type of stored blob.
+	Type *string `json:"type,omitempty"`
+	// Required: An opaque binary string which is an image's signature.
+	Content []byte `json:"content,omitempty"`
+	// conditions represent the latest available observations of a signature's current state.
+	Conditions []SignatureConditionApplyConfiguration `json:"conditions,omitempty"`
+	// A human readable string representing image's identity. It could be a product name and version, or an
+	// image pull spec (e.g. "registry.access.redhat.com/rhel7/rhel:7.2").
+	ImageIdentity *string `json:"imageIdentity,omitempty"`
+	// Contains claims from the signature.
+	SignedClaims map[string]string `json:"signedClaims,omitempty"`
+	// If specified, it is the time of signature's creation.
+	Created *apismetav1.Time `json:"created,omitempty"`
+	// If specified, it holds information about an issuer of signing certificate or key (a person or entity
+	// who signed the signing certificate or key).
+	IssuedBy *SignatureIssuerApplyConfiguration `json:"issuedBy,omitempty"`
+	// If specified, it holds information about a subject of signing certificate or key (a person or entity
+	// who signed the image).
+	IssuedTo *SignatureSubjectApplyConfiguration `json:"issuedTo,omitempty"`
 }
 
-// ImageSignature constructs an declarative configuration of the ImageSignature type for use with
+// ImageSignature constructs a declarative configuration of the ImageSignature type for use with
 // apply.
 func ImageSignature(name string) *ImageSignatureApplyConfiguration {
 	b := &ImageSignatureApplyConfiguration{}
@@ -33,11 +54,13 @@ func ImageSignature(name string) *ImageSignatureApplyConfiguration {
 	return b
 }
 
+func (b ImageSignatureApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ImageSignatureApplyConfiguration) WithKind(value string) *ImageSignatureApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -45,7 +68,7 @@ func (b *ImageSignatureApplyConfiguration) WithKind(value string) *ImageSignatur
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ImageSignatureApplyConfiguration) WithAPIVersion(value string) *ImageSignatureApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -54,7 +77,7 @@ func (b *ImageSignatureApplyConfiguration) WithAPIVersion(value string) *ImageSi
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ImageSignatureApplyConfiguration) WithName(value string) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -63,7 +86,7 @@ func (b *ImageSignatureApplyConfiguration) WithName(value string) *ImageSignatur
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ImageSignatureApplyConfiguration) WithGenerateName(value string) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -72,7 +95,7 @@ func (b *ImageSignatureApplyConfiguration) WithGenerateName(value string) *Image
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ImageSignatureApplyConfiguration) WithNamespace(value string) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -81,7 +104,7 @@ func (b *ImageSignatureApplyConfiguration) WithNamespace(value string) *ImageSig
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ImageSignatureApplyConfiguration) WithUID(value types.UID) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -90,7 +113,7 @@ func (b *ImageSignatureApplyConfiguration) WithUID(value types.UID) *ImageSignat
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ImageSignatureApplyConfiguration) WithResourceVersion(value string) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -99,25 +122,25 @@ func (b *ImageSignatureApplyConfiguration) WithResourceVersion(value string) *Im
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ImageSignatureApplyConfiguration) WithGeneration(value int64) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ImageSignatureApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ImageSignatureApplyConfiguration {
+func (b *ImageSignatureApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ImageSignatureApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ImageSignatureApplyConfiguration {
+func (b *ImageSignatureApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -126,7 +149,7 @@ func (b *ImageSignatureApplyConfiguration) WithDeletionTimestamp(value metav1.Ti
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ImageSignatureApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -136,11 +159,11 @@ func (b *ImageSignatureApplyConfiguration) WithDeletionGracePeriodSeconds(value 
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ImageSignatureApplyConfiguration) WithLabels(entries map[string]string) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -151,11 +174,11 @@ func (b *ImageSignatureApplyConfiguration) WithLabels(entries map[string]string)
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ImageSignatureApplyConfiguration) WithAnnotations(entries map[string]string) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -163,13 +186,13 @@ func (b *ImageSignatureApplyConfiguration) WithAnnotations(entries map[string]st
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ImageSignatureApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ImageSignatureApplyConfiguration {
+func (b *ImageSignatureApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -180,14 +203,14 @@ func (b *ImageSignatureApplyConfiguration) WithOwnerReferences(values ...*v1.Own
 func (b *ImageSignatureApplyConfiguration) WithFinalizers(values ...string) *ImageSignatureApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *ImageSignatureApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -247,7 +270,7 @@ func (b *ImageSignatureApplyConfiguration) WithSignedClaims(entries map[string]s
 // WithCreated sets the Created field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Created field is set to the value of the last call.
-func (b *ImageSignatureApplyConfiguration) WithCreated(value metav1.Time) *ImageSignatureApplyConfiguration {
+func (b *ImageSignatureApplyConfiguration) WithCreated(value apismetav1.Time) *ImageSignatureApplyConfiguration {
 	b.Created = &value
 	return b
 }
@@ -266,4 +289,26 @@ func (b *ImageSignatureApplyConfiguration) WithIssuedBy(value *SignatureIssuerAp
 func (b *ImageSignatureApplyConfiguration) WithIssuedTo(value *SignatureSubjectApplyConfiguration) *ImageSignatureApplyConfiguration {
 	b.IssuedTo = value
 	return b
+}
+
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ImageSignatureApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ImageSignatureApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ImageSignatureApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ImageSignatureApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }
