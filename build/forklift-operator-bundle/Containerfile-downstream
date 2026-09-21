@@ -11,11 +11,11 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:6aad76fbc831e97babd19f6d5d6e91122599ad90629a62d422c144df458fb2ba"
+ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:aba671b18628230089e1c1ce1ee9254153595c8583ff70143ac8ff94353c28dc"
 
 ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-cli-download-rhel9@sha256:9bdf3b120ef641d391165fb87debecc4a84c7e340a480bad31583428b036453e"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:19dfb06799417a4d3e199a71f6566b14dc7f3f304e653fbf72d2bf564b7fa9c4"
+ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:97af9de471a3af5f2ce0374ef9ea52e330e318edbfcd6c4702d4ab4cef8b4e2a"
 
 ARG DEEP_INSPECTION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-deep-inspection-rhel10@sha256:cda155c84c82271607b41bc34a0b28dfb1955bd382d187bea7096cc854ab8ccc"
 
@@ -23,7 +23,7 @@ ARG DEEP_INSPECTION_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualiza
 
 ARG HYPERV_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-hyperv-provider-server-rhel9@sha256:358ca12867751fd79a2ced4ec5adb275d0219bbba85211fd38281999775760b8"
 
-ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel9@sha256:c623e24ec05d1744c5cf8c742db8c93e0de5a29d60c571ba60939ea48796593a"
+ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel9@sha256:f74d930812c749c6487e72ef94528db153c5e2cc71f97f623952db4ee65991c7"
 
 ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:404c2e1957ccd2f9621575823c40e5c5057d5479cddd2c8a5f7c657526f48a60"
 
@@ -37,11 +37,11 @@ ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/m
 
 ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-populator-controller-rhel9@sha256:ec48f9511e68a0a4b2ed97a44876b024a596bb8abf8467c0c04d6233994226bf"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:054645cac006afa659db6d57ba33e3e3c66d4276c310c7d828cdeee21dec789a"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:0f657ddbdddf3b316cb8899d63811ab25ddc57d80c2757d1967ca2f094491c4e"
 
 ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:db529dd84373648a62405ba9161ee9bc2086085841cdaac5e83898c41d2ac409"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel10@sha256:a40188992085b5a9a890844718fdfe28586528fd8a376aa948943104afd15fbc"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel10@sha256:4044f873b1e3ef6e7cde9c1f6b3014ac2f35e5be0037091a49a9ad0a10079e83"
 
 ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:581235c4a537d0c1f0d59345c1b9395f3d8a548f4bfa739e7506b041c1c73abe"
 
