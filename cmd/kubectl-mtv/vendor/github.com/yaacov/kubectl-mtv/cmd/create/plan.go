@@ -555,7 +555,7 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&defaultAccessMode, "default-access-mode", "", "Default access mode for storage pairs (ReadWriteOnce|ReadWriteMany|ReadOnlyMany)")
 	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", "Default offload plugin type for storage pairs (vsphere)")
 	cmd.Flags().StringVar(&defaultOffloadSecret, "default-offload-secret", "", "Existing offload secret name to use for storage offload")
-	cmd.Flags().StringVar(&defaultOffloadVendor, "default-offload-vendor", "", "Default offload plugin vendor for storage pairs (flashsystem|vantara|ontap|primera3par|pureFlashArray|powerflex|powermax|powerstore|infinibox)")
+	cmd.Flags().StringVar(&defaultOffloadVendor, "default-offload-vendor", "", flags.OffloadVendorHelp)
 	cmd.Flags().StringVar(&defaultOffloadMigrationHosts, "default-offload-migration-hosts", "", "Default dedicated ESXi host IDs for XCOPY migrations (+-separated, e.g. host-10+host-11)")
 
 	// Offload secret creation flags (storage offload/XCOPY is vSphere-only)
@@ -648,7 +648,7 @@ Affinity Syntax (KARL):
 	}
 
 	if err := cmd.RegisterFlagCompletionFunc("default-offload-vendor", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"flashsystem", "vantara", "ontap", "primera3par", "pureFlashArray", "powerflex", "powermax", "powerstore", "infinibox"}, cobra.ShellCompDirectiveNoFileComp
+		return flags.OffloadVendors, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		panic(err)
 	}

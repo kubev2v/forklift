@@ -49,7 +49,7 @@ Examples:
 	}
 
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
+	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
 
 	if err := cmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return outputFormatFlag.GetValidValues(), cobra.ShellCompDirectiveNoFileComp

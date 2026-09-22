@@ -61,7 +61,7 @@ Host information is useful for planning migrations and understanding the source 
 	cmd.Flags().StringVarP(&provider, "provider", "p", "", "Provider name")
 	_ = cmd.MarkFlagRequired("provider")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
+	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 
@@ -125,7 +125,7 @@ organizational units that contain clusters, hosts, and VMs.`,
 	cmd.Flags().StringVarP(&provider, "provider", "p", "", "Provider name")
 	_ = cmd.MarkFlagRequired("provider")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
+	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 
@@ -189,7 +189,7 @@ together and define resource pools for VMs.`,
 	cmd.Flags().StringVarP(&provider, "provider", "p", "", "Provider name")
 	_ = cmd.MarkFlagRequired("provider")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
+	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 
@@ -253,7 +253,7 @@ size, storage location, and attachment to VMs.`,
 	cmd.Flags().StringVarP(&provider, "provider", "p", "", "Provider name")
 	_ = cmd.MarkFlagRequired("provider")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
+	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 

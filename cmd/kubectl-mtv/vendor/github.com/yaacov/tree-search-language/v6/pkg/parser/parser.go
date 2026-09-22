@@ -564,194 +564,194 @@ yydefault:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:57
 		{
-			yyVAL.node = NewBinaryOpNode(OpOr, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpOr, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 6:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:62
 		{
-			yyVAL.node = NewBinaryOpNode(OpAnd, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpAnd, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 8:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:67
 		{
-			yyVAL.node = NewBinaryOpNode(OpEQ, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpEQ, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 9:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:68
 		{
-			yyVAL.node = NewBinaryOpNode(OpNE, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpNE, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 10:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:69
 		{
-			yyVAL.node = NewBinaryOpNode(OpLT, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpLT, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 11:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:70
 		{
-			yyVAL.node = NewBinaryOpNode(OpLE, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpLE, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 12:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:71
 		{
-			yyVAL.node = NewBinaryOpNode(OpGT, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpGT, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 13:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:72
 		{
-			yyVAL.node = NewBinaryOpNode(OpGE, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpGE, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 14:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:73
 		{
-			yyVAL.node = NewBinaryOpNode(OpREQ, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpREQ, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 15:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:74
 		{
-			yyVAL.node = NewBinaryOpNode(OpRNE, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpRNE, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 16:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:75
 		{
-			yyVAL.node = NewBinaryOpNode(OpLike, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpLike, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 17:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:76
 		{
-			yyVAL.node = NewBinaryOpNode(OpILike, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpILike, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 18:
 		yyDollar = yyS[yypt-4 : yypt+1]
 //line parser.y:77
 		{
-			likeExpr := NewBinaryOpNode(OpLike, yyDollar[1].node, yyDollar[4].node, 0)
-			yyVAL.node = NewUnaryOpNode(OpNot, likeExpr, 0)
+			likeExpr := NewBinaryOpNode(OpLike, yyDollar[1].node, yyDollar[4].node, yyDollar[1].node.Position)
+			yyVAL.node = NewUnaryOpNode(OpNot, likeExpr, yyDollar[1].node.Position)
 		}
 	case 19:
 		yyDollar = yyS[yypt-4 : yypt+1]
 //line parser.y:81
 		{
-			ilikeExpr := NewBinaryOpNode(OpILike, yyDollar[1].node, yyDollar[4].node, 0)
-			yyVAL.node = NewUnaryOpNode(OpNot, ilikeExpr, 0)
+			ilikeExpr := NewBinaryOpNode(OpILike, yyDollar[1].node, yyDollar[4].node, yyDollar[1].node.Position)
+			yyVAL.node = NewUnaryOpNode(OpNot, ilikeExpr, yyDollar[1].node.Position)
 		}
 	case 20:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:85
 		{
-			yyVAL.node = NewBinaryOpNode(OpIs, yyDollar[1].node, NewNullNode(0), 0)
+			yyVAL.node = NewBinaryOpNode(OpIs, yyDollar[1].node, NewNullNode(yyDollar[1].node.Position), yyDollar[1].node.Position)
 		}
 	case 21:
 		yyDollar = yyS[yypt-4 : yypt+1]
 //line parser.y:86
 		{
-			isNullExpr := NewBinaryOpNode(OpIs, yyDollar[1].node, NewNullNode(0), 0)
-			yyVAL.node = NewUnaryOpNode(OpNot, isNullExpr, 0)
+			isNullExpr := NewBinaryOpNode(OpIs, yyDollar[1].node, NewNullNode(yyDollar[1].node.Position), yyDollar[1].node.Position)
+			yyVAL.node = NewUnaryOpNode(OpNot, isNullExpr, yyDollar[1].node.Position)
 		}
 	case 22:
 		yyDollar = yyS[yypt-5 : yypt+1]
 //line parser.y:90
 		{
-			rangeArray := NewArrayNode([]*Node{yyDollar[3].node, yyDollar[5].node}, 0)
-			yyVAL.node = NewBinaryOpNode(OpBetween, yyDollar[1].node, rangeArray, 0)
+			rangeArray := NewArrayNode([]*Node{yyDollar[3].node, yyDollar[5].node}, yyDollar[3].node.Position)
+			yyVAL.node = NewBinaryOpNode(OpBetween, yyDollar[1].node, rangeArray, yyDollar[1].node.Position)
 		}
 	case 23:
 		yyDollar = yyS[yypt-6 : yypt+1]
 //line parser.y:94
 		{
-			rangeArray := NewArrayNode([]*Node{yyDollar[4].node, yyDollar[6].node}, 0)
-			betweenExpr := NewBinaryOpNode(OpBetween, yyDollar[1].node, rangeArray, 0)
-			yyVAL.node = NewUnaryOpNode(OpNot, betweenExpr, 0)
+			rangeArray := NewArrayNode([]*Node{yyDollar[4].node, yyDollar[6].node}, yyDollar[4].node.Position)
+			betweenExpr := NewBinaryOpNode(OpBetween, yyDollar[1].node, rangeArray, yyDollar[1].node.Position)
+			yyVAL.node = NewUnaryOpNode(OpNot, betweenExpr, yyDollar[1].node.Position)
 		}
 	case 24:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:99
 		{
-			yyVAL.node = NewBinaryOpNode(OpIn, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpIn, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 25:
 		yyDollar = yyS[yypt-4 : yypt+1]
 //line parser.y:100
 		{
-			inExpr := NewBinaryOpNode(OpIn, yyDollar[1].node, yyDollar[4].node, 0)
-			yyVAL.node = NewUnaryOpNode(OpNot, inExpr, 0)
+			inExpr := NewBinaryOpNode(OpIn, yyDollar[1].node, yyDollar[4].node, yyDollar[1].node.Position)
+			yyVAL.node = NewUnaryOpNode(OpNot, inExpr, yyDollar[1].node.Position)
 		}
 	case 27:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:108
 		{
-			yyVAL.node = NewBinaryOpNode(OpPlus, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpPlus, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 28:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:109
 		{
-			yyVAL.node = NewBinaryOpNode(OpMinus, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpMinus, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 30:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:114
 		{
-			yyVAL.node = NewBinaryOpNode(OpStar, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpStar, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 31:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:115
 		{
-			yyVAL.node = NewBinaryOpNode(OpSlash, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpSlash, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 32:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line parser.y:116
 		{
-			yyVAL.node = NewBinaryOpNode(OpPercent, yyDollar[1].node, yyDollar[3].node, 0)
+			yyVAL.node = NewBinaryOpNode(OpPercent, yyDollar[1].node, yyDollar[3].node, yyDollar[1].node.Position)
 		}
 	case 34:
 		yyDollar = yyS[yypt-2 : yypt+1]
 //line parser.y:121
 		{
-			yyVAL.node = NewUnaryOpNode(OpNot, yyDollar[2].node, 0)
+			yyVAL.node = NewUnaryOpNode(OpNot, yyDollar[2].node, yyDollar[2].node.Position)
 		}
 	case 35:
 		yyDollar = yyS[yypt-2 : yypt+1]
 //line parser.y:122
 		{
-			yyVAL.node = NewUnaryOpNode(OpLen, yyDollar[2].node, 0)
+			yyVAL.node = NewUnaryOpNode(OpLen, yyDollar[2].node, yyDollar[2].node.Position)
 		}
 	case 36:
 		yyDollar = yyS[yypt-2 : yypt+1]
 //line parser.y:123
 		{
-			yyVAL.node = NewUnaryOpNode(OpAny, yyDollar[2].node, 0)
+			yyVAL.node = NewUnaryOpNode(OpAny, yyDollar[2].node, yyDollar[2].node.Position)
 		}
 	case 37:
 		yyDollar = yyS[yypt-2 : yypt+1]
 //line parser.y:124
 		{
-			yyVAL.node = NewUnaryOpNode(OpAll, yyDollar[2].node, 0)
+			yyVAL.node = NewUnaryOpNode(OpAll, yyDollar[2].node, yyDollar[2].node.Position)
 		}
 	case 38:
 		yyDollar = yyS[yypt-2 : yypt+1]
 //line parser.y:125
 		{
-			yyVAL.node = NewUnaryOpNode(OpSum, yyDollar[2].node, 0)
+			yyVAL.node = NewUnaryOpNode(OpSum, yyDollar[2].node, yyDollar[2].node.Position)
 		}
 	case 40:
 		yyDollar = yyS[yypt-2 : yypt+1]
 //line parser.y:130
 		{
-			yyVAL.node = NewUnaryOpNode(OpUMinus, yyDollar[2].node, 0)
+			yyVAL.node = NewUnaryOpNode(OpUMinus, yyDollar[2].node, yyDollar[2].node.Position)
 		}
 	case 41:
 		yyDollar = yyS[yypt-2 : yypt+1]
@@ -799,7 +799,7 @@ yydefault:
 		yyDollar = yyS[yypt-1 : yypt+1]
 //line parser.y:147
 		{
-			yyVAL.node = NewArrayNode([]*Node{yyDollar[1].node}, 0)
+			yyVAL.node = NewArrayNode([]*Node{yyDollar[1].node}, yyDollar[1].node.Position)
 		}
 	case 49:
 		yyDollar = yyS[yypt-3 : yypt+1]
@@ -813,43 +813,43 @@ yydefault:
 		yyDollar = yyS[yypt-1 : yypt+1]
 //line parser.y:158
 		{
-			yyVAL.node = NewNumberNode(yyDollar[1].str, 0)
+			yyVAL.node = NewNumberNode(yyDollar[1].str, yyDollar[1].pos)
 		}
 	case 51:
 		yyDollar = yyS[yypt-1 : yypt+1]
 //line parser.y:159
 		{
-			yyVAL.node = NewStringNode(yyDollar[1].str, 0)
+			yyVAL.node = NewStringNode(yyDollar[1].str, yyDollar[1].pos)
 		}
 	case 52:
 		yyDollar = yyS[yypt-1 : yypt+1]
 //line parser.y:160
 		{
-			yyVAL.node = NewIdentifierNode(yyDollar[1].str, 0)
+			yyVAL.node = NewIdentifierNode(yyDollar[1].str, yyDollar[1].pos)
 		}
 	case 53:
 		yyDollar = yyS[yypt-1 : yypt+1]
 //line parser.y:161
 		{
-			yyVAL.node = NewTimestampNode(yyDollar[1].str, 0)
+			yyVAL.node = NewTimestampNode(yyDollar[1].str, yyDollar[1].pos)
 		}
 	case 54:
 		yyDollar = yyS[yypt-1 : yypt+1]
 //line parser.y:162
 		{
-			yyVAL.node = NewDateNode(yyDollar[1].str, 0)
+			yyVAL.node = NewDateNode(yyDollar[1].str, yyDollar[1].pos)
 		}
 	case 55:
 		yyDollar = yyS[yypt-1 : yypt+1]
 //line parser.y:163
 		{
-			yyVAL.node = NewBooleanNode(true, 0)
+			yyVAL.node = NewBooleanNode(true, yyDollar[1].pos)
 		}
 	case 56:
 		yyDollar = yyS[yypt-1 : yypt+1]
 //line parser.y:164
 		{
-			yyVAL.node = NewBooleanNode(false, 0)
+			yyVAL.node = NewBooleanNode(false, yyDollar[1].pos)
 		}
 	}
 	goto yystack /* stack new state and value */

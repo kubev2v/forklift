@@ -72,7 +72,7 @@ mapping type.`,
 
 	cmd.Flags().StringVarP(&mappingName, "name", "M", "", "Mapping name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
+	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
 	cmd.Flags().BoolVarP(&watchFlag, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 
@@ -141,7 +141,7 @@ definitions (NADs) or pod networking.`,
 
 	cmd.Flags().StringVarP(&mappingName, "name", "M", "", "Mapping name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
+	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 
@@ -212,7 +212,7 @@ storage classes with optional volume mode and access mode settings.`,
 
 	cmd.Flags().StringVarP(&mappingName, "name", "M", "", "Mapping name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
+	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 
