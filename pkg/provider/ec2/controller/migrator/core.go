@@ -87,8 +87,8 @@ func (r *Migrator) Type() api.MigrationType {
 
 // Supported returns whether the plan's migration type is supported.
 func (r *Migrator) Supported() bool {
-	return r.Context.Plan.Spec.Type == api.MigrationCold ||
-		r.Context.Plan.Spec.Type == ""
+	return r.Plan.Spec.Type == api.MigrationCold ||
+		r.Plan.Spec.Type == ""
 }
 
 // DestinationClient returns the destination client (not used for EC2).

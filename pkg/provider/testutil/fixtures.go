@@ -73,25 +73,25 @@ func (b *PlanBuilder) WithVMs(vms ...planapi.VM) *PlanBuilder {
 
 // WithSourceProvider sets the source provider reference.
 func (b *PlanBuilder) WithSourceProvider(provider *api.Provider) *PlanBuilder {
-	b.plan.Referenced.Provider.Source = provider
+	b.plan.Provider.Source = provider
 	return b
 }
 
 // WithDestinationProvider sets the destination provider reference.
 func (b *PlanBuilder) WithDestinationProvider(provider *api.Provider) *PlanBuilder {
-	b.plan.Referenced.Provider.Destination = provider
+	b.plan.Provider.Destination = provider
 	return b
 }
 
 // WithNetworkMap sets the network map reference.
 func (b *PlanBuilder) WithNetworkMap(networkMap *api.NetworkMap) *PlanBuilder {
-	b.plan.Referenced.Map.Network = networkMap
+	b.plan.Map.Network = networkMap
 	return b
 }
 
 // WithStorageMap sets the storage map reference.
 func (b *PlanBuilder) WithStorageMap(storageMap *api.StorageMap) *PlanBuilder {
-	b.plan.Referenced.Map.Storage = storageMap
+	b.plan.Map.Storage = storageMap
 	return b
 }
 

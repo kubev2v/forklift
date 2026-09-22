@@ -39,7 +39,7 @@ var _ = Describe("Server", func() {
 	})
 
 	AfterEach(func() {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 	})
 
 	Describe("vmHandler", func() {

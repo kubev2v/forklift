@@ -66,14 +66,14 @@ func AddToManager(m manager.Manager) error {
 		}
 		return nil
 	}
-	if Settings.Role.Has(settings.InventoryRole) {
+	if Settings.Has(settings.InventoryRole) {
 		err := load(InventoryControllers)
 		if err != nil {
 			return err
 		}
 
 	}
-	if Settings.Role.Has(settings.MainRole) {
+	if Settings.Has(settings.MainRole) {
 		err := load(MainControllers)
 		if err != nil {
 			return err

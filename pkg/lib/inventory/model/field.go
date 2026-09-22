@@ -369,7 +369,7 @@ func (f *Field) Incremented() bool {
 func (f *Field) AsValue(object interface{}) (value interface{}, err error) {
 	val := reflect.ValueOf(object)
 	switch val.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		val = val.Elem()
 	case reflect.Struct,
 		reflect.Slice,

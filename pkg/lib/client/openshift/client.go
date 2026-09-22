@@ -38,7 +38,7 @@ func RestCfg(p *api.Provider, secret *core.Secret) *rest.Config {
 	}
 
 	if !insecure && hasCACert {
-		cfg.TLSClientConfig.CAData = cacert
+		cfg.CAData = cacert
 	}
 
 	cfg.Burst = 1000

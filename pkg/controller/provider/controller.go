@@ -80,7 +80,7 @@ func Add(mgr manager.Manager) error {
 		web.TLS.Enabled = true
 		web.TLS.Certificate = Settings.Inventory.TLS.Certificate
 		web.TLS.Key = Settings.Inventory.TLS.Key
-		web.AllowedOrigins = Settings.Inventory.CORS.AllowedOrigins
+		web.AllowedOrigins = Settings.CORS.AllowedOrigins
 	}
 	reconciler := &Reconciler{
 		Reconciler: base.Reconciler{
@@ -393,7 +393,7 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 
 // Build DB for provider.
 func (r *Reconciler) getDB(provider *api.Provider) (db libmodel.DB) {
-	dir := Settings.Inventory.WorkingDir
+	dir := Settings.WorkingDir
 	dir = filepath.Join(
 		dir,
 		provider.Namespace,
@@ -463,12 +463,12 @@ func (r *Reconciler) removeVolumeOfOVAServer(provider *api.Provider) error {
 		"provider": provider.Name,
 	})
 	pvList := &v1.PersistentVolumeList{}
-	if err := r.Client.List(context.TODO(), pvList, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
+	if err := r.List(context.TODO(), pvList, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
 		r.Log.Error(err, "Failed to list PVs for OVA provider", "provider", provider)
 		return err
 	} else {
 		for _, pv := range pvList.Items {
-			if err = r.Client.Delete(context.TODO(), &pv); err != nil {
+			if err = r.Delete(context.TODO(), &pv); err != nil {
 				r.Log.Error(err, "Failed to delete PV", "PV", pv)
 				return err
 			}

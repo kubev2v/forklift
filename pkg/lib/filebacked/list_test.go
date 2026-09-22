@@ -55,7 +55,7 @@ func TestList(t *testing.T) {
 	for i := 0; i < len(input); i++ {
 		list.Append(input[i])
 	}
-	g.Expect(len(cat.content)).To(gomega.Equal(2))
+	g.Expect(cat.content).To(gomega.HaveLen(2))
 	g.Expect(list.Len()).To(gomega.Equal(len(input)))
 
 	// iterate

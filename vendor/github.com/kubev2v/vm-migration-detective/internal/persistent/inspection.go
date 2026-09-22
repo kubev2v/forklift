@@ -24,6 +24,9 @@ type InspectorInterface interface {
 	// InspectWithVirtV2v performs inspection using VirtV2vInspector with memory and DB caching
 	InspectWithVirtV2v(ctx context.Context, vmMoref string, snapshotMoref string, diskInfo *types.SnapshotDiskInfo, sslVerify string) (*types.VirtV2VInspectorXML, error)
 
+	// InspectLocal performs inspection on locally-mounted disk files (no VDDK/vSphere)
+	InspectLocal(ctx context.Context, virtInspectorArgs []string) (*types.VirtInspectorXML, error)
+
 	// GetDB returns the database instance used by the inspector
 	GetDB() DB
 }
@@ -378,4 +381,13 @@ func (t *inflightTracker[T]) do(key CacheKey, fn func() (T, error)) (T, error, b
 // GetDB returns the database instance used by the inspector
 func (p *Inspector) GetDB() DB {
 	return p.db
+}
+
+// InspectLocal runs virt-inspector directly on local disk files (no VDDK/vSphere).
+// The args are passed directly to virt-inspector (e.g. ["-a", "/path/file.vhdx", "--format=vhdx"]).
+func (p *Inspector) InspectLocal(ctx context.Context, virtInspectorArgs []string) (*types.VirtInspectorXML, error) {
+	if p.logger != nil {
+		p.logger.WithField("args", virtInspectorArgs).Info("Running local disk inspection with virt-inspector")
+	}
+	return p.virtInspector.InspectLocal(ctx, virtInspectorArgs)
 }

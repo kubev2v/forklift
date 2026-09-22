@@ -50,7 +50,7 @@ func (h *VddkHandler) AddRoutes(e *gin.Engine) {
 // BuildImage receives a VDDK tar file, writes it to disk,
 // and triggers an OpenShift BuildConfig to build and push the image.
 func (h *VddkHandler) BuildImage(ctx *gin.Context) {
-	status, err := h.Handler.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		base.SetForkliftError(ctx, err)
@@ -97,14 +97,14 @@ func (h *VddkHandler) BuildImage(ctx *gin.Context) {
 // it returns a 200 JSON response containing the image reference. On error,
 // it writes a JSON error with the appropriate HTTP status.
 func (h *VddkHandler) ImageUrl(ctx *gin.Context) {
-	status, err := h.Handler.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		base.SetForkliftError(ctx, err)
 		return
 	}
 
-	if h.Handler.WatchRequest {
+	if h.WatchRequest {
 		h.watchImageURL(ctx)
 		return
 	}
@@ -137,7 +137,7 @@ func (h *VddkHandler) ImageUrl(ctx *gin.Context) {
 
 // DownloadVddkTar streams the uploaded VDDK tar back to the client.
 func (h *VddkHandler) DownloadVddkTar(ctx *gin.Context) {
-	status, err := h.Handler.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		base.SetForkliftError(ctx, err)
@@ -183,7 +183,7 @@ func saveFile(filePath string, file *multipart.FileHeader) error {
 	if err != nil {
 		return fmt.Errorf("could not process uploaded file: %v", err)
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	if err := os.MkdirAll(uploadDir, 0600); err != nil {
 		return fmt.Errorf("could not prepare upload directory: %v", err)
@@ -193,7 +193,7 @@ func saveFile(filePath string, file *multipart.FileHeader) error {
 	if err != nil {
 		return fmt.Errorf("error: %v, Could not save file on disk: %s. ", err, filePath)
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 
 	if _, err := io.Copy(dst, src); err != nil {
 		return fmt.Errorf("error copy to the local file: %v", err)

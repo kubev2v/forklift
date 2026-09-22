@@ -828,7 +828,7 @@ func smbMountBlocked(pod *core.Pod) (string, bool) {
 }
 
 func providerServicePendingTimeout() time.Duration {
-	return time.Duration(Settings.Providers.ProviderPendingTimeoutSeconds) * time.Second
+	return time.Duration(Settings.ProviderPendingTimeoutSeconds) * time.Second
 }
 
 func isPodReady(pod *core.Pod) bool {
@@ -1296,9 +1296,9 @@ func (r *Reconciler) ValidateSSHReadiness(provider *api.Provider, secret *core.S
 			// Parse "id|name|ip" format for human-readable display
 			parts := strings.Split(item, "|")
 			if len(parts) == 3 {
-				successSuggestion.WriteString(fmt.Sprintf("  - %s (%s)\n", parts[1], parts[2]))
+				fmt.Fprintf(&successSuggestion, "  - %s (%s)\n", parts[1], parts[2])
 			} else {
-				successSuggestion.WriteString(fmt.Sprintf("  - %s\n", item))
+				fmt.Fprintf(&successSuggestion, "  - %s\n", item)
 			}
 		}
 		successSuggestion.WriteString("\nTo use the xcopy volume populator, ensure your VMs are located on these ESXi hosts before starting the migration.\n")
@@ -1323,9 +1323,9 @@ func (r *Reconciler) ValidateSSHReadiness(provider *api.Provider, secret *core.S
 		// Parse "id|name|ip" format for human-readable display
 		parts := strings.Split(item, "|")
 		if len(parts) == 3 {
-			failSuggestion.WriteString(fmt.Sprintf("  - %s (%s)\n", parts[1], parts[2]))
+			fmt.Fprintf(&failSuggestion, "  - %s (%s)\n", parts[1], parts[2])
 		} else {
-			failSuggestion.WriteString(fmt.Sprintf("  - %s\n", item))
+			fmt.Fprintf(&failSuggestion, "  - %s\n", item)
 		}
 	}
 	failSuggestion.WriteString("\n")

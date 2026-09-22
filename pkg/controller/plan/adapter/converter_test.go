@@ -94,7 +94,7 @@ var _ = Describe("Converter tests", func() {
 			Expect(job).ToNot(BeNil())
 
 			createdJob := &batchv1.Job{}
-			err = converter.Destination.Client.Get(context.TODO(), types.NamespacedName{
+			err = converter.Destination.Get(context.TODO(), types.NamespacedName{
 				Name:      job.Name,
 				Namespace: job.Namespace,
 			}, createdJob)
@@ -201,7 +201,7 @@ var _ = Describe("Converter tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Check if scratch DV is removed
-			err = converter.Destination.Client.Get(context.TODO(), types.NamespacedName{Name: dv.Name, Namespace: dv.Namespace}, dv)
+			err = converter.Destination.Get(context.TODO(), types.NamespacedName{Name: dv.Name, Namespace: dv.Namespace}, dv)
 			Expect(err).To(HaveOccurred())
 		})
 	})

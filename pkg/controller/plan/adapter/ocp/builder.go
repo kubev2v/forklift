@@ -22,7 +22,6 @@ import (
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	cnv "kubevirt.io/api/core/v1"
-	export "kubevirt.io/api/export/v1alpha1"
+	export "kubevirt.io/api/export/v1beta1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -81,7 +80,7 @@ func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.Con
 }
 
 // DataVolumes implements base.Builder
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *v1.ConfigMap) (dvs []cdi.DataVolume, err error) {
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vmExport := &export.VirtualMachineExport{}
 	key := client.ObjectKey{
 		Namespace: vmRef.Namespace,
@@ -148,7 +147,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 		storageClassName := storageMap[*pvc.Spec.StorageClassName].StorageClass
 		dataVolume.Spec = *createDataVolumeSpec(size, storageClassName, url, certConfigMap, secret.Name)
 
-		err = r.Destination.Client.Create(context.TODO(), dataVolume, &client.CreateOptions{})
+		err = r.Destination.Create(context.TODO(), dataVolume, &client.CreateOptions{})
 		if err != nil {
 			if !errors.IsAlreadyExists(err) {
 				r.Log.Error(err, "Failed to create DataVolume")
@@ -179,7 +178,7 @@ func (*Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []
 
 // ResolveDataVolumeIdentifier implements base.Builder
 func (*Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	return dv.ObjectMeta.Annotations[planbase.AnnDiskSource]
+	return dv.Annotations[planbase.AnnDiskSource]
 }
 
 // ResolvePersistentVolumeClaimIdentifier implements base.Builder
@@ -294,7 +293,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 }
 
 // VirtualMachine implements base.Builder
-func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*v1.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) error {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) error {
 	sourceVm, err := r.getSourceVmFromDefinition(vmRef)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -520,7 +519,7 @@ func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Vi
 
 // mapVolumes updates volume references from source PVC names to target (templated) PVC names.
 // It uses the AnnDiskSource annotation on target PVCs to map source PVC identifiers to target PVC names.
-func (r *Builder) mapVolumes(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []*v1.PersistentVolumeClaim) {
+func (r *Builder) mapVolumes(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim) {
 	// Build a map from source PVC identifier (namespace/name) to target PVC name
 	// using the AnnDiskSource annotation
 	pvcMap := make(map[string]string) // sourcePVCIdentifier -> targetPVCName
@@ -619,7 +618,7 @@ func (r *Builder) getSourceVmFromDefinition(vmRef ref.Ref) (*cnv.VirtualMachine,
 		return nil, liberr.New("failed to get vm manifest", "status", resp.StatusCode)
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -633,7 +632,7 @@ func (r *Builder) getSourceVmFromDefinition(vmRef ref.Ref) (*cnv.VirtualMachine,
 	}
 
 	switch t := obj.(type) {
-	case *v1.List:
+	case *core.List:
 		for _, item := range t.Items {
 			decoded, _, err := decode(item.Raw, nil, nil)
 			if err != nil {
@@ -722,11 +721,11 @@ func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigR
 	return &planbase.ConversionPodConfigResult{}, nil
 }
 
-func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) ([]v1.PersistentVolumeClaim, error) {
+func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) ([]core.PersistentVolumeClaim, error) {
 	return nil, nil
 }
 
-func (r *Builder) CsiImportPVCs(_ ref.Ref, _ map[string]string) ([]v1.PersistentVolumeClaim, error) {
+func (r *Builder) CsiImportPVCs(_ ref.Ref, _ map[string]string) ([]core.PersistentVolumeClaim, error) {
 	return nil, nil
 }
 

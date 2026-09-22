@@ -99,7 +99,7 @@ func (c *Converter) ConvertPVCs(pvcs []*v1.PersistentVolumeClaim, srcFormat srcF
 }
 
 func (c *Converter) deleteScratchDV(scratchDV *cdi.DataVolume) {
-	err := c.Destination.Client.Delete(context.Background(), scratchDV)
+	err := c.Destination.Delete(context.Background(), scratchDV)
 	if err != nil {
 		c.Log.Error(err, "Failed to delete scratch DV", "DV", scratchDV.Name)
 	}
@@ -109,7 +109,7 @@ func (c *Converter) ensureJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume,
 	// Find existing job by label
 	jobList := &batchv1.JobList{}
 	label := client.MatchingLabels{planbase.AnnConversionSourcePVC: pvc.Name}
-	err := c.Destination.Client.List(context.Background(), jobList, client.InNamespace(pvc.Namespace), label)
+	err := c.Destination.List(context.Background(), jobList, client.InNamespace(pvc.Namespace), label)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func (c *Converter) ensureJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume,
 	// Job doesn't exist, create it
 	job := createConvertJob(pvc, dv, srcFormat, dstFormat, c.Labels, c.VirtV2vImage, c.ServiceAccountName)
 	c.Log.Info("Creating convert job", "pvc", pvc.Name, "srcFormat", srcFormat, "dstFormat", dstFormat)
-	err = c.Destination.Client.Create(context.Background(), job)
+	err = c.Destination.Create(context.Background(), job)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,7 @@ func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat
 func (c *Converter) ensureScratchDV(sourcePVC *v1.PersistentVolumeClaim) (*cdi.DataVolume, error) {
 	dvList := &cdi.DataVolumeList{}
 	label := client.MatchingLabels{planbase.AnnConversionSourcePVC: sourcePVC.Name}
-	err := c.Destination.Client.List(context.Background(), dvList, client.InNamespace(sourcePVC.Namespace), label)
+	err := c.Destination.List(context.Background(), dvList, client.InNamespace(sourcePVC.Namespace), label)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +268,7 @@ func (c *Converter) ensureScratchDV(sourcePVC *v1.PersistentVolumeClaim) (*cdi.D
 	// DV doesn't exist, create it
 	scratchDV := makeScratchDV(sourcePVC)
 	c.Log.Info("DV doesn't exist, creating", "dv", scratchDV.Name)
-	err = c.Destination.Client.Create(context.Background(), scratchDV)
+	err = c.Destination.Create(context.Background(), scratchDV)
 	if err != nil {
 		return nil, err
 	}

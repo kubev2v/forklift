@@ -182,12 +182,12 @@ func (r *Builder) PodSpec(provider *api.Provider, pvc *core.PersistentVolumeClai
 				},
 				Resources: core.ResourceRequirements{
 					Requests: core.ResourceList{
-						core.ResourceCPU:    resource.MustParse(Settings.Providers.OVA.Resources.CPU.Request),
-						core.ResourceMemory: resource.MustParse(Settings.Providers.OVA.Resources.Memory.Request),
+						core.ResourceCPU:    resource.MustParse(Settings.OVA.Resources.CPU.Request),
+						core.ResourceMemory: resource.MustParse(Settings.OVA.Resources.Memory.Request),
 					},
 					Limits: core.ResourceList{
-						core.ResourceCPU:    resource.MustParse(Settings.Providers.OVA.Resources.CPU.Limit),
-						core.ResourceMemory: resource.MustParse(Settings.Providers.OVA.Resources.Memory.Limit),
+						core.ResourceCPU:    resource.MustParse(Settings.OVA.Resources.CPU.Limit),
+						core.ResourceMemory: resource.MustParse(Settings.OVA.Resources.Memory.Limit),
 					},
 				},
 				SecurityContext: r.securityContext(),
@@ -287,13 +287,13 @@ func (r *Builder) securityContext() (sc *core.SecurityContext) {
 }
 
 func (r *Builder) applianceEndpoints(provider *api.Provider) string {
-	gateEnabled := Settings.Features.OVFApplianceManagement
+	gateEnabled := Settings.OVFApplianceManagement
 	providerEnabled, _ := strconv.ParseBool(provider.Spec.Settings[SettingApplianceManagement])
 	return strconv.FormatBool(gateEnabled && providerEnabled)
 }
 
 func (r *Builder) containerImage() string {
-	return Settings.Providers.OVA.ContainerImage
+	return Settings.OVA.ContainerImage
 }
 
 func (r *Builder) nfsMountPath() string {

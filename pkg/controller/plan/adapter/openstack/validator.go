@@ -29,7 +29,7 @@ type Validator struct {
 }
 
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Storage == nil {
+	if r.Plan.Map.Storage == nil {
 		return
 	}
 	vm := &model.Workload{}
@@ -39,13 +39,13 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 	for _, volType := range vm.VolumeTypes {
-		if !r.Plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: volType.ID}) {
+		if !r.Plan.Map.Storage.Status.Find(ref.Ref{ID: volType.ID}) {
 			return
 		}
 	}
 
 	// If vm is image based, we need to see glance in the storage map
-	if vm.ImageID != "" && !r.Plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{Name: api.GlanceSource}) {
+	if vm.ImageID != "" && !r.Plan.Map.Storage.Status.Find(ref.Ref{Name: api.GlanceSource}) {
 		return
 	}
 
@@ -55,7 +55,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
+	if r.Plan.Map.Network == nil {
 		return
 	}
 	vm := &model.Workload{}
@@ -65,7 +65,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 	for _, network := range vm.Networks {
-		if !r.Plan.Referenced.Map.Network.Status.Refs.Find(ref.Ref{ID: network.ID}) {
+		if !r.Plan.Map.Network.Status.Find(ref.Ref{ID: network.ID}) {
 			return
 		}
 	}

@@ -324,7 +324,7 @@ func getRecorder(kubeClient kubernetes.Interface, controllerName string) record.
 
 func (c *controller) addNotification(keyToCall, objType, namespace, name string) {
 	var key string
-	if 0 == len(namespace) {
+	if len(namespace) == 0 {
 		key = objType + "/" + name
 	} else {
 		key = objType + "/" + namespace + "/" + name
@@ -358,7 +358,7 @@ func (c *controller) cleanupNotifications(keyToCall string) {
 			continue
 		}
 		delete(t.set, keyToCall)
-		if 0 == len(t.set) {
+		if len(t.set) == 0 {
 			delete(c.notifyMap, key)
 		}
 	}
@@ -508,7 +508,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	if dataSourceRef.APIGroup != nil {
 		apiGroup = *dataSourceRef.APIGroup
 	}
-	if c.gk.Group != apiGroup || c.gk.Kind != dataSourceRef.Kind || "" == dataSourceRef.Name {
+	if c.gk.Group != apiGroup || c.gk.Kind != dataSourceRef.Kind || dataSourceRef.Name == "" {
 		// Ignore PVCs that aren't for this populator to handle
 		return nil
 	}
@@ -604,7 +604,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	// *** Here is the first place we start to create/modify objects ***
 
 	// If the PVC is unbound, we need to perform the population
-	if "" == pvc.Spec.VolumeName {
+	if pvc.Spec.VolumeName == "" {
 
 		// Record start time for populator metric
 		c.metrics.operationStart(pvc.UID)
@@ -682,7 +682,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			} else if sa, ok := pvc.Annotations[AnnPopulatorServiceAccount]; ok && sa != "" {
 				pod.Spec.ServiceAccountName = sa // Other populators use the annotation
 			}
-			pod.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName = pvcPrimeName
+			pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName = pvcPrimeName
 			con := &pod.Spec.Containers[0]
 			con.Image = c.imageName
 			con.Args = args
@@ -818,7 +818,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 		// This would be bad
 		if pvcPrime == nil {
-			return fmt.Errorf("Failed to find PVC for populator pod")
+			return fmt.Errorf("failed to find PVC for populator pod")
 		}
 
 		// Get PV
@@ -937,7 +937,7 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		return err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		klog.V(5).Info(err)

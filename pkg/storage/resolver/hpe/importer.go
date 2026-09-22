@@ -24,6 +24,7 @@ type HpeImporter struct {
 }
 
 func NewHpeImporter(host, user, pass string, skipSSL bool) (*HpeImporter, error) {
+	host = resolver.EnsureScheme(host)
 	parsedURL, err := url.Parse(host)
 	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
 		return nil, fmt.Errorf("STORAGE_HOSTNAME must be a full URL with scheme (e.g. https://host:8080), got %q", host)

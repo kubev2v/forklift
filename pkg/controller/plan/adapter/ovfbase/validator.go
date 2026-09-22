@@ -100,7 +100,7 @@ func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category st
 
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
+	if r.Plan.Map.Network == nil {
 		return
 	}
 	vm := &model.VM{}
@@ -111,7 +111,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	for _, net := range vm.Networks {
-		if !r.Plan.Referenced.Map.Network.Status.Refs.Find(ref.Ref{ID: net.ID}) {
+		if !r.Plan.Map.Network.Status.Find(ref.Ref{ID: net.ID}) {
 			return
 		}
 	}
@@ -136,7 +136,7 @@ func (r *Validator) NICNetworkRefs(vmRef ref.Ref) (refs []ref.Ref, err error) {
 
 // Validate that a VM's disk backing storage has been mapped.
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Storage == nil {
+	if r.Plan.Map.Storage == nil {
 		return
 	}
 	vm := &model.VM{}
@@ -147,7 +147,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	for _, disk := range vm.Disks {
-		if !r.Plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: disk.ID}) {
+		if !r.Plan.Map.Storage.Status.Find(ref.Ref{ID: disk.ID}) {
 			return
 		}
 	}

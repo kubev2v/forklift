@@ -72,13 +72,13 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 	case *model.Workload:
 		*res = model.Workload{VM: m.vm}
 		if ref.Name == "full_guest_network" {
-			res.VM.GuestNetworks = append(res.VM.GuestNetworks, vsphere.GuestNetwork{MAC: "mac2"})
+			res.GuestNetworks = append(res.GuestNetworks, vsphere.GuestNetwork{MAC: "mac2"})
 		}
 		if ref.Name == "not_windows_guest" {
-			res.VM.GuestID = "rhel8_64Guest"
+			res.GuestID = "rhel8_64Guest"
 		}
 		if ref.Name == "nics_no_guest_networks" {
-			res.VM.GuestNetworks = nil
+			res.GuestNetworks = nil
 		}
 		if ref.Name == "missing_from_inventory" {
 			return base.NotFoundError{}
@@ -102,7 +102,7 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 			*res = defaultVM()
 		}
 		if ref.Name == "empty_disk_vm" {
-			res.VM1.Disks = []vsphere.Disk{}
+			res.Disks = []vsphere.Disk{}
 		}
 		// Test cases for GuestToolsInstalled
 		switch ref.Name {

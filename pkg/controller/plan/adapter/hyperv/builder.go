@@ -395,10 +395,10 @@ func (r *Builder) mapDataVolume(vm *model.VM, disk hyperv.Disk, diskIndex int, d
 
 	dv := dvTemplate.DeepCopy()
 	dv.Spec = dvSpec
-	if dv.ObjectMeta.Annotations == nil {
-		dv.ObjectMeta.Annotations = make(map[string]string)
+	if dv.Annotations == nil {
+		dv.Annotations = make(map[string]string)
 	}
-	dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = disk.ID
+	dv.Annotations[planbase.AnnDiskSource] = disk.ID
 
 	templateData := &api.PVCNameTemplateData{
 		VmName:       vm.Name,
@@ -416,8 +416,8 @@ func (r *Builder) mapDataVolume(vm *model.VM, disk hyperv.Disk, diskIndex int, d
 }
 
 func (r *Builder) getStorageClass() string {
-	if r.Context.Map.Storage != nil {
-		for _, pair := range r.Context.Map.Storage.Spec.Map {
+	if r.Map.Storage != nil {
+		for _, pair := range r.Map.Storage.Spec.Map {
 			return pair.Destination.StorageClass
 		}
 	}
@@ -543,8 +543,8 @@ func mapOperatingSystemToTemplate(operatingSystem string) string {
 }
 
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	if dv.ObjectMeta.Annotations != nil {
-		if id, ok := dv.ObjectMeta.Annotations[planbase.AnnDiskSource]; ok {
+	if dv.Annotations != nil {
+		if id, ok := dv.Annotations[planbase.AnnDiskSource]; ok {
 			return id
 		}
 	}

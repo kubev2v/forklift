@@ -205,7 +205,7 @@ var _ = Describe("requestSize", func() {
 func makeBuilder(networkPairs ...api.NetworkPair) *Builder {
 	b := &Builder{}
 	b.Context = &plancontext.Context{}
-	b.Context.Map.Network = &api.NetworkMap{
+	b.Map.Network = &api.NetworkMap{
 		Spec: api.NetworkMapSpec{
 			Map: networkPairs,
 		},

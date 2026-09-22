@@ -66,6 +66,7 @@ type OntapImporter struct {
 }
 
 func NewOntapImporter(host, user, pass, svm, backendUUID, driverType string, skipSSL bool, k8sClient client.Client, storageClass string) (*OntapImporter, error) {
+	host = resolver.EnsureScheme(host)
 	parsedURL, err := url.Parse(host)
 	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
 		return nil, fmt.Errorf("STORAGE_HOSTNAME must be a full URL with scheme (e.g. https://host), got %q", host)

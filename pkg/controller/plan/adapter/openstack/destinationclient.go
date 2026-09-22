@@ -51,7 +51,7 @@ func (r *DestinationClient) SetPopulatorCrOwnership() (err error) {
 			continue
 		}
 		patch := client.MergeFrom(populatorCrCopy)
-		err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
+		err = r.Destination.Patch(context.TODO(), &populatorCr, patch)
 		if err != nil {
 			continue
 		}
@@ -67,7 +67,7 @@ func (r *DestinationClient) getPopulatorCrList(vmID string) (populatorCrList v1b
 	if vmID != "" {
 		labelSet["vmID"] = vmID
 	}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		&populatorCrList,
 		&client.ListOptions{
@@ -80,7 +80,7 @@ func (r *DestinationClient) getPopulatorCrList(vmID string) (populatorCrList v1b
 // Deletes an object from destination cluster associated with the VM.
 func (r *DestinationClient) DeleteObject(object client.Object, vm *plan.VMStatus, message, objType string) (err error) {
 	//TODO use kubevirt? it will move most of the logic of the DestinationClient out.
-	err = r.Destination.Client.Delete(context.TODO(), object)
+	err = r.Destination.Delete(context.TODO(), object)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			err = nil
@@ -102,7 +102,7 @@ func (r *DestinationClient) DeleteObject(object client.Object, vm *plan.VMStatus
 
 func (r *DestinationClient) findPVCByCR(cr *v1beta1.OpenstackVolumePopulator) (pvc *core.PersistentVolumeClaim, err error) {
 	pvcList := core.PersistentVolumeClaimList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		&pvcList,
 		&client.ListOptions{

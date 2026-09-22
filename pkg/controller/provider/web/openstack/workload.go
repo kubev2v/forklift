@@ -67,7 +67,7 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 	}
 	h.Detail = model.MaxDetail
 	r := Workload{}
-	r.VM.With(m)
+	r.With(m)
 	err = r.Expand(h.Collector.DB())
 	if err != nil {
 		return

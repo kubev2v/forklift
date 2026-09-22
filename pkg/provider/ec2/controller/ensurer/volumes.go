@@ -21,7 +21,7 @@ func (r *Ensurer) EnsurePersistentVolumes(ctx context.Context, vm *planapi.VMSta
 	// List existing PVs by label
 	existingPVList := &core.PersistentVolumeList{}
 	vmLabels := r.Labeler.MigrationVMLabels(vm.Ref)
-	err := r.Client.List(ctx, existingPVList, &client.ListOptions{
+	err := r.List(ctx, existingPVList, &client.ListOptions{
 		LabelSelector: k8slabels.SelectorFromSet(vmLabels),
 	})
 	if err != nil {
@@ -53,7 +53,7 @@ func (r *Ensurer) EnsurePersistentVolumes(ctx context.Context, vm *planapi.VMSta
 		}
 
 		// Create new PV
-		err = r.Client.Create(ctx, pv)
+		err = r.Create(ctx, pv)
 		if err != nil {
 			if errors.IsAlreadyExists(err) {
 				// Race condition: another reconcile created it
@@ -62,7 +62,7 @@ func (r *Ensurer) EnsurePersistentVolumes(ctx context.Context, vm *planapi.VMSta
 					"ebsVolumeID", ebsVolumeID)
 				// Fetch the created PV to get its name
 				freshPVList := &core.PersistentVolumeList{}
-				listErr := r.Client.List(ctx, freshPVList, &client.ListOptions{
+				listErr := r.List(ctx, freshPVList, &client.ListOptions{
 					LabelSelector: k8slabels.SelectorFromSet(map[string]string{
 						"forklift.konveyor.io/ebs-volume-id": ebsVolumeID,
 					}),
@@ -99,7 +99,7 @@ func (r *Ensurer) EnsureDirectPVCs(ctx context.Context, vm *planapi.VMStatus, pv
 	// List existing PVCs by label
 	existingPVCList := &core.PersistentVolumeClaimList{}
 	vmLabels := r.Labeler.MigrationVMLabels(vm.Ref)
-	err := r.Client.List(ctx, existingPVCList, &client.ListOptions{
+	err := r.List(ctx, existingPVCList, &client.ListOptions{
 		Namespace:     r.Plan.Spec.TargetNamespace,
 		LabelSelector: k8slabels.SelectorFromSet(vmLabels),
 	})
@@ -131,13 +131,13 @@ func (r *Ensurer) EnsureDirectPVCs(ctx context.Context, vm *planapi.VMStatus, pv
 		}
 
 		// Set owner reference to the plan for cleanup
-		err = controllerutil.SetOwnerReference(r.Plan, pvc, r.Client.Scheme())
+		err = controllerutil.SetOwnerReference(r.Plan, pvc, r.Scheme())
 		if err != nil {
 			r.log.Error(err, "Failed to set owner reference on PVC", "vm", vm.Name)
 		}
 
 		// Create new PVC
-		err = r.Client.Create(ctx, pvc)
+		err = r.Create(ctx, pvc)
 		if err != nil {
 			if errors.IsAlreadyExists(err) {
 				r.log.V(1).Info("PVC created by another reconcile",
@@ -169,7 +169,7 @@ func (r *Ensurer) CheckDirectPVCsBound(ctx context.Context, vm *planapi.VMStatus
 	// List existing PVCs by label
 	existingPVCList := &core.PersistentVolumeClaimList{}
 	vmLabels := r.Labeler.MigrationVMLabels(vm.Ref)
-	err = r.Client.List(ctx, existingPVCList, &client.ListOptions{
+	err = r.List(ctx, existingPVCList, &client.ListOptions{
 		Namespace:     r.Plan.Spec.TargetNamespace,
 		LabelSelector: k8slabels.SelectorFromSet(vmLabels),
 	})

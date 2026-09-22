@@ -100,6 +100,12 @@ func (c *Conversion) addCommonArgs(cmd utils.CommandBuilder) error {
 
 // addConversionExtraArgs adds extra args that apply ONLY to virt-v2v and virt-v2v-in-place
 func (c *Conversion) addConversionExtraArgs(cmd utils.CommandBuilder) {
+	if c.SelinuxRelabelAtBoot {
+		cmd.AddFlag("--selinux-relabel-at-boot")
+	}
+	for _, dir := range c.SelinuxRelabelExclude {
+		cmd.AddArg("--selinux-relabel-exclude", dir)
+	}
 	if c.ExtraArgs != nil {
 		cmd.AddExtraArgs(c.ExtraArgs...)
 	}
@@ -203,6 +209,7 @@ func (c *Conversion) addVirtV2vArgs(cmd utils.CommandBuilder) (err error) {
 		AddArg("-o", "kubevirt").
 		AddArg("-os", c.Workdir).
 		AddArg("-on", outputName)
+	c.addConversionExtraArgs(cmd)
 	switch c.Source {
 	case config.VSPHERE:
 		err = c.addVirtV2vVsphereArgs(cmd)
@@ -230,7 +237,6 @@ func (c *Conversion) addVirtV2vVsphereArgs(cmd utils.CommandBuilder) (err error)
 	if err != nil {
 		return err
 	}
-	c.addConversionExtraArgs(cmd)
 	if c.addVsphereInputTransport(cmd) == vsphereTransportVddk {
 		var extraArgs = c.ExtraArgs
 		if _, err := os.Stat(c.VddkConfFile); !errors.Is(err, os.ErrNotExist) && len(extraArgs) == 0 {
@@ -307,7 +313,7 @@ func (c *Conversion) RunVirtV2v() error {
 	monitorCmd.SetStdin(pipe)
 	v2vCmd.SetStdout(writer)
 	v2vCmd.SetStderr(writer)
-	defer writer.Close()
+	defer func() { _ = writer.Close() }()
 
 	if err := monitorCmd.Start(); err != nil {
 		fmt.Printf("Error executing monitor command: %v\n", err)
@@ -319,7 +325,7 @@ func (c *Conversion) RunVirtV2v() error {
 	}
 
 	// virt-v2v is done, we can close the pipe to virt-v2v-monitor
-	writer.Close()
+	_ = writer.Close()
 
 	if err := monitorCmd.Wait(); err != nil {
 		fmt.Printf("Error waiting for virt-v2v-monitor to finish: %v\n", err)
@@ -401,7 +407,7 @@ func (c *Conversion) addVsphereInputTransport(cmd utils.CommandBuilder) vsphereT
 
 func (c *Conversion) addVirtV2vRemoteInspectionArgs(cmd utils.CommandBuilder) (err error) {
 	if len(c.RemoteInspectionDisks) == 0 {
-		return fmt.Errorf("No remote disks were supplied")
+		return fmt.Errorf("no remote disks were supplied")
 	}
 	fileKey := "vddk-file"
 	if c.vsphereInputTransport() == vsphereTransportNfc {
@@ -456,7 +462,7 @@ func (c *Conversion) GetDomainXML() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(c.VmName)
 	if err != nil {

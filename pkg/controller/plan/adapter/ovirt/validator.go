@@ -102,7 +102,7 @@ func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category st
 
 // Validate whether warm migration is supported from this provider type.
 func (r *Validator) WarmMigration() (ok bool) {
-	ok = settings.Settings.Features.OvirtWarmMigration
+	ok = settings.Settings.OvirtWarmMigration
 	return
 }
 
@@ -113,7 +113,7 @@ func (r *Validator) MigrationType() bool {
 	case api.MigrationCold, "":
 		return true
 	case api.MigrationWarm:
-		return settings.Settings.Features.OvirtWarmMigration
+		return settings.Settings.OvirtWarmMigration
 	default:
 		return false
 	}
@@ -121,7 +121,7 @@ func (r *Validator) MigrationType() bool {
 
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
+	if r.Plan.Map.Network == nil {
 		return
 	}
 	vm := &model.Workload{}
@@ -132,7 +132,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	for _, nic := range vm.NICs {
-		if !r.Plan.Referenced.Map.Network.Status.Refs.Find(ref.Ref{ID: nic.Profile.Network}) {
+		if !r.Plan.Map.Network.Status.Find(ref.Ref{ID: nic.Profile.Network}) {
 			return
 		}
 	}
@@ -157,7 +157,7 @@ func (r *Validator) NICNetworkRefs(vmRef ref.Ref) (refs []ref.Ref, err error) {
 
 // Validate that a VM's disk backing storage has been mapped.
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Storage == nil {
+	if r.Plan.Map.Storage == nil {
 		return
 	}
 	vm := &model.Workload{}
@@ -168,7 +168,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	for _, da := range vm.DiskAttachments {
-		if da.Disk.StorageType != "lun" && !r.Plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: da.Disk.StorageDomain}) {
+		if da.Disk.StorageType != "lun" && !r.Plan.Map.Storage.Status.Find(ref.Ref{ID: da.Disk.StorageDomain}) {
 			return
 		}
 	}
@@ -201,7 +201,7 @@ func (r *Validator) DirectStorage(vmRef ref.Ref) (ok bool, err error) {
 // Checks the version for ovirt direct LUN/FC
 func (r *Validator) canImportDirectDisksFromProvider() (bool, error) {
 	// validate ovirt version > ovirt-engine-4.5.2.1 (https://github.com/oVirt/ovirt-engine/commit/e7c1f585863a332bcecfc8c3d909c9a3a56eb922)
-	rl := container.Build(nil, r.Plan.Referenced.Provider.Source, r.Plan.Referenced.Secret)
+	rl := container.Build(nil, r.Plan.Provider.Source, r.Plan.Secret)
 	major, minor, build, revision, err := rl.Version()
 	if err != nil {
 		return false, err

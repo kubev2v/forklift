@@ -112,7 +112,7 @@ func (r *Definition) IsKind(kind string) bool {
 // Get the table name for the model.
 func (r Definition) kind(model interface{}) string {
 	mt := reflect.TypeOf(model)
-	if mt.Kind() == reflect.Ptr {
+	if mt.Kind() == reflect.Pointer {
 		mt = mt.Elem()
 	}
 
@@ -139,7 +139,7 @@ func (r *Definition) validate() (err error) {
 func (r *Definition) fields(model interface{}) (fields []*Field, err error) {
 	mt := reflect.TypeOf(model)
 	mv := reflect.ValueOf(model)
-	if mt.Kind() == reflect.Ptr {
+	if mt.Kind() == reflect.Pointer {
 		mt = mt.Elem()
 		mv = mv.Elem()
 	} else {
@@ -208,7 +208,7 @@ func (r *Definition) fields(model interface{}) (fields []*Field, err error) {
 // New model for kind.
 func (r *Definition) NewModel() (m interface{}) {
 	mt := reflect.TypeOf(r.model)
-	if mt.Kind() == reflect.Ptr {
+	if mt.Kind() == reflect.Pointer {
 		mt = mt.Elem()
 	}
 	m = reflect.New(mt).Interface()

@@ -6,8 +6,6 @@ on:
 
 permissions:
   contents: read
-  # Optional: allow read access to pull request. Use with `only-new-issues` option.
-  pull-requests: read
 
 jobs:
   golangci:
@@ -15,6 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }}
       - name: Install libvirt dependencies
         run: |
           sudo apt-get update
@@ -37,10 +39,10 @@ jobs:
           #
           # Note: By default, the `.golangci.yml` file should be at the root of the repository.
           # The location of the configuration file can be changed by using `--config=`
-          args: --timeout=10m
+          args: --timeout=10m --new-from-merge-base=origin/${{ github.base_ref }}
 
-          # Optional: show only new issues if it's a pull request. The default value is `false`.
-          only-new-issues: true
+          # Compare against the merge base locally instead of fetching the PR
+          # patch from GitHub API (which fails when a PR touches 300+ files).
 
           # Optional: if set to true, then all caching functionality will be completely disabled,
           #           takes precedence over all other caching options.

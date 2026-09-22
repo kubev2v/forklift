@@ -89,8 +89,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
 			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
 			plan := createPlan(testPlanName, testNamespace, source, destination)
-			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
-			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			source.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
 			reconciler = createFakeReconciler(secret, plan, source, destination)
 			err := reconciler.ensureSecretForProvider(plan)
@@ -105,8 +105,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			source := createProvider(sourceName, sourceNamespace, "", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
 			destination := createProvider(destName, destNamespace, "https://destination", api.OpenShift, &core.ObjectReference{})
 			plan := createPlan(testPlanName, testNamespace, source, destination)
-			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
-			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			source.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
 			reconciler = createFakeReconciler(secret, plan, source, destination)
 			err := reconciler.ensureSecretForProvider(plan)
@@ -524,14 +524,14 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 		})
 
 		ginkgo.It("should skip SA validation for AAP hooks", func() {
-			savedURL := Settings.Migration.AAPURL
-			savedTok := Settings.Migration.AAPTokenSecretName
+			savedURL := Settings.AAPURL
+			savedTok := Settings.AAPTokenSecretName
 			defer func() {
-				Settings.Migration.AAPURL = savedURL
-				Settings.Migration.AAPTokenSecretName = savedTok
+				Settings.AAPURL = savedURL
+				Settings.AAPTokenSecretName = savedTok
 			}()
-			Settings.Migration.AAPURL = "https://aap.example.com"
-			Settings.Migration.AAPTokenSecretName = "aap-token"
+			Settings.AAPURL = "https://aap.example.com"
+			Settings.AAPTokenSecretName = "aap-token"
 
 			aapCfg := &api.AAPConfig{
 				JobTemplateID: 42,
@@ -564,8 +564,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			plan := createPlan(testPlanName, testNamespace, source, destination)
 			plan.Spec.ConversionTempStorageClass = "fast-ssd"
 			plan.Spec.ConversionTempStorageSize = "50Gi"
-			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
-			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			source.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
 			sc := &storagev1.StorageClass{ObjectMeta: meta.ObjectMeta{Name: "fast-ssd"}, Provisioner: "kubernetes.io/fake"}
 			csiCap := &storagev1.CSIStorageCapacity{
@@ -585,8 +585,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
 			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
 			plan := createPlan(testPlanName, testNamespace, source, destination)
-			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
-			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			source.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
 			reconciler = createFakeReconciler(secret, plan, source, destination)
 			err := reconciler.validateConversionTempStorage(plan)
@@ -602,8 +602,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			plan := createPlan(testPlanName, testNamespace, source, destination)
 			plan.Spec.ConversionTempStorageClass = "fast-ssd"
 			plan.Spec.ConversionTempStorageSize = ""
-			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
-			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			source.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
 			reconciler = createFakeReconciler(secret, plan, source, destination)
 			err := reconciler.validateConversionTempStorage(plan)
@@ -622,8 +622,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			plan := createPlan(testPlanName, testNamespace, source, destination)
 			plan.Spec.ConversionTempStorageClass = ""
 			plan.Spec.ConversionTempStorageSize = "50Gi"
-			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
-			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			source.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
 			reconciler = createFakeReconciler(secret, plan, source, destination)
 			err := reconciler.validateConversionTempStorage(plan)
@@ -642,8 +642,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			plan := createPlan(testPlanName, testNamespace, source, destination)
 			plan.Spec.ConversionTempStorageClass = "fast-ssd"
 			plan.Spec.ConversionTempStorageSize = "invalid-size"
-			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
-			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			source.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
 			reconciler = createFakeReconciler(secret, plan, source, destination)
 			err := reconciler.validateConversionTempStorage(plan)
@@ -659,8 +659,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			secret := createSecret(sourceSecretName, sourceNamespace, false)
 			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
 			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
-			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
-			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			source.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
 			sc := &storagev1.StorageClass{ObjectMeta: meta.ObjectMeta{Name: "fast-ssd"}, Provisioner: "kubernetes.io/fake"}
 			csiCap := &storagev1.CSIStorageCapacity{
@@ -689,8 +689,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			plan := createPlan(testPlanName, testNamespace, source, destination)
 			plan.Spec.ConversionTempStorageClass = "error-sc"
 			plan.Spec.ConversionTempStorageSize = "150Gi"
-			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
-			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			source.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
 			// No StorageClass "error-sc" in fake client -> should block
 			reconciler = createFakeReconciler(secret, plan, source, destination)
@@ -712,8 +712,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			plan := createPlan(testPlanName, testNamespace, source, destination)
 			plan.Spec.ConversionTempStorageClass = "ocs-storagecluster-ceph-rbd"
 			plan.Spec.ConversionTempStorageSize = "1Ti"
-			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
-			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			source.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
 			sc := &storagev1.StorageClass{ObjectMeta: meta.ObjectMeta{Name: "ocs-storagecluster-ceph-rbd"}, Provisioner: "kubernetes.io/fake"}
 			// Only 70Gi available - not enough for 1Ti
@@ -1190,18 +1190,18 @@ var _ = ginkgo.Describe("Template Validation", func() {
 		}
 
 		ginkgo.BeforeEach(func() {
-			Settings.Migration.VirtV2vImage = globalImage
-			savedGlobalSA = Settings.Migration.ServiceAccount
+			Settings.VirtV2vImage = globalImage
+			savedGlobalSA = Settings.ServiceAccount
 		})
 
 		ginkgo.AfterEach(func() {
-			Settings.Migration.ServiceAccount = savedGlobalSA
+			Settings.ServiceAccount = savedGlobalSA
 		})
 
 		ginkgo.It("should set plan SA on the VDDK validation job", func() {
 			p := newPlanWithVddkProvider()
 			p.Spec.ServiceAccount = "plan-sa"
-			Settings.Migration.ServiceAccount = ""
+			Settings.ServiceAccount = ""
 			job := createVddkCheckJob(p)
 			gomega.Expect(job.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal("plan-sa"))
 		})
@@ -1209,7 +1209,7 @@ var _ = ginkgo.Describe("Template Validation", func() {
 		ginkgo.It("should fall back to global SA when plan SA is empty", func() {
 			p := newPlanWithVddkProvider()
 			p.Spec.ServiceAccount = ""
-			Settings.Migration.ServiceAccount = "global-sa"
+			Settings.ServiceAccount = "global-sa"
 			job := createVddkCheckJob(p)
 			gomega.Expect(job.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal("global-sa"))
 		})
@@ -1217,7 +1217,7 @@ var _ = ginkgo.Describe("Template Validation", func() {
 		ginkgo.It("should leave SA empty when both plan and global are empty", func() {
 			p := newPlanWithVddkProvider()
 			p.Spec.ServiceAccount = ""
-			Settings.Migration.ServiceAccount = ""
+			Settings.ServiceAccount = ""
 			job := createVddkCheckJob(p)
 			gomega.Expect(job.Spec.Template.Spec.ServiceAccountName).To(gomega.BeEmpty())
 		})
@@ -1225,7 +1225,7 @@ var _ = ginkgo.Describe("Template Validation", func() {
 		ginkgo.It("should prefer plan SA over global SA", func() {
 			p := newPlanWithVddkProvider()
 			p.Spec.ServiceAccount = "plan-sa"
-			Settings.Migration.ServiceAccount = "global-sa"
+			Settings.ServiceAccount = "global-sa"
 			job := createVddkCheckJob(p)
 			gomega.Expect(job.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal("plan-sa"))
 		})
@@ -1264,7 +1264,7 @@ var _ = ginkgo.Describe("Template Validation", func() {
 		}
 
 		ginkgo.BeforeEach(func() {
-			Settings.Migration.VirtV2vImage = globalImage
+			Settings.VirtV2vImage = globalImage
 		})
 
 		ginkgo.It("should use global virt-v2v image when plan has no override", func() {

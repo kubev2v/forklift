@@ -88,7 +88,7 @@ func (r *EventMapper) findRefs(object interface{}) []Target {
 	list := []Target{}
 	rt := reflect.TypeOf(object)
 	rv := reflect.ValueOf(object)
-	if rt.Kind() == reflect.Ptr {
+	if rt.Kind() == reflect.Pointer {
 		rt = rt.Elem()
 		rv = rv.Elem()
 	}

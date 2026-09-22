@@ -54,6 +54,8 @@ func TestNewHpeImporter(t *testing.T) {
 		{"http://host:8080", "http://host:8080"},
 		{"https://10.46.2.10:8080", "https://10.46.2.10:8080"},
 		{"https://10.46.2.10:8080/", "https://10.46.2.10:8080"},
+		{"10.46.2.10", "https://10.46.2.10"},
+		{"host:8080", "https://host:8080"},
 	}
 	for _, tt := range validTests {
 		imp, err := NewHpeImporter(tt.input, "user", "pass", true)
@@ -66,8 +68,6 @@ func TestNewHpeImporter(t *testing.T) {
 	}
 
 	invalidTests := []string{
-		"10.46.2.10",
-		"host:8080",
 		"",
 	}
 	for _, input := range invalidTests {

@@ -75,8 +75,8 @@ func GetDestinationVMsFromInventory(client InventoryClient, params ...webbase.Pa
 			macs = ExtractMACsFromInterfaces(kVM.Object.Spec.Template.Spec.Domain.Devices.Interfaces)
 		}
 		destinationVMs = append(destinationVMs, DestinationVM{
-			Namespace: kVM.Resource.Namespace,
-			Name:      kVM.Resource.Name,
+			Namespace: kVM.Namespace,
+			Name:      kVM.Name,
 			MACs:      macs,
 		})
 	}

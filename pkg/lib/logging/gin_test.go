@@ -212,7 +212,7 @@ func captureStderr(t *testing.T, fn func()) string {
 
 	fn()
 
-	w.Close()
+	_ = w.Close()
 	os.Stderr = origStderr
 
 	scanner := bufio.NewScanner(r)
@@ -220,7 +220,7 @@ func captureStderr(t *testing.T, fn func()) string {
 	for scanner.Scan() {
 		output += scanner.Text() + "\n"
 	}
-	r.Close()
+	_ = r.Close()
 	return output
 }
 

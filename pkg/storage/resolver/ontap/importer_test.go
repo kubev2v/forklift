@@ -56,6 +56,8 @@ func TestNewOntapImporter(t *testing.T) {
 		{"https://10.46.246.90", "https://10.46.246.90"},
 		{"https://10.46.246.90/", "https://10.46.246.90"},
 		{"http://host:8080", "http://host:8080"},
+		{"10.46.246.90", "https://10.46.246.90"},
+		{"host:8080", "https://host:8080"},
 	}
 	for _, tt := range validTests {
 		imp, err := NewOntapImporter(tt.host, "user", "pass", "svm", "uuid", "", true, nil, "")
@@ -68,8 +70,6 @@ func TestNewOntapImporter(t *testing.T) {
 	}
 
 	invalidHosts := []string{
-		"10.46.246.90",
-		"host:8080",
 		"",
 	}
 	for _, host := range invalidHosts {

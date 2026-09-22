@@ -60,7 +60,7 @@ func TestFindRefs(t *testing.T) {
 	aRefs := mapper.findRefs(thing)
 
 	// Validation
-	g.Expect(len(aRefs)).To(gomega.Equal(2))
+	g.Expect(aRefs).To(gomega.HaveLen(2))
 }
 
 func TestMapperCreate(t *testing.T) {
@@ -112,7 +112,7 @@ func TestMapperCreate(t *testing.T) {
 		Namespace: "nsB",
 		Name:      "thingB",
 	}
-	g.Expect(len(m.Content)).To(gomega.Equal(2))
+	g.Expect(m.Content).To(gomega.HaveLen(2))
 	g.Expect(m.Match(targetA, owner)).To(gomega.BeTrue())
 	g.Expect(m.Match(targetB, owner)).To(gomega.BeTrue())
 }
@@ -190,7 +190,7 @@ func TestMapperUpdate(t *testing.T) {
 		Namespace: "nsC",
 		Name:      "thingC",
 	}
-	g.Expect(len(m.Content)).To(gomega.Equal(2))
+	g.Expect(m.Content).To(gomega.HaveLen(2))
 	g.Expect(m.Match(targetA, owner)).To(gomega.BeFalse())
 	g.Expect(m.Match(targetB, owner)).To(gomega.BeTrue())
 	g.Expect(m.Match(targetC, owner)).To(gomega.BeTrue())
@@ -242,7 +242,7 @@ func TestMapperDelete(t *testing.T) {
 		Namespace: "nsB",
 		Name:      "thingB",
 	}
-	g.Expect(len(m.Content)).To(gomega.Equal(2))
+	g.Expect(m.Content).To(gomega.HaveLen(2))
 	g.Expect(m.Match(targetA, owner)).To(gomega.BeTrue())
 	g.Expect(m.Match(targetB, owner)).To(gomega.BeTrue())
 
@@ -253,7 +253,7 @@ func TestMapperDelete(t *testing.T) {
 		})
 
 	// Validation
-	g.Expect(len(m.Content)).To(gomega.Equal(0))
+	g.Expect(m.Content).To(gomega.BeEmpty())
 }
 
 func TestHandler(t *testing.T) {
@@ -304,5 +304,5 @@ func TestHandler(t *testing.T) {
 		target,
 	)
 
-	g.Expect(len(list)).To(gomega.Equal(1))
+	g.Expect(list).To(gomega.HaveLen(1))
 }

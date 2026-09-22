@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator/ocp"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	azuremigrator "github.com/kubev2v/forklift/pkg/provider/azure/controller/migrator"
 	ec2migrator "github.com/kubev2v/forklift/pkg/provider/ec2/controller/migrator"
 )
 
@@ -26,6 +27,11 @@ func New(context *plancontext.Context) (migrator Migrator, err error) {
 		}
 	case api.EC2:
 		migrator, err = ec2migrator.New(context)
+		if err != nil {
+			return
+		}
+	case api.Azure:
+		migrator, err = azuremigrator.New(context)
 		if err != nil {
 			return
 		}

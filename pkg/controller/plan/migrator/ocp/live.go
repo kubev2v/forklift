@@ -105,7 +105,7 @@ type LiveMigrator struct {
 }
 
 func (r *LiveMigrator) Init() (err error) {
-	r.sourceClient, err = K8sClient(r.Context.Source.Provider)
+	r.sourceClient, err = K8sClient(r.Source.Provider)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -169,7 +169,7 @@ func (r *LiveMigrator) Complete(vm *planapi.VMStatus) {
 }
 
 func (r *LiveMigrator) Status(vm planapi.VM) (status *planapi.VMStatus) {
-	if current, found := r.Context.Plan.Status.Migration.FindVM(vm.Ref); !found {
+	if current, found := r.Plan.Status.Migration.FindVM(vm.Ref); !found {
 		status = &planapi.VMStatus{VM: vm}
 	} else {
 		status = current
@@ -671,7 +671,7 @@ func (r *LiveMigrator) SynchronizeCertificateBundles() (err error) {
 	destExternalData := destExternalCA.Data[KeyCABundle]
 	if !strings.Contains(destExternalData, sourceData) {
 		destExternalCA.Data[KeyCABundle] = destExternalData + fmt.Sprintf("\n%s", sourceData)
-		err = r.Destination.Client.Update(context.TODO(), destExternalCA)
+		err = r.Destination.Update(context.TODO(), destExternalCA)
 		if err != nil {
 			err = liberr.New("Unable to update external KubeVirt CA bundle on destination cluster.", "reason", err) // TODO
 			return
@@ -710,9 +710,9 @@ func (r *LiveMigrator) WaitForStateTransfer(vm *planapi.VMStatus) (done bool, er
 // local (namespaced) VirtualMachinePreference.
 func (r *LiveMigrator) RequiresLocalPreference(vm *planapi.VMStatus) (required bool, err error) {
 	virtualMachine := &model.VM{}
-	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 	required = virtualMachine.Object.Spec.Preference != nil &&
@@ -724,9 +724,9 @@ func (r *LiveMigrator) RequiresLocalPreference(vm *planapi.VMStatus) (required b
 // VirtualMachineClusterPreference.
 func (r *LiveMigrator) RequiresClusterPreference(vm *planapi.VMStatus) (required bool, err error) {
 	virtualMachine := &model.VM{}
-	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 	required = virtualMachine.Object.Spec.Preference != nil &&
@@ -738,9 +738,9 @@ func (r *LiveMigrator) RequiresClusterPreference(vm *planapi.VMStatus) (required
 // (namespaced) VirtualMachineInstancetype.
 func (r *LiveMigrator) RequiresLocalInstanceType(vm *planapi.VMStatus) (required bool, err error) {
 	virtualMachine := &model.VM{}
-	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 	required = virtualMachine.Object.Spec.Instancetype != nil &&
@@ -752,9 +752,9 @@ func (r *LiveMigrator) RequiresLocalInstanceType(vm *planapi.VMStatus) (required
 // VirtualMachineClusterInstancetype.
 func (r *LiveMigrator) RequiresClusterInstanceType(vm *planapi.VMStatus) (required bool, err error) {
 	virtualMachine := &model.VM{}
-	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 	required = virtualMachine.Object.Spec.Instancetype != nil &&
@@ -775,12 +775,12 @@ func (r *LiveMigrator) SynchronizationAddressReady(vmim *cnv.VirtualMachineInsta
 // more than one VM matches the selection criteria, the first is returned.
 func (r *LiveMigrator) GetTargetVM(vm *planapi.VMStatus) (target *cnv.VirtualMachine, err error) {
 	vms := &cnv.VirtualMachineList{}
-	err = r.Context.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		vms,
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
-			Namespace:     r.Context.Plan.Spec.TargetNamespace,
+			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
 	if err != nil {
@@ -815,12 +815,12 @@ func (r *LiveMigrator) GetConfigMap(ctx context.Context, c client.Client, namesp
 // GetTargetVMIM object from the destination cluster.
 func (r *LiveMigrator) GetTargetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMachineInstanceMigration, err error) {
 	vmims := &cnv.VirtualMachineInstanceMigrationList{}
-	err = r.Context.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		vmims,
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
-			Namespace:     r.Context.Plan.Spec.TargetNamespace,
+			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -838,9 +838,9 @@ func (r *LiveMigrator) GetTargetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMac
 // GetSourceVMIM object from the source cluster.
 func (r *LiveMigrator) GetSourceVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMachineInstanceMigration, err error) {
 	virtualMachine := &model.VM{}
-	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 	vmims := &cnv.VirtualMachineInstanceMigrationList{}
@@ -870,7 +870,7 @@ func (r *LiveMigrator) GetSourceVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMac
 func (r *LiveMigrator) WaitForTargetVMI(vm *planapi.VMStatus) (ready bool, err error) {
 	key := types.NamespacedName{Namespace: r.Plan.Spec.TargetNamespace, Name: vm.Name}
 	vmi := &cnv.VirtualMachineInstance{}
-	err = r.Destination.Client.Get(context.TODO(), key, vmi)
+	err = r.Destination.Get(context.TODO(), key, vmi)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			err = nil
@@ -917,7 +917,7 @@ func (r *LiveMigrator) DeleteServiceExports(vm *planapi.VMStatus) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	err = r.Destination.Client.DeleteAllOf(
+	err = r.Destination.DeleteAllOf(
 		context.Background(),
 		&multicluster.ServiceExport{},
 		&client.DeleteAllOfOptions{
@@ -934,7 +934,7 @@ func (r *LiveMigrator) DeleteServiceExports(vm *planapi.VMStatus) (err error) {
 
 // DeleteDataVolumes deletes the DataVolumes that were created for this VM.
 func (r *LiveMigrator) DeleteDataVolumes(vm *planapi.VMStatus) (err error) {
-	err = r.Destination.Client.DeleteAllOf(
+	err = r.Destination.DeleteAllOf(
 		context.Background(),
 		&cdi.DataVolume{},
 		&client.DeleteAllOfOptions{
@@ -951,7 +951,7 @@ func (r *LiveMigrator) DeleteDataVolumes(vm *planapi.VMStatus) (err error) {
 
 // DeletePersistentVolumeClaims deletes the PersistentVolumeClaims that were created for this VM.
 func (r *LiveMigrator) DeletePersistentVolumeClaims(vm *planapi.VMStatus) (err error) {
-	err = r.Destination.Client.DeleteAllOf(
+	err = r.Destination.DeleteAllOf(
 		context.Background(),
 		&core.PersistentVolumeClaim{},
 		&client.DeleteAllOfOptions{
@@ -968,7 +968,7 @@ func (r *LiveMigrator) DeletePersistentVolumeClaims(vm *planapi.VMStatus) (err e
 
 // DeleteVirtualMachine deletes the target VirtualMachine.
 func (r *LiveMigrator) DeleteVirtualMachine(vm *planapi.VMStatus) (err error) {
-	err = r.Destination.Client.DeleteAllOf(
+	err = r.Destination.DeleteAllOf(
 		context.Background(),
 		&cnv.VirtualMachine{},
 		&client.DeleteAllOfOptions{
@@ -986,9 +986,9 @@ func (r *LiveMigrator) DeleteVirtualMachine(vm *planapi.VMStatus) (err error) {
 // DeleteSourceVMIM deletes the VMIM resource from the source cluster.
 func (r *LiveMigrator) DeleteSourceVMIM(vm *planapi.VMStatus) (err error) {
 	inventoryVm := &model.VM{}
-	err = r.Context.Source.Inventory.Find(inventoryVm, vm.Ref)
+	err = r.Source.Inventory.Find(inventoryVm, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 	err = r.sourceClient.DeleteAllOf(
@@ -1008,7 +1008,7 @@ func (r *LiveMigrator) DeleteSourceVMIM(vm *planapi.VMStatus) (err error) {
 
 // DeleteTargetVMIM deletes the VMIM resource from the target cluster.
 func (r *LiveMigrator) DeleteTargetVMIM(vm *planapi.VMStatus) (err error) {
-	err = r.Destination.Client.DeleteAllOf(
+	err = r.Destination.DeleteAllOf(
 		context.Background(),
 		&cnv.VirtualMachineInstanceMigration{},
 		&client.DeleteAllOfOptions{
@@ -1025,7 +1025,7 @@ func (r *LiveMigrator) DeleteTargetVMIM(vm *planapi.VMStatus) (err error) {
 
 // DeleteJobs deletes any hook jobs created for the VM on the target cluster.
 func (r *LiveMigrator) DeleteJobs(vm *planapi.VMStatus) (err error) {
-	err = r.Destination.Client.DeleteAllOf(
+	err = r.Destination.DeleteAllOf(
 		context.Background(),
 		&batch.Job{},
 		&client.DeleteAllOfOptions{
@@ -1050,7 +1050,7 @@ type Ensurer struct {
 // EnsureOwnerReferences are set on the target VM's DataVolumes.
 func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 	vms := &cnv.VirtualMachineList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		vms,
 		&client.ListOptions{
@@ -1068,7 +1068,7 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 	}
 	target := &vms.Items[0]
 	dvs := &cdi.DataVolumeList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.Background(),
 		dvs,
 		&client.ListOptions{
@@ -1086,14 +1086,14 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 		if err != nil {
 			return
 		}
-		err = r.Destination.Client.Patch(context.Background(), dv, client.MergeFrom(original))
+		err = r.Destination.Patch(context.Background(), dv, client.MergeFrom(original))
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
 	}
 	pvcs := &core.PersistentVolumeClaimList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.Background(),
 		pvcs,
 		&client.ListOptions{
@@ -1111,7 +1111,7 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 		if err != nil {
 			return
 		}
-		err = r.Destination.Client.Patch(context.Background(), pvc, client.MergeFrom(original))
+		err = r.Destination.Patch(context.Background(), pvc, client.MergeFrom(original))
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -1123,7 +1123,7 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 // EnsureTargetVMIM
 func (r *Ensurer) EnsureTargetVMIM(vm *planapi.VMStatus, target *cnv.VirtualMachineInstanceMigration) (out *cnv.VirtualMachineInstanceMigration, err error) {
 	list := &cnv.VirtualMachineInstanceMigrationList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -1137,7 +1137,7 @@ func (r *Ensurer) EnsureTargetVMIM(vm *planapi.VMStatus, target *cnv.VirtualMach
 	}
 
 	if len(list.Items) == 0 {
-		err = r.Destination.Client.Create(context.TODO(), target)
+		err = r.Destination.Create(context.TODO(), target)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -1194,7 +1194,7 @@ func (r *Ensurer) EnsureSourceVMIM(vm *planapi.VMStatus, source *cnv.VirtualMach
 // EnsureLocalPreference ensures that the target local Preference has been created in the destination cluster.
 // If one already exists, we assume it's the intended preference to use.
 func (r *Ensurer) EnsureLocalPreference(vm *planapi.VMStatus, target *instancetype.VirtualMachinePreference) (err error) {
-	err = r.Destination.Client.Create(context.Background(), target)
+	err = r.Destination.Create(context.Background(), target)
 	if err != nil {
 		if k8serr.IsAlreadyExists(err) {
 			_, found := target.Annotations[AnnSource]
@@ -1226,7 +1226,7 @@ func (r *Ensurer) EnsureLocalPreference(vm *planapi.VMStatus, target *instancety
 // EnsureLocalInstanceType ensures that the target local InstanceType has been created in the destination cluster.
 // If one already exists, we assume it's the intended preference to use.
 func (r *Ensurer) EnsureLocalInstanceType(vm *planapi.VMStatus, target *instancetype.VirtualMachineInstancetype) (err error) {
-	err = r.Destination.Client.Create(context.Background(), target)
+	err = r.Destination.Create(context.Background(), target)
 	if err != nil {
 		if k8serr.IsAlreadyExists(err) {
 			_, found := target.Annotations[AnnSource]
@@ -1257,7 +1257,7 @@ func (r *Ensurer) EnsureLocalInstanceType(vm *planapi.VMStatus, target *instance
 
 // EnsureServiceExport exists on destination cluster.
 func (r *Ensurer) EnsureServiceExport(vm *planapi.VMStatus, export *multicluster.ServiceExport) (err error) {
-	err = r.Destination.Client.Create(context.TODO(), export)
+	err = r.Destination.Create(context.TODO(), export)
 	if err != nil {
 		if k8serr.IsAlreadyExists(err) {
 			err = nil
@@ -1285,7 +1285,7 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus) (object *cnv.VirtualMachi
 	source := &model.VM{}
 	err = r.Source.Inventory.Find(source, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 
@@ -1367,7 +1367,7 @@ func (r *Builder) DataVolumes(vm *planapi.VMStatus) (dvs []cdi.DataVolume, err e
 	virtualMachine := &model.VM{}
 	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 	storageMap := make(map[string]api.DestinationStorage)
@@ -1423,7 +1423,7 @@ func (r *Builder) PersistentVolumeClaims(vm *planapi.VMStatus) (pvcs []core.Pers
 	virtualMachine := &model.VM{}
 	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 	storageMap := make(map[string]api.DestinationStorage)
@@ -1437,14 +1437,14 @@ func (r *Builder) PersistentVolumeClaims(vm *planapi.VMStatus) (pvcs []core.Pers
 			pvcRef := ref.Ref{Name: vol.PersistentVolumeClaim.ClaimName, Namespace: vm.Namespace}
 			err = r.Source.Inventory.Find(source, pvcRef)
 			if err != nil {
-				err = liberr.Wrap(err, "vm", vm.Ref.String(), "volume", vol.Name)
+				err = liberr.Wrap(err, "vm", vm.String(), "volume", vol.Name)
 				return
 			}
 		case vol.Ephemeral != nil && vol.Ephemeral.PersistentVolumeClaim != nil:
 			pvcRef := ref.Ref{Name: vol.Ephemeral.PersistentVolumeClaim.ClaimName, Namespace: vm.Namespace}
 			err = r.Source.Inventory.Find(source, pvcRef)
 			if err != nil {
-				err = liberr.Wrap(err, "vm", vm.Ref.String(), "volume", vol.Name)
+				err = liberr.Wrap(err, "vm", vm.String(), "volume", vol.Name)
 				return
 			}
 		default:
@@ -1551,7 +1551,7 @@ func (r *Builder) LocalInstanceType(vm *planapi.VMStatus) (target *instancetype.
 	virtualMachine := &model.VM{}
 	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 
@@ -1580,7 +1580,7 @@ func (r *Builder) LocalPreference(vm *planapi.VMStatus) (target *instancetype.Vi
 	virtualMachine := &model.VM{}
 	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 
@@ -1611,7 +1611,7 @@ func (r *Builder) ConfigMaps(vm *planapi.VMStatus) (list []core.ConfigMap, err e
 	virtualMachine := &model.VM{}
 	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 	sources := []types.NamespacedName{}
@@ -1658,7 +1658,7 @@ func (r *Builder) Secrets(vm *planapi.VMStatus) (list []core.Secret, err error) 
 	virtualMachine := &model.VM{}
 	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 	sources := []types.NamespacedName{}
@@ -1737,13 +1737,13 @@ func (r *Builder) TargetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMachineInst
 	inventoryVm := &model.VM{}
 	err = r.Source.Inventory.Find(inventoryVm, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 
 	vmim = &cnv.VirtualMachineInstanceMigration{}
 	vmim.GenerateName = "forklift-"
-	vmim.Namespace = r.Context.Plan.Spec.TargetNamespace
+	vmim.Namespace = r.Plan.Spec.TargetNamespace
 	vmim.Labels = r.Labeler.MigrationVMLabels(vm.Ref)
 	vmim.Spec.VMIName = inventoryVm.Name
 	vmim.Spec.Receive = &cnv.VirtualMachineInstanceMigrationTarget{
@@ -1754,9 +1754,9 @@ func (r *Builder) TargetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMachineInst
 
 func (r *Builder) SourceVMIM(vm *planapi.VMStatus, syncAddress string) (vmim *cnv.VirtualMachineInstanceMigration, err error) {
 	inventoryVm := &model.VM{}
-	err = r.Context.Source.Inventory.Find(inventoryVm, vm.Ref)
+	err = r.Source.Inventory.Find(inventoryVm, vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		err = liberr.Wrap(err, "vm", vm.String())
 		return
 	}
 

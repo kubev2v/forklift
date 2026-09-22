@@ -36,9 +36,12 @@ const (
 	VolumeStatusUploading = libclient.VolumeStatusUploading
 )
 
-var ResourceNotFoundError = errors.New("resource not found")
-var NameOrIDRequiredError = errors.New("id or name is required")
-var UnexpectedVolumeStatusError = errors.New("unexpected volume status")
+//nolint:staticcheck // legacy exported error names; rename in follow-up
+var (
+	ResourceNotFoundError       = errors.New("resource not found")
+	NameOrIDRequiredError       = errors.New("id or name is required")
+	UnexpectedVolumeStatusError = errors.New("unexpected volume status")
+)
 
 type Client struct {
 	libclient.Client
@@ -145,7 +148,7 @@ func (r *Client) Close() {
 
 func (r *Client) Finalize(vmStatuses []*planapi.VMStatus, migrationName string) {
 	for _, vmStatus := range vmStatuses {
-		vmRef := ref.Ref{ID: vmStatus.Ref.ID}
+		vmRef := ref.Ref{ID: vmStatus.ID}
 		vm, err := r.getVM(vmRef)
 		if err != nil {
 			r.Log.Error(err, "failed to find vm", "vm", vm.Name)

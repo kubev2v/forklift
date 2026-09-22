@@ -47,6 +47,8 @@ const (
 	HyperV ProviderType = "hyperv"
 	// Nutanix
 	Nutanix ProviderType = "nutanix"
+	// Azure
+	Azure ProviderType = "azure"
 )
 
 var ProviderTypes = []ProviderType{
@@ -58,6 +60,7 @@ var ProviderTypes = []ProviderType{
 	EC2,
 	HyperV,
 	Nutanix,
+	Azure,
 }
 
 func (t ProviderType) String() string {
@@ -84,6 +87,10 @@ const (
 	// Nutanix Prism endpoint settings.
 	NutanixPrismType   = "prismType"
 	NutanixClusterUUID = "clusterUuid"
+	AzureSnapshotSku   = "snapshotSku"
+	AzureSnapshotRG    = "snapshotResourceGroup"
+	AzureTargetRegion  = "targetRegion"
+	AzureSnapshotClass = "volumeSnapshotClassName"
 )
 
 // Nutanix Prism endpoint types.
@@ -204,7 +211,7 @@ func (p *Provider) HasReconciled() bool {
 
 // This provider requires VM guest conversion.
 func (p *Provider) RequiresConversion() bool {
-	return p.Type() == VSphere || p.Type() == Ova || p.Type() == HyperV || p.Type() == EC2
+	return p.Type() == VSphere || p.Type() == Ova || p.Type() == HyperV || p.Type() == EC2 || p.Type() == Azure
 }
 
 // This provider support the vddk aio parameters.

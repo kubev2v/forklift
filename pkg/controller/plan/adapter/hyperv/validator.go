@@ -60,7 +60,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (bool, error) {
 		return false, liberr.Wrap(err, "vm", vmRef.String())
 	}
 
-	if r.Context.Map.Network == nil {
+	if r.Map.Network == nil {
 		return false, nil
 	}
 
@@ -74,7 +74,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (bool, error) {
 			continue // Truly disconnected NIC
 		}
 		mapped := false
-		for _, pair := range r.Context.Map.Network.Spec.Map {
+		for _, pair := range r.Map.Network.Spec.Map {
 			if pair.Source.ID == nic.Network.ID {
 				mapped = true
 				break

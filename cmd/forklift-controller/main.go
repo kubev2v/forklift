@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/kubev2v/forklift/pkg/apis"
 	"github.com/kubev2v/forklift/pkg/controller"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
@@ -36,7 +37,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	cnv "kubevirt.io/api/core/v1"
-	export "kubevirt.io/api/export/v1alpha1"
+	export "kubevirt.io/api/export/v1beta1"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -99,7 +100,7 @@ func main() {
 	// Create a new Cmd to provide shared dependencies and start components
 	log.Info("setting up manager")
 	mgr, err := manager.New(cfg, manager.Options{
-		Metrics: server.Options{BindAddress: Settings.Metrics.Address()},
+		Metrics: server.Options{BindAddress: Settings.Address()},
 	})
 	if err != nil {
 		log.Error(err, "unable to set up overall controller manager")
@@ -143,6 +144,9 @@ func main() {
 	if err := multicluster.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "proceeding without optional multicluster APIs.")
 	}
+	if err := snapshotv1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "proceeding without optional CSI snapshot APIs")
+	}
 	if Settings.OpenShift {
 		if err := route.Install(mgr.GetScheme()); err != nil {
 			log.Error(err, "unable to add route APIs to scheme")
@@ -179,7 +183,7 @@ func profiler() (profiler interface{ Stop() }) {
 	default:
 		kind = profile.MemProfile
 	}
-	if len(Settings.Profiler.Path) == 0 {
+	if len(Settings.Path) == 0 {
 		return
 	}
 	settings := Settings.Profiler

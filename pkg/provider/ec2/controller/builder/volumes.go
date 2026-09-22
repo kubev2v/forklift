@@ -93,8 +93,8 @@ func (r *Builder) calculatePVCSize(volumeSizeBytes int64, volumeMode *core.Persi
 // ResolvePersistentVolumeClaimIdentifier extracts the EBS volume ID from a PVC's annotations.
 // Enables tracking which PVC corresponds to which source EBS volume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
-	if pvc.ObjectMeta.Annotations != nil {
-		return pvc.ObjectMeta.Annotations["forklift.konveyor.io/volume-id"]
+	if pvc.Annotations != nil {
+		return pvc.Annotations["forklift.konveyor.io/volume-id"]
 	}
 	return ""
 }

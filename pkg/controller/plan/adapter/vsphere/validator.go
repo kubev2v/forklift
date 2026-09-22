@@ -23,7 +23,6 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -66,7 +65,7 @@ func (r *Validator) MigrationType() bool {
 
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
+	if r.Plan.Map.Network == nil {
 		return
 	}
 	vm := &model.VM{}
@@ -77,7 +76,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	for _, net := range vm.Networks {
-		if !r.Plan.Referenced.Map.Network.Status.Refs.Find(ref.Ref{ID: net.ID}) {
+		if !r.Plan.Map.Network.Status.Find(ref.Ref{ID: net.ID}) {
 			return
 		}
 	}
@@ -102,7 +101,7 @@ func (r *Validator) NICNetworkRefs(vmRef ref.Ref) (refs []ref.Ref, err error) {
 
 // Validate that a VM's disk backing storage has been mapped.
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Storage == nil {
+	if r.Plan.Map.Storage == nil {
 		return
 	}
 	vm := &model.VM{}
@@ -113,7 +112,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	for _, disk := range vm.Disks {
-		if !r.Plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: disk.Datastore.ID}) {
+		if !r.Plan.Map.Storage.Status.Find(ref.Ref{ID: disk.Datastore.ID}) {
 			return
 		}
 	}
@@ -488,27 +487,27 @@ func rootDiskExcluded(vm *model.VM, rootDiskSpec string, exclude []string) (bus 
 	return root.BusAddress, excluded
 }
 
-func (r *Validator) getUdnSubnet(client client.Client) (string, error) {
-	key := k8sclient.ObjectKey{
+func (r *Validator) getUdnSubnet(k8sClient client.Client) (string, error) {
+	key := client.ObjectKey{
 		Name: r.Plan.Spec.TargetNamespace,
 	}
 	namespace := &core.Namespace{}
-	err := client.Get(context.TODO(), key, namespace)
+	err := k8sClient.Get(context.TODO(), key, namespace)
 	if err != nil {
 		return "", err
 	}
-	_, hasUdnLabel := namespace.ObjectMeta.Labels[namespaceLabelPrimaryUDN]
+	_, hasUdnLabel := namespace.Labels[namespaceLabelPrimaryUDN]
 	if !hasUdnLabel {
 		return "", nil
 	}
 
 	nadList := &k8snet.NetworkAttachmentDefinitionList{}
-	listOpts := []k8sclient.ListOption{
-		k8sclient.InNamespace(r.Plan.Spec.TargetNamespace),
-		k8sclient.MatchingLabels{nadLabelUDN: ""},
+	listOpts := []client.ListOption{
+		client.InNamespace(r.Plan.Spec.TargetNamespace),
+		client.MatchingLabels{nadLabelUDN: ""},
 	}
 
-	err = client.List(context.TODO(), nadList, listOpts...)
+	err = k8sClient.List(context.TODO(), nadList, listOpts...)
 	if err != nil {
 		return "", err
 	}
@@ -533,7 +532,7 @@ func (r *Validator) getSourceNetworkForPodNetworkTarget(vmRef ref.Ref) (net *mod
 		return
 	}
 
-	mapping := r.Plan.Referenced.Map.Network.Spec.Map
+	mapping := r.Plan.Map.Network.Spec.Map
 	for i := range mapping {
 		mapped := &mapping[i]
 		ref := mapped.Source

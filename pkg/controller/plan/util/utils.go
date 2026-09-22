@@ -117,7 +117,7 @@ func GetBootDiskNumber(deviceString string) int {
 }
 
 func GetDeviceNumber(deviceString string) int {
-	if !(strings.HasPrefix(deviceString, diskPrefix) && len(deviceString) > len(diskPrefix)) {
+	if !strings.HasPrefix(deviceString, diskPrefix) || len(deviceString) <= len(diskPrefix) {
 		// In case we encounter an issue detecting the root disk order,
 		// we will return zero to avoid failing the migration due to boot orde
 		return 0
