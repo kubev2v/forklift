@@ -64,7 +64,6 @@ const (
 	VMStorageNotMapped              = "VMStorageNotMapped"
 	VMStorageNotSupported           = "VMStorageNotSupported"
 	VMMultiplePodNetworkMappings    = "VMMultiplePodNetworkMappings"
-	VMDuplicateNADMappings          = "VMDuplicateNADMappings"
 	VMMissingGuestIPs               = "VMMissingGuestIPs"
 	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
 	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
@@ -74,6 +73,7 @@ const (
 	DuplicateVM                     = "DuplicateVM"
 	SharedDisks                     = "SharedDisks"
 	SharedWarnDisks                 = "SharedWarnDisks"
+	ExcludeWarnDisks                = "ExcludeWarnDisks"
 	NameNotValid                    = "TargetNameNotValid"
 	HookNotValid                    = "HookNotValid"
 	HookNotReady                    = "HookNotReady"
@@ -110,6 +110,7 @@ const (
 	VMCriticalConcerns              = "VMCriticalConcerns"
 	RDMDiskWarning                  = "RDMDiskWarning"
 	IndependentDiskWarning          = "IndependentDiskWarning"
+	ExcludeDisks                    = "ExcludeDisks"
 	// NetAppShift (Advisory) reports whether the plan's storage map uses a NetApp Shift/Trident class.
 	NetAppShift = "NetAppShift"
 	// NetAppShiftWarmNotSupported (Critical) blocks warm migration when the storage map uses NetApp Shift.
@@ -376,7 +377,7 @@ func (r *Reconciler) ensureSecretForProvider(plan *api.Plan) error {
 // and returns whether the plan uses Shift storage so callers can pass the flag forward.
 func (r *Reconciler) validateNetAppShift(ctx *plancontext.Context) (err error) {
 	plan := ctx.Plan
-	src := plan.Referenced.Provider.Source
+	src := plan.Provider.Source
 	if src == nil || src.Type() != api.VSphere || plan.Map.Storage == nil {
 		return nil
 	}
@@ -384,6 +385,7 @@ func (r *Reconciler) validateNetAppShift(ctx *plancontext.Context) (err error) {
 	if err != nil {
 		return liberr.Wrap(err, "check NetApp Shift storage")
 	}
+	plan.Status.NetAppShiftDestination = shift
 	if !shift {
 		return nil
 	}
@@ -800,14 +802,6 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		Message:  "VM has more than one interface mapped to the pod network.",
 		Items:    []string{},
 	}
-	duplicateNADMappings := libcnd.Condition{
-		Type:     VMDuplicateNADMappings,
-		Status:   True,
-		Reason:   NotValid,
-		Category: api.CategoryCritical,
-		Message:  "Multiple VM NICs mapped to the same Multus NAD. Add additional NetworkMap entries with different destination NADs for the same source network.",
-		Items:    []string{},
-	}
 	missingStaticIPs := libcnd.Condition{
 		Type:     VMMissingGuestIPs,
 		Status:   True,
@@ -996,6 +990,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		Items:    []string{},
 	}
 	var sharedDisksConditions []libcnd.Condition
+	var excludeDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
 
@@ -1003,17 +998,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	source := plan.Referenced.Provider.Source
 	checkMixedUsage := source != nil && source.Type() == api.VSphere && settings.Settings.Features.CopyOffload
 	planUsesOffload := checkMixedUsage && plan.IsUsingOffloadPlugin()
-	netAppShift := false
-	var err error
-	if source != nil && source.Type() == api.VSphere && plan.Map.Storage != nil {
-		netAppShift, err = plan.Map.Storage.HasNetAppShiftDestination(ctx.Destination.Client)
-		if err != nil {
-			return liberr.Wrap(err, "check NetApp Shift storage")
-		}
-	}
-	if err != nil {
-		return liberr.Wrap(err, "check NetApp Shift storage")
-	}
+	netAppShift := plan.HasNetAppShiftDestination()
 
 	// Referenced VMs.
 	for i := range plan.Spec.VMs {
@@ -1152,12 +1137,8 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			if nErr != nil {
 				return nErr
 			}
-			foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
-			if foundPodDup {
+			if planbase.ValidatePodNetworkDuplicates(nicRefs, plan.Map.Network) {
 				multiplePodNetworkMappings.Items = append(multiplePodNetworkMappings.Items, ref.String())
-			}
-			if foundNadDup {
-				duplicateNADMappings.Items = append(duplicateNADMappings.Items, ref.String())
 			}
 		}
 		if plan.Referenced.Map.Storage != nil {
@@ -1287,6 +1268,30 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			}
 			sharedDisks.Type = fmt.Sprintf("%s-%s", sharedDisks.Type, ref.ID)
 			sharedDisksConditions = append(sharedDisksConditions, sharedDisks)
+		}
+
+		exOk, exMsg, exCategory, exErr := validator.ExcludedDisks(*ref)
+		if exErr != nil {
+			return exErr
+		}
+		if !exOk {
+			excludeDisks := libcnd.Condition{
+				Type:     ExcludeDisks,
+				Status:   True,
+				Category: exCategory,
+				Message:  "VM excludeDisks configuration is invalid.",
+				Items:    []string{ref.String()},
+			}
+			if exMsg != "" {
+				excludeDisks.Message = exMsg
+			}
+			if exCategory == validation.Warn {
+				excludeDisks.Type = ExcludeWarnDisks
+			} else {
+				excludeDisks.Type = ExcludeDisks
+			}
+			excludeDisks.Type = fmt.Sprintf("%s-%s", excludeDisks.Type, ref.ID)
+			excludeDisksConditions = append(excludeDisksConditions, excludeDisks)
 		}
 		if settings.Settings.StaticUdnIpAddresses && plan.Spec.PreserveStaticIPs && plan.DestinationHasUdnNetwork(r.Client) {
 			ok, err = validator.UdnStaticIPs(*ref, ctx.Destination.Client)
@@ -1418,14 +1423,14 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	if len(multiplePodNetworkMappings.Items) > 0 {
 		plan.Status.SetCondition(multiplePodNetworkMappings)
 	}
-	if len(duplicateNADMappings.Items) > 0 {
-		plan.Status.SetCondition(duplicateNADMappings)
-	}
 	if len(missingStaticIPs.Items) > 0 {
 		plan.Status.SetCondition(missingStaticIPs)
 	}
 	if len(sharedDisksConditions) > 0 {
 		plan.Status.SetCondition(sharedDisksConditions...)
+	}
+	if len(excludeDisksConditions) > 0 {
+		plan.Status.SetCondition(excludeDisksConditions...)
 	}
 	if len(missingCbtForWarm.Items) > 0 {
 		plan.Status.SetCondition(missingCbtForWarm)
@@ -2175,7 +2180,10 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 								},
 							},
 							VolumeMounts: []core.VolumeMount{mount},
-							Command:      []string{"file", "-E", "/opt/vmware-vix-disklib-distrib/lib64/libvixDiskLib.so"},
+							Command: []string{"/bin/sh", "-c",
+								"file -E /opt/vmware-vix-disklib-distrib/lib64/libvixDiskLib.so" +
+									" || file -E /opt/nbdkit-nfc-plugin.so" +
+									" || file -E /usr/lib64/nbdkit/plugins/nbdkit-nfc-plugin.so"},
 						},
 					},
 					Volumes: volumes,

@@ -39,6 +39,8 @@ const (
 	EnvVsphereVmwareDriverRemovalName   = "V2V_vsphereVmwareDriverRemoval"
 	EnvWindowsRegistryNetworkConfigName = "V2V_windowsRegistryNetworkConfig"
 	EnvWaitForGuestRebootName           = "V2V_waitForGuestReboot"
+	EnvSelinuxRelabelAtBootName         = "V2V_selinuxRelabelAtBoot"
+	EnvSelinuxRelabelExcludeName        = "V2V_selinuxRelabelExclude"
 	EnvXfsCompatibilityName             = "V2V_xfsCompatibility"
 	EnvXfsRepairIgnoreName              = "V2V_xfsRepairIgnore"
 )
@@ -61,6 +63,8 @@ const (
 	V2vOutputDir            = "/var/tmp/v2v"
 	InspectionOutputFile    = V2vOutputDir + "/inspection.xml"
 	VddkLib                 = "/opt/vmware-vix-disklib-distrib"
+	NfcPlugin               = "/opt/nbdkit-nfc-plugin.so"
+	NfcPluginBuiltin        = "/usr/lib64/nbdkit/plugins/nbdkit-nfc-plugin.so"
 	Luksdir                 = "/etc/luks"
 	VddkConfFile            = "/mnt/vddk-conf/vddk-config-file"
 	DynamicScriptsMountPath = "/mnt/dynamic_scripts"
@@ -119,6 +123,10 @@ type AppConfig struct {
 	WindowsRegistryNetworkConfig bool
 	// V2V_waitForGuestReboot — upload first-boot script signaling CONVERSION_DONE on COM1
 	WaitForGuestReboot bool
+	// V2V_selinuxRelabelAtBoot — defer SELinux relabeling until first guest boot
+	SelinuxRelabelAtBoot bool
+	// V2V_selinuxRelabelExclude — guest directories excluded from SELinux relabeling
+	SelinuxRelabelExclude []string
 	// V2V_xfsCompatibility — use XFS-capable virt-v2v; omit --no-fstrim when true
 	XfsCompatibility bool
 	// SupportsNoFstrim is true when the virt-v2v binary supports --no-fstrim
@@ -135,6 +143,7 @@ type AppConfig struct {
 	DynamicScriptsDir    string
 	Workdir              string
 	VddkLibDir           string
+	NfcPluginPath        string
 	LibvirtDomainFile    string
 }
 
@@ -158,6 +167,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.DynamicScriptsDir, "dynamic-scripts-dir", DynamicScriptsMountPath, "Directory path to specify dynamic scripts which will edit the guest")
 	flag.StringVar(&s.Workdir, "work-dir", V2vOutputDir, "Directory path to which the virt-v2v will output the disks and data")
 	flag.StringVar(&s.VddkLibDir, "vddk-lib-dir", VddkLib, "Directory path containing the vddk library")
+	flag.StringVar(&s.NfcPluginPath, "nfc-plugin", NfcPlugin, "Path to nbdkit-nfc-plugin.so from the init image sidecar")
 	flag.StringVar(&s.VddkConfFile, "vddk-conf-file", VddkConfFile, "Path for additional vddk configuration")
 	flag.StringVar(&s.InspectionOutputFile, "inspection-output-file", InspectionOutputFile, "Path where the virt-v2v-inspector will output the metadata")
 	flag.StringVar(&s.LibvirtDomainFile, "libvirt-domain-file", V2vInPlaceLibvirtDomain, "Path to the libvirt domain used in the in-place conversion")
@@ -170,9 +180,13 @@ func (s *AppConfig) Load() (err error) {
 	flag.BoolVar(&s.VsphereVmwareDriverRemoval, "vsphere-vmware-driver-removal", s.getEnvBool(EnvVsphereVmwareDriverRemovalName, false), "Run VMware driver removal scripts during Windows vSphere conversion")
 	flag.BoolVar(&s.WindowsRegistryNetworkConfig, "windows-registry-network-config", s.getEnvBool(EnvWindowsRegistryNetworkConfigName, false), "Use registry-based network configuration scripts for Windows static IP setup")
 	flag.BoolVar(&s.WaitForGuestReboot, "wait-for-guest-reboot", s.getEnvBool(EnvWaitForGuestRebootName, false), "Inject first-boot script to signal conversion completion on guest serial (COM1)")
+	flag.BoolVar(&s.SelinuxRelabelAtBoot, "selinux-relabel-at-boot", s.getEnvBool(EnvSelinuxRelabelAtBootName, false), "Defer SELinux relabeling until the guest's first boot after conversion")
+	excludeDirs := stringSliceFlag(s.getSelinuxRelabelExclude())
+	flag.Var(&excludeDirs, "selinux-relabel-exclude", "Exclude guest directory from SELinux relabeling (repeatable)")
 	flag.BoolVar(&s.XfsCompatibility, "xfs-compatibility", s.getEnvBool(EnvXfsCompatibilityName, false), "XFS compatibility mode: do not pass --no-fstrim to virt-v2v")
 	s.RemoteInspectionDisks = s.getRemoteInspectionDisks()
 	flag.Parse()
+	s.SelinuxRelabelExclude = []string(excludeDirs)
 
 	s.SupportsNoFstrim = detectNoFstrimSupport("/etc/os-release")
 
@@ -211,6 +225,27 @@ func (s *AppConfig) getInspectorExtraArgs() []string {
 		}
 	}
 	return extraArgs
+}
+
+func (s *AppConfig) getSelinuxRelabelExclude() []string {
+	var dirs []string
+	if envDirs, found := os.LookupEnv(EnvSelinuxRelabelExcludeName); found && envDirs != "" {
+		if err := json.Unmarshal([]byte(envDirs), &dirs); err != nil {
+			return nil
+		}
+	}
+	return dirs
+}
+
+type stringSliceFlag []string
+
+func (s *stringSliceFlag) String() string {
+	return fmt.Sprintf("%v", *s)
+}
+
+func (s *stringSliceFlag) Set(value string) error {
+	*s = append(*s, value)
+	return nil
 }
 
 func (s *AppConfig) getRemoteInspectionDisks() []string {

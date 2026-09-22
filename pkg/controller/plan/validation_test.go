@@ -2,6 +2,7 @@ package plan
 
 import (
 	"strconv"
+	"strings"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -1291,6 +1292,16 @@ var _ = ginkgo.Describe("Template Validation", func() {
 
 			validatorContainer := job.Spec.Template.Spec.Containers[0]
 			gomega.Expect(validatorContainer.Image).To(gomega.Equal(globalImage))
+		})
+
+		ginkgo.It("should accept libvixDiskLib or nbdkit-nfc plugin in /opt", func() {
+			p := newPlanWithVddkProvider()
+			job := createVddkCheckJob(p)
+
+			cmd := strings.Join(job.Spec.Template.Spec.Containers[0].Command, " ")
+			gomega.Expect(cmd).To(gomega.ContainSubstring("libvixDiskLib.so"))
+			gomega.Expect(cmd).To(gomega.ContainSubstring("/opt/nbdkit-nfc-plugin.so"))
+			gomega.Expect(cmd).To(gomega.ContainSubstring("/usr/lib64/nbdkit/plugins/nbdkit-nfc-plugin.so"))
 		})
 	})
 })

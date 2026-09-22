@@ -360,6 +360,20 @@ func runSingle[T any](d *WinRMDriver, script, label string) (*T, error) {
 	return &result, nil
 }
 
+// UnmarshalArrayOrSingle unmarshals JSON that may be either an array or a bare
+// object (PowerShell returns a bare object when the result set has one element).
+func UnmarshalArrayOrSingle[T any](data []byte) ([]T, error) {
+	var results []T
+	if err := json.Unmarshal(data, &results); err != nil {
+		var single T
+		if err := json.Unmarshal(data, &single); err != nil {
+			return nil, err
+		}
+		results = append(results, single)
+	}
+	return results, nil
+}
+
 // runList executes a PowerShell script and unmarshals the JSON output into a
 // slice of T. Handles PowerShell's behavior of returning a bare object instead
 // of a one-element array.
@@ -371,13 +385,9 @@ func runList[T any](d *WinRMDriver, script, label string) ([]T, error) {
 	if stdout == "" {
 		return []T{}, nil
 	}
-	var results []T
-	if err := json.Unmarshal([]byte(stdout), &results); err != nil {
-		var single T
-		if err := json.Unmarshal([]byte(stdout), &single); err != nil {
-			return nil, fmt.Errorf("failed to parse %s JSON: %w", label, err)
-		}
-		results = append(results, single)
+	results, err := UnmarshalArrayOrSingle[T]([]byte(stdout))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse %s JSON: %w", label, err)
 	}
 	return results, nil
 }

@@ -64,7 +64,21 @@ spec:
             type: object
           status:
             properties:
+              allocatedBytes:
+                type: string
+              cloneMethod:
+                type: string
+              copyDurationSeconds:
+                type: string
               progress:
+                type: string
+              provisionedBytes:
+                type: string
+              result:
+                type: string
+              storageProtocol:
+                type: string
+              storageVendor:
                 type: string
               vibVersion:
                 type: string

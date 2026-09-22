@@ -306,7 +306,6 @@ type VM struct {
 	ToolsVersionStatus string                   `json:"toolsVersionStatus2"`
 	DiskEnableUuid     bool                     `json:"diskEnableUuid"`
 	NestedHVEnabled    bool                     `json:"nestedHVEnabled"`
-	CustomDef          []model.CustomFieldDef   `json:"customDef"`
 	CustomValues       []model.CustomFieldValue `json:"customValues"`
 	Tags               []model.Tag              `json:"tags"`
 }
@@ -359,7 +358,6 @@ func (r *VM) With(m *model.VM) {
 	r.ToolsVersionStatus = m.ToolsVersionStatus
 	r.DiskEnableUuid = m.DiskEnableUuid
 	r.NestedHVEnabled = m.NestedHVEnabled
-	r.CustomDef = m.CustomDef
 	r.CustomValues = m.CustomValues
 	r.Tags = m.Tags
 	r.ConsolidationNeeded = m.ConsolidationNeeded
@@ -406,6 +404,23 @@ func (r *VM) RemoveSharedDisks() {
 	var disks []model.Disk
 	for _, disk := range r.Disks {
 		if !disk.Shared {
+			disks = append(disks, disk)
+		}
+	}
+	r.Disks = disks
+}
+
+func (r *VM) RemoveExcludedDisks(ids []string) {
+	if len(ids) == 0 {
+		return
+	}
+	exclude := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		exclude[id] = struct{}{}
+	}
+	var disks []model.Disk
+	for _, disk := range r.Disks {
+		if _, skip := exclude[disk.BusAddress]; !skip {
 			disks = append(disks, disk)
 		}
 	}

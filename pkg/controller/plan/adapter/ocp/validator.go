@@ -231,6 +231,11 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client k8sclient.Client) (ok bool
 	return
 }
 
+func (r *Validator) ExcludedDisks(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
+	ok = true
+	return
+}
+
 // HasSnapshot - OCP live migration doesn't require snapshot validation
 func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
 	ok = true
@@ -405,16 +410,7 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok b
 		return
 	}
 
-	// Get target VM name (either from VM status NewName or source VM name)
-	targetVmName := vmRef.Name
-	if r.Plan != nil && r.Plan.Status.Migration.VMs != nil {
-		for _, vmStatus := range r.Plan.Status.Migration.VMs {
-			if vmStatus.ID == vmRef.ID && vmStatus.NewName != "" {
-				targetVmName = vmStatus.NewName
-				break
-			}
-		}
-	}
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name)
 
 	// Test template with sample data for each disk
 	diskIndex := 0

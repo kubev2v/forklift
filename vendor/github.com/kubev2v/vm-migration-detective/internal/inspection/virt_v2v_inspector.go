@@ -80,7 +80,7 @@ func (i *VirtV2vInspector) Inspect(
 	// Password is kept secure in separate file via -ip parameter
 	// Add SSL verification parameter (provided by caller)
 	libvirtURL := fmt.Sprintf("vpx://%s@%s%s?%s",
-		encodedUsername, vcenterHost, computeResourcePath, sslVerify)
+		encodedUsername, bracketIPv6(vcenterHost), computeResourcePath, sslVerify)
 
 	// Create context with timeout
 	inspectCtx, cancel := context.WithTimeout(ctx, i.timeout)
@@ -119,14 +119,19 @@ func (i *VirtV2vInspector) Inspect(
 		Add("-v", "-x").
 		Flag("-i", "libvirt").
 		Flag("-ic", libvirtURL).
-		Flag("-ip", passwordFile).
-		Flag("-it", "vddk").
-		FlagIf(thumbprint != "", "-io", fmt.Sprintf("vddk-thumbprint=%s", thumbprint)).
-		FlagIf(vddkLibDir != "", "-io", fmt.Sprintf("vddk-libdir=%s", vddkLibDir))
+		Flag("-ip", passwordFile)
+
+	nbdkitPlugin := "vddk"
+	if info, err := os.Stat(vddkLibDir); err != nil || !info.IsDir() {
+		nbdkitPlugin = "nfc"
+	}
+	cmdArgs.Flag("-it", nbdkitPlugin).
+		FlagIf(thumbprint != "", "-io", fmt.Sprintf("%s-thumbprint=%s", nbdkitPlugin, thumbprint)).
+		FlagIf(nbdkitPlugin == "vddk" && vddkLibDir != "", "-io", fmt.Sprintf("vddk-libdir=%s", vddkLibDir))
 
 	for _, baseDiskPath := range diskInfo.BaseDiskPaths {
 		if baseDiskPath != "" {
-			cmdArgs.Flag("-io", fmt.Sprintf("vddk-file=%s", baseDiskPath))
+			cmdArgs.Flag("-io", fmt.Sprintf("%s-file=%s", nbdkitPlugin, baseDiskPath))
 		}
 	}
 

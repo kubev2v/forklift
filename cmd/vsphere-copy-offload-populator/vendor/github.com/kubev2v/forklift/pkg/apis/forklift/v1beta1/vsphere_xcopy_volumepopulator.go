@@ -40,6 +40,20 @@ type VSphereXcopyVolumePopulatorStatus struct {
 	XcopyUsed string `json:"xcopyUsed,omitempty"`
 	// +optional
 	VibVersion string `json:"vibVersion,omitempty"`
+	// +optional
+	CopyDurationSeconds string `json:"copyDurationSeconds,omitempty"`
+	// +optional
+	Result string `json:"result,omitempty"`
+	// +optional
+	StorageVendor string `json:"storageVendor,omitempty"`
+	// +optional
+	CloneMethod string `json:"cloneMethod,omitempty"`
+	// +optional
+	StorageProtocol string `json:"storageProtocol,omitempty"`
+	// +optional
+	ProvisionedBytes string `json:"provisionedBytes,omitempty"`
+	// +optional
+	AllocatedBytes string `json:"allocatedBytes,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

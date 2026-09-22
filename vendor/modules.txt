@@ -443,7 +443,7 @@ github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8
 # github.com/klauspost/cpuid/v2 v2.2.10
 ## explicit; go 1.22
 github.com/klauspost/cpuid/v2
-# github.com/kubev2v/vm-migration-detective v0.0.0-20260506144435-77e61ac7d78d
+# github.com/kubev2v/vm-migration-detective v0.0.0-20260908083350-a89447103cf3
 ## explicit; go 1.25.0
 github.com/kubev2v/vm-migration-detective/internal/checks
 github.com/kubev2v/vm-migration-detective/internal/cmdbuilder
@@ -1420,7 +1420,7 @@ k8s.io/utils/trace
 kubevirt.io/api/core
 kubevirt.io/api/core/v1
 kubevirt.io/api/export
-kubevirt.io/api/export/v1alpha1
+kubevirt.io/api/export/v1beta1
 kubevirt.io/api/instancetype
 kubevirt.io/api/instancetype/v1beta1
 # kubevirt.io/containerized-data-importer-api v1.63.1-0.20251115214221-0b4e9b5c9c59

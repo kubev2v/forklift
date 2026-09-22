@@ -248,7 +248,7 @@ func (r *Scheduler) migratesSharedDisks(vmStatus *plan.VMStatus) bool {
 }
 
 func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
-	useV2vForTransfer, _ := r.Plan.ShouldUseV2vForTransfer(vmStatus.Ref, r.Destination.Client)
+	useV2vForTransfer, _ := r.Plan.ShouldUseV2vForTransfer(vmStatus.Ref)
 	if useV2vForTransfer || r.Plan.IsUsingOffloadPlugin() {
 		switch vmStatus.Phase {
 		case CreateVM, PostHook, Completed:

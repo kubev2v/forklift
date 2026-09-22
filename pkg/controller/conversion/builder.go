@@ -17,6 +17,9 @@ import (
 const (
 	qemuUser  = int64(107)
 	qemuGroup = int64(107)
+
+	nbdkitNfcPluginSubPath   = "nbdkit-nfc-plugin.so"
+	nbdkitNfcPluginMountPath = "/usr/lib64/nbdkit/plugins/nbdkit-nfc-plugin.so"
 )
 
 // Builder constructs virt-v2v pod specs from a fully-resolved PodConfig.
@@ -130,6 +133,13 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 				AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 				Capabilities:             &core.Capabilities{Drop: []core.Capability{"ALL"}},
 			},
+		})
+		// Sidecar images such as go-nfc copy /opt/nbdkit-nfc-plugin.so; overlay that file
+		// on the nbdkit plugin path without replacing the image's built-in plugin directory.
+		volumeMounts = append(volumeMounts, core.VolumeMount{
+			Name:      convctx.VddkVolumeName,
+			MountPath: nbdkitNfcPluginMountPath,
+			SubPath:   nbdkitNfcPluginSubPath,
 		})
 	}
 

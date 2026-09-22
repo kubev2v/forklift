@@ -1,10 +1,13 @@
 package vsphere
 
 import (
+	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
@@ -626,21 +629,12 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 func TestVmAdapter_Apply_CustomFields(t *testing.T) {
 	tests := []struct {
 		name              string
-		preExistingDef    []model.CustomFieldDef
 		preExistingValues []model.CustomFieldValue
-		availableFieldVal interface{}
 		customValueVal    interface{}
-		expectedDef       []model.CustomFieldDef
 		expectedValues    []model.CustomFieldValue
 	}{
 		{
-			name: "populates CustomDef and CustomValues from scratch",
-			availableFieldVal: types.ArrayOfCustomFieldDef{
-				CustomFieldDef: []types.CustomFieldDef{
-					{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
-					{Name: "env", Key: 200, ManagedObjectType: ""},
-				},
-			},
+			name: "populates CustomValues from scratch",
 			customValueVal: types.ArrayOfCustomFieldValue{
 				CustomFieldValue: []types.BaseCustomFieldValue{
 					&types.CustomFieldStringValue{
@@ -653,24 +647,10 @@ func TestVmAdapter_Apply_CustomFields(t *testing.T) {
 					},
 				},
 			},
-			expectedDef: []model.CustomFieldDef{
-				{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
-				{Name: "env", Key: 200, ManagedObjectType: ""},
-			},
 			expectedValues: []model.CustomFieldValue{
 				{Key: 100, Value: "alice"},
 				{Key: 200, Value: "production"},
 			},
-		},
-		{
-			name: "clears CustomDef when vSphere reports empty availableField",
-			preExistingDef: []model.CustomFieldDef{
-				{Name: "stale", Key: 999},
-			},
-			availableFieldVal: types.ArrayOfCustomFieldDef{
-				CustomFieldDef: []types.CustomFieldDef{},
-			},
-			expectedDef: []model.CustomFieldDef{},
 		},
 		{
 			name: "clears CustomValues when vSphere reports empty customValue (ArrayOf)",
@@ -708,19 +688,11 @@ func TestVmAdapter_Apply_CustomFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			v := &VmAdapter{
 				model: model.VM{
-					CustomDef:    tt.preExistingDef,
 					CustomValues: tt.preExistingValues,
 				},
 			}
 
 			changeSet := []types.PropertyChange{}
-			if tt.availableFieldVal != nil {
-				changeSet = append(changeSet, types.PropertyChange{
-					Op:   Assign,
-					Name: fAvailableField,
-					Val:  tt.availableFieldVal,
-				})
-			}
 			if tt.customValueVal != nil {
 				changeSet = append(changeSet, types.PropertyChange{
 					Op:   Assign,
@@ -733,17 +705,231 @@ func TestVmAdapter_Apply_CustomFields(t *testing.T) {
 				ChangeSet: changeSet,
 			})
 
-			if tt.expectedDef != nil {
-				if !reflect.DeepEqual(v.model.CustomDef, tt.expectedDef) {
-					t.Errorf("CustomDef mismatch\ngot:  %+v\nwant: %+v", v.model.CustomDef, tt.expectedDef)
-				}
-			}
 			if tt.expectedValues != nil {
 				if !reflect.DeepEqual(v.model.CustomValues, tt.expectedValues) {
 					t.Errorf("CustomValues mismatch\ngot:  %+v\nwant: %+v", v.model.CustomValues, tt.expectedValues)
 				}
 			}
 		})
+	}
+}
+
+func newTestInventoryDB(t *testing.T) libmodel.DB {
+	t.Helper()
+	db := libmodel.New(filepath.Join(t.TempDir(), "test.db"), &model.CustomFieldDef{})
+	if err := db.Open(true); err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close(true) })
+	return db
+}
+
+func newTestCollector() *Collector {
+	return &Collector{
+		customFieldDefs:   map[int32]model.CustomFieldDef{},
+		customFieldDefsMu: &sync.RWMutex{},
+	}
+}
+
+func TestUpsertCustomFieldDefs(t *testing.T) {
+	adapter := newTestCollector()
+	db := newTestInventoryDB(t)
+	defs := []types.CustomFieldDef{
+		{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
+		{Name: "env", Key: 200, ManagedObjectType: ""},
+	}
+	u := types.ObjectUpdate{
+		Obj: types.ManagedObjectReference{Type: "VirtualMachine"},
+		ChangeSet: []types.PropertyChange{
+			{
+				Op:   Assign,
+				Name: fAvailableField,
+				Val: types.ArrayOfCustomFieldDef{
+					CustomFieldDef: defs,
+				},
+			},
+		},
+	}
+
+	err := db.With(func(tx *libmodel.Tx) error {
+		return adapter.upsertCustomFieldDefs(tx, u)
+	})
+	if err != nil {
+		t.Fatalf("upsertCustomFieldDefs returned error: %v", err)
+	}
+
+	list := []model.CustomFieldDef{}
+	err = db.List(&list, libmodel.ListOptions{Detail: libmodel.MaxDetail})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(list) != len(defs) {
+		t.Fatalf("expected %d defs upserted, got %d", len(defs), len(list))
+	}
+	byKey := make(map[int32]model.CustomFieldDef, len(list))
+	for _, d := range list {
+		byKey[d.Key] = d
+	}
+	for _, f := range defs {
+		got, ok := byKey[f.Key]
+		if !ok {
+			t.Errorf("expected def with key %d to be present", f.Key)
+			continue
+		}
+		expected := model.CustomFieldDef{
+			Name:              f.Name,
+			Key:               f.Key,
+			ManagedObjectType: f.ManagedObjectType,
+		}
+		if !reflect.DeepEqual(got, expected) {
+			t.Errorf("def %d mismatch\ngot:  %+v\nwant: %+v", f.Key, got, expected)
+		}
+	}
+}
+
+func TestUpsertCustomFieldDefsSkipsNonVM(t *testing.T) {
+	adapter := newTestCollector()
+	db := newTestInventoryDB(t)
+
+	err := db.With(func(tx *libmodel.Tx) error {
+		return adapter.upsertCustomFieldDefs(tx, types.ObjectUpdate{
+			Obj: types.ManagedObjectReference{Type: "HostSystem"},
+		})
+	})
+	if err != nil {
+		t.Fatalf("upsertCustomFieldDefs returned unexpected error: %v", err)
+	}
+
+	list := []model.CustomFieldDef{}
+	err = db.List(&list, libmodel.ListOptions{Detail: libmodel.MaxDetail})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(list) != 0 {
+		t.Errorf("expected no defs for non-VM object, got %d", len(list))
+	}
+}
+
+func TestUpsertCustomFieldDefsCaches(t *testing.T) {
+	adapter := newTestCollector()
+	db := newTestInventoryDB(t)
+
+	defs := []types.CustomFieldDef{
+		{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
+		{Name: "env", Key: 200, ManagedObjectType: ""},
+	}
+	update := func(defs []types.CustomFieldDef) types.ObjectUpdate {
+		return types.ObjectUpdate{
+			Obj: types.ManagedObjectReference{Type: "VirtualMachine", Value: "vm-1"},
+			ChangeSet: []types.PropertyChange{
+				{
+					Op:   Assign,
+					Name: fAvailableField,
+					Val:  types.ArrayOfCustomFieldDef{CustomFieldDef: defs},
+				},
+			},
+		}
+	}
+
+	countRows := func() int {
+		t.Helper()
+		list := []model.CustomFieldDef{}
+		if err := db.List(&list, libmodel.ListOptions{Detail: libmodel.MaxDetail}); err != nil {
+			t.Fatalf("List returned error: %v", err)
+		}
+		return len(list)
+	}
+
+	if err := db.With(func(tx *libmodel.Tx) error {
+		return adapter.upsertCustomFieldDefs(tx, update(defs))
+	}); err != nil {
+		t.Fatalf("first upsert returned error: %v", err)
+	}
+	if got := countRows(); got != len(defs) {
+		t.Fatalf("expected %d rows after first upsert, got %d", len(defs), got)
+	}
+
+	// The same provider-global def set reported by a second VM should be
+	// skipped via the in-memory cache (no additional DB writes, no dup rows).
+	if err := db.With(func(tx *libmodel.Tx) error {
+		return adapter.upsertCustomFieldDefs(tx, update(defs))
+	}); err != nil {
+		t.Fatalf("repeated upsert returned error: %v", err)
+	}
+	if got := countRows(); got != len(defs) {
+		t.Fatalf("expected %d rows after repeated upsert, got %d", len(defs), got)
+	}
+
+	// A changed def set should be reflected in the DB.
+	changed := []types.CustomFieldDef{
+		{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
+		{Name: "env-renamed", Key: 200, ManagedObjectType: ""},
+		{Name: "team", Key: 300, ManagedObjectType: "VirtualMachine"},
+	}
+	if err := db.With(func(tx *libmodel.Tx) error {
+		return adapter.upsertCustomFieldDefs(tx, update(changed))
+	}); err != nil {
+		t.Fatalf("changed upsert returned error: %v", err)
+	}
+	if got := countRows(); got != len(changed) {
+		t.Fatalf("expected %d rows after changed upsert, got %d", len(changed), got)
+	}
+}
+
+func TestUpsertCustomFieldDefsRollbackRetriesIdentical(t *testing.T) {
+	adapter := newTestCollector()
+	db := newTestInventoryDB(t)
+
+	defs := []types.CustomFieldDef{
+		{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
+		{Name: "env", Key: 200, ManagedObjectType: ""},
+	}
+	u := types.ObjectUpdate{
+		Obj: types.ManagedObjectReference{Type: "VirtualMachine", Value: "vm-1"},
+		ChangeSet: []types.PropertyChange{
+			{
+				Op:   Assign,
+				Name: fAvailableField,
+				Val:  types.ArrayOfCustomFieldDef{CustomFieldDef: defs},
+			},
+		},
+	}
+
+	countRows := func() int {
+		t.Helper()
+		list := []model.CustomFieldDef{}
+		if err := db.List(&list, libmodel.ListOptions{Detail: libmodel.MaxDetail}); err != nil {
+			t.Fatalf("List returned error: %v", err)
+		}
+		return len(list)
+	}
+
+	// Stage the defs inside a transaction that is then rolled back.
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("Begin returned error: %v", err)
+	}
+	if err := adapter.upsertCustomFieldDefs(tx, u); err != nil {
+		t.Fatalf("upsertCustomFieldDefs returned error: %v", err)
+	}
+	if err := tx.End(); err != nil {
+		t.Fatalf("rollback returned error: %v", err)
+	}
+	// The cache must not retain defs from the rolled-back transaction.
+	adapter.resetCustomFieldDefs()
+
+	if got := countRows(); got != 0 {
+		t.Fatalf("expected 0 rows after rollback, got %d", got)
+	}
+
+	// Retrying identical definitions after the rollback must reinsert them.
+	if err := db.With(func(tx *libmodel.Tx) error {
+		return adapter.upsertCustomFieldDefs(tx, u)
+	}); err != nil {
+		t.Fatalf("retry upsert returned error: %v", err)
+	}
+	if got := countRows(); got != len(defs) {
+		t.Fatalf("expected %d rows after retry, got %d", len(defs), got)
 	}
 }
 
@@ -766,5 +952,115 @@ func TestHasDiskPrefix(t *testing.T) {
 				t.Errorf("hasDiskPrefix(%q) = %v, want %v", tt.key, got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestDiskBusAddress(t *testing.T) {
+	tests := []struct {
+		bus        string
+		busNumber  int32
+		unitNumber int32
+		want       string
+	}{
+		{"scsi", 0, 0, "scsi0:0"},
+		{"scsi", 0, 1, "scsi0:1"},
+		{"scsi", 1, 1, "scsi1:1"},
+		{"sata", 0, 1, "sata0:1"},
+		{"nvme", 0, 2, "nvme0:2"},
+		{"ide", 0, 0, "ide0:0"},
+		{"scsi", 2, 0, "scsi2:0"},
+		{"", 0, 0, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			got := diskBusAddress(tt.bus, tt.busNumber, tt.unitNumber)
+			if got != tt.want {
+				t.Errorf("diskBusAddress(%q, %d, %d) = %q, want %q",
+					tt.bus, tt.busNumber, tt.unitNumber, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUpdateDisks_setsBusAddress(t *testing.T) {
+	unit := int32(1)
+	v := &VmAdapter{
+		model: model.VM{
+			Controllers: []model.Controller{{Key: 1000, BusNumber: 0, Bus: SCSI}},
+		},
+	}
+	v.updateDisks(&types.ArrayOfVirtualDevice{VirtualDevice: []types.BaseVirtualDevice{
+		&types.VirtualDisk{
+			VirtualDevice: types.VirtualDevice{
+				Key:           2001,
+				ControllerKey: 1000,
+				UnitNumber:    &unit,
+				Backing: &types.VirtualDiskFlatVer2BackingInfo{
+					VirtualDeviceFileBackingInfo: types.VirtualDeviceFileBackingInfo{
+						FileName: "[ds] vm/disk.vmdk",
+					},
+				},
+			},
+			CapacityInBytes: 1024,
+		},
+	}})
+	if len(v.model.Disks) != 1 {
+		t.Fatalf("got %d disks, want 1", len(v.model.Disks))
+	}
+	if v.model.Disks[0].BusAddress != "scsi0:1" {
+		t.Errorf("BusAddress = %q, want scsi0:1", v.model.Disks[0].BusAddress)
+	}
+	if v.model.Disks[0].Bus != SCSI {
+		t.Errorf("Bus = %q, want %q", v.model.Disks[0].Bus, SCSI)
+	}
+}
+
+func TestUpdateDisks_usesBusNumberWhenKeyDiffers(t *testing.T) {
+	unit := int32(0)
+	v := &VmAdapter{}
+	v.updateControllers(&types.ArrayOfVirtualDevice{VirtualDevice: []types.BaseVirtualDevice{
+		&types.ParaVirtualSCSIController{
+			VirtualSCSIController: types.VirtualSCSIController{
+				VirtualController: types.VirtualController{
+					VirtualDevice: types.VirtualDevice{Key: 1000},
+					BusNumber:     2,
+					Device:        []int32{2000},
+				},
+			},
+		},
+	}})
+	if len(v.model.Controllers) != 1 {
+		t.Fatalf("got %d controllers, want 1", len(v.model.Controllers))
+	}
+	if v.model.Controllers[0].Key != 1000 {
+		t.Errorf("Key = %d, want 1000", v.model.Controllers[0].Key)
+	}
+	if v.model.Controllers[0].BusNumber != 2 {
+		t.Errorf("BusNumber = %d, want 2", v.model.Controllers[0].BusNumber)
+	}
+
+	v.updateDisks(&types.ArrayOfVirtualDevice{VirtualDevice: []types.BaseVirtualDevice{
+		&types.VirtualDisk{
+			VirtualDevice: types.VirtualDevice{
+				Key:           2000,
+				ControllerKey: 1000,
+				UnitNumber:    &unit,
+				Backing: &types.VirtualDiskFlatVer2BackingInfo{
+					VirtualDeviceFileBackingInfo: types.VirtualDeviceFileBackingInfo{
+						FileName: "[ds] vm/disk.vmdk",
+					},
+				},
+			},
+			CapacityInBytes: 1024,
+		},
+	}})
+	if len(v.model.Disks) != 1 {
+		t.Fatalf("got %d disks, want 1", len(v.model.Disks))
+	}
+	if v.model.Disks[0].BusAddress != "scsi2:0" {
+		t.Errorf("BusAddress = %q, want scsi2:0 (from BusNumber, not Key remainder)", v.model.Disks[0].BusAddress)
+	}
+	if v.model.Disks[0].BusNumber != 2 {
+		t.Errorf("Disk.BusNumber = %d, want 2", v.model.Disks[0].BusNumber)
 	}
 }
