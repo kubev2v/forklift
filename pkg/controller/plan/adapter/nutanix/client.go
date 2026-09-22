@@ -1,6 +1,8 @@
 package nutanix
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -22,10 +24,15 @@ const (
 	powerStateOff = "OFF"
 )
 
-// powerStateTransitionAcpiShutdown is the v3 POST .../set_power_state
-// transition for a guest ACPI shutdown. Matches vSphere ShutdownGuest /
-// oVirt Shutdown: no hard power-off fallback (avoids dirty NTFS for Windows).
+// powerStateTransitionAcpiShutdown is the PE REST v2.0 set_power_state
+// transition for a guest ACPI shutdown. PC uses POST .../acpi_shutdown
+// instead (v3 has no set_power_state). No hard power-off fallback
+// (matches vSphere ShutdownGuest / oVirt Shutdown; avoids dirty NTFS).
 const powerStateTransitionAcpiShutdown = "ACPI_SHUTDOWN"
+
+// peSetPowerStatePath is Prism Element's v2.0 power-transition endpoint.
+// PE rejects v3 VM PUT (405) and has no v3 acpi_shutdown.
+const peSetPowerStatePath = "/PrismGateway/services/rest/v2.0/vms/%s/set_power_state"
 
 // Nutanix v3 image entity states (status.state).
 const (
@@ -133,6 +140,9 @@ func (r *Client) PowerOn(vmRef ref.Ref) error {
 // Like vSphere ShutdownGuest / oVirt Shutdown, there is no hard power-off
 // fallback: a failed or ignored ACPI request fails the step or leaves
 // WaitForPowerOff polling until the guest is off.
+//
+// Prism Central: POST /api/nutanix/v3/vms/{uuid}/acpi_shutdown
+// Prism Element: POST .../v2.0/vms/{uuid}/set_power_state (ACPI_SHUTDOWN)
 func (r *Client) PowerOff(vmRef ref.Ref) error {
 	state, err := r.PowerState(vmRef)
 	if err != nil {
@@ -141,7 +151,14 @@ func (r *Client) PowerOff(vmRef ref.Ref) error {
 	if state == planapi.VMPowerStateOff {
 		return nil
 	}
-	return r.transitionPowerState(vmRef, powerStateTransitionAcpiShutdown)
+	element, err := r.isPrismElement()
+	if err != nil {
+		return err
+	}
+	if element {
+		return r.transitionPowerStateV2(vmRef, powerStateTransitionAcpiShutdown)
+	}
+	return r.acpiShutdown(vmRef)
 }
 
 // PoweredOff reports whether the VM has finished powering off.
@@ -167,38 +184,97 @@ func (r *Client) getVM(vmRef ref.Ref) (entity libclient.VM, err error) {
 }
 
 // setPowerState submits a v3 PUT that transitions the VM to the given
-// power state. Nutanix v3's update pattern requires sending the full spec
-// back (as returned by GET, with the desired field changed), not a partial
-// patch.
+// power state. The GET body is decoded with UseNumber so disk sizes and
+// spec_version stay exact integers (plain map[string]any remarshal turns
+// them into float64 and Prism Element returns 422). Only metadata+spec
+// are PUT back; status is omitted.
 func (r *Client) setPowerState(vmRef ref.Ref, state string) error {
-	entity, err := r.getVM(vmRef)
-	if err != nil {
-		return err
-	}
-	entity.Spec.Resources.PowerState = state
-
-	body := libclient.VMUpdateBody(entity)
 	url := fmt.Sprintf("%s/api/nutanix/v3/vms/%s", r.URL, vmRef.ID)
-	status, err := r.Put(url, body, nil)
+	var raw json.RawMessage
+	status, err := r.Get(url, &raw)
+	if err != nil {
+		return liberr.Wrap(err, "vm", vmRef.String())
+	}
+	if status != http.StatusOK {
+		return liberr.New(
+			fmt.Sprintf("unexpected status fetching VM: %d", status),
+			"vm", vmRef.String(),
+			"status", status,
+		)
+	}
+	var entity map[string]any
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	if err := dec.Decode(&entity); err != nil {
+		return liberr.Wrap(err, "vm", vmRef.String())
+	}
+	spec, _ := entity["spec"].(map[string]any)
+	if spec == nil {
+		return liberr.New("VM GET missing spec", "vm", vmRef.String())
+	}
+	resources, _ := spec["resources"].(map[string]any)
+	if resources == nil {
+		return liberr.New("VM GET missing spec.resources", "vm", vmRef.String())
+	}
+	resources["power_state"] = state
+	// Empty host_reference is present on some GETs and rejected on PUT.
+	if host, ok := resources["host_reference"].(map[string]any); ok {
+		if uuid, _ := host["uuid"].(string); uuid == "" {
+			delete(resources, "host_reference")
+		}
+	}
+
+	body := map[string]any{
+		"metadata": entity["metadata"],
+		"spec":     spec,
+	}
+	if v, ok := entity["api_version"]; ok {
+		body["api_version"] = v
+	}
+
+	status, err = r.Put(url, body, nil)
 	if err != nil {
 		return liberr.Wrap(err, "vm", vmRef.String(), "state", state)
 	}
 	if status != http.StatusOK && status != http.StatusAccepted {
-		return liberr.New("unexpected status setting power state", "vm", vmRef.String(), "state", state, "status", status)
+		return liberr.New(
+			fmt.Sprintf("unexpected status setting power state: %d", status),
+			"vm", vmRef.String(),
+			"state", state,
+			"status", status,
+		)
 	}
 	return nil
 }
 
-// transitionPowerState submits POST .../vms/{uuid}/set_power_state with the
-// given transition (ON, OFF, ACPI_SHUTDOWN, etc.).
-func (r *Client) transitionPowerState(vmRef ref.Ref, transition string) error {
+// acpiShutdown submits Prism Central's v3 ACPI shutdown request.
+func (r *Client) acpiShutdown(vmRef ref.Ref) error {
+	url := fmt.Sprintf("%s/api/nutanix/v3/vms/%s/acpi_shutdown", r.URL, vmRef.ID)
+	status, err := r.Post(url, map[string]any{}, nil)
+	if err != nil {
+		return liberr.Wrap(err, "vm", vmRef.String())
+	}
+	// PC returns 202 with a task_uuid.
+	if status != http.StatusOK && status != http.StatusAccepted {
+		return liberr.New(
+			fmt.Sprintf("unexpected status requesting ACPI shutdown: %d", status),
+			"vm", vmRef.String(),
+			"status", status,
+		)
+	}
+	return nil
+}
+
+// transitionPowerStateV2 submits Prism Element REST v2.0 set_power_state.
+func (r *Client) transitionPowerStateV2(vmRef ref.Ref, transition string) error {
 	body := map[string]string{"transition": transition}
-	url := fmt.Sprintf("%s/api/nutanix/v3/vms/%s/set_power_state", r.URL, vmRef.ID)
+	url := fmt.Sprintf("%s"+peSetPowerStatePath, r.URL, vmRef.ID)
 	status, err := r.Post(url, body, nil)
 	if err != nil {
 		return liberr.Wrap(err, "vm", vmRef.String(), "transition", transition)
 	}
-	if status != http.StatusOK && status != http.StatusAccepted {
+	// PE returns 201 with a task_uuid.
+	if status != http.StatusOK && status != http.StatusCreated && status != http.StatusAccepted {
 		return liberr.New(
 			fmt.Sprintf("unexpected status setting power state transition: %d", status),
 			"vm", vmRef.String(),
