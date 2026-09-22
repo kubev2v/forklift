@@ -715,6 +715,10 @@ type ForkliftControllerSpec struct {
 	// +kubebuilder:validation:Enum="true";"false"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	VirtV2VDontRequestKVM string `json:"virt_v2v_dont_request_kvm,omitempty"`
+	// Seccomp profile for the conversion pods, as a Localhost profile name resolved by the kubelet under its seccomp profile root (for example "profiles/unshare.json"). The conversion appliance runs passt, which calls unshare(CLONE_NEWUSER) and then mount, umount2 and pivot_root; a runtime's default profile denies those. Unlike Unconfined, a Localhost profile keeps syscall filtering enabled and is admitted by the baseline and restricted Pod Security Standards. Optional. When empty, OpenShift clusters use profiles/unshare.json as before and all others use the runtime default.
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	VirtV2VSeccompProfile string `json:"virt_v2v_seccomp_profile,omitempty"`
 	// Additional arguments for virt-v2v conversion. Optional. If left empty, the operator automatically sets this from the environment.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
