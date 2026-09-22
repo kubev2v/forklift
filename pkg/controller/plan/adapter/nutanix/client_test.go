@@ -202,8 +202,8 @@ func vmEntityPtr(uuid, powerState string) *libclient.VM {
 
 // newPowerTestServer serves the connectivity probe plus GET/PUT for a
 // single VM entity, tracking PUT bodies and set_power_state transitions
-// for assertions. PUT ON/OFF updates the entity in place; ACPI_SHUTDOWN
-// leaves the VM running until an OFF transition is posted.
+// for assertions. ACPI_SHUTDOWN leaves the VM running; PUT ON/OFF updates
+// power_state in place (used by PowerOn).
 func newPowerTestServer(
 	t *testing.T,
 	entity *libclient.VM,
@@ -222,10 +222,6 @@ func newPowerTestServer(
 			}
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			transitionBodies = append(transitionBodies, body.Transition)
-			if body.Transition == powerStateTransitionOff {
-				entity.Spec.Resources.PowerState = powerStateOff
-				entity.Status.Resources.PowerState = powerStateOff
-			}
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{}`))
 		case r.Method == http.MethodGet:
@@ -259,11 +255,7 @@ func newConnectedTestClient(t *testing.T, url string) *Client {
 
 func powerTestVMID(t *testing.T, name string) string {
 	t.Helper()
-	vmID := "vm-power-" + name
-	t.Cleanup(func() {
-		clearPowerOffTracking(testMigrationUID, vmID)
-	})
-	return vmID
+	return "vm-power-" + name
 }
 
 func TestPowerState(t *testing.T) {
@@ -329,8 +321,7 @@ func TestPowerOff_SkipsAcpiWhenAlreadyOff(t *testing.T) {
 }
 
 // TestPowerOff_SubmitsAcpiShutdown verifies PowerOff requests ACPI_SHUTDOWN
-// and leaves the VM running until PoweredOff forces OFF after the grace
-// period.
+// and does not hard-off while the guest is still on.
 func TestPowerOff_SubmitsAcpiShutdown(t *testing.T) {
 	vmID := powerTestVMID(t, "acpi-shutdown")
 	server, puts, transitions := newPowerTestServer(t, vmEntityPtr(vmID, powerStateOn))
@@ -363,43 +354,39 @@ func TestPowerOff_SubmitsAcpiShutdown(t *testing.T) {
 	}
 }
 
-func TestPoweredOff_ForcesHardOffAfterGracePeriod(t *testing.T) {
-	oldGrace := powerOffGracePeriod
-	powerOffGracePeriod = 0
-	t.Cleanup(func() { powerOffGracePeriod = oldGrace })
-
-	vmID := powerTestVMID(t, "hard-off")
-	server, puts, transitions := newPowerTestServer(t, vmEntityPtr(vmID, powerStateOn))
+// TestPowerOff_FailsWhenAcpiUnavailable verifies a failed ACPI POST fails
+// PowerOff with no hard-off PUT (same as vSphere/oVirt: no force power-off).
+func TestPowerOff_FailsWhenAcpiUnavailable(t *testing.T) {
+	vmID := powerTestVMID(t, "acpi-404")
+	entity := vmEntityPtr(vmID, powerStateOn)
+	var puts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/set_power_state"):
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{}`))
+		case r.Method == http.MethodGet:
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(entity)
+		case r.Method == http.MethodPut:
+			puts++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
 	defer server.Close()
 
 	client := newConnectedTestClient(t, server.URL)
-	if err := client.PowerOff(ref.Ref{ID: vmID}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err := client.PowerOff(ref.Ref{ID: vmID}); err == nil {
+		t.Fatal("expected PowerOff to fail when ACPI set_power_state returns 404")
 	}
-
-	off, err := client.PoweredOff(ref.Ref{ID: vmID})
-	if err != nil {
-		t.Fatalf("unexpected error on first PoweredOff: %v", err)
-	}
-	if off {
-		t.Fatal("expected PoweredOff to be false before hard off completes")
-	}
-	if len(*transitions) != 2 {
-		t.Fatalf("expected ACPI then OFF transitions, got %v", *transitions)
-	}
-	if (*transitions)[1] != powerStateTransitionOff {
-		t.Fatalf("expected hard-off transition %q, got %q", powerStateTransitionOff, (*transitions)[1])
-	}
-	if len(*puts) != 0 {
-		t.Fatalf("expected no PUT requests, got %d", len(*puts))
-	}
-
-	off, err = client.PoweredOff(ref.Ref{ID: vmID})
-	if err != nil {
-		t.Fatalf("unexpected error on second PoweredOff: %v", err)
-	}
-	if !off {
-		t.Fatal("expected PoweredOff to be true after hard off")
+	if puts != 0 {
+		t.Fatalf("expected no hard-off PUT, got %d", puts)
 	}
 }
 
