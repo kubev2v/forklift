@@ -418,6 +418,13 @@ func (c *Customize) customizeLinux() (err error) {
 	cmdBuilder.AddFlag("--verbose")
 	cmdBuilder.AddArg("--format", "raw")
 
+	if c.appConfig.SelinuxRelabelAtBoot {
+		cmdBuilder.AddFlag("--selinux-relabel-at-boot")
+	}
+	for _, dir := range c.appConfig.SelinuxRelabelExclude {
+		cmdBuilder.AddArg("--selinux-relabel-exclude", dir)
+	}
+
 	// Step 2: Handle static IP configuration
 	if err := c.handleStaticIPConfiguration(cmdBuilder); err != nil {
 		return err
