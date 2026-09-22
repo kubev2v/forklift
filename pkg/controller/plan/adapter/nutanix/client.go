@@ -3,8 +3,6 @@ package nutanix
 import (
 	"fmt"
 	"net/http"
-	"sync"
-	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -24,33 +22,10 @@ const (
 	powerStateOff = "OFF"
 )
 
-// Nutanix v3 set_power_state transitions (POST .../vms/{uuid}/set_power_state).
-const (
-	powerStateTransitionOff          = "OFF"
-	powerStateTransitionAcpiShutdown = "ACPI_SHUTDOWN"
-)
-
-// powerOffGracePeriod is how long WaitForPowerOff waits for an ACPI shutdown
-// before forcing power off. Matches the graceful-first pattern used by other
-// Forklift providers (vSphere ShutdownGuest, oVirt Shutdown, etc.), with a
-// Nutanix-specific hard-off fallback because the migration controller has no
-// global power-off timeout.
-var powerOffGracePeriod = 5 * time.Minute
-
-type powerOffState struct {
-	hardOffSent bool
-	started     time.Time
-}
-
-var powerOffStates sync.Map // key: migrationUID/vmID -> powerOffState
-
-func powerOffKey(migrationUID, vmID string) string {
-	return migrationUID + "/" + vmID
-}
-
-func clearPowerOffTracking(migrationUID, vmID string) {
-	powerOffStates.Delete(powerOffKey(migrationUID, vmID))
-}
+// powerStateTransitionAcpiShutdown is the v3 POST .../set_power_state
+// transition for a guest ACPI shutdown. Matches vSphere ShutdownGuest /
+// oVirt Shutdown: no hard power-off fallback (avoids dirty NTFS for Windows).
+const powerStateTransitionAcpiShutdown = "ACPI_SHUTDOWN"
 
 // Nutanix v3 image entity states (status.state).
 const (
@@ -103,7 +78,6 @@ func (r *Client) Finalize(vms []*planapi.VMStatus, _ string) {
 		return
 	}
 	for _, vm := range vms {
-		clearPowerOffTracking(string(r.Context.Migration.UID), vm.ID)
 		disks, err := r.vmDisks(vm.Ref)
 		if err != nil {
 			r.Context.Log.Error(err, "Failed to look up VM disks for image cleanup", "vm", vm.String())
@@ -156,8 +130,9 @@ func (r *Client) PowerOn(vmRef ref.Ref) error {
 }
 
 // PowerOff initiates a graceful ACPI shutdown unless the VM is already off.
-// WaitForPowerOff polls PoweredOff, which forces power off after
-// powerOffGracePeriod if the guest has not shut down.
+// Like vSphere ShutdownGuest / oVirt Shutdown, there is no hard power-off
+// fallback: a failed or ignored ACPI request fails the step or leaves
+// WaitForPowerOff polling until the guest is off.
 func (r *Client) PowerOff(vmRef ref.Ref) error {
 	state, err := r.PowerState(vmRef)
 	if err != nil {
@@ -166,47 +141,16 @@ func (r *Client) PowerOff(vmRef ref.Ref) error {
 	if state == planapi.VMPowerStateOff {
 		return nil
 	}
-	key := powerOffKey(string(r.Context.Migration.UID), vmRef.ID)
-	powerOffStates.LoadOrStore(key, powerOffState{started: time.Now()})
-	if err := r.transitionPowerState(vmRef, powerStateTransitionAcpiShutdown); err != nil {
-		r.Context.Log.Error(err, "ACPI shutdown failed, forcing power off", "vm", vmRef.String())
-		return r.transitionPowerState(vmRef, powerStateTransitionOff)
-	}
-	return nil
+	return r.transitionPowerState(vmRef, powerStateTransitionAcpiShutdown)
 }
 
-// PoweredOff reports whether the VM has finished powering off. If the guest
-// has not shut down within powerOffGracePeriod of PowerOff, a hard power-off
-// is issued once and polling continues until the VM reaches OFF.
+// PoweredOff reports whether the VM has finished powering off.
 func (r *Client) PoweredOff(vmRef ref.Ref) (bool, error) {
 	state, err := r.PowerState(vmRef)
 	if err != nil {
 		return false, err
 	}
-	if state == planapi.VMPowerStateOff {
-		clearPowerOffTracking(string(r.Context.Migration.UID), vmRef.ID)
-		return true, nil
-	}
-
-	key := powerOffKey(string(r.Context.Migration.UID), vmRef.ID)
-	raw, ok := powerOffStates.Load(key)
-	if !ok {
-		return false, nil
-	}
-	tracking := raw.(powerOffState)
-	if !tracking.hardOffSent && time.Since(tracking.started) >= powerOffGracePeriod {
-		if err := r.transitionPowerState(vmRef, powerStateTransitionOff); err != nil {
-			return false, err
-		}
-		tracking.hardOffSent = true
-		powerOffStates.Store(key, tracking)
-		r.Context.Log.Info(
-			"Nutanix VM graceful shutdown timed out, forcing power off",
-			"vm", vmRef.String(),
-			"gracePeriod", powerOffGracePeriod,
-		)
-	}
-	return false, nil
+	return state == planapi.VMPowerStateOff, nil
 }
 
 // getVM fetches the full v3 VM entity (metadata/spec/status) by UUID.
@@ -256,7 +200,7 @@ func (r *Client) transitionPowerState(vmRef ref.Ref, transition string) error {
 	}
 	if status != http.StatusOK && status != http.StatusAccepted {
 		return liberr.New(
-			"unexpected status setting power state transition",
+			fmt.Sprintf("unexpected status setting power state transition: %d", status),
 			"vm", vmRef.String(),
 			"transition", transition,
 			"status", status,
