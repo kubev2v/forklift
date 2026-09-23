@@ -975,6 +975,194 @@ var _ = Describe("vSphere builder", func() {
 			Expect(result).NotTo(ContainSubstring("00:50:56:83:25:48"))
 			Expect(result).NotTo(ContainSubstring("00:50:56:83:25:49"))
 		})
+
+		// Linux-specific DHCP tests: DHCP mode should be INCLUDED for Linux (for udev rules)
+		It("should include NICs with mode 'dhcp' on Linux guests", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "rhel8Guest", // Linux guest
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+				},
+				GuestIpStacks: []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}},
+			}
+			modeByMAC := map[string]string{
+				"00:50:56:83:25:47": "dhcp",
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			// DHCP on Linux should include the MAC:IP mapping (for udev rules)
+			Expect(result).To(ContainSubstring("00:50:56:83:25:47"))
+		})
+
+		It("should skip mode 'dhcp' only on Windows guests", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "windows9Guest", // Windows guest
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:50:56:83:25:47": "dhcp",
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			// DHCP on Windows should be skipped (Windows handles DHCP natively)
+			Expect(result).To(BeEmpty())
+		})
+
+		It("should handle mixed modes correctly for Linux", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "rhel7Guest", // Linux guest
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+					{MAC: "00:50:56:83:25:48", IP: "172.29.3.194", Origin: ManualOrigin, PrefixLength: 16},
+					{MAC: "00:50:56:83:25:49", IP: "172.29.3.195", Origin: ManualOrigin, PrefixLength: 16},
+				},
+				GuestIpStacks: []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}},
+			}
+			modeByMAC := map[string]string{
+				"00:50:56:83:25:47": "preserve",
+				"00:50:56:83:25:48": "dhcp",
+				"00:50:56:83:25:49": "none",
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			// On Linux: preserve YES, dhcp YES (for udev rules), none NO
+			Expect(result).To(ContainSubstring("00:50:56:83:25:47"))
+			Expect(result).To(ContainSubstring("00:50:56:83:25:48"))
+			Expect(result).NotTo(ContainSubstring("00:50:56:83:25:49"))
+		})
+
+		It("should include both preserve and DHCP NICs in mixed modes", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "rhel7Guest", // Linux guest
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+					{MAC: "00:50:56:83:25:48", IP: "172.29.3.194", Origin: ManualOrigin, PrefixLength: 16},
+				},
+				GuestIpStacks: []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}},
+			}
+			modeByMAC := map[string]string{
+				"00:50:56:83:25:47": "dhcp",     // DHCP
+				"00:50:56:83:25:48": "preserve", // PRESERVE
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			// Mixed modes: include both preserve and DHCP (Linux) for udev naming
+			Expect(result).To(ContainSubstring("00:50:56:83:25:47")) // DHCP included for udev naming
+			Expect(result).To(ContainSubstring("172.29.3.193"))      // DHCP IP included for udev naming
+			Expect(result).To(ContainSubstring("00:50:56:83:25:48")) // PRESERVE included
+			Expect(result).To(ContainSubstring("172.29.3.194"))      // PRESERVE IP included
+		})
+	})
+
+	// Tests covering PodEnvironment env-var logic for DHCP/preserve/mixed modes.
+	// Exercises ResolveNICModes → HasPreserveMode/HasDHCPMode → mapMacStaticIps → env construction.
+	Context("PodEnvironment env vars for networkIPMode", func() {
+		// Helper: simulates the PodEnvironment env-var logic block
+		buildEnvVars := func(b *Builder, vm *model.VM, modeByMAC map[string]string) []core.EnvVar {
+			var env []core.EnvVar
+			if planbase.HasPreserveMode(modeByMAC) || planbase.HasDHCPMode(modeByMAC) {
+				macsToIps, err := b.mapMacStaticIps(vm, modeByMAC)
+				Expect(err).NotTo(HaveOccurred())
+				if macsToIps != "" {
+					env = append(env, core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps})
+				}
+				if planbase.HasPreserveMode(modeByMAC) {
+					env = append(env, core.EnvVar{Name: "V2V_preserveStaticIPs", Value: "true"})
+				}
+			}
+			return env
+		}
+
+		findEnv := func(env []core.EnvVar, name string) (string, bool) {
+			for _, e := range env {
+				if e.Name == name {
+					return e.Value, true
+				}
+			}
+			return "", false
+		}
+
+		It("DHCP-only Linux: V2V_staticIPs present, V2V_preserveStaticIPs absent", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "rhel8Guest",
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+				},
+				GuestIpStacks: []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}},
+			}
+			modeByMAC := map[string]string{
+				"00:50:56:83:25:47": "dhcp",
+			}
+			env := buildEnvVars(b, vm, modeByMAC)
+			val, found := findEnv(env, "V2V_staticIPs")
+			Expect(found).To(BeTrue(), "V2V_staticIPs should be present for Linux DHCP")
+			Expect(val).To(ContainSubstring("00:50:56:83:25:47"))
+			_, found = findEnv(env, "V2V_preserveStaticIPs")
+			Expect(found).To(BeFalse(), "V2V_preserveStaticIPs should be absent for DHCP-only")
+		})
+
+		It("DHCP-only Windows: no V2V_staticIPs, no V2V_preserveStaticIPs", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "windows9Guest",
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:50:56:83:25:47": "dhcp",
+			}
+			env := buildEnvVars(b, vm, modeByMAC)
+			_, found := findEnv(env, "V2V_staticIPs")
+			Expect(found).To(BeFalse(), "V2V_staticIPs should be absent for Windows DHCP")
+			_, found = findEnv(env, "V2V_preserveStaticIPs")
+			Expect(found).To(BeFalse(), "V2V_preserveStaticIPs should be absent for Windows DHCP")
+		})
+
+		It("Mixed preserve+DHCP Linux: V2V_staticIPs has both, V2V_preserveStaticIPs present", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "rhel7Guest",
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+					{MAC: "00:50:56:83:25:48", IP: "172.29.3.194", Origin: ManualOrigin, PrefixLength: 16},
+				},
+				GuestIpStacks: []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}},
+			}
+			modeByMAC := map[string]string{
+				"00:50:56:83:25:47": "dhcp",
+				"00:50:56:83:25:48": "preserve",
+			}
+			env := buildEnvVars(b, vm, modeByMAC)
+			val, found := findEnv(env, "V2V_staticIPs")
+			Expect(found).To(BeTrue(), "V2V_staticIPs should be present in mixed mode")
+			Expect(val).To(ContainSubstring("00:50:56:83:25:47"))
+			Expect(val).To(ContainSubstring("00:50:56:83:25:48"))
+			_, found = findEnv(env, "V2V_preserveStaticIPs")
+			Expect(found).To(BeTrue(), "V2V_preserveStaticIPs should be present when preserve exists")
+		})
+
+		It("no preserve, no DHCP (none-only): no env vars set", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "rhel8Guest",
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:50:56:83:25:47": "none",
+			}
+			env := buildEnvVars(b, vm, modeByMAC)
+			Expect(env).To(BeEmpty(), "no env vars when all modes are none")
+		})
 	})
 
 	DescribeTable("should", func(disks []vsphere.Disk, output []vsphere.Disk) {

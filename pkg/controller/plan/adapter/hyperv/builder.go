@@ -588,14 +588,18 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	)
 
 	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
-	if planbase.HasPreserveMode(modeByMAC) {
-		macsToIps := r.mapMacStaticIps(vm, modeByMAC)
+	if planbase.HasPreserveMode(modeByMAC) || planbase.HasDHCPMode(modeByMAC) {
+		macsToIps, mapErr := r.mapMacStaticIps(vm, modeByMAC)
+		if mapErr != nil {
+			err = mapErr
+			return
+		}
 		if macsToIps != "" {
 			env = append(env,
 				core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps},
 			)
 		}
-		if hasMultipleStaticIPsPerNIC(vm, modeByMAC) {
+		if planbase.HasPreserveMode(modeByMAC) && hasMultipleStaticIPsPerNIC(vm, modeByMAC) {
 			env = append(env, core.EnvVar{
 				Name:  "V2V_multipleIPsPerNic",
 				Value: "true",
@@ -626,14 +630,18 @@ func hasMultipleStaticIPsPerNIC(vm *model.VM, modeByMAC map[string]string) bool 
 	return planbase.HasMultipleIPsPerMAC(manualMACs)
 }
 
-func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) string {
+func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) (string, error) {
 	isWin := isWindows(vm)
 	networks := planbase.SortedIPv4First(vm.GuestNetworks, func(gn hyperv.GuestNetwork) string { return gn.IP })
 
 	var configurations []string
 	for _, gn := range networks {
-		if mode, ok := modeByMAC[gn.MAC]; ok && mode != string(api.NetworkIPModePreserve) {
-			continue
+		if mode, ok := modeByMAC[gn.MAC]; ok {
+			// For Windows: skip DHCP (works natively)
+			// For Linux: include DHCP (needed for udev rules)
+			if mode != string(api.NetworkIPModePreserve) && (mode != string(api.NetworkIPModeDHCP) || isWin) {
+				continue
+			}
 		}
 		if !isWin || gn.Origin == hyperv.OriginManual {
 			ip := net.ParseIP(gn.IP)
@@ -652,7 +660,7 @@ func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) str
 			configurations = append(configurations, strings.TrimSuffix(configurationString, ","))
 		}
 	}
-	return strings.Join(configurations, "_")
+	return strings.Join(configurations, "_"), nil
 }
 
 func isWindows(vm *model.VM) bool {

@@ -102,6 +102,15 @@ func HasPreserveMode(modes map[string]string) bool {
 	return false
 }
 
+func HasDHCPMode(modes map[string]string) bool {
+	for _, mode := range modes {
+		if mode == string(api.NetworkIPModeDHCP) {
+			return true
+		}
+	}
+	return false
+}
+
 // Network destination types.
 const (
 	Pod     = "pod"

@@ -314,7 +314,8 @@ var _ = Describe("HyperV builder", func() {
 				"00:15:5D:01:02:03": "preserve",
 				"00:15:5D:01:02:04": "none",
 			}
-			result := b.mapMacStaticIps(vm, modeByMAC)
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
 			Expect(result).NotTo(ContainSubstring("00:15:5D:01:02:04"))
 		})
@@ -330,7 +331,8 @@ var _ = Describe("HyperV builder", func() {
 			modeByMAC := map[string]string{
 				"00:15:5D:01:02:03": "dhcp",
 			}
-			result := b.mapMacStaticIps(vm, modeByMAC)
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(BeEmpty())
 		})
 
@@ -343,7 +345,8 @@ var _ = Describe("HyperV builder", func() {
 				},
 			}
 			modeByMAC := map[string]string{}
-			result := b.mapMacStaticIps(vm, modeByMAC)
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
 		})
 
@@ -356,7 +359,8 @@ var _ = Describe("HyperV builder", func() {
 					{MAC: "00:15:5D:01:02:04", IP: "172.29.3.194", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
 				},
 			}
-			result := b.mapMacStaticIps(vm, nil)
+			result, err := b.mapMacStaticIps(vm, nil)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
 			Expect(result).To(ContainSubstring("00:15:5D:01:02:04"))
 		})
@@ -376,9 +380,68 @@ var _ = Describe("HyperV builder", func() {
 				"00:15:5D:01:02:04": "dhcp",
 				"00:15:5D:01:02:05": "none",
 			}
-			result := b.mapMacStaticIps(vm, modeByMAC)
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
 			Expect(result).NotTo(ContainSubstring("00:15:5D:01:02:04"))
+			Expect(result).NotTo(ContainSubstring("00:15:5D:01:02:05"))
+		})
+
+		// Linux-specific DHCP tests: DHCP mode should be INCLUDED for Linux (for udev rules)
+		It("should include NICs with mode 'dhcp' on Linux guests", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestOS: "Red Hat Enterprise Linux 8",
+				GuestNetworks: []hyperv.GuestNetwork{
+					{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:15:5D:01:02:03": "dhcp",
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			// DHCP on Linux should include the MAC:IP mapping (for udev rules)
+			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
+		})
+
+		It("should skip mode 'dhcp' only on Windows guests", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestOS: "Windows Server 2019",
+				GuestNetworks: []hyperv.GuestNetwork{
+					{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:15:5D:01:02:03": "dhcp",
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			// DHCP on Windows should be skipped (Windows handles DHCP natively)
+			Expect(result).To(BeEmpty())
+		})
+
+		It("should handle mixed modes correctly for Linux", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestOS: "CentOS 7",
+				GuestNetworks: []hyperv.GuestNetwork{
+					{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+					{MAC: "00:15:5D:01:02:04", IP: "172.29.3.194", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+					{MAC: "00:15:5D:01:02:05", IP: "172.29.3.195", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:15:5D:01:02:03": "preserve",
+				"00:15:5D:01:02:04": "dhcp",
+				"00:15:5D:01:02:05": "none",
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			// On Linux: preserve YES, dhcp YES (for udev rules), none NO
+			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
+			Expect(result).To(ContainSubstring("00:15:5D:01:02:04"))
 			Expect(result).NotTo(ContainSubstring("00:15:5D:01:02:05"))
 		})
 	})
