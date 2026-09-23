@@ -215,9 +215,6 @@ func importCertTLSHost(rawURL string) (string, error) {
 	if err != nil {
 		return "", liberr.Wrap(err, "failed to parse import URL", "url", rawURL)
 	}
-	if parsed.Scheme == "" {
-		parsed.Scheme = "https"
-	}
 	if parsed.Host == "" {
 		return "", liberr.New("import URL missing host", "url", rawURL)
 	}
