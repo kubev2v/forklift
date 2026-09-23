@@ -449,6 +449,53 @@ func TestPowerOn_SkipsPutWhenAlreadyOn(t *testing.T) {
 	}
 }
 
+// TestPowerOn_PrismElementUsesV2SetPowerState verifies PE PowerOn uses
+// REST v2.0 set_power_state with ON (PE rejects v3 VM PUT).
+func TestPowerOn_PrismElementUsesV2SetPowerState(t *testing.T) {
+	vmID := powerTestVMID(t, "pe-on")
+	entity := vmEntityPtr(vmID, powerStateOff)
+	var transitions []string
+	var puts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == prismCentralPath:
+			w.WriteHeader(http.StatusNotFound)
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/set_power_state"):
+			var body struct {
+				Transition string `json:"transition"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			transitions = append(transitions, body.Transition)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"task_uuid":"pe-task"}`))
+		case r.Method == http.MethodGet:
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(entity)
+		case r.Method == http.MethodPut:
+			puts++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	client := newConnectedTestClient(t, server.URL)
+	if err := client.PowerOn(ref.Ref{ID: vmID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if puts != 0 {
+		t.Fatalf("expected no PUT requests, got %d", puts)
+	}
+	if len(transitions) != 1 || transitions[0] != powerStateOn {
+		t.Fatalf("expected one ON v2 transition, got %v", transitions)
+	}
+}
+
 // newImageTestServer serves the connectivity probe plus a minimal v3 image
 // list/create/delete implementation backed by an in-memory store keyed by
 // UUID, for testing the catalog image lifecycle used by PreTransferActions
