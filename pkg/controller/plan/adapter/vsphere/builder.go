@@ -212,16 +212,18 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	r.removeExcludedDisks(vm)
 	macsToIps := ""
 	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
-	if planbase.HasPreserveMode(modeByMAC) {
+	if planbase.HasPreserveMode(modeByMAC) || planbase.HasDHCPMode(modeByMAC) {
 		macsToIps, err = r.mapMacStaticIps(vm, modeByMAC)
 		if err != nil {
 			return
 		}
 
-		env = append(env, core.EnvVar{
-			Name:  "V2V_preserveStaticIPs",
-			Value: "true",
-		})
+		if planbase.HasPreserveMode(modeByMAC) {
+			env = append(env, core.EnvVar{
+				Name:  "V2V_preserveStaticIPs",
+				Value: "true",
+			})
+		}
 	}
 
 	useLegacyDrivers := false
@@ -426,18 +428,23 @@ func nicRefsFromVM(vm *model.VM) []planbase.NICRef {
 }
 
 func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) (ipMap string, err error) {
-	isWindowsFlag := isWindows(vm)
+	isWin := isWindows(vm)
 	sortedNetworks := planbase.SortedIPv4First(vm.GuestNetworks, func(gn vsphere.GuestNetwork) string { return gn.IP })
 
 	var configurations []string
 	for _, guestNetwork := range sortedNetworks {
-		if mode, ok := modeByMAC[guestNetwork.MAC]; ok && mode != string(api.NetworkIPModePreserve) {
+		if mode, ok := modeByMAC[guestNetwork.MAC]; ok {
+			// For Windows: skip DHCP (works natively)
+			// For Linux: include DHCP (needed for udev rules)
+			if mode != string(api.NetworkIPModePreserve) && (mode != string(api.NetworkIPModeDHCP) || isWin) {
+				continue
+			}
+		}
+
+		if !shouldIncludeNetwork(guestNetwork, isWin) {
 			continue
 		}
-		if !shouldIncludeNetwork(guestNetwork, isWindowsFlag) {
-			continue
-		}
-		gateway := selectGateway(guestNetwork.IP, guestNetwork.Device, vm.GuestIpStacks, isWindowsFlag)
+		gateway := selectGateway(guestNetwork.IP, guestNetwork.Device, vm.GuestIpStacks, isWin)
 		configurations = append(configurations, formatNetworkConfig(guestNetwork, gateway))
 	}
 	return strings.Join(configurations, "_"), nil
