@@ -30,8 +30,9 @@ const (
 // (matches vSphere ShutdownGuest / oVirt Shutdown; avoids dirty NTFS).
 const powerStateTransitionAcpiShutdown = "ACPI_SHUTDOWN"
 
-// peSetPowerStatePath is Prism Element's v2.0 power-transition endpoint.
-// PE rejects v3 VM PUT (405) and has no v3 acpi_shutdown.
+// peSetPowerStatePath is Prism Element's v2.0 power-transition endpoint
+// (ON, ACPI_SHUTDOWN, etc.). PE rejects v3 VM PUT (405) and has no
+// v3 acpi_shutdown.
 const peSetPowerStatePath = "/PrismGateway/services/rest/v2.0/vms/%s/set_power_state"
 
 // Nutanix v3 image entity states (status.state).
@@ -125,6 +126,10 @@ func (r *Client) PowerState(vmRef ref.Ref) (planapi.VMPowerState, error) {
 }
 
 // PowerOn powers on the VM, unless it is already on.
+//
+// Prism Central: v3 PUT .../vms/{uuid} with power_state=ON
+// Prism Element: POST .../v2.0/vms/{uuid}/set_power_state (ON)
+// (PE rejects v3 VM PUT with 405; v2 transition enum includes ON.)
 func (r *Client) PowerOn(vmRef ref.Ref) error {
 	state, err := r.PowerState(vmRef)
 	if err != nil {
@@ -132,6 +137,13 @@ func (r *Client) PowerOn(vmRef ref.Ref) error {
 	}
 	if state == planapi.VMPowerStateOn {
 		return nil
+	}
+	element, err := r.isPrismElement()
+	if err != nil {
+		return err
+	}
+	if element {
+		return r.transitionPowerStateV2(vmRef, powerStateOn)
 	}
 	return r.setPowerState(vmRef, powerStateOn)
 }
