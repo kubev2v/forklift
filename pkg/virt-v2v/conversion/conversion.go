@@ -311,25 +311,30 @@ func (c *Conversion) RunVirtV2v() error {
 
 	pipe, writer := io.Pipe()
 	monitorCmd.SetStdin(pipe)
-	v2vCmd.SetStdout(writer)
-	v2vCmd.SetStderr(writer)
+	stdoutCapture := newCaptureWriter(writer, virtV2vCaptureLimit)
+	stderrCapture := newCaptureWriter(writer, virtV2vCaptureLimit)
+	v2vCmd.SetStdout(stdoutCapture)
+	v2vCmd.SetStderr(stderrCapture)
 	defer func() { _ = writer.Close() }()
 
 	if err := monitorCmd.Start(); err != nil {
 		fmt.Printf("Error executing monitor command: %v\n", err)
 		return err
 	}
-	if err := v2vCmd.Run(); err != nil {
-		fmt.Printf("Error executing v2v command: %v\n", err)
-		return err
+	v2vErr := v2vCmd.Run()
+	if closeErr := writer.Close(); closeErr != nil {
+		fmt.Printf("Error closing virt-v2v monitor pipe: %v\n", closeErr)
+	}
+	monitorErr := monitorCmd.Wait()
+	if v2vErr != nil {
+		c.writeTerminationFailure(stdoutCapture.Bytes(), stderrCapture.Bytes())
+		fmt.Printf("Error executing v2v command: %v\n", v2vErr)
+		return fmt.Errorf("run virt-v2v: %w", v2vErr)
 	}
 
-	// virt-v2v is done, we can close the pipe to virt-v2v-monitor
-	_ = writer.Close()
-
-	if err := monitorCmd.Wait(); err != nil {
-		fmt.Printf("Error waiting for virt-v2v-monitor to finish: %v\n", err)
-		return err
+	if monitorErr != nil {
+		fmt.Printf("Error waiting for virt-v2v-monitor to finish: %v\n", monitorErr)
+		return fmt.Errorf("wait for virt-v2v-monitor: %w", monitorErr)
 	}
 
 	return nil

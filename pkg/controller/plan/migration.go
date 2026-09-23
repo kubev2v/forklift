@@ -29,6 +29,7 @@ import (
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/settings"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/errorreporting"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2271,7 +2272,11 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 		}
 	case core.PodFailed:
 		step.MarkCompleted()
-		step.AddError("Guest conversion failed. See pod logs for details.")
+		if failure, ok := errorreporting.ExtractFromPod(pod); ok {
+			step.AddError(errorreporting.Format(failure))
+		} else {
+			step.AddError("Guest conversion failed. See pod logs for details.")
+		}
 	default:
 		if pod.Status.PodIP == "" {
 			// we get the progress from the pod and we cannot connect to the pod without PodIP
