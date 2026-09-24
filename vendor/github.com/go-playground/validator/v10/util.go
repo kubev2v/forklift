@@ -1,17 +1,25 @@
 package validator
 
 import (
+	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
+// Valuer is an interface that allows you to expose a method on a type
+// (including generic types) that returns a value that is supposed to be validated.
+type Valuer interface {
+	// ValidatorValue returns the value that is supposed to be validated.
+	ValidatorValue() any
+}
+
 // extractTypeInternal gets the actual underlying type of field value.
 // It will dive into pointers, customTypes and return you the
 // underlying value and it's kind.
 func (v *validate) extractTypeInternal(current reflect.Value, nullable bool) (reflect.Value, reflect.Kind, bool) {
-
 BEGIN:
 	switch current.Kind() {
 	case reflect.Ptr:
@@ -20,6 +28,13 @@ BEGIN:
 
 		if current.IsNil() {
 			return current, reflect.Ptr, nullable
+		}
+
+		if current.CanInterface() {
+			if v, ok := current.Interface().(Valuer); ok {
+				current = reflect.ValueOf(v.ValidatorValue())
+				goto BEGIN
+			}
 		}
 
 		current = current.Elem()
@@ -33,6 +48,13 @@ BEGIN:
 			return current, reflect.Interface, nullable
 		}
 
+		if current.CanInterface() {
+			if v, ok := current.Interface().(Valuer); ok {
+				current = reflect.ValueOf(v.ValidatorValue())
+				goto BEGIN
+			}
+		}
+
 		current = current.Elem()
 		goto BEGIN
 
@@ -41,8 +63,14 @@ BEGIN:
 
 	default:
 
-		if v.v.hasCustomFuncs {
+		if current.CanInterface() {
+			if v, ok := current.Interface().(Valuer); ok {
+				current = reflect.ValueOf(v.ValidatorValue())
+				goto BEGIN
+			}
+		}
 
+		if v.v.hasCustomFuncs {
 			if fn, ok := v.v.customFuncs[current.Type()]; ok {
 				current = reflect.ValueOf(fn(current))
 				goto BEGIN
@@ -59,7 +87,6 @@ BEGIN:
 // NOTE: when not successful ok will be false, this can happen when a nested struct is nil and so the field
 // could not be retrieved because it didn't exist.
 func (v *validate) getStructFieldOKInternal(val reflect.Value, namespace string) (current reflect.Value, kind reflect.Kind, nullable bool, found bool) {
-
 BEGIN:
 	current, kind, nullable = v.ExtractType(val)
 	if kind == reflect.Invalid {
@@ -72,7 +99,6 @@ BEGIN:
 	}
 
 	switch kind {
-
 	case reflect.Ptr, reflect.Interface:
 		return
 
@@ -83,7 +109,6 @@ BEGIN:
 		var ns string
 
 		if !typ.ConvertibleTo(timeType) {
-
 			idx := strings.Index(namespace, namespaceSeparator)
 
 			if idx != -1 {
@@ -217,10 +242,12 @@ BEGIN:
 	}
 
 	// if got here there was more namespace, cannot go any deeper
-	panic("Invalid field namespace")
+	// return found=false instead of panicking to handle cases like ValidateMap
+	// where cross-field validators (required_if, etc.) can't navigate non-struct parents
+	return
 }
 
-// asInt returns the parameter as a int64
+// asInt returns the parameter as an int64
 // or panics if it can't convert
 func asInt(param string) int64 {
 	i, err := strconv.ParseInt(param, 0, 64)
@@ -254,27 +281,31 @@ func asIntFromType(t reflect.Type, param string) int64 {
 // asUint returns the parameter as a uint64
 // or panics if it can't convert
 func asUint(param string) uint64 {
-
 	i, err := strconv.ParseUint(param, 0, 64)
 	panicIf(err)
 
 	return i
 }
 
-// asFloat returns the parameter as a float64
+// asFloat64 returns the parameter as a float64
 // or panics if it can't convert
-func asFloat(param string) float64 {
-
+func asFloat64(param string) float64 {
 	i, err := strconv.ParseFloat(param, 64)
 	panicIf(err)
+	return i
+}
 
+// asFloat32 returns the parameter as a float32
+// or panics if it can't convert
+func asFloat32(param string) float64 {
+	i, err := strconv.ParseFloat(param, 32)
+	panicIf(err)
 	return i
 }
 
 // asBool returns the parameter as a bool
 // or panics if it can't convert
 func asBool(param string) bool {
-
 	i, err := strconv.ParseBool(param)
 	panicIf(err)
 
@@ -284,5 +315,21 @@ func asBool(param string) bool {
 func panicIf(err error) {
 	if err != nil {
 		panic(err.Error())
+	}
+}
+
+// Checks if field value matches regex. If fl.Field can be cast to Stringer, it uses the Stringer interfaces
+// String() return value. Otherwise, it uses fl.Field's String() value.
+func fieldMatchesRegexByStringerValOrString(regexFn func() *regexp.Regexp, fl FieldLevel) bool {
+	regex := regexFn()
+	switch fl.Field().Kind() {
+	case reflect.String:
+		return regex.MatchString(fl.Field().String())
+	default:
+		if stringer, ok := getValue(fl.Field()).(fmt.Stringer); ok {
+			return regex.MatchString(stringer.String())
+		} else {
+			return regex.MatchString(fl.Field().String())
+		}
 	}
 }
