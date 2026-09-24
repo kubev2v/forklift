@@ -8,15 +8,19 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/api/core/v1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -346,5 +350,206 @@ var _ = Describe("OpenStack builder mapNetworks", func() {
 		iface := spec.Template.Spec.Domain.Devices.Interfaces[0]
 		Expect(iface.Masquerade).NotTo(BeNil())
 		Expect(iface.Binding).To(BeNil())
+	})
+})
+
+// notReadyInventory simulates inventory HTTP 206 / 404 mapped to ProviderNotReadyError.
+type notReadyInventory struct {
+	web.Client
+}
+
+func (n *notReadyInventory) Find(resource interface{}, r ref.Ref) error {
+	return web.ProviderNotReadyError{}
+}
+
+var _ = Describe("OpenStack populator progress from PVC", func() {
+	It("progress methods succeed when inventory reports Provider not ready", func() {
+		scheme := runtime.NewScheme()
+		Expect(core.AddToScheme(scheme)).To(Succeed())
+		Expect(v1beta1.SchemeBuilder.AddToScheme(scheme)).To(Succeed())
+
+		populator := &v1beta1.OpenstackVolumePopulator{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "populator",
+				Namespace: "test",
+				Labels: map[string]string{
+					"migration": "migration1",
+					"imageID":   "img-1",
+				},
+			},
+			Status: v1beta1.OpenstackVolumePopulatorStatus{
+				Progress: "50",
+			},
+		}
+		builder := &Builder{
+			Context: &plancontext.Context{
+				Source: plancontext.Source{Inventory: &notReadyInventory{}},
+				Destination: plancontext.Destination{
+					Client: fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(populator).Build(),
+				},
+				Plan: createPlan(),
+				Migration: &v1beta1.Migration{
+					ObjectMeta: metav1.ObjectMeta{UID: types.UID("migration1")},
+				},
+			},
+		}
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels:      map[string]string{"imageID": "img-1"},
+				Annotations: map[string]string{annImageName: "forklift-migration-vm-abc-volume-def"},
+			},
+			Spec: core.PersistentVolumeClaimSpec{
+				Resources: core.VolumeResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceStorage: *resource.NewQuantity(1000, resource.BinarySI),
+					},
+				},
+			},
+		}
+
+		_, err := builder.getImageFromPVC(pvc)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("Provider not ready"))
+
+		name, err := builder.GetPopulatorTaskName(pvc)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(name).To(Equal("forklift-migration-vm-abc-volume-def"))
+
+		transferred, err := builder.PopulatorTransferredBytes(pvc)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(transferred).To(Equal(int64(500)))
+	})
+
+	It("GetPopulatorTaskName uses the image-name annotation and does not need inventory", func() {
+		builder := &Builder{Context: &plancontext.Context{}}
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					annImageName: "forklift-migration-vm-abc-volume-def",
+				},
+			},
+		}
+
+		name, err := builder.GetPopulatorTaskName(pvc)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(name).To(Equal("forklift-migration-vm-abc-volume-def"))
+	})
+
+	It("GetPopulatorTaskName errors when the image-name annotation is missing", func() {
+		builder := &Builder{Context: &plancontext.Context{}}
+		_, err := builder.GetPopulatorTaskName(&core.PersistentVolumeClaim{})
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("PopulatorTransferredBytes reads progress from the populator CR using the PVC imageID label", func() {
+		scheme := runtime.NewScheme()
+		Expect(core.AddToScheme(scheme)).To(Succeed())
+		Expect(v1beta1.SchemeBuilder.AddToScheme(scheme)).To(Succeed())
+
+		populator := &v1beta1.OpenstackVolumePopulator{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "populator",
+				Namespace: "test",
+				Labels: map[string]string{
+					"migration": "migration1",
+					"imageID":   "img-1",
+				},
+			},
+			Status: v1beta1.OpenstackVolumePopulatorStatus{
+				Progress: "50",
+			},
+		}
+		cl := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(populator).Build()
+		builder := &Builder{
+			Context: &plancontext.Context{
+				Destination: plancontext.Destination{Client: cl},
+				Plan:        createPlan(),
+				Migration: &v1beta1.Migration{
+					ObjectMeta: metav1.ObjectMeta{UID: types.UID("migration1")},
+				},
+			},
+		}
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"imageID": "img-1"},
+			},
+			Spec: core.PersistentVolumeClaimSpec{
+				Resources: core.VolumeResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceStorage: *resource.NewQuantity(1000, resource.BinarySI),
+					},
+				},
+			},
+		}
+
+		transferred, err := builder.PopulatorTransferredBytes(pvc)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(transferred).To(Equal(int64(500)))
+	})
+})
+
+var _ = Describe("OpenStack builder persistentVolumeClaimWithSourceRef", func() {
+	const storageClassName = "test-storage-class"
+
+	newPVCBuilder := func() *Builder {
+		scheme := runtime.NewScheme()
+		Expect(core.AddToScheme(scheme)).To(Succeed())
+		Expect(cdi.AddToScheme(scheme)).To(Succeed())
+
+		storageProfile := &cdi.StorageProfile{
+			ObjectMeta: metav1.ObjectMeta{Name: storageClassName},
+			Status: cdi.StorageProfileStatus{
+				ClaimPropertySets: []cdi.ClaimPropertySet{
+					{
+						AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+					},
+				},
+			},
+		}
+
+		cl := fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithRuntimeObjects(storageProfile).
+			Build()
+
+		return &Builder{
+			Context: &plancontext.Context{
+				// Host client used by r.Get (storage profile lookup) and r.Create (PVC creation).
+				Client: cl,
+				Plan:   createPlan(),
+				Log:    builderLog,
+				Migration: &v1beta1.Migration{
+					ObjectMeta: metav1.ObjectMeta{UID: types.UID("migration1")},
+				},
+			},
+		}
+	}
+
+	It("stamps the created PVC with the image-name annotation", func() {
+		builder := newPVCBuilder()
+		image := model.Image{
+			Resource:  model.Resource{ID: "image-1", Name: "my-image"},
+			SizeBytes: 1024,
+		}
+		vmRef := ref.Ref{ID: "vm-1", Name: "vm-1"}
+
+		pvc, err := builder.persistentVolumeClaimWithSourceRef(image, storageClassName, "populator-1", nil, vmRef, 0)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(pvc).NotTo(BeNil())
+		Expect(pvc.Annotations).To(HaveKeyWithValue(annImageName, "my-image"))
+	})
+
+	It("returns an error and no PVC when the image has an empty name", func() {
+		builder := newPVCBuilder()
+		image := model.Image{
+			Resource:  model.Resource{ID: "image-2", Name: ""},
+			SizeBytes: 1024,
+		}
+		vmRef := ref.Ref{ID: "vm-2", Name: "vm-2"}
+
+		pvc, err := builder.persistentVolumeClaimWithSourceRef(image, storageClassName, "populator-2", nil, vmRef, 0)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("cannot create PVC: openstack image has empty name"))
+		Expect(pvc).To(BeNil())
 	})
 })
