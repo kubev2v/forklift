@@ -412,7 +412,11 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		return
 	}
 	for _, disk := range vm.Disks {
-		mB := disk.Capacity / 0x100000
+		mB, capErr := diskCapacityMB(disk.Capacity, disk.CapacityAllocationUnits)
+		if capErr != nil {
+			err = liberr.Wrap(capErr, "disk", disk.Name)
+			return
+		}
 		list = append(
 			list,
 			&plan.Task{
@@ -488,6 +492,14 @@ func getDiskSourcePath(filePath string) string {
 		return filePath
 	}
 	return filepath.Dir(filePath)
+}
+
+func diskCapacityMB(capacity int64, units string) (int64, error) {
+	diskSizeBytes, err := getResourceCapacity(capacity, units)
+	if err != nil {
+		return 0, err
+	}
+	return diskSizeBytes / 0x100000, nil
 }
 
 func getResourceCapacity(capacity int64, units string) (int64, error) {
