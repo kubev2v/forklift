@@ -21,6 +21,72 @@ log() {
     echo "$@" >&3
 }
 
+# Prevents IPv6 autoconfiguration timeouts from pulling down the network interface.
+# Marks IPv6 failures as non-fatal in NetworkManager keyfiles (ipv6.may-fail=true) 
+# and ifcfg scripts (IPV6_FAILURE_FATAL=no).
+fix_nm_ipv6_may_fail() {
+    # NM keyfile format (.nmconnection)
+    if [ -d "$NETWORK_CONNECTIONS_DIR" ]; then
+        for NM_FILE in "$NETWORK_CONNECTIONS_DIR"/*.nmconnection; do
+            [ -f "$NM_FILE" ] || continue
+
+            # Only touch profiles that have an [ipv6] section with method=auto or dhcp.
+            # Tolerate optional whitespace around '=' for manually edited profiles.
+            if ! grep -q '^\[ipv6\]' "$NM_FILE"; then
+                continue
+            fi
+            local IPV6_METHOD
+            IPV6_METHOD=$(sed -n '/^\[ipv6\]/,/^\[/{ s/^method[[:space:]]*=[[:space:]]*//p; }' "$NM_FILE" | sed 's/[[:space:]]*$//')
+            if [ "$IPV6_METHOD" != "auto" ] && [ "$IPV6_METHOD" != "dhcp" ]; then
+                continue
+            fi
+
+            # Check current may-fail value (tolerate whitespace around '=')
+            local CURRENT_MAY_FAIL
+            CURRENT_MAY_FAIL=$(sed -n '/^\[ipv6\]/,/^\[/{ s/^may-fail[[:space:]]*=[[:space:]]*//p; }' "$NM_FILE" | sed 's/[[:space:]]*$//')
+            if [ "$CURRENT_MAY_FAIL" = "false" ]; then
+                log "Fixing $NM_FILE: setting ipv6.may-fail=true"
+                sed -i '/^\[ipv6\]/,/^\[/ s/^may-fail[[:space:]]*=.*/may-fail=true/' "$NM_FILE"
+            elif [ -z "$CURRENT_MAY_FAIL" ]; then
+                log "Fixing $NM_FILE: adding ipv6.may-fail=true"
+                sed -i '/^\[ipv6\]/a may-fail=true' "$NM_FILE"
+            fi
+        done
+    fi
+
+    # ifcfg format (RHEL 7/8)
+    local SCRIPTS_DIR=""
+    if [ -d "$NETWORK_SCRIPTS_DIR" ]; then
+        SCRIPTS_DIR="$NETWORK_SCRIPTS_DIR"
+    elif [ -d "$NETWORK_SCRIPTS_DIR_SUSE" ]; then
+        SCRIPTS_DIR="$NETWORK_SCRIPTS_DIR_SUSE"
+    fi
+    if [ -n "$SCRIPTS_DIR" ]; then
+        for IFCFG in "$SCRIPTS_DIR"/ifcfg-*; do
+            [ -f "$IFCFG" ] || continue
+            # Skip loopback and editor backup files
+            case "$(basename "$IFCFG")" in
+                ifcfg-lo|*.bak|*.orig|*~) continue ;;
+            esac
+            # Only touch interfaces that have IPv6 enabled (IPV6INIT=yes or
+            # IPV6_AUTOCONF=yes), regardless of BOOTPROTO. A static-IPv4
+            # interface can still use IPv6 SLAAC/DHCPv6.
+            if ! grep -qE '^(IPV6INIT|IPV6_AUTOCONF)[[:space:]]*=[[:space:]]*yes' "$IFCFG"; then
+                continue
+            fi
+            if grep -q '^IPV6_FAILURE_FATAL[[:space:]]*=[[:space:]]*yes' "$IFCFG"; then
+                log "Fixing $IFCFG: setting IPV6_FAILURE_FATAL=no"
+                sed -i 's/^IPV6_FAILURE_FATAL[[:space:]]*=.*/IPV6_FAILURE_FATAL=no/' "$IFCFG"
+            elif ! grep -q '^IPV6_FAILURE_FATAL[[:space:]]*=' "$IFCFG"; then
+                log "Fixing $IFCFG: adding IPV6_FAILURE_FATAL=no"
+                echo "IPV6_FAILURE_FATAL=no" >> "$IFCFG"
+            fi
+        done
+    fi
+}
+
+fix_nm_ipv6_may_fail
+
 # Sanity checks
 # -------------
 

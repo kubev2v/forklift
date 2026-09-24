@@ -250,6 +250,27 @@ func templateFuncMap() template.FuncMap {
 	}
 }
 
+// renderIPv6PodGatewayScript renders the IPv6 gateway template with Pod network MACs.
+// If no Pod MACs are configured, renders with an empty list (script will self-skip).
+func (c *Customize) renderIPv6PodGatewayScript(windowsScriptsPath string) error {
+	type TemplateData struct {
+		PodMACs []string
+	}
+
+	var podMACs []string
+	if c.appConfig.PodNetworkMACs != "" {
+		podMACs = strings.Split(c.appConfig.PodNetworkMACs, ",")
+		for i := range podMACs {
+			podMACs[i] = strings.TrimSpace(podMACs[i])
+		}
+	}
+
+	templatePath := filepath.Join(windowsScriptsPath, "9999-ensure-ipv6-pod-gateway.ps1.tmpl")
+	outputPath := filepath.Join(windowsScriptsPath, "9999-ensure-ipv6-pod-gateway.ps1")
+
+	return renderTemplate(templatePath, outputPath, "ipv6PodGatewayScript", TemplateData{PodMACs: podMACs})
+}
+
 // renderTemplate parses a Go template from file, executes it with data, and writes the result.
 func renderTemplate(templatePath, outputPath, name string, data interface{}) error {
 	tmplContent, err := os.ReadFile(templatePath)
@@ -360,6 +381,16 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) erro
 			}
 			uploadPreserveMultipleIpPath = c.formatUpload(preserveMultipleNicsPath, WinFirstbootScriptsPath)
 		}
+	}
+
+	// Render IPv6 Pod network gateway script with the list of Pod network MACs.
+	// Only render if the template exists and at least one Pod MAC is configured.
+	if c.appConfig.PodNetworkMACs != "" {
+		if err := c.renderIPv6PodGatewayScript(windowsScriptsPath); err != nil {
+			return err
+		}
+		ipv6GwScript := filepath.Join(windowsScriptsPath, "9999-ensure-ipv6-pod-gateway.ps1")
+		cmdBuilder.AddArg(UploadCmd, c.formatUpload(ipv6GwScript, WinFirstbootScriptsPath))
 	}
 	// TODO: Remove once https://redhat.atlassian.net/browse/RHEL-184971 is resolved.
 	qemuGAPath := filepath.Join(windowsScriptsPath, qemuGAInstallScript)
