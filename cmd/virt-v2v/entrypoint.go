@@ -74,15 +74,19 @@ func main() {
 
 				// The disk paths in the domain xml are currently pointing to the raw disk
 				// files, so we need to modify the xml to point to the disk symlink so
-				// that it will work with overlay enabled
+				// that it will work with overlay enabled.
+				// The ConfigMap-mounted file at LibvirtDomainFile is read-only, so
+				// write the modified XML to a writable path in the work directory.
 				modifiedXML, err := convert.UpdateDiskPaths(string(fileContents))
 				if err != nil {
 					return fmt.Errorf("failed to update disk paths in domain XML: %w", err)
 				}
 
-				if err := os.WriteFile(convert.LibvirtDomainFile, []byte(modifiedXML), 0644); err != nil {
+				writablePath := "/var/tmp/domain.xml"
+				if err := os.WriteFile(writablePath, []byte(modifiedXML), 0644); err != nil {
 					return fmt.Errorf("failed to write domain XML file: %w", err)
 				}
+				convert.LibvirtDomainFile = writablePath
 				return nil
 			}(); err == nil || !errors.Is(err, os.ErrNotExist) {
 				if err == nil {
