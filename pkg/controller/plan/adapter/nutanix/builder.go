@@ -1,6 +1,7 @@
 package nutanix
 
 import (
+	"bytes"
 	"context"
 	"encoding/pem"
 	"fmt"
@@ -73,28 +74,15 @@ func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) error {
 }
 
 // ConfigMap carries a CA certificate for CDI's HTTP importer to trust when
-// downloading catalog images. CDI's DataVolumeSourceHTTP has no
-// insecureSkipVerify field (unlike e.g. ImageIO), so when the provider is
-// configured with insecureSkipVerify instead of a real CA, the only way to
-// honor that is to fetch the server's own certificate once and trust it
-// explicitly here -- the same fallback oVirt uses for older CNV versions.
+// downloading catalog images. In secure mode (no insecureSkipVerify), only
+// ca.crt from the provider secret is copied; CDI verifies import TLS against
+// that bundle. When insecureSkipVerify is set, DataVolumes() may fetch and
+// pin leaf certificates from import endpoints (CDI HTTP import has no
+// insecureSkipVerify field).
 func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) error {
 	if cacert, found := libutil.GetCACert(in); found && len(cacert) > 0 {
 		setCDICACerts(object, cacert)
-		return nil
 	}
-	if !providerbase.GetInsecureSkipVerifyFlag(in) {
-		return nil
-	}
-
-	cacert, err := r.fetchProviderCert()
-	if err != nil {
-		r.Log.Error(err, "Failed to fetch Nutanix provider certificate")
-		// Don't fail here -- let the migration proceed and fail with a
-		// clearer error from CDI if the certificate is actually needed.
-		return nil
-	}
-	setCDICACerts(object, cacert)
 	return nil
 }
 
@@ -109,24 +97,197 @@ func setCDICACerts(object *core.ConfigMap, cacert []byte) {
 	object.BinaryData["tls.crt"] = cacert
 }
 
-// fetchProviderCert dials the Nutanix provider URL and returns its leaf
-// certificate PEM-encoded, for use as a trusted CA when insecureSkipVerify
-// is set instead of a real CA certificate.
-func (r *Builder) fetchProviderCert() ([]byte, error) {
-	providerURL := r.Source.Provider.Spec.URL
-	parsedURL, err := url.Parse(providerURL)
+// configMapHasCert reports whether the ConfigMap already carries CA material.
+func configMapHasCert(configMap *core.ConfigMap) bool {
+	if configMap == nil || len(configMap.BinaryData) == 0 {
+		return false
+	}
+	return len(configMap.BinaryData["ca.pem"]) > 0 || len(configMap.BinaryData["tls.crt"]) > 0
+}
+
+// configMapBundleMatches reports whether both CDI cert keys match the bundle.
+func configMapBundleMatches(configMap *core.ConfigMap, bundle []byte) bool {
+	if configMap == nil || len(bundle) == 0 {
+		return false
+	}
+	return bytes.Equal(configMap.BinaryData["ca.pem"], bundle) &&
+		bytes.Equal(configMap.BinaryData["tls.crt"], bundle)
+}
+
+// ensureImportCertConfigMap updates the CDI cert ConfigMap for Nutanix HTTP
+// imports when insecureSkipVerify is enabled. It merges optional ca.crt with
+// leaf certificates fetched from each distinct import TLS endpoint. Secure
+// migrations rely on a pre-configured ca.crt bundle only.
+func (r *Builder) ensureImportCertConfigMap(
+	configMap *core.ConfigMap,
+	secret *core.Secret,
+	client *Client,
+	vmRef ref.Ref,
+	vm *model.VM,
+) error {
+	if !providerbase.GetInsecureSkipVerifyFlag(secret) {
+		return nil
+	}
+
+	urls, err := r.importCertURLs(client, vmRef, vm)
 	if err != nil {
-		return nil, liberr.Wrap(err, "failed to parse Nutanix provider URL", "url", providerURL)
+		return err
+	}
+
+	bundle, err := r.buildImportCertBundle(secret, urls)
+	if err != nil {
+		return err
+	}
+	if len(bundle) == 0 {
+		return nil
+	}
+	if configMapBundleMatches(configMap, bundle) {
+		return nil
+	}
+
+	setCDICACerts(configMap, bundle)
+	if err = r.Destination.Update(context.TODO(), configMap); err != nil {
+		return liberr.Wrap(err, "configMap", path.Join(configMap.Namespace, configMap.Name))
+	}
+	r.Log.V(1).Info("Updated CDI cert ConfigMap for Nutanix HTTP import endpoints.",
+		"configMap", path.Join(configMap.Namespace, configMap.Name),
+		"urls", urls,
+		"vm", vmRef.String())
+	return nil
+}
+
+// importCertURLs lists HTTPS endpoints whose certificates CDI may need to
+// trust. Prism Element uses the provider URL. Prism Central includes the
+// provider URL plus each resolved entity_download URL (deduped by host).
+func (r *Builder) importCertURLs(client *Client, vmRef ref.Ref, vm *model.VM) ([]string, error) {
+	providerURL := strings.TrimRight(r.Source.Provider.Spec.URL, "/")
+	element, err := client.isPrismElement()
+	if err != nil {
+		return nil, err
+	}
+	if element {
+		return []string{providerURL}, nil
+	}
+
+	seen := map[string]struct{}{}
+	var urls []string
+	urls, err = appendUniqueImportCertURL(urls, seen, providerURL)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, disk := range vm.Disks {
+		if disk.IsCdrom {
+			continue
+		}
+		name := migrationImageName(string(r.Migration.UID), vmRef, disk.UUID)
+		downloadURL, _, err := r.resolveCentralDownload(client, name)
+		if err != nil {
+			return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", disk.UUID)
+		}
+		urls, err = appendUniqueImportCertURL(urls, seen, downloadURL)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(urls) == 0 {
+		return nil, liberr.New("no importable disks found for cert resolution", "vm", vmRef.String())
+	}
+	return urls, nil
+}
+
+// appendUniqueImportCertURL appends rawURL when its TLS host has not been seen.
+func appendUniqueImportCertURL(urls []string, seen map[string]struct{}, rawURL string) ([]string, error) {
+	host, err := importCertTLSHost(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := seen[host]; ok {
+		return urls, nil
+	}
+	seen[host] = struct{}{}
+	return append(urls, strings.TrimRight(rawURL, "/")), nil
+}
+
+// importCertTLSHost returns the host portion of an HTTPS import URL.
+func importCertTLSHost(rawURL string) (string, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "", liberr.Wrap(err, "failed to parse import URL", "url", rawURL)
+	}
+	if parsed.Host == "" {
+		return "", liberr.New("import URL missing host", "url", rawURL)
+	}
+	return parsed.Host, nil
+}
+
+// buildImportCertBundle merges ca.crt from the provider secret with leaf
+// certificates fetched from each import URL when insecureSkipVerify is set.
+// Any fetch failure is returned to the caller so the ConfigMap is not updated
+// with an incomplete trust bundle.
+func (r *Builder) buildImportCertBundle(secret *core.Secret, urls []string) ([]byte, error) {
+	var chunks [][]byte
+	if cacert, found := libutil.GetCACert(secret); found && len(cacert) > 0 {
+		chunks = append(chunks, cacert)
+	}
+	if !providerbase.GetInsecureSkipVerifyFlag(secret) {
+		return mergePEMCertificates(chunks...), nil
+	}
+	for _, rawURL := range urls {
+		cacert, err := r.fetchCertFromURL(rawURL, secret)
+		if err != nil {
+			return nil, liberr.Wrap(err, "url", rawURL)
+		}
+		chunks = append(chunks, cacert)
+	}
+	return mergePEMCertificates(chunks...), nil
+}
+
+// mergePEMCertificates concatenates PEM blocks and deduplicates certificates.
+func mergePEMCertificates(chunks ...[]byte) []byte {
+	seen := map[string]struct{}{}
+	var out []byte
+	for _, chunk := range chunks {
+		rest := chunk
+		for {
+			var block *pem.Block
+			block, rest = pem.Decode(rest)
+			if block == nil {
+				break
+			}
+			if block.Type != "CERTIFICATE" {
+				continue
+			}
+			key := string(block.Bytes)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, pem.EncodeToMemory(block)...)
+		}
+	}
+	return out
+}
+
+// fetchCertFromURL dials the given HTTPS endpoint and returns its leaf
+// certificate PEM-encoded.
+func (r *Builder) fetchCertFromURL(rawURL string, secret *core.Secret) ([]byte, error) {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, liberr.Wrap(err, "failed to parse import URL", "url", rawURL)
+	}
+	if parsedURL.Scheme == "" {
+		parsedURL.Scheme = "https"
 	}
 
 	cert, err := libutil.GetTlsCertificate(parsedURL, &core.Secret{
 		Data: map[string][]byte{"insecureSkipVerify": []byte("true")},
 	})
 	if err != nil {
-		return nil, liberr.Wrap(err, "failed to fetch certificate from Nutanix provider")
+		return nil, liberr.Wrap(err, "failed to fetch certificate from import URL", "url", rawURL)
 	}
 	if cert == nil {
-		return nil, liberr.New("no certificate returned from Nutanix provider")
+		return nil, liberr.New("no certificate returned from import URL", "url", rawURL)
 	}
 
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}), nil
@@ -424,6 +585,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	}
 	element, err := client.isPrismElement()
 	if err != nil {
+		return nil, err
+	}
+	if err = r.ensureImportCertConfigMap(configMap, r.Source.Secret, client, vmRef, vm); err != nil {
 		return nil, err
 	}
 
