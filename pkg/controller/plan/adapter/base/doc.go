@@ -222,6 +222,8 @@ type Builder interface {
 	// SourceVMLabelsAndAnnotations returns provider-specific labels and annotations
 	// derived from source VM metadata (e.g. vSphere tags and custom attributes).
 	SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *api.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error)
+	// DomainXML generates a libvirt domain xml definition for the given vm and pvcs
+	DomainXML(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (string, error)
 }
 
 // Client API.

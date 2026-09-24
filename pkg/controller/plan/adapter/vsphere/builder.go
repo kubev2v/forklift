@@ -3003,3 +3003,7 @@ func sanitizeForK8sMetadata(s string) string {
 	}
 	return sanitized
 }
+
+func (r *Builder) DomainXML(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (string, error) {
+	return "", nil
+}

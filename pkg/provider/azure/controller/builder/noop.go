@@ -61,3 +61,7 @@ func (r *Builder) PopulatorOffloadInfo(_ *core.PersistentVolumeClaim) (map[strin
 func (r *Builder) PopulatorXcopyUsed(_ *core.PersistentVolumeClaim) (string, bool, error) {
 	return "", false, nil
 }
+
+func (r *Builder) DomainXML(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (string, error) {
+	return "", nil
+}
