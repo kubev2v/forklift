@@ -952,6 +952,9 @@ func buildDomainXML(vm *model.VM, pvcs []*core.PersistentVolumeClaim) (string, e
 			nicModel = "virtio"
 		}
 		interfaces = append(interfaces, libvirtxml.DomainInterface{
+			Source: &libvirtxml.DomainInterfaceSource{
+				Ethernet: &libvirtxml.DomainInterfaceSourceEthernet{},
+			},
 			Model: &libvirtxml.DomainInterfaceModel{Type: nicModel},
 			MAC:   &libvirtxml.DomainInterfaceMAC{Address: nic.MACAddress},
 		})
