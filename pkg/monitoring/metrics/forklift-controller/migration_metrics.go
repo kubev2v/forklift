@@ -54,20 +54,13 @@ func RecordMigrationMetrics(c client.Client) {
 
 				isLocal := destProvider.Spec.URL == ""
 
-				var target, mode string
+				var target string
 				if isLocal {
 					target = Local
 				} else {
 					target = Remote
 				}
-				switch plan.Spec.Type {
-				case api.MigrationWarm:
-					mode = Warm
-				case api.MigrationLive:
-					mode = Live
-				default:
-					mode = Cold
-				}
+				mode := modeForType(plan.Spec.Type)
 
 				provider := sourceProvider.Type().String()
 				processMigration(m, provider, mode, target, string(plan.UID))
