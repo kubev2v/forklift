@@ -153,9 +153,10 @@ func (r *Collector) Start() error {
 		defer func() {
 			r.log.Info("Stopped.")
 		}()
+		healer := &libmodel.IOErrHealer{DB: r.db, Log: r.log}
 		for {
 			if !r.canceled() {
-				_ = r.run()
+				healer.Observe(r.run())
 			} else {
 				return
 			}
