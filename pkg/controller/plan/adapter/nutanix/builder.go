@@ -20,6 +20,7 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	libutil "github.com/kubev2v/forklift/pkg/lib/util"
+	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1027,7 +1028,10 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, _ *core.Secret) (env []core.EnvV
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-	env = append(env, core.EnvVar{Name: "V2V_vmName", Value: vm.Name})
+	env = append(env,
+		core.EnvVar{Name: "V2V_vmName", Value: vm.Name},
+		core.EnvVar{Name: v2vconfig.EnvNutanixDriverRemovalName, Value: "true"},
+	)
 
 	staticIPs, staticErr := r.mapMacStaticIps(vm)
 	if staticErr != nil {
