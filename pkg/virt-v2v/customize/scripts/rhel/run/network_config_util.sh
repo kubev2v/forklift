@@ -80,6 +80,40 @@ get_device_from_ifcfg() {
     echo ""
 }
 
+# connection.interface-name is a single ifname.
+# match.interface-name is a semicolon-separated list; use the first one only if it is a real ifname.
+get_device_from_nm() {
+    local NM_FILE="$1"
+    local DEVICE
+
+    DEVICE=$(awk '
+        /^\[/ { sect = substr($0, 2, length($0) - 2) }
+        sect == "connection" && /^interface-name=/ {
+            sub(/^interface-name=/, "")
+            print
+            exit
+        }
+    ' "$NM_FILE")
+    DEVICE=$(remove_quotes "$DEVICE")
+    if [ -n "$DEVICE" ]; then
+        echo "$DEVICE"
+        return
+    fi
+
+    DEVICE=$(awk '
+        /^\[/ { sect = substr($0, 2, length($0) - 2) }
+        sect == "match" && /^interface-name=/ {
+            sub(/^interface-name=/, "")
+            print
+            exit
+        }
+    ' "$NM_FILE")
+    DEVICE=$(remove_quotes "$DEVICE")
+    echo "$DEVICE" | awk -F';' '{
+        if ($1 ~ /^[a-zA-Z][a-zA-Z0-9._-]{0,14}$/) print $1
+    }'
+}
+
 # Create udev rules based on the macToIP mapping + SUSE wicked DHCP leases.
 # Wicked stores lease files as XML in /var/lib/wicked/ with filenames like
 # lease-<interface>-dhcp-ipv4.xml, where the interface name is the second
@@ -202,13 +236,13 @@ udev_from_nm() {
         fi
 
         # Extract the DEVICE (interface name) from the matching file
-        DEVICE=$(grep '^interface-name=' "$NM_FILE" | cut -d'=' -f2)
+        DEVICE=$(get_device_from_nm "$NM_FILE")
         if [ -z "$DEVICE" ]; then
             log "Info: no interface name found to $S_IP."
             continue
         fi
 
-        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$DEVICE\""
     done
 }
 
@@ -556,7 +590,7 @@ generate_link_files() {
 
         # Read the interface name the connection is bound to.
         local DEVICE
-        DEVICE=$(grep '^interface-name=' "$NM_FILE" | cut -d'=' -f2)
+        DEVICE=$(get_device_from_nm "$NM_FILE")
         if [ -z "$DEVICE" ]; then
             continue
         fi
