@@ -1243,6 +1243,16 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image,
 	}
 	virtualSize = utils.CalculateSpaceWithOverhead(virtualSize, volumeMode)
 
+	if image.Name == "" {
+		err = liberr.New("cannot create PVC: openstack image has empty name", "imageID", image.ID)
+		return
+	}
+
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations[annImageName] = image.Name
+
 	// The image might be a VM Snapshot Image and has no volume associated to it
 	if originalVolumeDiskId, ok := image.Properties["forklift_original_volume_id"]; ok {
 		annotations[planbase.AnnDiskSource] = originalVolumeDiskId.(string)
@@ -1303,12 +1313,12 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image,
 }
 
 func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
-	image, err := r.getImageFromPVC(persistentVolumeClaim)
-	if err != nil {
-		err = liberr.Wrap(err)
+	imageID := persistentVolumeClaim.Labels["imageID"]
+	if imageID == "" {
+		err = liberr.New("missing imageID label on PVC", "pvc", persistentVolumeClaim.Name)
 		return
 	}
-	populatorCr, err := r.getVolumePopulatorCR(image.ID)
+	populatorCr, err := r.getVolumePopulatorCR(imageID)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -1409,12 +1419,11 @@ func (r *Builder) setPopulatorLabels(populatorCr api.OpenstackVolumePopulator, v
 }
 
 func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
-	image, err := r.getImageFromPVC(pvc)
-	if err != nil {
-		err = liberr.Wrap(err)
+	taskName = pvc.Annotations[annImageName]
+	if taskName == "" {
+		err = liberr.New("missing openstack image name annotation on PVC", "pvc", pvc.Name)
 		return
 	}
-	taskName = image.Name
 	return
 }
 
