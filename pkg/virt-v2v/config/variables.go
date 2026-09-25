@@ -38,6 +38,7 @@ const (
 	EnvMemSizeName                      = "V2V_memSize"
 	EnvSmpName                          = "V2V_smp"
 	EnvVsphereVmwareDriverRemovalName   = "V2V_vsphereVmwareDriverRemoval"
+	EnvNutanixDriverRemovalName         = "V2V_nutanixDriverRemoval"
 	EnvWindowsRegistryNetworkConfigName = "V2V_windowsRegistryNetworkConfig"
 	EnvWaitForGuestRebootName           = "V2V_waitForGuestReboot"
 	EnvSelinuxRelabelAtBootName         = "V2V_selinuxRelabelAtBoot"
@@ -121,6 +122,8 @@ type AppConfig struct {
 	Smp int
 	// V2V_vsphereVmwareDriverRemoval
 	VsphereVmwareDriverRemoval bool
+	// V2V_nutanixDriverRemoval
+	NutanixDriverRemoval bool
 	// V2V_windowsRegistryNetworkConfig
 	WindowsRegistryNetworkConfig bool
 	// V2V_waitForGuestReboot — upload first-boot script signaling CONVERSION_DONE on COM1
@@ -186,6 +189,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.IntVar(&s.MemSize, "memsize", s.getEnvInt(EnvMemSizeName, 0), "Amount of memory (in MB) allocated for the conversion appliance")
 	flag.IntVar(&s.Smp, "smp", s.getEnvInt(EnvSmpName, 0), "Number of virtual CPUs used for the conversion appliance")
 	flag.BoolVar(&s.VsphereVmwareDriverRemoval, "vsphere-vmware-driver-removal", s.getEnvBool(EnvVsphereVmwareDriverRemovalName, false), "Run VMware driver removal scripts during Windows vSphere conversion")
+	flag.BoolVar(&s.NutanixDriverRemoval, "nutanix-driver-removal", s.getEnvBool(EnvNutanixDriverRemovalName, false), "Run Nutanix driver removal scripts during Windows Nutanix conversion")
 	flag.BoolVar(&s.WindowsRegistryNetworkConfig, "windows-registry-network-config", s.getEnvBool(EnvWindowsRegistryNetworkConfigName, false), "Use registry-based network configuration scripts for Windows static IP setup")
 	flag.BoolVar(&s.WaitForGuestReboot, "wait-for-guest-reboot", s.getEnvBool(EnvWaitForGuestRebootName, false), "Inject first-boot script to signal conversion completion on guest serial (COM1)")
 	flag.BoolVar(&s.SelinuxRelabelAtBoot, "selinux-relabel-at-boot", s.getEnvBool(EnvSelinuxRelabelAtBootName, false), "Defer SELinux relabeling until the guest's first boot after conversion")

@@ -16,6 +16,7 @@ import (
 	providerbase "github.com/kubev2v/forklift/pkg/controller/base"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
@@ -1027,7 +1028,10 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, _ *core.Secret) (env []core.EnvV
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-	env = append(env, core.EnvVar{Name: "V2V_vmName", Value: vm.Name})
+	env = append(env,
+		core.EnvVar{Name: "V2V_vmName", Value: vm.Name},
+		core.EnvVar{Name: v2vconfig.EnvNutanixDriverRemovalName, Value: "true"},
+	)
 	return
 }
 
