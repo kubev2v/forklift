@@ -10,6 +10,7 @@ import (
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
@@ -112,6 +113,48 @@ func (r *Scheduler) buildSchedule() (err error) {
 	return
 }
 
+// markNotFound stops migrating vmStatus because it no longer exists in
+// the source inventory (e.g. deleted on the source provider mid-migration).
+// A VM that had already started (mid-transfer, mid-conversion, etc.) is
+// marked Failed since real work was interrupted; a VM that was still
+// queued and never started is marked Canceled since nothing was attempted.
+// It also marks the VM completed so plan/migration finalization
+// (which requires every VM to be MarkedCompleted) isn't blocked by it.
+func (r *Scheduler) markNotFound(vmStatus *plan.VMStatus) {
+	conditionType := api.ConditionCanceled
+	if vmStatus.Running() {
+		conditionType = api.ConditionFailed
+		reason := "VM was not found in inventory."
+		// Record error.phase/reasons (consistent with how other failures
+		// are reported) before Phase is overwritten to Completed below.
+		vmStatus.AddError(reason)
+		// Also record the error on the actively-running pipeline step,
+		// matching how naturally-occurring task/step failures report it
+		// (e.g. guest inspection pod failure at migration.go). Without
+		// this, the step never shows an error of its own even though the
+		// VM-level condition and error block do.
+		for _, step := range vmStatus.Pipeline {
+			if step.Phase == api.StepRunning {
+				step.Error = &plan.Error{
+					Phase:   step.Phase,
+					Reasons: []string{reason},
+				}
+				break
+			}
+		}
+	}
+	vmStatus.Phase = api.PhaseCompleted
+	vmStatus.SetCondition(libcnd.Condition{
+		Type:     conditionType,
+		Status:   libcnd.True,
+		Category: api.CategoryAdvisory,
+		Reason:   NotFound,
+		Message:  "VM was not found in inventory.",
+		Durable:  true,
+	})
+	vmStatus.MarkCompleted()
+}
+
 // Build the map of the number of disks that
 // are currently in flight for each host.
 func (r *Scheduler) buildInFlight() (err error) {
@@ -121,12 +164,16 @@ func (r *Scheduler) buildInFlight() (err error) {
 	// we need to use the plan from the context rather
 	// than from the list of plans that are retrieved below.
 	for _, vmStatus := range r.Plan.Status.Migration.VMs {
-		if vmStatus.HasCondition(Canceled) {
+		if vmStatus.HasCondition(Canceled) || vmStatus.MarkedCompleted() {
 			continue
 		}
 		vm := &model.VM{}
 		err = r.Source.Inventory.Find(vm, vmStatus.Ref)
 		if err != nil {
+			if errors.As(err, &web.NotFoundError{}) {
+				r.markNotFound(vmStatus)
+				continue
+			}
 			return
 		}
 		if vmStatus.Running() {
@@ -199,15 +246,20 @@ func (r *Scheduler) buildPending() (err error) {
 	}
 
 	for _, vmStatus := range r.Plan.Status.Migration.VMs {
-		if vmStatus.HasCondition(Canceled) {
+		if vmStatus.HasCondition(Canceled) || vmStatus.MarkedCompleted() {
 			continue
 		}
 		vm := &model.VM{}
 		err = r.Source.Inventory.Find(vm, vmStatus.Ref)
 		if err != nil {
+			if errors.As(err, &web.NotFoundError{}) {
+				r.markNotFound(vmStatus)
+				err = nil
+				continue
+			}
 			return
 		}
-		if vmStatus.MarkedStarted() || vmStatus.MarkedCompleted() {
+		if vmStatus.MarkedStarted() {
 			continue
 		}
 		if hasActiveCreators && vm.HasSharedDisk() && !r.migratesSharedDisks(vmStatus) {
@@ -231,6 +283,10 @@ func (r *Scheduler) hasActiveSharedDiskCreators() (bool, error) {
 		}
 		vm := &model.VM{}
 		if err := r.Source.Inventory.Find(vm, vmStatus.Ref); err != nil {
+			if errors.As(err, &web.NotFoundError{}) {
+				r.markNotFound(vmStatus)
+				continue
+			}
 			return false, err
 		}
 		if vm.HasSharedDisk() && r.migratesSharedDisks(vmStatus) {
