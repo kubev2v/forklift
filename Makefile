@@ -135,6 +135,9 @@ OVA_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG
 CLI_DOWNLOAD_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG)
 VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-copy-offload-populator:$(REGISTRY_TAG)
 DEEP_INSPECTION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-deep-inspection:$(REGISTRY_TAG)
+# Built from a digest-pinned virt-cluster-validate image supplied by CI/release.
+VIRT_VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-validation:$(REGISTRY_TAG)
+VIRT_CLUSTER_VALIDATE_IMAGE ?= quay.io/tiraboschi/virt-cluster-validate@sha256:8ad07476146aaa8549e2581bd63dceb84285fd47addfab05a288b19e16909d59
 
 ### OLM
 OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG)
@@ -333,6 +336,14 @@ build-validation-image: check_container_runtime
 push-validation-image: build-validation-image
 	$(CONTAINER_CMD) push $(VALIDATION_IMAGE)$(PLATFORM_SUFFIX)
 
+build-virt-validation-image: check_container_runtime
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) \
+		--build-arg VIRT_CLUSTER_VALIDATE_IMAGE=$(VIRT_CLUSTER_VALIDATE_IMAGE) \
+		-t $(VIRT_VALIDATION_IMAGE)$(PLATFORM_SUFFIX) -f build/virt-validation/Containerfile .
+
+push-virt-validation-image: build-virt-validation-image
+	$(CONTAINER_CMD) push $(VIRT_VALIDATION_IMAGE)$(PLATFORM_SUFFIX)
+
 build-operator-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(OPERATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-operator/Containerfile .
 
@@ -381,6 +392,7 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg CONTROLLER_IMAGE=$(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg API_IMAGE=$(API_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VALIDATION_IMAGE=$(VALIDATION_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg VIRT_VALIDATION_IMAGE=$(VIRT_VALIDATION_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OPERATOR_IMAGE=$(OPERATOR_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) \
@@ -502,6 +514,7 @@ build-all-images: ## Build all container images
 build-all-images: build-api-image \
                   build-controller-image \
                   build-validation-image \
+                  build-virt-validation-image \
                   build-operator-image \
                   build-virt-v2v-image \
                   build-virt-v2v-xfs-image \
@@ -521,6 +534,7 @@ push-all-images: ## Push all container images
 push-all-images:  push-api-image \
                   push-controller-image \
                   push-validation-image \
+                  push-virt-validation-image \
                   push-operator-image \
                   push-virt-v2v-image \
                   push-virt-v2v-xfs-image \
@@ -557,6 +571,13 @@ push-validation-image-manifest:
 		$(VALIDATION_IMAGE)-amd64 \
 		$(VALIDATION_IMAGE)-arm64
 	$(CONTAINER_CMD) manifest push $(VALIDATION_IMAGE)
+
+push-virt-validation-image-manifest:
+	$(CONTAINER_CMD) manifest rm $(VIRT_VALIDATION_IMAGE) || true
+	$(CONTAINER_CMD) manifest create $(VIRT_VALIDATION_IMAGE) \
+		$(VIRT_VALIDATION_IMAGE)-amd64 \
+		$(VIRT_VALIDATION_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(VIRT_VALIDATION_IMAGE)
 
 push-operator-image-manifest:
 	$(CONTAINER_CMD) manifest rm $(OPERATOR_IMAGE) || true
@@ -650,6 +671,7 @@ push-all-images-manifest: ## Push all multi-arch manifests
 push-all-images-manifest: push-controller-image-manifest \
                           push-api-image-manifest \
                           push-validation-image-manifest \
+                          push-virt-validation-image-manifest \
                           push-operator-image-manifest \
                           push-virt-v2v-image-manifest \
                           push-virt-v2v-xfs-image-manifest \
@@ -802,5 +824,3 @@ validate-commits-range:
 
 $(GOLANGCI_LINT_BIN):
 	$(MAKE) lint-install
-
-

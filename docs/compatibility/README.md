@@ -29,6 +29,7 @@ Forklift supports migration from the following source platforms:
 
 - [Provider Secrets](./provider-secrets.md) - Authentication credentials and secret fields for each provider type
 - [Provider Settings](./provider-settings.md) - Provider-specific configuration in `spec.settings`
+- [Remote OpenShift Virtualization Provider setup](../remote-openshift-virtualization-provider.md) - Remote ServiceAccount, RBAC, credentials, and validation setup
 
 ### Migration Planning
 

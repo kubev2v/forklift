@@ -27,6 +27,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/ova"
 	"github.com/kubev2v/forklift/pkg/controller/plan"
 	"github.com/kubev2v/forklift/pkg/controller/provider"
+	"github.com/kubev2v/forklift/pkg/controller/virtualizationvalidation"
 	"github.com/kubev2v/forklift/pkg/settings"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -47,6 +48,7 @@ var MainControllers = []AddFunction{
 	host.Add,
 	hook.Add,
 	conversion.Add,
+	virtualizationvalidation.Add,
 }
 
 // List of Inventory controllers

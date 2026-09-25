@@ -7,6 +7,7 @@ app_namespace: "{{ lookup( 'env', 'WATCH_NAMESPACE') or 'konveyor-forklift' }}"
 # Container images -- resolved from RELATED_IMAGE_* env vars injected by OLM/CSV.
 controller_image_fqin: "{{ lookup( 'env', 'CONTROLLER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_CONTROLLER') }}"
 validation_image_fqin: "{{ lookup( 'env', 'VALIDATION_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VALIDATION') }}"
+virt_validation_image_fqin: "{{ lookup( 'env', 'VIRT_VALIDATION_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_VALIDATION') }}"
 ui_plugin_image_fqin: "{{ lookup( 'env', 'UI_PLUGIN_IMAGE') or lookup( 'env', 'RELATED_IMAGE_UI_PLUGIN') }}"
 cli_download_image_fqin: "{{ lookup( 'env', 'CLI_DOWNLOAD_IMAGE') or lookup( 'env', 'RELATED_IMAGE_CLI_DOWNLOAD') }}"
 api_image_fqin: "{{ lookup( 'env', 'API_IMAGE') or lookup( 'env', 'RELATED_IMAGE_API') }}"
