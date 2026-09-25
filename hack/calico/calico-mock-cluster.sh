@@ -57,16 +57,23 @@ networking:
   podSubnet: 192.168.0.0/16
 EOF
 
-# The v3 CRDs are installed here, the four Enterprise schemas are then layered on top and stay put.
-echo "Installing the Calico projectcalico.org/v3 CRDs (api-server-less datastore)..."
+# Should have happened implicitly, but _explicitly_ switch context to
+# the new kind context, and do not progress if that attempt fails.
+KUBE_CONTEXT="kind-${CLUSTER_NAME}"
+kubectl config get-contexts -o name | grep -qx "${KUBE_CONTEXT}" \
+  || { echo "STOP: kubeconfig has no context ${KUBE_CONTEXT}; the cluster was not created"; exit 1; }
+kubectl config use-context "${KUBE_CONTEXT}" >/dev/null \
+  || { echo "STOP: could not select context ${KUBE_CONTEXT}"; exit 1; }
 
-# Install just CRDs.
+echo "Using kubeconfig context: $(kubectl config current-context)"
+
+echo "Installing the Calico projectcalico.org/v3 CRDs (api-server-less datastore)..."
 curl --proto "${CURL_PROTO}" -fsL "${CALICO_MANIFESTS}/v3_projectcalico_org.yaml" \
   | python3 -c "import sys; print('\n---\n'.join(d for d in sys.stdin.read().split('\n---\n') if 'kind: CustomResourceDefinition' in d))" \
   | kubectl apply --server-side -f -
 
 echo "Applying the Enterprise CRD schemas for every resource Forklift reads..."
-# networks is Enterprise-only; the other three override the OSS schemas with
+# `Networks` is Enterprise-only; the other three override the OSS schemas with
 # the Enterprise ones (a superset carrying the fields Forklift's checks read).
 kubectl apply --server-side --force-conflicts -f "${MOCK_DIR}/networks-crd.yaml"
 kubectl apply --server-side --force-conflicts -f "${MOCK_DIR}/ippools-crd.yaml"
@@ -82,6 +89,7 @@ curl --proto "${CURL_PROTO}" -fsL "${CALICO_MANIFESTS}/tigera-operator.yaml" \
   | kubectl create -f -
 kubectl set env -n tigera-operator deployment/tigera-operator CALICO_API_GROUP=projectcalico.org/v3
 kubectl wait --for=condition=Available --timeout=300s deployment -n tigera-operator tigera-operator
+
 echo "Waiting for the operator API to be established..."
 until kubectl get crd installations.operator.tigera.io >/dev/null 2>&1; do sleep 2; done
 kubectl wait --for=condition=Established --timeout=120s crd/installations.operator.tigera.io
