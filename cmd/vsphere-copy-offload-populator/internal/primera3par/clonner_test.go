@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestExtractSerialFromNAA(t *testing.T) {
+func TestExtractSerialFromVML(t *testing.T) {
 	tests := []struct {
 		name          string
 		naa           string
@@ -17,35 +17,36 @@ func TestExtractSerialFromNAA(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name:     "valid NAA with naa. prefix",
-			naa:      "naa.60002ac0000000000000001a00028af4",
-			expected: "0000000000000001A00028AF4",
-		},
-		{
-			name:     "valid NAA without prefix",
-			naa:      "60002ac0000000000000001a00028af4",
-			expected: "0000000000000001A00028AF4",
-		},
-		{
-			name:     "uppercase NAA",
-			naa:      "NAA.60002AC0000000000000001A00028AF4",
-			expected: "0000000000000001A00028AF4",
-		},
-		{
-			name:          "wrong provider ID",
-			naa:           "naa.624a93700000000000001234",
+			name:          "naa. prefixed input is rejected — RDM device names are always vml.",
+			naa:           "naa.60002ac0000000000000001a00028af4",
 			expectError:   true,
-			errorContains: "does not appear to be a 3PAR device",
-		},
-		{
-			name:          "empty serial after provider ID",
-			naa:           "naa.60002ac",
-			expectError:   true,
-			errorContains: "could not extract serial",
+			errorContains: "not in vml. format",
 		},
 		{
 			name:          "empty string",
 			naa:           "",
+			expectError:   true,
+			errorContains: "not in vml. format",
+		},
+		{
+			name:     "vml. device name (MTV-6321)",
+			naa:      "vml.020002000060002ac0000000000000628200021f6b565620202020",
+			expected: "0000000000000628200021F6B",
+		},
+		{
+			name:     "uppercase VML. device name",
+			naa:      "VML.020002000060002AC0000000000000628200021F6B565620202020",
+			expected: "0000000000000628200021F6B",
+		},
+		{
+			name:          "vml. device name with truncated payload",
+			naa:           "vml.020002000060002ac000000000000062",
+			expectError:   true,
+			errorContains: "vml. name too short",
+		},
+		{
+			name:          "vml. device name with wrong provider OUI",
+			naa:           "vml.0200020000624a9370000000000000000000000000",
 			expectError:   true,
 			errorContains: "does not appear to be a 3PAR device",
 		},
@@ -53,7 +54,7 @@ func TestExtractSerialFromNAA(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			serial, err := extractSerialFromNAA(tc.naa)
+			serial, err := extractSerialFromVML(tc.naa)
 			if tc.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tc.errorContains)
@@ -128,7 +129,7 @@ func TestFindVolumeByVVolID(t *testing.T) {
 
 func TestResolveRDMToLUN(t *testing.T) {
 	volumes := []Volume{
-		{Id: 1, Name: "source-vol-1", WWN: "0000000000000001A00028AF4"},
+		{Id: 1, Name: "source-vol-1", WWN: "60002AC0000000000000001A00028AF4"},
 		{Id: 2, Name: "source-vol-2", WWN: "AABBCCDD11223344"},
 	}
 
@@ -157,6 +158,11 @@ func TestResolveRDMToLUN(t *testing.T) {
 			name:       "fallback matches by WWN substring",
 			deviceName: "naa.500AABBCCDD11223344",
 			expected:   "source-vol-2",
+		},
+		{
+			name:       "resolve by vml. device name against full WWN (MTV-6321)",
+			deviceName: "vml.020002000060002ac0000000000000001a00028af4565620202020",
+			expected:   "source-vol-1",
 		},
 	}
 
