@@ -324,6 +324,22 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              controller_vsphere_post_migration_tag_category:
+                default: Forklift
+                description: vSphere tag category name for post-migration tagging.
+                type: string
+              controller_vsphere_post_migration_tag_name:
+                default: migrated
+                description: vSphere tag name for post-migration tagging.
+                type: string
+              controller_vsphere_post_migration_tagging:
+                default: "true"
+                description: Enable post-migration tagging for successfully migrated
+                  vSphere VMs.
+                enum:
+                - "true"
+                - "false"
+                type: string
               controller_windows_reboot_timeout:
                 default: 1800
                 description: Timeout in seconds for the wait-for-reboot step.

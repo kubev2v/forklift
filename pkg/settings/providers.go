@@ -9,10 +9,13 @@ import (
 
 // Env
 const (
-	OVAProviderServerImage       = "OVA_PROVIDER_SERVER_IMAGE"
-	HyperVProviderServerImage    = "HYPERV_PROVIDER_SERVER_IMAGE"
-	ProviderPendingTimeout       = "PROVIDER_PENDING_TIMEOUT_SECONDS"
-	VsphereTagFetchConcurrencyEv = "VSPHERE_TAG_FETCH_CONCURRENCY"
+	OVAProviderServerImage               = "OVA_PROVIDER_SERVER_IMAGE"
+	HyperVProviderServerImage            = "HYPERV_PROVIDER_SERVER_IMAGE"
+	ProviderPendingTimeout               = "PROVIDER_PENDING_TIMEOUT_SECONDS"
+	VsphereTagFetchConcurrencyEv         = "VSPHERE_TAG_FETCH_CONCURRENCY"
+	VspherePostMigrationTagCategoryEv    = "VSPHERE_POST_MIGRATION_TAG_CATEGORY"
+	VspherePostMigrationTagNameEv        = "VSPHERE_POST_MIGRATION_TAG_NAME"
+	VspherePostMigrationTaggingEnabledEv = "VSPHERE_POST_MIGRATION_TAGGING_ENABLED"
 )
 
 // Defaults
@@ -27,8 +30,11 @@ const (
 	DefaultHyperVMemoryLimit   = "1Gi"
 	DefaultHyperVMemoryRequest = "512Mi"
 
-	DefaultProviderPendingTimeoutSeconds = 120
-	DefaultVsphereTagFetchConcurrency    = 10
+	DefaultProviderPendingTimeoutSeconds      = 120
+	DefaultVsphereTagFetchConcurrency         = 10
+	DefaultVspherePostMigrationTagCategory    = "Forklift"
+	DefaultVspherePostMigrationTagName        = "migrated"
+	DefaultVspherePostMigrationTaggingEnabled = true
 )
 
 // ProviderPodConfig defines common configuration for provider server pods
@@ -51,6 +57,9 @@ type Providers struct {
 	HyperV                        ProviderPodConfig
 	ProviderPendingTimeoutSeconds int
 	VsphereTagFetchConcurrency    int
+	PostMigrationTagCategory      string
+	PostMigrationTagName          string
+	PostMigrationTaggingEnabled   bool
 }
 
 func (r *Providers) Load() error {
@@ -102,6 +111,10 @@ func (r *Providers) Load() error {
 		return fmt.Errorf("invalid vsphere tag fetch concurrency: %w", err)
 	}
 	r.VsphereTagFetchConcurrency = tagConcurrency
+
+	r.PostMigrationTagCategory = Lookup(VspherePostMigrationTagCategoryEv, DefaultVspherePostMigrationTagCategory)
+	r.PostMigrationTagName = Lookup(VspherePostMigrationTagNameEv, DefaultVspherePostMigrationTagName)
+	r.PostMigrationTaggingEnabled = getEnvBool(VspherePostMigrationTaggingEnabledEv, DefaultVspherePostMigrationTaggingEnabled)
 
 	return nil
 }

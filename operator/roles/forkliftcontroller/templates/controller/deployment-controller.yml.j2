@@ -177,6 +177,21 @@ spec:
         - name: FEATURE_VSPHERE_INCREMENTAL_BACKUP
           value: "true"
 {% endif %}
+{% if controller_vsphere_post_migration_tagging|default('true')|bool %}
+        - name: VSPHERE_POST_MIGRATION_TAGGING_ENABLED
+          value: "true"
+{% else %}
+        - name: VSPHERE_POST_MIGRATION_TAGGING_ENABLED
+          value: "false"
+{% endif %}
+{% if controller_vsphere_post_migration_tag_category is defined and controller_vsphere_post_migration_tag_category %}
+        - name: VSPHERE_POST_MIGRATION_TAG_CATEGORY
+          value: "{{ controller_vsphere_post_migration_tag_category }}"
+{% endif %}
+{% if controller_vsphere_post_migration_tag_name is defined and controller_vsphere_post_migration_tag_name %}
+        - name: VSPHERE_POST_MIGRATION_TAG_NAME
+          value: "{{ controller_vsphere_post_migration_tag_name }}"
+{% endif %}
 {% if feature_copy_offload|bool %}
         - name: FEATURE_COPY_OFFLOAD
           value: "true"
