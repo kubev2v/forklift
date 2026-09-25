@@ -1068,6 +1068,21 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 	}
 }
 
+// vmPropertyDenylist lists properties that can never be excluded from
+// the VM PathSet because they are required for migration to succeed.
+var vmPropertyDenylist = map[string]bool{
+	fName:            true,
+	fParent:          true,
+	fUUID:            true,
+	fDevices:         true,
+	fGuestNet:        true,
+	fGuestIpStack:    true,
+	fDatastore:       true,
+	fNetwork:         true,
+	fPowerState:      true,
+	fConnectionState: true,
+}
+
 func (r *Collector) vmPathSet() []string {
 	pathSet := []string{
 		fName,
@@ -1119,7 +1134,37 @@ func (r *Collector) vmPathSet() []string {
 	if majorVal > 6 || majorVal == 6 && minorVal >= 7 {
 		pathSet = append(pathSet, fTpmPresent)
 	}
-	return pathSet
+
+	return r.filterVmPathSet(pathSet)
+}
+
+// filterVmPathSet removes excluded properties from the PathSet. Properties
+// in the denylist are always preserved; a warning is logged if an operator
+// attempts to exclude one.
+func (r *Collector) filterVmPathSet(pathSet []string) []string {
+	excluded := settings.Settings.VsphereExcludedVMProperties
+	if len(excluded) == 0 {
+		return pathSet
+	}
+	exclusionSet := make(map[string]bool, len(excluded))
+	for _, p := range excluded {
+		exclusionSet[strings.TrimSpace(p)] = true
+	}
+	filtered := make([]string, 0, len(pathSet))
+	for _, p := range pathSet {
+		if !exclusionSet[p] {
+			filtered = append(filtered, p)
+			continue
+		}
+		if vmPropertyDenylist[p] {
+			if r.log != nil {
+				r.log.Info("ignoring exclusion of denylisted VM property", "property", p)
+			}
+			filtered = append(filtered, p)
+			continue
+		}
+	}
+	return filtered
 }
 
 // Apply updates.
