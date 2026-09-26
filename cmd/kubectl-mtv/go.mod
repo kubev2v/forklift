@@ -68,7 +68,7 @@ require (
 	github.com/yaacov/karl-interpreter v0.0.1 // indirect
 	github.com/yaacov/tree-search-language/v6 v6.0.10 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
-	go.yaml.in/yaml/v2 v2.4.3 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
