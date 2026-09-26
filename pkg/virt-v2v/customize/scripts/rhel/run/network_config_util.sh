@@ -407,7 +407,7 @@ udev_from_netplan() {
         if ${DISABLE_NETPLAN_GET:-false}; then
             return 1
         fi
-        netplan get >&3
+        netplan get --root-dir "$NETPLAN_DIR" >&3
         return $?
     }
 
