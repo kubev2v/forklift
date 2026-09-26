@@ -611,6 +611,18 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		env = append(env, core.EnvVar{Name: "V2V_firmware", Value: "uefi"})
 	}
 
+	// Collect Pod network MACs using the same NIC resolver as mapNetworks
+	nicKeys, pairsBySource := r.buildNICResolver(vm.NICs)
+	podMacs := planbase.CollectPodNetworkMACs(nicKeys, pairsBySource, vm.NICs, func(nic hyperv.NIC) string {
+		return nic.MAC
+	})
+	if len(podMacs) > 0 {
+		env = append(env, core.EnvVar{
+			Name:  "V2V_podNetworkMACs",
+			Value: strings.Join(podMacs, ","),
+		})
+	}
+
 	return
 }
 

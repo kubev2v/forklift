@@ -32,6 +32,7 @@ const (
 	EnvHostName                         = "V2V_HOSTNAME"
 	EnvNbdeClevis                       = "V2V_NBDE_CLEVIS"
 	EnvMultipleIpsPerNicName            = "V2V_multipleIPsPerNic"
+	EnvPodNetworkMACsName               = "V2V_podNetworkMACs"
 	EnvRemoteInspection                 = "V2V_remoteInspection"
 	EnvRemoteInspectionDisk             = "V2V_remoteInspectDisk_"
 	EnvMemSizeName                      = "V2V_memSize"
@@ -138,6 +139,8 @@ type AppConfig struct {
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
+	// V2V_podNetworkMACs
+	PodNetworkMACs string
 	// Paths
 	VddkConfFile         string
 	InspectionOutputFile string
@@ -178,6 +181,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.VirtIoWinLegacyDrivers, "virtio-win-legacy-drivers", os.Getenv(EnvVirtIoWinLegacyDriversName), "Path to the virtio-win legacy drivers ISO")
 	flag.StringVar(&s.HostName, "hostname", os.Getenv(EnvHostName), "Hostname of the vm")
 	flag.StringVar(&s.MultipleIpsPerNicName, "multiple-ips-per-nic", os.Getenv(EnvMultipleIpsPerNicName), "Multiple IPs per NIC")
+	flag.StringVar(&s.PodNetworkMACs, "pod-network-macs", os.Getenv(EnvPodNetworkMACsName), "Comma-separated MAC addresses for Pod network interfaces")
 	flag.BoolVar(&s.IsRemoteInspection, "remote-inspection", s.getEnvBool(EnvRemoteInspection, false), "Run virt-v2v-inspection on remote disks")
 	flag.IntVar(&s.MemSize, "memsize", s.getEnvInt(EnvMemSizeName, 0), "Amount of memory (in MB) allocated for the conversion appliance")
 	flag.IntVar(&s.Smp, "smp", s.getEnvInt(EnvSmpName, 0), "Number of virtual CPUs used for the conversion appliance")

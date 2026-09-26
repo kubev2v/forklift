@@ -1,0 +1,72 @@
+# Inject IPv6 default gateway (fd10:0:2::1) on KubeVirt masquerade interfaces.
+
+Write-Host "=== Ensure IPv6 default gateway for KubeVirt Pod network ===" -ForegroundColor Cyan
+
+# MAC addresses mapped to Pod networks, passed from Forklift Go controller
+$podMacs = @(
+{{ range .PodMACs }}
+    "{{ . }}"
+{{ end }}
+)
+
+if ($podMacs.Count -eq 0) {
+    Write-Host "No Pod network MACs mapped, nothing to do." -ForegroundColor Green
+    exit 0
+}
+
+foreach ($mac in $podMacs) {
+    $cleanMac = $mac.Replace(':', '-').ToUpperInvariant()
+
+    # 1. Wait up to 60s for THIS specific adapter to appear/initialize
+    $adapter = $null
+    $deadline = (Get-Date).AddMinutes(1)
+    do {
+        $adapter = Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object {
+            $_.MacAddress.Replace(':', '-').ToUpperInvariant() -eq $cleanMac
+        }
+        if (-not $adapter) { Start-Sleep -Seconds 2 }
+    } while (-not $adapter -and (Get-Date) -lt $deadline)
+
+    if (-not $adapter) {
+        Write-Host "  [WARN] Pod network adapter ($mac) did not appear after 60s" -ForegroundColor Yellow
+        continue
+    }
+
+    $ifIdx = $adapter.InterfaceIndex
+    $ifName = $adapter.Name
+
+    # 2. Enable Router Discovery strictly on THIS adapter
+    Set-NetIPInterface -InterfaceIndex $ifIdx -AddressFamily IPv6 -RouterDiscovery Enabled -ErrorAction SilentlyContinue
+
+    # 3. Wait up to 60s for THIS adapter to acquire its fd10:0:2::/120 IPv6 address
+    $podAddr = $null
+    $deadline = (Get-Date).AddMinutes(1)
+    do {
+        $podAddr = Get-NetIPAddress -InterfaceIndex $ifIdx -AddressFamily IPv6 -PrefixLength 120 -ErrorAction SilentlyContinue |
+            Where-Object { $_.IPAddress -like "fd10:0:2::*" } | Select-Object -First 1
+        if (-not $podAddr) { Start-Sleep -Seconds 2 }
+    } while (-not $podAddr -and (Get-Date) -lt $deadline)
+
+    if (-not $podAddr) {
+        Write-Host "  [WARN] No IPv6 address found on $ifName ($mac) after 60s" -ForegroundColor Yellow
+        continue
+    }
+
+    Write-Host "  Interface $ifIdx ($ifName) acquired Pod network IPv6 ($($podAddr.IPAddress))" -ForegroundColor Cyan
+
+    # 4. Inject ::/0 route if missing
+    $existingGw = Get-NetRoute -DestinationPrefix "::/0" -InterfaceIndex $ifIdx -AddressFamily IPv6 -ErrorAction SilentlyContinue
+    if (-not $existingGw) {
+        Write-Host "    No ::/0 route found, adding fd10:0:2::1" -ForegroundColor Yellow
+        try {
+            New-NetRoute -DestinationPrefix "::/0" -InterfaceIndex $ifIdx -NextHop "fd10:0:2::1" -RouteMetric 256 -ErrorAction Stop
+            Write-Host "    [OK] Added IPv6 default gateway fd10:0:2::1" -ForegroundColor Green
+        } catch {
+            Write-Host "    [FAIL] Could not add IPv6 gateway: $($_.Exception.Message)" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "    [OK] IPv6 default gateway already configured" -ForegroundColor Green
+    }
+}
+
+Write-Host "=== IPv6 Pod network gateway check completed ===" -ForegroundColor Green

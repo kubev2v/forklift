@@ -240,3 +240,29 @@ func ValidatePodNetworkDuplicates(nicRefs []ref.Ref, networkMap *api.NetworkMap)
 	}
 	return podCount > 1
 }
+
+// CollectPodNetworkMACs returns MAC addresses for all NICs mapped to Pod networks.
+// These are needed for targeted IPv6 gateway injection in Windows firstboot scripts.
+func CollectPodNetworkMACs[N any](nicKeys []string, pairsBySourceKey map[string][]api.NetworkPair, nics []N, nicToRef func(N) (mac string)) []string {
+	var podMacs []string
+	pool := NewNADPool()
+
+	for i, nic := range nics {
+		if i >= len(nicKeys) {
+			break
+		}
+		pairs := pairsBySourceKey[nicKeys[i]]
+		if len(pairs) == 0 {
+			continue
+		}
+		// Use the same allocation logic as mapNetworks
+		pair, ok := AllocateNetwork(pool, pairs)
+		if !ok {
+			continue
+		}
+		if pair.Destination.Type == Pod {
+			podMacs = append(podMacs, nicToRef(nic))
+		}
+	}
+	return podMacs
+}
