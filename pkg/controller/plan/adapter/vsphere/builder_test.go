@@ -276,6 +276,25 @@ var _ = Describe("vSphere builder", func() {
 			Expect(objectMeta.Name).To(Equal("unit-test-plan--my-vm-with-spac-disk-0"))
 			Expect(objectMeta.GenerateName).To(BeEmpty())
 		})
+		It("should replace dots in migration status target name for PVC templates", func() {
+			builder := createBuilder()
+			builder.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(false)
+			builder.Plan.Status.Migration.VMs = []*plan.VMStatus{{
+				VM:      plan.VM{Ref: ref.Ref{ID: "test-vm-id"}},
+				NewName: "mtv.redhat.com",
+			}}
+			vm := &model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "test-vm-id", Name: "source-vm"},
+				},
+			}
+			objectMeta := &meta.ObjectMeta{}
+
+			err := builder.setPVCNameFromTemplate(objectMeta, vm, 0, vsphere.Disk{})
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(objectMeta.Name).To(Equal("unit-test-plan--mtv-redhat-com-disk-0"))
+		})
 
 		It("should honor explicit AccessMode StorageMap and ignore VolumeMode from StorageMap", func() {
 			builder := createBuilder(&core.Secret{ObjectMeta: meta.ObjectMeta{Name: "test-secret", Namespace: "test"}})

@@ -400,9 +400,11 @@ func (r *Builder) mapDataVolume(vm *model.VM, disk hyperv.Disk, diskIndex int, d
 	}
 	dv.Annotations[planbase.AnnDiskSource] = disk.ID
 
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vm.ID, vm.Name)
+
 	templateData := &api.PVCNameTemplateData{
 		VmName:       vm.Name,
-		TargetVmName: planbase.ResolveTargetVmName(r.Plan, vm.ID, vm.Name),
+		TargetVmName: targetVmName,
 		PlanName:     r.Plan.Name,
 		DiskIndex:    diskIndex,
 		VmId:         vm.ID,

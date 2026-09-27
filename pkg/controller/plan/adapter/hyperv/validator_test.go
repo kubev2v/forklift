@@ -309,3 +309,27 @@ func TestPVCNameTemplate_UsesInventoryVMIdentity(t *testing.T) {
 		t.Error("expected ok=true: PVC name template should be valid when TargetVmName resolves to spec.targetName")
 	}
 }
+
+func TestPVCNameTemplate_ValidatesDottedVMName(t *testing.T) {
+	vmID := "vm-dotted"
+	vm := &hyperv.VM{}
+	vm.ID = vmID
+	vm.Name = "mtv.redhat.com"
+	vm.Disks = []model.Disk{{Base: model.Base{ID: "disk-1"}}}
+
+	plan := &api.Plan{}
+	plan.Name = "test-plan"
+	plan.Spec.PVCNameTemplate = "{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}"
+	validator := &Validator{Context: &plancontext.Context{
+		Plan:   plan,
+		Source: plancontext.Source{Inventory: &stubInventory{vms: map[string]*hyperv.VM{vmID: vm}}},
+	}}
+
+	ok, err := validator.PVCNameTemplate(ref.Ref{ID: vmID}, plan.Spec.PVCNameTemplate)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected the default PVC name template to validate for a dotted VM name")
+	}
+}

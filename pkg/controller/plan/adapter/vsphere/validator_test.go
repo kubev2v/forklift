@@ -336,6 +336,29 @@ var _ = Describe("vsphere validation tests", func() {
 			Expect(ok).To(BeTrue())
 		})
 
+		It("should validate the default PVC template for a dotted VM name", func() {
+			plan := createPlan()
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{
+					Inventory: &mockInventory{
+						vm: model.VM{
+							VM1: model.VM1{
+								VM0:   model.VM0{ID: "test-vm-id", Name: "mtv-func.win2019_79"},
+								Disks: []vsphere.Disk{{File: "[datastore1] vm-1/disk.vmdk"}},
+							},
+						},
+					},
+				},
+			}
+			validator := &Validator{Context: &ctx}
+
+			ok, err := validator.PVCNameTemplate(ref.Ref{ID: "test-vm-id"}, planbase.DefaultPVCNameTemplate)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ok).To(BeTrue())
+		})
+
 		It("should use VM-level template over plan-level template", func() {
 			plan := createPlan()
 			plan.Spec.PVCNameTemplate = "plan-{{.VmName}}-{{.DiskIndex}}"
