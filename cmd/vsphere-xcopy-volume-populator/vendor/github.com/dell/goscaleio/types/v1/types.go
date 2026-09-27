@@ -14,6 +14,7 @@ package goscaleio
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"net/http"
 	"sync"
@@ -60,7 +61,6 @@ func (e Error) Error() string {
 			translation := TranslateErrorCodeToErrorMessage(e.ErrorDetails[0].Error)
 			if translation != "" {
 				e.Message = translation
-				e.Message = e.ErrorDetails[0].ErrorMessage
 				return translation
 			}
 		}
@@ -353,6 +353,28 @@ type CompatibilityManagementPost struct {
 	CompatibilityDataBytes []byte `json:"compatibilityDataBytes,omitempty"`
 }
 
+type MetricsRequest struct {
+	ResourceType string   `json:"resource_type"`
+	IDs          []string `json:"ids"`
+}
+
+type MetricsResponse struct {
+	Format       string     `json:"format"`
+	ResourceType string     `json:"resource_type"`
+	Timestamps   []string   `json:"timestamps"`
+	Resources    []Resource `json:"resources"`
+}
+
+type Resource struct {
+	ID      string   `json:"id"`
+	Metrics []Metric `json:"metrics"`
+}
+
+type Metric struct {
+	Name   string    `json:"name"`
+	Values []float64 `json:"values"`
+}
+
 // SdcStatistics defines struct of Statistics for PowerFlex SDC
 type SdcStatistics struct {
 	UserDataReadBwc         BWC      `json:"userDataReadBwc"`
@@ -446,6 +468,10 @@ type PDConnInfo struct {
 	DisconnectedServerIP   *string `json:"disconnectedServerIp"`
 }
 
+const (
+	GenTypeEC = "EC"
+)
+
 // ProtectionDomain defines struct for PowerFlex ProtectionDomain
 type ProtectionDomain struct {
 	SystemID                    string     `json:"systemId"`
@@ -487,6 +513,7 @@ type ProtectionDomain struct {
 	Name                  string  `json:"name"`
 	ID                    string  `json:"id"`
 	Links                 []*Link `json:"links"`
+	GenType               string  `json:"genType"`
 }
 
 // ProtectionDomainParam defines struct for ProtectionDomainParam
@@ -512,8 +539,8 @@ type ApproveSdcParam struct {
 	Name    string   `json:"name,omitempty"`
 }
 
-// ApproveSdcByGUIDResponse defines struct for ApproveSdcByGUIDResponse
-type ApproveSdcByGUIDResponse struct {
+// ApproveSdcResponse defines struct for ApproveSdcResponse
+type ApproveSdcResponse struct {
 	SdcID string `json:"id"`
 }
 
@@ -687,6 +714,39 @@ type SdsName struct {
 // SdsPort defines struct for Sds Port
 type SdsPort struct {
 	SdsPort string `json:"sdsPort"`
+}
+
+// ResourceCredentials defines struct for list of resource credential
+type ResourceCredentials struct {
+	TotalRecords int                  `json:"totalRecords"`
+	Credentials  []ResourceCredential `json:"credentialList"`
+}
+
+// ResourceCredential defines struct for resource credential
+type ResourceCredential struct {
+	Link       Link    `json:"link"`
+	Credential CredObj `json:"credential"`
+	Reference  CredRef `json:"reference"`
+}
+
+// CredObj defines struct for credential object
+type CredObj struct {
+	Type        string `json:"type"`
+	CreateDate  string `json:"createdDate"`
+	CreatedBy   string `json:"createdBy"`
+	UpdatedBy   string `json:"updatedBy"`
+	UpdatedDate string `json:"updatedDate"`
+	Label       string `json:"label"`
+	Domain      string `json:"domain"`
+	Link        Link   `json:"link"`
+	Username    string `json:"username"`
+	ID          string `json:"id"`
+}
+
+// CredRef defines struct for credential reference
+type CredRef struct {
+	Devices  int `json:"devices"`
+	Policies int `json:"policies"`
 }
 
 // Device defines struct of Device for PowerFlex Array
@@ -886,6 +946,7 @@ type StoragePool struct {
 	ProtectedMaintenanceModeIoPriorityAppIopsPerDeviceThreshold     int     `json:"protectedMaintenanceModeIoPriorityAppIopsPerDeviceThreshold"`
 	ProtectedMaintenanceModeIoPriorityAppBwPerDeviceThresholdInKbps int     `json:"protectedMaintenanceModeIoPriorityAppBwPerDeviceThresholdInKbps"`
 	ProtectedMaintenanceModeIoPriorityQuietPeriodInMsec             int     `json:"protectedMaintenanceModeIoPriorityQuietPeriodInMsec"`
+	GenType                                                         string  `json:"genType"`
 }
 
 // StoragePoolParam defines struct for StoragePoolParam
@@ -985,6 +1046,7 @@ type MappedSdcInfo struct {
 	SdcName               string `json:"sdcName"`
 	AccessMode            string `json:"accessMode"`
 	IsDirectBufferMapping bool   `json:"isDirectBufferMapping"`
+	HostType              string `json:"hostType"`
 }
 
 // Volume defines struct for Volume
@@ -1017,6 +1079,7 @@ type Volume struct {
 	ReplicationJournalVolume           bool             `json:"replicationJournalVolume"`
 	ReplicationTimeStamp               int              `json:"replicationTimeStamp"`
 	Links                              []*Link          `json:"links"`
+	GenType                            string           `json:"genType"`
 }
 
 // VolumeParam defines struct for VolumeParam
@@ -1073,6 +1136,16 @@ type MapVolumeSdcParam struct {
 	AccessMode            string `json:"accessMode,omitempty"`
 }
 
+// MapVolumeNVMeParam defines struct for MapVolumeNVMeParam
+type MapVolumeNVMeParam struct {
+	SdcID                 string `json:"sdcId,omitempty"`
+	HostID                string `json:"hostId,omitempty"`
+	Nqn                   string `json:"nqn,omitempty"`
+	AllHosts              string `json:"allHosts,omitempty"`
+	AllowMultipleMappings string `json:"allowMultipleMappings,omitempty"`
+	AccessMode            string `json:"accessMode,omitempty"`
+}
+
 // UnmapVolumeSdcParam defines struct for UnmapVolumeSdcParam
 type UnmapVolumeSdcParam struct {
 	SdcID                string `json:"sdcId,omitempty"`
@@ -1109,6 +1182,12 @@ type SnapshotVolumesParam struct {
 	RetentionPeriodInMin string         `json:"retentionPeriodInMin,omitempty"`
 	AccessMode           string         `json:"accessModeLimit,omitempty"`
 	AllowOnExtManagedVol bool           `json:"allowOnExtManagedVol,omitempty"`
+}
+
+type CreateSnapshotParam struct {
+	SnapshotDefs         []*SnapshotDef `json:"snapshotDefs"`
+	RetentionPeriodInMin string         `json:"retentionPeriodInMin,omitempty"`
+	VolumeClass          string         `json:"volumeClass,omitempty"`
 }
 
 // SnapshotVolumesResp defines struct for SnapshotVolumesResp
@@ -1416,6 +1495,21 @@ type NAS struct {
 // CreateNASResponse defines the struct for CreateNASResponse
 type CreateNASResponse struct {
 	ID string `json:"id"`
+}
+
+// GetAllNASResponse defines the struct for GetAllNASResponse
+type NFSServer struct {
+	ID                           string `json:"id"`
+	HostName                     string `json:"host_name"`
+	NasServerID                  string `json:"nas_server_id"`
+	IsNFSv3Enabled               bool   `json:"is_nfsv3_enabled"`
+	IsNFSv4Enabled               bool   `json:"is_nfsv4_enabled"`
+	IsSecureEnabled              bool   `json:"is_secure_enabled"`
+	IsUseSMBConfigEnabled        bool   `json:"is_use_smb_config_enabled"`
+	ServicePrincipalName         string `json:"service_principal_name"`
+	IsJoined                     bool   `json:"is_joined"`
+	IsExtendedCredentialsEnabled bool   `json:"is_extended_credentials_enabled"`
+	CredentialsCacheTTL          int    `json:"credentials_cache_TTL"`
 }
 
 // PingNASParam defines the struct (payload) for Ping NAS
@@ -2088,6 +2182,12 @@ type ChangeNvmeHostMaxNumSysPortsParam struct {
 	MaxNumSysPorts IntString `json:"newMaxNumSysPorts"`
 }
 
+// UnmapVolumeNVMeParam defines struct for NVME HostID
+type UnmapVolumeNVMeParam struct {
+	HostID   string `json:"hostId,omitempty"`
+	AllHosts string `json:"allHosts,omitempty"`
+}
+
 // NvmeHostParam defines struct for creating an NVMe host
 type NvmeHostParam struct {
 	Name           string    `json:"name,omitempty"`
@@ -2190,4 +2290,154 @@ type LcmStatus struct {
 	LcmStatus      string `json:"lcmStatus"`
 	ClusterVersion string `json:"clusterVersion"`
 	ClusterBuild   string `json:"clusterBuild"`
+}
+
+type NodeCredentialWrapper struct {
+	XMLName          xml.Name         `xml:"asmCredential"`
+	ServerCredential ServerCredential `xml:"serverCredential"`
+}
+
+type ServerCredential struct {
+	XMLName  xml.Name `xml:"serverCredential"`
+	Username string   `xml:"username"`
+	Password string   `xml:"password"`
+	Label    string   `xml:"label"`
+	// Needed for SNMPv2
+	SNMPv2CommunityString string `xml:"snmpCommunityString,omitempty"`
+	// If SNMPv2 is Set this should be set to SSH
+	SNMPv2Protocol string `xml:"protocol,omitempty"`
+	// Needed for SNMPv3
+	SNMPv3SecurityName string `xml:"snmpv3UserName,omitempty"`
+	// Sets the level 1 2 or 3 for SNMPv3
+	SNMPv3SecurityLevel string `xml:"securityLevel,omitempty"`
+	// Required for SNMPv3 level 2 and 3
+	SNMPv3MD5AuthenticationPassword string `xml:"md5AuthenticationPassword,omitempty"`
+	// Required for SNMPv3 level 3
+	SNMPv3DesPrivatePassword string `xml:"desPrivacyPassword,omitempty"`
+	// Private Key Stringified in the .pem format
+	SSHPrivateKey string `xml:"sshPrivateKey,omitempty"`
+	// Required if Private Key is set
+	KeyPairName string `xml:"keyPairName,omitempty"`
+}
+
+type SwitchCredentialWrapper struct {
+	XMLName       xml.Name      `xml:"asmCredential"`
+	IomCredential IomCredential `xml:"iomCredential"`
+}
+
+type IomCredential struct {
+	XMLName  xml.Name `xml:"iomCredential"`
+	Username string   `xml:"username"`
+	Password string   `xml:"password"`
+	Label    string   `xml:"label"`
+	// Needed for SNMPv2
+	SNMPv2CommunityString string `xml:"snmpCommunityString"`
+	// For SNMPv2 this should be set to SSH
+	SNMPv2Protocol string `xml:"protocol"`
+	// Private Key Stringified in the .pem format
+	SSHPrivateKey string `xml:"sshPrivateKey,omitempty"`
+	// Required if Private Key is set
+	KeyPairName string `xml:"keyPairName,omitempty"`
+}
+
+type VCenterCredentialWrapper struct {
+	XMLName           xml.Name          `xml:"asmCredential"`
+	VCenterCredential VCenterCredential `xml:"vCenterCredential"`
+}
+
+type VCenterCredential struct {
+	XMLName  xml.Name `xml:"vCenterCredential"`
+	Username string   `xml:"username"`
+	Password string   `xml:"password"`
+	Label    string   `xml:"label"`
+	Domain   string   `xml:"domain"`
+}
+
+type ElementManagerCredentialWrapper struct {
+	XMLName      xml.Name     `xml:"asmCredential"`
+	EMCredential EMCredential `xml:"emCredential"`
+}
+
+type EMCredential struct {
+	XMLName  xml.Name `xml:"emCredential"`
+	Username string   `xml:"username"`
+	Password string   `xml:"password"`
+	Domain   string   `xml:"domain"`
+	Label    string   `xml:"label"`
+	// Needed for SNMPv2
+	SNMPv2CommunityString string `xml:"snmpCommunityString"`
+	// If SNMPv2 is Set this should be set to SSH
+	SNMPv2Protocol string `xml:"protocol"`
+}
+
+type GatewayCredentialWrapper struct {
+	XMLName           xml.Name          `xml:"asmCredential"`
+	ScaleIOCredential ScaleIOCredential `xml:"scaleIOCredential"`
+}
+
+type ScaleIOCredential struct {
+	XMLName       xml.Name `xml:"scaleIOCredential"`
+	AdminUsername string   `xml:"username"`
+	AdminPassword string   `xml:"password"`
+	Label         string   `xml:"label"`
+	OSUsername    string   `xml:"osUsername"`
+	OSPassword    string   `xml:"osPassword"`
+}
+
+type PresentationServerCredentialWrapper struct {
+	XMLName      xml.Name     `xml:"asmCredential"`
+	PSCredential PSCredential `xml:"PSCredential"`
+}
+
+type PSCredential struct {
+	XMLName  xml.Name `xml:"PSCredential"`
+	Label    string   `xml:"label"`
+	Username string   `xml:"username"`
+	Password string   `xml:"password"`
+}
+
+type OsAdminCredentialWrapper struct {
+	XMLName           xml.Name          `xml:"asmCredential"`
+	OSAdminCredential OSAdminCredential `xml:"OSCredential"`
+}
+
+type OSAdminCredential struct {
+	XMLName xml.Name `xml:"OSCredential"`
+	// Gets defaulted to root if not set
+	Username string `xml:"username"`
+	Password string `xml:"password"`
+	Label    string `xml:"label"`
+	// Private Key Stringified in the .pem format
+	SSHPrivateKey string `xml:"sshPrivateKey,omitempty"`
+	// Required if Private Key is set
+	KeyPairName string `xml:"keyPairName,omitempty"`
+}
+
+type OsUserCredentialWrapper struct {
+	XMLName          xml.Name         `xml:"asmCredential"`
+	OSUserCredential OSUserCredential `xml:"OSUserCredential"`
+}
+
+type OSUserCredential struct {
+	XMLName  xml.Name `xml:"OSUserCredential"`
+	Username string   `xml:"username"`
+	Password string   `xml:"password"`
+	Domain   string   `xml:"domain"`
+	Label    string   `xml:"label"`
+	// Private Key Stringified in the .pem format
+	SSHPrivateKey string `xml:"sshPrivateKey,omitempty"`
+	// Required if Private Key is set
+	KeyPairName string `xml:"keyPairName,omitempty"`
+}
+
+// SdcVolumeMetrics represents metrics for a single volume on a single SDC
+type SdcVolumeMetrics struct {
+	ReadLatencyBwc  BWC    `json:"readLatencyBwc"`
+	ReadBwc         BWC    `json:"readBwc"`
+	TrimBwc         BWC    `json:"trimBwc"`
+	TrimLatencyBwc  BWC    `json:"trimLatencyBwc"`
+	WriteBwc        BWC    `json:"writeBwc"`
+	WriteLatencyBwc BWC    `json:"writeLatencyBwc"`
+	VolumeID        string `json:"volumeId"`
+	SdcID           string `json:"sdcId"`
 }

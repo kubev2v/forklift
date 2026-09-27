@@ -30,6 +30,10 @@ type Sdc struct {
 	client *Client
 }
 
+var execCmd = func(cmd string, args ...string) ([]byte, error) {
+	return exec.Command(cmd, args...).Output()
+}
+
 // NewSdc returns a new Sdc
 func NewSdc(client *Client, sdc *types.Sdc) *Sdc {
 	return &Sdc{
@@ -132,26 +136,6 @@ func (s *System) FindSdc(field, value string) (*Sdc, error) {
 	return nil, errors.New("Couldn't find SDC")
 }
 
-// ApproveSdcByGUID approves the Sdc When the Powerflex Array is operating in Guid RestrictedSdcMode.
-func (s *System) ApproveSdcByGUID(sdcGUID string) (*types.ApproveSdcByGUIDResponse, error) {
-	defer TimeSpent("ApproveSdcByGUID", time.Now())
-
-	var resp types.ApproveSdcByGUIDResponse
-
-	path := fmt.Sprintf("/api/instances/System::%v/action/approveSdc", s.System.ID)
-
-	var body types.ApproveSdcParam = types.ApproveSdcParam{
-		SdcGUID: sdcGUID,
-	}
-
-	err := s.client.getJSONWithRetry(http.MethodPost, path, body, &resp)
-	if err != nil {
-		return nil, err
-	}
-
-	return &resp, nil
-}
-
 // GetStatistics returns a Sdc statistcs
 func (sdc *Sdc) GetStatistics() (*types.SdcStatistics, error) {
 	defer TimeSpent("GetStatistics", time.Now())
@@ -190,6 +174,21 @@ func (sdc *Sdc) GetVolume() ([]*types.Volume, error) {
 	return vols, nil
 }
 
+func (sdc *Sdc) GetVolumeMetrics() ([]*types.SdcVolumeMetrics, error) {
+	defer TimeSpent("GetVolume", time.Now())
+
+	sdcID := sdc.Sdc.ID
+	path := fmt.Sprintf("/api/instances/Sdc::%s/action/queryVolumeSdcBwc", sdcID)
+	body := struct{}{}
+	var metrics []*types.SdcVolumeMetrics
+	err := sdc.client.getJSONWithRetry(http.MethodPost, path, body, &metrics)
+	if err != nil {
+		return nil, err
+	}
+
+	return metrics, nil
+}
+
 // FindVolumes returns volumes
 func (sdc *Sdc) FindVolumes() ([]*Volume, error) {
 	defer TimeSpent("FindVolumes", time.Now())
@@ -217,7 +216,7 @@ func GetSdcLocalGUID() (string, error) {
 	// /bin/emc/scaleio/drv_cfg --query_guid
 	// sdcKernelGuid := "271bad82-08ee-44f2-a2b1-7e2787c27be1"
 
-	out, err := exec.Command("/opt/emc/scaleio/sdc/bin/drv_cfg", "--query_guid").Output()
+	out, err := execCmd("/opt/emc/scaleio/sdc/bin/drv_cfg", "--query_guid")
 	if err != nil {
 		return "", fmt.Errorf("GetSdcLocalGUID: query vols failed: %v", err)
 	}
@@ -365,9 +364,9 @@ func (s *System) SetApprovedIps(sdcID string, sdcApprovedIps []string) error {
 }
 
 // ApproveSdc approves an SDC
-func (s *System) ApproveSdc(approveSdcParam *types.ApproveSdcParam) (*types.ApproveSdcByGUIDResponse, error) {
+func (s *System) ApproveSdc(approveSdcParam *types.ApproveSdcParam) (*types.ApproveSdcResponse, error) {
 	defer TimeSpent("ApproveSdc", time.Now())
-	var resp types.ApproveSdcByGUIDResponse
+	var resp types.ApproveSdcResponse
 
 	path := fmt.Sprintf("/api/instances/System::%v/action/approveSdc", s.System.ID)
 	sdcParam := &types.ApproveSdcParam{

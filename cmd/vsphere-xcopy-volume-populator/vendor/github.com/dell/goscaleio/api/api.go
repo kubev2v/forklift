@@ -1,4 +1,4 @@
-// Copyright © 2019 - 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2019 - 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,17 +18,21 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	logger "github.com/dell/goscaleio/log"
 	types "github.com/dell/goscaleio/types/v1"
 )
 
@@ -41,12 +45,14 @@ const (
 	HeaderValContentTypeJSON = "application/json"
 	// headerValContentTypeBinaryOctetStream is key for binary/octet-stream
 	headerValContentTypeBinaryOctetStream = "binary/octet-stream"
+
+	// BearerAuthenticationMinVersion is the minimum version of PowerFlex that supports Bearer authentication
+	BearerAuthenticationMinVersion = 4.0
 )
 
 var (
 	errNewClient = errors.New("missing endpoint")
 	errSysCerts  = errors.New("Unable to initialize cert pool from system")
-	logger       = slog.New(slog.NewTextHandler(os.Stderr, nil))
 )
 
 // Client is an API client.
@@ -108,14 +114,53 @@ type Client interface {
 
 	// ParseJSONError parses the JSON in r into an error object
 	ParseJSONError(r *http.Response) error
+
+	// DoXMLRequest sends an HTTP request to the API.
+	DoXMLRequest(
+		ctx context.Context,
+		method, path, version string,
+		body, response interface{},
+	) (*http.Response, error)
+
+	// SetCustomHTTPHeaders sets custom HTTP headers that will be sent with every request
+	SetCustomHTTPHeaders(headers http.Header)
+
+	// GetCustomHTTPHeaders returns the current custom HTTP headers
+	GetCustomHTTPHeaders() http.Header
+}
+
+type SafeHeader struct {
+	mu     *sync.RWMutex
+	header http.Header
+}
+
+func NewSafeHeader() *SafeHeader {
+	return &SafeHeader{
+		mu:     &sync.RWMutex{},
+		header: make(http.Header),
+	}
+}
+
+func (s *SafeHeader) SetHeader(h http.Header) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.header = h.Clone() // clone to avoid external mutations
+}
+
+func (s *SafeHeader) GetHeader() http.Header {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	h := s.header.Clone()
+	return h // return a safe copy
 }
 
 type client struct {
-	http     *http.Client
-	host     string
-	token    string
-	showHTTP bool
-	debug    bool
+	http              *http.Client
+	host              string
+	token             string
+	showHTTP          bool
+	debug             bool
+	customHTTPHeaders *SafeHeader
 }
 
 // GetSecuredCipherSuites returns a slice of secured cipher suites.
@@ -136,6 +181,9 @@ type ClientOptions struct {
 
 	// UseCerts is a flag that indicates whether system certs should be loaded
 	UseCerts bool
+
+	// CAFilePath is the path to a custom CA certificate file
+	CAFilePath string
 
 	// Timeout specifies a time limit for requests made by this client.
 	Timeout time.Duration
@@ -159,8 +207,9 @@ func New(
 	host = strings.Replace(host, "/api", "", 1)
 
 	c := &client{
-		http: &http.Client{},
-		host: host,
+		http:              &http.Client{},
+		host:              host,
+		customHTTPHeaders: NewSafeHeader(),
 	}
 
 	if opts.Timeout != 0 {
@@ -181,6 +230,48 @@ func New(
 		pool, err := x509.SystemCertPool()
 		if err != nil {
 			return nil, errSysCerts
+		}
+
+		// Load custom CA certificate if provided
+		if opts.CAFilePath != "" {
+			// Open a restricted view rooted at the file's directory, then open the file by its base name.
+			dir := filepath.Dir(opts.CAFilePath)
+			base := filepath.Base(opts.CAFilePath)
+
+			root, err := os.OpenRoot(dir)
+			if err != nil {
+				return nil, fmt.Errorf("unable to read rootCA file %q: %v", opts.CAFilePath, err)
+			}
+
+			file, err := root.Open(base)
+			if err != nil {
+				return nil, fmt.Errorf("unable to read rootCA file %q: %v", opts.CAFilePath, err)
+			}
+			defer file.Close()
+
+			data, err := io.ReadAll(file)
+			if err != nil {
+				return nil, fmt.Errorf("unable to read rootCA file %q: %v", opts.CAFilePath, err)
+			}
+
+			block, _ := pem.Decode(data)
+			if block == nil || block.Type != "CERTIFICATE" {
+				return nil, fmt.Errorf("failed to decode PEM block containing certificate")
+			}
+
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse certificate: %v", err)
+			}
+
+			if !cert.IsCA {
+				return nil, fmt.Errorf("%s is not a CA", opts.CAFilePath)
+			}
+
+			ok := pool.AppendCertsFromPEM(data)
+			if !ok {
+				return nil, fmt.Errorf("failed to append CA certificate from file: %s", opts.CAFilePath)
+			}
 		}
 
 		c.http.Transport = &http.Transport{
@@ -272,7 +363,7 @@ func (c *client) DoWithHeaders(
 
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			c.doLog(logger.Error, err.Error())
+			logger.DoLog(logger.Log.Error, err.Error())
 		}
 	}()
 
@@ -286,7 +377,7 @@ func (c *client) DoWithHeaders(
 		}
 		dec := json.NewDecoder(res.Body)
 		if err = dec.Decode(resp); err != nil && err != io.EOF {
-			c.doLog(logger.Error, fmt.Sprintf("Error: %s Unable to decode response into %+v", err.Error(), resp))
+			logger.DoLog(logger.Log.Error, fmt.Sprintf("Error: %s Unable to decode response into %+v", err.Error(), resp))
 			return err
 		}
 	default:
@@ -339,7 +430,7 @@ func (c *client) DoAndGetResponseBody(
 
 		defer func() {
 			if err := r.Close(); err != nil {
-				c.doLog(logger.Error, err.Error())
+				logger.DoLog(logger.Log.Error, err.Error())
 			}
 		}()
 
@@ -393,6 +484,116 @@ func (c *client) DoAndGetResponseBody(
 		if c.token != "" {
 			// use Bearer Authentication if the powerflex array
 			// version >= 4.0
+			if ver >= BearerAuthenticationMinVersion {
+				bearer := "Bearer " + c.token
+				req.Header.Set("Authorization", bearer)
+			} else {
+				req.SetBasicAuth("", c.token)
+			}
+		}
+
+	} else {
+		if c.token != "" {
+			req.SetBasicAuth("", c.token)
+		}
+	}
+
+	for key, values := range c.customHTTPHeaders.GetHeader() {
+		for _, elem := range values {
+			req.Header.Add(key, elem)
+		}
+	}
+
+	if c.showHTTP {
+		logRequest(ctx, req, logger.DoLog)
+	}
+
+	// send the request
+	req = req.WithContext(ctx)
+	if res, err = c.http.Do(req); err != nil { // #nosec G704 - Request to user-provided gateway endpoint. This is intended SDK behavior where users configure their own gateway URL
+		return nil, err
+	}
+
+	if c.showHTTP {
+		logResponse(ctx, res, logger.DoLog)
+	}
+
+	return res, err
+}
+
+func (c *client) SetToken(token string) {
+	c.token = token
+}
+
+func (c *client) GetToken() string {
+	return c.token
+}
+
+func (c *client) DoXMLRequest(
+	ctx context.Context,
+	method, path, version string,
+	body, resp interface{},
+) (*http.Response, error) {
+	var (
+		err                error
+		req                *http.Request
+		res                *http.Response
+		ubf                = &bytes.Buffer{}
+		luri               = len(path)
+		hostEndsWithSlash  = endsWithSlash(c.host)
+		uriBeginsWithSlash = beginsWithSlash(path)
+	)
+	ubf.WriteString(c.host)
+
+	if !hostEndsWithSlash && (luri > 0) {
+		ubf.WriteString("/")
+	}
+
+	if luri > 0 {
+		if uriBeginsWithSlash {
+			ubf.WriteString(path[1:])
+		} else {
+			ubf.WriteString(path)
+		}
+	}
+
+	u, err := url.Parse(ubf.String())
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		xmlBody, err := xml.Marshal(body)
+		if err != nil {
+			logger.DoLog(logger.Log.Error, fmt.Sprintf("Error marshaling XML: %v", err))
+			return nil, err
+		}
+
+		// Create the HTTP request
+		req, err = http.NewRequest(method, u.String(), bytes.NewBuffer(xmlBody))
+		if err != nil {
+			logger.DoLog(logger.Log.Error, fmt.Sprintf("Error creating request: %v", err))
+			return nil, err
+		}
+	} else {
+		req, err = http.NewRequest(method, u.String(), nil)
+		if err != nil {
+			logger.DoLog(logger.Log.Error, fmt.Sprintf("Error creating request: %v", err))
+			return nil, err
+		}
+	}
+
+	req.Header.Set("Content-Type", "application/xml")
+	// add headers to the request
+	if version != "" {
+		ver, err := strconv.ParseFloat(version, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		// set the auth token
+		if c.token != "" {
+			// use Bearer Authentication if the powerflex array
+			// version >= 4.0
 			if ver >= 4.0 {
 				bearer := "Bearer " + c.token
 				req.Header.Set("Authorization", bearer)
@@ -407,29 +608,30 @@ func (c *client) DoAndGetResponseBody(
 		}
 	}
 
-	if c.showHTTP {
-		logRequest(ctx, req, c.doLog)
-	}
-
 	// send the request
 	req = req.WithContext(ctx)
-	if res, err = c.http.Do(req); err != nil {
+	if res, err = c.http.Do(req); err != nil { // #nosec G704 - Request to user-provided gateway endpoint. This is intended SDK behavior where users configure their own gateway URL
 		return nil, err
 	}
 
-	if c.showHTTP {
-		logResponse(ctx, res, c.doLog)
+	// parse the response
+	switch {
+	case res == nil:
+		return nil, nil
+	case res.StatusCode >= 200 && res.StatusCode <= 299:
+		if resp == nil {
+			return nil, nil
+		}
+		dec := json.NewDecoder(res.Body)
+		if err = dec.Decode(resp); err != nil && err != io.EOF {
+			logger.DoLog(logger.Log.Error, fmt.Sprintf("Error: %s Unable to decode response into %+v", err.Error(), resp))
+			return nil, err
+		}
+	default:
+		return nil, c.ParseJSONError(res)
 	}
 
 	return res, err
-}
-
-func (c *client) SetToken(token string) {
-	c.token = token
-}
-
-func (c *client) GetToken() string {
-	return c.token
 }
 
 func (c *client) ParseJSONError(r *http.Response) error {
@@ -454,11 +656,12 @@ func (c *client) ParseJSONError(r *http.Response) error {
 	return jsonError
 }
 
-func (c *client) doLog(
-	l func(msg string, args ...any),
-	msg string,
-) {
-	if c.debug {
-		l(msg)
-	}
+// SetCustomHTTPHeaders method register headers which will be sent with every request
+func (c *client) SetCustomHTTPHeaders(headers http.Header) {
+	c.customHTTPHeaders.SetHeader(headers)
+}
+
+// GetCustomHTTPHeaders method retrieves http headers
+func (c *client) GetCustomHTTPHeaders() http.Header {
+	return c.customHTTPHeaders.GetHeader()
 }

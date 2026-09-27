@@ -1,4 +1,4 @@
-// Copyright © 2019 - 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2019 - 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ package goscaleio
 //#
 
 // TranslateErrorCodeToErrorMessage translates an error code to error message
+// #nosec G101 - This file contains error code translations and user-facing error messages, not hardcoded credentials
 func TranslateErrorCodeToErrorMessage(code string) string {
 	errorCodeTranslationMap := map[string]string{
 		"ILLEGAL":                          "Illegal",

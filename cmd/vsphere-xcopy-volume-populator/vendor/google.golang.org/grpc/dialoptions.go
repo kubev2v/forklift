@@ -33,6 +33,7 @@ import (
 	"google.golang.org/grpc/internal/binarylog"
 	"google.golang.org/grpc/internal/transport"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/mem"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/stats"
 )
@@ -60,7 +61,7 @@ func init() {
 	internal.WithBinaryLogger = withBinaryLogger
 	internal.JoinDialOptions = newJoinDialOption
 	internal.DisableGlobalDialOptions = newDisableGlobalDialOptions
-	internal.WithRecvBufferPool = withRecvBufferPool
+	internal.WithBufferPool = withBufferPool
 }
 
 // dialOptions configure a Dial call. dialOptions are set by the DialOption
@@ -72,7 +73,7 @@ type dialOptions struct {
 	chainUnaryInts  []UnaryClientInterceptor
 	chainStreamInts []StreamClientInterceptor
 
-	cp                          Compressor
+	compressorV0                Compressor
 	dc                          Decompressor
 	bs                          internalbackoff.Strategy
 	block                       bool
@@ -86,15 +87,15 @@ type dialOptions struct {
 	disableServiceConfig        bool
 	disableRetry                bool
 	disableHealthCheck          bool
-	healthCheckFunc             internal.HealthChecker
 	minConnectTimeout           func() time.Duration
 	defaultServiceConfig        *ServiceConfig // defaultServiceConfig is parsed from defaultServiceConfigRawJSON.
 	defaultServiceConfigRawJSON *string
 	resolvers                   []resolver.Builder
 	idleTimeout                 time.Duration
-	recvBufferPool              SharedBufferPool
 	defaultScheme               string
 	maxCallAttempts             int
+	enableLocalDNSResolution    bool // Specifies if target hostnames should be resolved when proxying is enabled.
+	useProxy                    bool // Specifies if a server should be connected via proxy.
 }
 
 // DialOption configures how we set up the connection.
@@ -172,10 +173,8 @@ func newJoinDialOption(opts ...DialOption) DialOption {
 // If this option is set to true every connection will release the buffer after
 // flushing the data on the wire.
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a
-// later release.
+// Deprecated: shared write buffer is enabled by default. WithSharedWriteBuffer
+// will be removed in a future release.
 func WithSharedWriteBuffer(val bool) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.SharedWriteBuffer = val
@@ -212,6 +211,7 @@ func WithReadBufferSize(s int) DialOption {
 func WithInitialWindowSize(s int32) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.InitialWindowSize = s
+		o.copts.StaticWindowSize = true
 	})
 }
 
@@ -221,6 +221,42 @@ func WithInitialWindowSize(s int32) DialOption {
 func WithInitialConnWindowSize(s int32) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.InitialConnWindowSize = s
+		o.copts.StaticWindowSize = true
+	})
+}
+
+// WithStaticStreamWindowSize returns a DialOption which sets the initial
+// stream window size to the value provided and disables dynamic flow control.
+//
+// Note that this also disables dynamic flow control for the connection,
+// falling back to a default static connection-level window of 64KB. To
+// use a larger connection-level window, you must also use the
+// [WithStaticConnWindowSize] DialOption.
+//
+// Most users should not configure static flow control windows unless
+// operating in a memory-constrained environment.
+func WithStaticStreamWindowSize(s int32) DialOption {
+	return newFuncDialOption(func(o *dialOptions) {
+		o.copts.InitialWindowSize = s
+		o.copts.StaticWindowSize = true
+	})
+}
+
+// WithStaticConnWindowSize returns a DialOption which sets the initial
+// connection window size to the value provided and disables dynamic flow
+// control.
+//
+// Note that this also disables dynamic flow control for individual streams,
+// falling back to a default static connection-level window of 64KB. To
+// explicitly configure the stream-level window size, you must also use the
+// [WithStaticStreamWindowSize] DialOption.
+//
+// Most users should not configure static flow control windows unless
+// operating in a memory-constrained environment.
+func WithStaticConnWindowSize(s int32) DialOption {
+	return newFuncDialOption(func(o *dialOptions) {
+		o.copts.InitialConnWindowSize = s
+		o.copts.StaticWindowSize = true
 	})
 }
 
@@ -257,7 +293,7 @@ func WithCodec(c Codec) DialOption {
 // Deprecated: use UseCompressor instead.  Will be supported throughout 1.x.
 func WithCompressor(cp Compressor) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
-		o.cp = cp
+		o.compressorV0 = cp
 	})
 }
 
@@ -359,7 +395,7 @@ func WithReturnConnectionError() DialOption {
 //
 // Note that using this DialOption with per-RPC credentials (through
 // WithCredentialsBundle or WithPerRPCCredentials) which require transport
-// security is incompatible and will cause grpc.Dial() to fail.
+// security is incompatible and will cause RPCs to fail.
 //
 // Deprecated: use WithTransportCredentials and insecure.NewCredentials()
 // instead. Will be supported throughout 1.x.
@@ -378,7 +414,22 @@ func WithInsecure() DialOption {
 // later release.
 func WithNoProxy() DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
-		o.copts.UseProxy = false
+		o.useProxy = false
+	})
+}
+
+// WithLocalDNSResolution forces local DNS name resolution even when a proxy is
+// specified in the environment.  By default, the server name is provided
+// directly to the proxy as part of the CONNECT handshake. This is ignored if
+// WithNoProxy is used.
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+// later release.
+func WithLocalDNSResolution() DialOption {
+	return newFuncDialOption(func(o *dialOptions) {
+		o.enableLocalDNSResolution = true
 	})
 }
 
@@ -429,6 +480,11 @@ func WithTimeout(d time.Duration) DialOption {
 // returned by f, gRPC checks the error's Temporary() method to decide if it
 // should try to reconnect to the network address.
 //
+// Note that gRPC by default performs name resolution on the target passed to
+// NewClient. To bypass name resolution and cause the target string to be
+// passed directly to the dialer here instead, use the "passthrough" resolver
+// by specifying it in the target string, e.g. "passthrough:target".
+//
 // Note: All supported releases of Go (as of December 2023) override the OS
 // defaults for TCP keepalive time and interval to 15s. To enable TCP keepalive
 // with OS defaults for keepalive time and interval, use a net.Dialer that sets
@@ -436,17 +492,13 @@ func WithTimeout(d time.Duration) DialOption {
 // option to true from the Control field. For a concrete example of how to do
 // this, see internal.NetDialerWithTCPKeepalive().
 //
-// For more information, please see [issue 23459] in the Go github repo.
+// For more information, please see [issue 23459] in the Go GitHub repo.
 //
 // [issue 23459]: https://github.com/golang/go/issues/23459
 func WithContextDialer(f func(context.Context, string) (net.Conn, error)) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.Dialer = f
 	})
-}
-
-func init() {
-	internal.WithHealthCheckFunc = withHealthCheckFunc
 }
 
 // WithDialer returns a DialOption that specifies a function to use for dialing
@@ -518,6 +570,8 @@ func WithUserAgent(s string) DialOption {
 
 // WithKeepaliveParams returns a DialOption that specifies keepalive parameters
 // for the client transport.
+//
+// Keepalive is disabled by default.
 func WithKeepaliveParams(kp keepalive.ClientParameters) DialOption {
 	if kp.Time < internal.KeepaliveMinPingTime {
 		logger.Warningf("Adjusting keepalive ping interval to minimum period of %v", internal.KeepaliveMinPingTime)
@@ -568,6 +622,8 @@ func WithChainStreamInterceptor(interceptors ...StreamClientInterceptor) DialOpt
 
 // WithAuthority returns a DialOption that specifies the value to be used as the
 // :authority pseudo-header and as the server name in authentication handshake.
+// This overrides all other ways of setting authority on the channel, but can be
+// overridden per-call by using grpc.CallAuthority.
 func WithAuthority(a string) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.authority = a
@@ -660,30 +716,21 @@ func WithDisableHealthCheck() DialOption {
 	})
 }
 
-// withHealthCheckFunc replaces the default health check function with the
-// provided one. It makes tests easier to change the health check function.
-//
-// For testing purpose only.
-func withHealthCheckFunc(f internal.HealthChecker) DialOption {
-	return newFuncDialOption(func(o *dialOptions) {
-		o.healthCheckFunc = f
-	})
-}
-
 func defaultDialOptions() dialOptions {
 	return dialOptions{
 		copts: transport.ConnectOptions{
-			ReadBufferSize:  defaultReadBufSize,
-			WriteBufferSize: defaultWriteBufSize,
-			UseProxy:        true,
-			UserAgent:       grpcUA,
+			ReadBufferSize:    defaultReadBufSize,
+			WriteBufferSize:   defaultWriteBufSize,
+			SharedWriteBuffer: true,
+			UserAgent:         grpcUA,
+			BufferPool:        mem.DefaultBufferPool(),
 		},
-		bs:              internalbackoff.DefaultExponential,
-		healthCheckFunc: internal.HealthCheckFunc,
-		idleTimeout:     30 * time.Minute,
-		recvBufferPool:  nopBufferPool{},
-		defaultScheme:   "dns",
-		maxCallAttempts: defaultMaxCallAttempts,
+		bs:                       internalbackoff.DefaultExponential,
+		idleTimeout:              30 * time.Minute,
+		defaultScheme:            "dns",
+		maxCallAttempts:          defaultMaxCallAttempts,
+		useProxy:                 true,
+		enableLocalDNSResolution: false,
 	}
 }
 
@@ -758,25 +805,8 @@ func WithMaxCallAttempts(n int) DialOption {
 	})
 }
 
-// WithRecvBufferPool returns a DialOption that configures the ClientConn
-// to use the provided shared buffer pool for parsing incoming messages. Depending
-// on the application's workload, this could result in reduced memory allocation.
-//
-// If you are unsure about how to implement a memory pool but want to utilize one,
-// begin with grpc.NewSharedBufferPool.
-//
-// Note: The shared buffer pool feature will not be active if any of the following
-// options are used: WithStatsHandler, EnableTracing, or binary logging. In such
-// cases, the shared buffer pool will be ignored.
-//
-// Deprecated: use experimental.WithRecvBufferPool instead.  Will be deleted in
-// v1.60.0 or later.
-func WithRecvBufferPool(bufferPool SharedBufferPool) DialOption {
-	return withRecvBufferPool(bufferPool)
-}
-
-func withRecvBufferPool(bufferPool SharedBufferPool) DialOption {
+func withBufferPool(bufferPool mem.BufferPool) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
-		o.recvBufferPool = bufferPool
+		o.copts.BufferPool = bufferPool
 	})
 }
