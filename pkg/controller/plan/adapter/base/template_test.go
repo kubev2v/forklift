@@ -299,6 +299,14 @@ func TestResolveTargetVmName(t *testing.T) {
 		}
 	})
 
+	t.Run("replaces dots in the resolved target name", func(t *testing.T) {
+		p := &api.Plan{}
+		got := ResolveTargetVmName(p, vmID, "app.prod")
+		if got != "app-prod" {
+			t.Fatalf("got %q, want app-prod", got)
+		}
+	})
+
 	t.Run("whitespace-only targetName falls through to sanitization", func(t *testing.T) {
 		p := &api.Plan{
 			Spec: api.PlanSpec{
@@ -348,6 +356,29 @@ func TestResolveTargetVmName(t *testing.T) {
 		}
 		if errs := k8svalidation.IsDNS1123Label(got1); len(errs) > 0 {
 			t.Fatalf("fallback %q is not a valid DNS1123 label: %v", got1, errs)
+		}
+	})
+
+	t.Run("replaces dots with dashes to prevent invalid PVC template results", func(t *testing.T) {
+		p := &api.Plan{}
+		// Dotted names from ChangeVmName retain dots (e.g., "mtv.redhat.com" → "mtv.redhat.com" after sanitization)
+		got := ResolveTargetVmName(p, vmID, "mtv.redhat.com")
+		if got != "mtv-redhat-com" {
+			t.Fatalf("got %q, want mtv-redhat-com (dots must be replaced)", got)
+		}
+
+		// Spec overrides with dots should also be sanitized
+		p2 := &api.Plan{
+			Spec: api.PlanSpec{
+				VMs: []planapi.VM{{
+					Ref:        ref.Ref{ID: vmID},
+					TargetName: "override.name.com",
+				}},
+			},
+		}
+		got2 := ResolveTargetVmName(p2, vmID, "ignored")
+		if got2 != "override-name-com" {
+			t.Fatalf("got %q, want override-name-com (spec targetName dots must also be replaced)", got2)
 		}
 	})
 }

@@ -99,17 +99,22 @@ func SetPVCNameOnObject(objectMeta *metav1.ObjectMeta, templateStr string, useGe
 //  2. status.migration.vms[].newName — assigned during a previous migration run
 //  3. util.ChangeVmName(vmName) — automatic sanitization when vmName is not a valid DNS1123 label
 //  4. vmName as-is
+//
+// Dots are replaced with dashes to ensure valid PVC template results across all providers.
 func ResolveTargetVmName(p *api.Plan, vmID, vmName string) string {
+	var result string
 	if name := planOverrideName(p, vmID); name != "" {
-		return name
-	}
-	if errs := k8svalidation.IsDNS1123Label(vmName); len(errs) > 0 {
+		result = name
+	} else if errs := k8svalidation.IsDNS1123Label(vmName); len(errs) > 0 {
 		if hasAlphanumeric(vmName) {
-			return util.ChangeVmName(vmName)
+			result = util.ChangeVmName(vmName)
+		} else {
+			result = vmIDFallbackName(vmID)
 		}
-		return vmIDFallbackName(vmID)
+	} else {
+		result = vmName
 	}
-	return vmName
+	return strings.ReplaceAll(result, ".", "-")
 }
 
 // planOverrideName checks the plan for an explicit target name (spec.targetName

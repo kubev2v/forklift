@@ -13,6 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cnv "kubevirt.io/api/core/v1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
 func TestBuildNICKeys(t *testing.T) {
@@ -127,6 +128,23 @@ func TestMapMemoryUsesInstanceType(t *testing.T) {
 
 	if object.Template.Spec.Domain.Memory != nil {
 		t.Errorf("expected Memory to be nil when usesInstanceType is true, got %+v", object.Template.Spec.Domain.Memory)
+	}
+}
+
+func TestMapDataVolumeSanitizesDotsInTargetVMName(t *testing.T) {
+	builder := createBuilder()
+	builder.Plan.Spec.PVCNameTemplate = "{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}"
+	vm := &model.VM{}
+	vm.ID = "vm-1"
+	vm.Name = "mtv.redhat.com"
+	disk := hyperv.Disk{Base: hyperv.Base{ID: "disk-1"}, Capacity: 1024}
+
+	dv, err := builder.mapDataVolume(vm, disk, 0, &cdi.DataVolume{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if dv.GenerateName != "test-plan-mtv-redhat-com-disk-0-" {
+		t.Fatalf("GenerateName = %q, want %q", dv.GenerateName, "test-plan-mtv-redhat-com-disk-0-")
 	}
 }
 
