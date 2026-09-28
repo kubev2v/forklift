@@ -45,7 +45,8 @@ This document compares the EC2 provider with VMware (vSphere) and oVirt provider
 
 EC2 uniquely supports filtering VMs by AWS tags via `?label.key=value` query parameters.
 
-EC2 only supports cold migration due to its snapshot-based transfer model.
+EC2 only supports cold migration due to its snapshot-based transfer model. The controller
+stops the instance (if running) before the snapshots are taken.
 
 ## Limitations Summary
 
