@@ -1,0 +1,30 @@
+# Forklift-specific wrapper around virt-cluster-validate.
+#
+# The default is the amd64 VCV image built from the agreed upstream mtv_mvp
+# branch. Release and CI may override it only with another digest.
+ARG VIRT_CLUSTER_VALIDATE_IMAGE=quay.io/tiraboschi/virt-cluster-validate@sha256:8ad07476146aaa8549e2581bd63dceb84285fd47addfab05a288b19e16909d59
+FROM ${VIRT_CLUSTER_VALIDATE_IMAGE}
+
+USER 0
+COPY build/virt-validation/entrypoint.sh /usr/local/bin/forklift-virt-validation
+RUN chmod 0555 /usr/local/bin/forklift-virt-validation
+USER 1001
+
+ENTRYPOINT ["/usr/local/bin/forklift-virt-validation"]
+
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+LABEL \
+        com.redhat.component="mtv-virt-validation-container" \
+        name="migration-toolkit-virtualization/mtv-virt-validation" \
+        license="Apache License 2.0" \
+        io.k8s.display-name="Migration Toolkit for Virtualization" \
+        io.k8s.description="Migration Toolkit for Virtualization target virtualization validation" \
+        io.openshift.tags="migration,mtv,forklift,validation" \
+        summary="Migration Toolkit for Virtualization target virtualization validation" \
+        description="Forklift wrapper for virt-cluster-validate" \
+        vendor="Red Hat, Inc." \
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+        org.opencontainers.image.revision="$GIT_COMMIT" \
+        org.opencontainers.image.created="$BUILD_DATE" \
+        org.opencontainers.image.source="https://github.com/kubev2v/forklift"

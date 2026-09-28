@@ -226,6 +226,8 @@ rules:
   - clusterrolebindings
   verbs:
   - get
+  - list
+  - watch
   - patch
   - create
   - delete

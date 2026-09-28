@@ -11,6 +11,8 @@ relatedImages:
     image: ${MUST_GATHER_IMAGE}
   - name: validation
     image: ${VALIDATION_IMAGE}
+  - name: virt_validation
+    image: ${VIRT_VALIDATION_IMAGE}
   - name: api
     image: ${API_IMAGE}
   - name: populator_controller

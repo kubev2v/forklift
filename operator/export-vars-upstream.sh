@@ -26,6 +26,14 @@ images[CLI_DOWNLOAD_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklif
 
 images[VALIDATION_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/validation@sha256:58edf1e9d49c33bdd62abcd632a61ba61e68b8977f3f57e9feb93c1dd4f07fb6
 
+# Replaced with a promoted digest when the VCV-derived image is available.
+images[VIRT_VALIDATION_IMAGE]=registry.invalid/kubev2v/forklift-virt-validation@sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+if [[ "${images[VIRT_VALIDATION_IMAGE]}" == registry.invalid/* ]]; then
+    echo "VIRT_VALIDATION_IMAGE must be replaced with a promoted image digest" >&2
+    exit 1
+fi
+
 images[VIRT_V2V_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/virt-v2v@sha256:9a8548cf4439121ceaa7a8d626d6c6f1f9280f63b2daf471d24fd62c8185a3f4
 
 images[VIRT_V2V_IMAGE_RHEL9]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/virt-v2v-rhel9@sha256:0000000000000000000000000000000000000000000000000000000000000000
