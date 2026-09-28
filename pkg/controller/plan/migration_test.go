@@ -2,18 +2,27 @@
 package plan
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var _ = ginkgo.Describe("VMStatus", func() {
@@ -282,6 +291,66 @@ var _ = ginkgo.Describe("Cancellation", func() {
 	})
 })
 
+func TestCutoverFor(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	globalCutover := meta.NewTime(time.Now().Add(-time.Hour))
+
+	t.Run("returns global cutover when no per-VM cutover is set", func(t *testing.T) {
+		g := gomega.NewGomegaWithT(t)
+		spec := &api.MigrationSpec{Cutover: &globalCutover}
+		result := spec.CutoverFor(ref.Ref{ID: "vm-1", Name: "test-vm"})
+		g.Expect(result).To(gomega.Equal(&globalCutover))
+	})
+
+	t.Run("returns nil when no cutover is set at all", func(t *testing.T) {
+		g := gomega.NewGomegaWithT(t)
+		spec := &api.MigrationSpec{}
+		result := spec.CutoverFor(ref.Ref{ID: "vm-1", Name: "test-vm"})
+		g.Expect(result).To(gomega.BeNil())
+	})
+
+	t.Run("returns per-VM cutover when it matches", func(t *testing.T) {
+		g := gomega.NewGomegaWithT(t)
+		vmCutoverTime := meta.NewTime(time.Now().Add(-30 * time.Minute))
+		spec := &api.MigrationSpec{
+			Cutover: &globalCutover,
+			VMCutover: []api.VMCutover{
+				{ID: "vm-1", Cutover: vmCutoverTime},
+			},
+		}
+		result := spec.CutoverFor(ref.Ref{ID: "vm-1", Name: "test-vm"})
+		g.Expect(result.Time).To(gomega.Equal(vmCutoverTime.Time))
+	})
+
+	t.Run("falls back to global cutover for unlisted VMs", func(t *testing.T) {
+		g := gomega.NewGomegaWithT(t)
+		vmCutoverTime := meta.NewTime(time.Now().Add(-30 * time.Minute))
+		spec := &api.MigrationSpec{
+			Cutover: &globalCutover,
+			VMCutover: []api.VMCutover{
+				{ID: "vm-1", Cutover: vmCutoverTime},
+			},
+		}
+		result := spec.CutoverFor(ref.Ref{ID: "vm-2", Name: "other-vm"})
+		g.Expect(result).To(gomega.Equal(&globalCutover))
+	})
+
+	t.Run("skips matching when VM ref has no ID", func(t *testing.T) {
+		g := gomega.NewGomegaWithT(t)
+		vmCutoverTime := meta.NewTime(time.Now().Add(-30 * time.Minute))
+		spec := &api.MigrationSpec{
+			Cutover: &globalCutover,
+			VMCutover: []api.VMCutover{
+				{ID: "vm-1", Cutover: vmCutoverTime},
+			},
+		}
+		result := spec.CutoverFor(ref.Ref{Name: "test-vm"})
+		g.Expect(result).To(gomega.Equal(&globalCutover))
+	})
+
+	_ = g // parent scope used for table-level setup
+}
+
 func TestMarkSchedulerQueuedVMs(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
@@ -346,4 +415,298 @@ func TestExecuteClearsSchedulerPendingCondition(t *testing.T) {
 	err := m.execute(vm)
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	g.Expect(vm.HasCondition(api.ConditionPending)).To(gomega.BeFalse())
+}
+
+func TestResolveCsiPVCs(t *testing.T) {
+	pvcWithSource := func(name, diskSource string) *core.PersistentVolumeClaim {
+		return &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:        name,
+				Annotations: map[string]string{base.AnnDiskSource: diskSource},
+			},
+		}
+	}
+	specWithSource := func(diskSource string) core.PersistentVolumeClaim {
+		return core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{Annotations: map[string]string{base.AnnDiskSource: diskSource}},
+		}
+	}
+
+	tests := []struct {
+		name          string
+		csiSpecs      []core.PersistentVolumeClaim
+		migrationPVCs []*core.PersistentVolumeClaim
+		wantNames     []string
+	}{
+		{
+			name:          "basic match",
+			csiSpecs:      []core.PersistentVolumeClaim{specWithSource("disk-a")},
+			migrationPVCs: []*core.PersistentVolumeClaim{pvcWithSource("pvc-a", "disk-a")},
+			wantNames:     []string{"pvc-a"},
+		},
+		{
+			name:          "no match",
+			csiSpecs:      []core.PersistentVolumeClaim{specWithSource("disk-a")},
+			migrationPVCs: []*core.PersistentVolumeClaim{pvcWithSource("pvc-b", "disk-b")},
+			wantNames:     nil,
+		},
+		{
+			name: "selective match among several",
+			csiSpecs: []core.PersistentVolumeClaim{
+				specWithSource("disk-a"),
+				specWithSource("disk-b"),
+			},
+			migrationPVCs: []*core.PersistentVolumeClaim{
+				pvcWithSource("pvc-a", "disk-a"),
+				pvcWithSource("pvc-b", "disk-b"),
+				pvcWithSource("pvc-c", "disk-c"),
+			},
+			wantNames: []string{"pvc-a", "pvc-b"},
+		},
+		{
+			name:     "PVC with no disk source annotation is excluded",
+			csiSpecs: []core.PersistentVolumeClaim{specWithSource("disk-a")},
+			migrationPVCs: []*core.PersistentVolumeClaim{
+				pvcWithSource("pvc-a", "disk-a"),
+				{ObjectMeta: meta.ObjectMeta{Name: "lun-pvc"}}, // no AnnDiskSource, e.g. a LUN PVC
+			},
+			wantNames: []string{"pvc-a"},
+		},
+		{
+			name: "empty disk source never matches empty disk source",
+			csiSpecs: []core.PersistentVolumeClaim{
+				{ObjectMeta: meta.ObjectMeta{}}, // no AnnDiskSource set
+			},
+			migrationPVCs: []*core.PersistentVolumeClaim{
+				{ObjectMeta: meta.ObjectMeta{Name: "pvc-empty"}}, // also no AnnDiskSource
+			},
+			wantNames: nil,
+		},
+		{
+			name:          "empty built specs",
+			csiSpecs:      nil,
+			migrationPVCs: []*core.PersistentVolumeClaim{pvcWithSource("pvc-a", "disk-a")},
+			wantNames:     nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			g := gomega.NewGomegaWithT(t)
+			matched := resolveCsiPVCs(tc.csiSpecs, tc.migrationPVCs)
+			var gotNames []string
+			for _, pvc := range matched {
+				gotNames = append(gotNames, pvc.Name)
+			}
+			g.Expect(gotNames).To(gomega.Equal(tc.wantNames))
+		})
+	}
+}
+
+func TestIsImportAuthFailure(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	terminatedPod := func(message string, exitCode int32) *core.Pod {
+		return &core.Pod{
+			Status: core.PodStatus{
+				ContainerStatuses: []core.ContainerStatus{{
+					State: core.ContainerState{
+						Terminated: &core.ContainerStateTerminated{
+							ExitCode: exitCode,
+							Message:  message,
+						},
+					},
+				}},
+			},
+		}
+	}
+
+	lastTerminatedPod := func(message string, exitCode int32) *core.Pod {
+		return &core.Pod{
+			Status: core.PodStatus{
+				ContainerStatuses: []core.ContainerStatus{{
+					LastTerminationState: core.ContainerState{
+						Terminated: &core.ContainerStateTerminated{
+							ExitCode: exitCode,
+							Message:  message,
+						},
+					},
+				}},
+			},
+		}
+	}
+
+	g.Expect(isImportAuthFailure(terminatedPod("http: expected status code 200, got 401. Status: 401 Unauthorized", 1))).To(gomega.BeTrue())
+	g.Expect(isImportAuthFailure(terminatedPod("request failed: 401 Unauthorized from endpoint", 1))).To(gomega.BeTrue())
+	g.Expect(isImportAuthFailure(terminatedPod("download failed with status code 401", 1))).To(gomega.BeTrue())
+	g.Expect(isImportAuthFailure(lastTerminatedPod("got 401 from server", 1))).To(gomega.BeTrue())
+
+	g.Expect(isImportAuthFailure(terminatedPod("got 403 Forbidden", 1))).To(gomega.BeFalse())
+	g.Expect(isImportAuthFailure(terminatedPod("connection reset", 1))).To(gomega.BeFalse())
+	g.Expect(isImportAuthFailure(terminatedPod("got 401", 0))).To(gomega.BeFalse())
+	g.Expect(isImportAuthFailure(&core.Pod{})).To(gomega.BeFalse())
+}
+
+func TestMaybeRefreshImportCredentials(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	g.Expect(core.AddToScheme(scheme)).To(gomega.Succeed())
+	g.Expect(cdi.AddToScheme(scheme)).To(gomega.Succeed())
+
+	dv := &cdi.DataVolume{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "test-dv",
+			Namespace: "target-ns",
+		},
+	}
+	importer := authFailureImporterPod()
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(dv, importer).Build()
+
+	refresher := &stubImportCredentialRefresher{refreshed: true}
+	m := &Migration{
+		Context: &plancontext.Context{
+			Destination: plancontext.Destination{Client: client},
+			Log:         logging.WithName("test"),
+		},
+		builder: refresher,
+	}
+	vm := &plan.VMStatus{
+		VM: plan.VM{Ref: ref.Ref{ID: "vm-1", Name: "test-vm"}},
+	}
+
+	m.maybeRefreshImportCredentials(vm, dv, importer)
+
+	g.Expect(refresher.calls).To(gomega.Equal(1))
+	updated := &cdi.DataVolume{}
+	g.Expect(client.Get(context.TODO(), types.NamespacedName{Namespace: dv.Namespace, Name: dv.Name}, updated)).To(gomega.Succeed())
+	g.Expect(updated.Annotations[annCookieRefreshedAt]).NotTo(gomega.BeEmpty())
+	err := client.Get(context.TODO(), types.NamespacedName{Namespace: importer.Namespace, Name: importer.Name}, &core.Pod{})
+	g.Expect(k8serr.IsNotFound(err)).To(gomega.BeTrue())
+
+	// Cooldown: a second refresh within the window must be skipped.
+	refresher.calls = 0
+	importer2 := importer.DeepCopy()
+	importer2.ResourceVersion = ""
+	g.Expect(client.Create(context.TODO(), importer2)).To(gomega.Succeed())
+	m.maybeRefreshImportCredentials(vm, updated, importer2)
+	g.Expect(refresher.calls).To(gomega.Equal(0))
+}
+
+func TestMaybeRefreshImportCredentials_NotRefreshed(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	g.Expect(core.AddToScheme(scheme)).To(gomega.Succeed())
+	g.Expect(cdi.AddToScheme(scheme)).To(gomega.Succeed())
+
+	dv := &cdi.DataVolume{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "test-dv",
+			Namespace: "target-ns",
+		},
+	}
+	importer := authFailureImporterPod()
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(dv, importer).Build()
+
+	refresher := &stubImportCredentialRefresher{refreshed: false}
+	m := &Migration{
+		Context: &plancontext.Context{
+			Destination: plancontext.Destination{Client: client},
+			Log:         logging.WithName("test"),
+		},
+		builder: refresher,
+	}
+	vm := &plan.VMStatus{
+		VM: plan.VM{Ref: ref.Ref{ID: "vm-1", Name: "test-vm"}},
+	}
+
+	m.maybeRefreshImportCredentials(vm, dv, importer)
+
+	g.Expect(refresher.calls).To(gomega.Equal(1))
+	updated := &cdi.DataVolume{}
+	g.Expect(client.Get(context.TODO(), types.NamespacedName{Namespace: dv.Namespace, Name: dv.Name}, updated)).To(gomega.Succeed())
+	g.Expect(updated.Annotations[annCookieRefreshedAt]).To(gomega.BeEmpty())
+	err := client.Get(context.TODO(), types.NamespacedName{Namespace: importer.Namespace, Name: importer.Name}, &core.Pod{})
+	g.Expect(k8serr.IsNotFound(err)).To(gomega.BeFalse())
+}
+
+func TestMaybeRefreshImportCredentials_NonAuthFailure(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	scheme := runtime.NewScheme()
+	g.Expect(core.AddToScheme(scheme)).To(gomega.Succeed())
+	g.Expect(cdi.AddToScheme(scheme)).To(gomega.Succeed())
+
+	dv := &cdi.DataVolume{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "test-dv",
+			Namespace: "target-ns",
+		},
+	}
+	importer := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "importer-test-dv",
+			Namespace: "target-ns",
+		},
+		Status: core.PodStatus{
+			ContainerStatuses: []core.ContainerStatus{{
+				State: core.ContainerState{
+					Terminated: &core.ContainerStateTerminated{
+						ExitCode: 1,
+						Message:  "connection reset by peer",
+					},
+				},
+			}},
+		},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(dv, importer).Build()
+
+	refresher := &stubImportCredentialRefresher{refreshed: true}
+	m := &Migration{
+		Context: &plancontext.Context{
+			Destination: plancontext.Destination{Client: client},
+			Log:         logging.WithName("test"),
+		},
+		builder: refresher,
+	}
+	vm := &plan.VMStatus{
+		VM: plan.VM{Ref: ref.Ref{ID: "vm-1", Name: "test-vm"}},
+	}
+
+	m.maybeRefreshImportCredentials(vm, dv, importer)
+
+	g.Expect(refresher.calls).To(gomega.Equal(0))
+	err := client.Get(context.TODO(), types.NamespacedName{Namespace: importer.Namespace, Name: importer.Name}, &core.Pod{})
+	g.Expect(k8serr.IsNotFound(err)).To(gomega.BeFalse())
+}
+
+func authFailureImporterPod() *core.Pod {
+	return &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "importer-test-dv",
+			Namespace: "target-ns",
+		},
+		Status: core.PodStatus{
+			ContainerStatuses: []core.ContainerStatus{{
+				State: core.ContainerState{
+					Terminated: &core.ContainerStateTerminated{
+						ExitCode: 1,
+						Message:  "http: expected status code 200, got 401. Status: 401 Unauthorized",
+					},
+				},
+			}},
+		},
+	}
+}
+
+type stubImportCredentialRefresher struct {
+	base.Builder
+	refreshed bool
+	calls     int
+}
+
+func (s *stubImportCredentialRefresher) RefreshImportCredentials(_ *cdi.DataVolume) (bool, error) {
+	s.calls++
+	return s.refreshed, nil
 }

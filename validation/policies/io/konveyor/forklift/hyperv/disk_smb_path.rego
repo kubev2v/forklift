@@ -24,6 +24,6 @@ concerns contains flag if {
 		"id": "hyperv.disk.smb_path.missing",
 		"category": "Warning",
 		"label": sprintf("Disk '%v' cannot be mapped to SMB share", [disk.name]),
-		"assessment": sprintf("Cannot map Windows path '%v' to SMB share. Ensure the disk is located on a configured SMB share.", [disk.windowsPath]),
+		"assessment": sprintf("Cannot map Windows path '%v' to SMB share. Ensure the disk is located on a configured SMB share. In multi-node clusters, disks local to a node that does not host the SMB share are not accessible — move the disk to shared storage or to the SMB-shared directory.", [disk.windowsPath]),
 	}
 }

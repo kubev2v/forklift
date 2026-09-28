@@ -117,7 +117,8 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		return
 	}
 
-	storageMapIn := r.Context.Map.Storage.Spec.Map
+	diskIndex := 0
+	storageMapIn := r.Map.Storage.Spec.Map
 	for i := range storageMapIn {
 		mapped := &storageMapIn[i]
 		ref := mapped.Source
@@ -130,11 +131,12 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		for _, disk := range vm.Disks {
 			if disk.ID == storage.ID {
 				var dv *cdi.DataVolume
-				dv, err = r.mapDataVolume(disk, mapped.Destination, dvTemplate)
+				dv, err = r.mapDataVolume(vm, disk, mapped.Destination, diskIndex, dvTemplate)
 				if err != nil {
 					return
 				}
 				dvs = append(dvs, *dv)
+				diskIndex++
 			}
 		}
 	}
@@ -142,7 +144,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	return
 }
 
-func (r *Builder) mapDataVolume(disk ovfmodel.Disk, destination api.DestinationStorage, dvTemplate *cdi.DataVolume) (dv *cdi.DataVolume, err error) {
+func (r *Builder) mapDataVolume(vm *model.VM, disk ovfmodel.Disk, destination api.DestinationStorage, diskIndex int, dvTemplate *cdi.DataVolume) (dv *cdi.DataVolume, err error) {
 	diskSize, err := getResourceCapacity(disk.Capacity, disk.CapacityAllocationUnits)
 	if err != nil {
 		return
@@ -162,8 +164,6 @@ func (r *Builder) mapDataVolume(disk ovfmodel.Disk, destination api.DestinationS
 			StorageClassName: &storageClass,
 		},
 	}
-	// set the access mode and volume mode if they were specified in the storage map.
-	// otherwise, let the storage profile decide the default values.
 	if destination.AccessMode != "" {
 		dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{destination.AccessMode}
 	}
@@ -174,14 +174,26 @@ func (r *Builder) mapDataVolume(disk ovfmodel.Disk, destination api.DestinationS
 	dv = dvTemplate.DeepCopy()
 	dv.Spec = dvSpec
 	updateDataVolumeAnnotations(dv, &disk)
+
+	templateData := &api.PVCNameTemplateData{
+		VmName:       vm.Name,
+		TargetVmName: planbase.ResolveTargetVmName(r.Plan, vm.ID, vm.Name),
+		PlanName:     r.Plan.Name,
+		DiskIndex:    diskIndex,
+		VmId:         vm.ID,
+	}
+	pvcNameTemplate := planbase.GetPVCNameTemplate(r.Plan, vm.ID)
+	if nameErr := planbase.SetPVCNameOnObject(&dv.ObjectMeta, pvcNameTemplate, planbase.GetPVCNameTemplateUseGenerateName(r.Plan), templateData); nameErr != nil {
+		err = liberr.Wrap(nameErr, "vm", vm.ID, "diskIndex", diskIndex)
+	}
 	return
 }
 
 func updateDataVolumeAnnotations(dv *cdi.DataVolume, disk *ovfmodel.Disk) {
-	if dv.ObjectMeta.Annotations == nil {
-		dv.ObjectMeta.Annotations = make(map[string]string)
+	if dv.Annotations == nil {
+		dv.Annotations = make(map[string]string)
 	}
-	dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = getDiskFullPath(disk)
+	dv.Annotations[planbase.AnnDiskSource] = getDiskFullPath(disk)
 }
 
 // Create the destination Kubevirt VM.
@@ -405,6 +417,7 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []*core.Persiste
 					Bus: Virtio,
 				},
 			},
+			Serial: planbase.DiskSerial(disk.DiskId, vm.ID, i),
 		}
 		kVolumes = append(kVolumes, volume)
 		kDisks = append(kDisks, kubevirtDisk)
@@ -472,7 +485,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 }
 
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	return trimBackingFileName(dv.ObjectMeta.Annotations[planbase.AnnDiskSource])
+	return trimBackingFileName(dv.Annotations[planbase.AnnDiskSource])
 }
 
 // Return a stable identifier for a PersistentDataVolume.
@@ -566,8 +579,8 @@ func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.Persiste
 	return
 }
 
-func (r *Builder) PopulatorXcopyUsed(_ *core.PersistentVolumeClaim) (string, bool, error) {
-	return "", false, nil
+func (r *Builder) PopulatorOffloadInfo(_ *core.PersistentVolumeClaim) (map[string]string, error) {
+	return map[string]string{}, nil
 }
 
 func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error) {
@@ -592,6 +605,14 @@ func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) ([]co
 
 func (r *Builder) CsiImportPVCs(_ ref.Ref, _ map[string]string) ([]core.PersistentVolumeClaim, error) {
 	return nil, nil
+}
+
+func (r *Builder) AdoptDownloadCookieSecretOwner(_ *cdi.DataVolume) error {
+	return nil
+}
+
+func (r *Builder) RefreshImportCredentials(_ *cdi.DataVolume) (bool, error) {
+	return false, nil
 }
 
 func (r *Builder) SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *api.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error) {

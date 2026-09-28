@@ -168,4 +168,54 @@ var (
 			"target",
 		},
 	)
+
+	// 'result' - [success, failure]
+	// 'migration' - [Migration UID]
+	// 'owner_uid' - [PVC UID]
+	// 'storage_vendor' - [ontap, powermax, ...]
+	// 'clone_method' - [vib, vddk]
+	// 'xcopy_used' - [0, 1]
+	// 'storage_protocol' - [iscsi, fc, nfs]
+	// 'vib_version' - [VIB version string, "unknown"]
+	xcopyDurationGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "mtv_vsphere_xcopy_volume_populator_copy_duration_seconds",
+		Help: "Duration of copy-offload operation in seconds per disk",
+	},
+		[]string{
+			"result",
+			"migration",
+			"owner_uid",
+			"storage_vendor",
+			"clone_method",
+			"xcopy_used",
+			"storage_protocol",
+			"vib_version",
+		},
+	)
+
+	// 'result' - [success, failure]
+	// 'migration' - [Migration UID]
+	// 'owner_uid' - [PVC UID]
+	// 'storage_vendor' - [ontap, powermax, ...]
+	// 'clone_method' - [vib, vddk]
+	// 'xcopy_used' - [0, 1]
+	// 'storage_protocol' - [iscsi, fc, nfs]
+	// 'vib_version' - [VIB version string, "unknown"]
+	// 'type' - [provisioned, datastore_allocated]
+	xcopySourceDiskBytesGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "mtv_vsphere_xcopy_volume_populator_source_disk_bytes",
+		Help: "Source disk size in bytes per disk. type=provisioned is guest-visible size; type=datastore_allocated is actual data on datastore",
+	},
+		[]string{
+			"result",
+			"migration",
+			"owner_uid",
+			"storage_vendor",
+			"clone_method",
+			"xcopy_used",
+			"storage_protocol",
+			"vib_version",
+			"type",
+		},
+	)
 )

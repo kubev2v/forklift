@@ -71,6 +71,9 @@ func Describe(configFlags *genericclioptions.ConfigFlags, mappingType, name, nam
 			{Display: "SOURCE", Key: "source"},
 			{Display: "DESTINATION", Key: "destination"},
 		}
+		if mappingType == "network" {
+			headers = append(headers, describe.TableColumn{Display: "IP MODE", Key: "ipMode"})
+		}
 
 		rows := make([]map[string]string, 0, len(mapEntries))
 		for _, entry := range mapEntries {
@@ -78,10 +81,15 @@ func Describe(configFlags *genericclioptions.ConfigFlags, mappingType, name, nam
 			if !ok {
 				continue
 			}
-			rows = append(rows, map[string]string{
+			row := map[string]string{
 				"source":      formatMappingEntry(entryMap, "source"),
 				"destination": formatMappingEntry(entryMap, "destination"),
-			})
+			}
+			if mappingType == "network" {
+				ipMode, _ := entryMap["networkIPMode"].(string)
+				row["ipMode"] = ipMode
+			}
+			rows = append(rows, row)
 		}
 		b.Table(headers, rows)
 	}

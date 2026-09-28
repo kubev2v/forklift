@@ -136,7 +136,7 @@ func (h Endpoint) Get(ctx *gin.Context) {
 
 func (h Endpoint) List(ctx *gin.Context) {
 	// Watch request.
-	h.Watched.Prepare(ctx)
+	h.Prepare(ctx)
 	if h.WatchRequest {
 		err := h.Watch(
 			ctx,

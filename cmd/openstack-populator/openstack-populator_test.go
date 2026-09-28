@@ -37,11 +37,11 @@ func setupMockServer() (*httptest.Server, string, int, error) {
                 ]
             }
         }`, baseURL)
-		fmt.Fprint(w, response)
+		_, _ = fmt.Fprint(w, response)
 	})
 
 	mux.HandleFunc("/v2/images/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, `mock_data`)
+		_, _ = fmt.Fprintln(w, `mock_data`)
 	})
 
 	mux.HandleFunc("/v3/auth/tokens", func(w http.ResponseWriter, r *http.Request) {
@@ -116,7 +116,7 @@ func setupMockServer() (*httptest.Server, string, int, error) {
 			identityServer,
 			imageServiceURL)
 
-		fmt.Fprint(w, response)
+		_, _ = fmt.Fprint(w, response)
 	})
 
 	server := httptest.NewUnstartedServer(mux)
@@ -128,14 +128,14 @@ func setupMockServer() (*httptest.Server, string, int, error) {
 }
 
 func TestPopulate(t *testing.T) {
-	os.Setenv("username", "testuser")
-	os.Setenv("password", "testpassword")
-	os.Setenv("projectName", "Default")
-	os.Setenv("domainName", "Default")
-	os.Setenv("insecureSkipVerify", "true")
-	os.Setenv("availability", "public")
-	os.Setenv("regionName", "RegionOne")
-	os.Setenv("authType", "password")
+	t.Setenv("username", "testuser")
+	t.Setenv("password", "testpassword")
+	t.Setenv("projectName", "Default")
+	t.Setenv("domainName", "Default")
+	t.Setenv("insecureSkipVerify", "true")
+	t.Setenv("availability", "public")
+	t.Setenv("regionName", "RegionOne")
+	t.Setenv("authType", "password")
 
 	server, identityServerURL, port, err := setupMockServer()
 	if err != nil {
@@ -166,7 +166,7 @@ func TestPopulate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open file: %v", err)
 	}
-	defer file.Close() // Ensure the file is closed after reading
+	defer func() { _ = file.Close() }() // Ensure the file is closed after reading
 
 	content, err := io.ReadAll(file)
 	if err != nil {
@@ -177,5 +177,5 @@ func TestPopulate(t *testing.T) {
 		t.Errorf("Expected %s, got %s", "mock_data", string(content))
 	}
 
-	os.Remove(fileName)
+	_ = os.Remove(fileName)
 }

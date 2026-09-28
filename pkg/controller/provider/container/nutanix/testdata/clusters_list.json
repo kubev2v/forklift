@@ -1,0 +1,158 @@
+{
+  "api_version": "3.1",
+  "metadata": {
+    "total_matches": 2,
+    "kind": "cluster",
+    "length": 2,
+    "offset": 0
+  },
+  "entities": [
+    {
+      "metadata": {
+        "kind": "cluster",
+        "uuid": "0005e123-4567-89ab-cdef-000000000001",
+        "spec_version": 1,
+        "name": "prod-cluster-01",
+        "categories": {}
+      },
+      "spec": {
+        "name": "prod-cluster-01",
+        "resources": {
+          "config": {
+            "service_list": [
+              "AOS"
+            ],
+            "timezone": "America/Los_Angeles",
+            "build": {
+              "version": "6.8.2",
+              "build_type": "release"
+            },
+            "cluster_arch": "X86_64",
+            "is_available": true
+          }
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "config": {
+            "cluster_arch": "X86_64",
+            "build": {
+              "version": "6.8.2",
+              "build_type": "release",
+              "full_version": "el7.nutanix.20240802.100"
+            },
+            "service_list": [
+              "AOS"
+            ],
+            "timezone": "America/Los_Angeles",
+            "operation_mode": "NORMAL",
+            "encryption_status": "DISABLED"
+          },
+          "network": {
+            "external_ip": "10.10.1.100",
+            "masquerading_ip": "10.10.1.100",
+            "masquerading_port": 9440,
+            "ntp_server_ip_list": [
+              "0.pool.ntp.org",
+              "1.pool.ntp.org"
+            ],
+            "smtp_server": {
+              "email_address": "alerts@example.com"
+            }
+          },
+          "nodes": {
+            "hypervisor_server_list": [
+              {
+                "ip": "10.10.1.101",
+                "version": "el7.nutanix.20240802.100",
+                "type": "AHV"
+              },
+              {
+                "ip": "10.10.1.102",
+                "version": "el7.nutanix.20240802.100",
+                "type": "AHV"
+              }
+            ]
+          },
+          "analysis": {
+            "vm_count": 25,
+            "storage_summary": {
+              "total_capacity_bytes": 10995116277760,
+              "usage_bytes": 5497558138880
+            }
+          }
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "cluster",
+        "uuid": "0005e123-4567-89ab-cdef-000000000002",
+        "spec_version": 1,
+        "name": "dev-cluster-01",
+        "categories": {}
+      },
+      "spec": {
+        "name": "dev-cluster-01",
+        "resources": {
+          "config": {
+            "service_list": [
+              "AOS"
+            ],
+            "timezone": "UTC",
+            "build": {
+              "version": "6.8.2",
+              "build_type": "release"
+            },
+            "cluster_arch": "X86_64",
+            "is_available": true
+          }
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "config": {
+            "cluster_arch": "X86_64",
+            "build": {
+              "version": "6.8.2",
+              "build_type": "release",
+              "full_version": "el7.nutanix.20240802.100"
+            },
+            "service_list": [
+              "AOS"
+            ],
+            "timezone": "UTC",
+            "operation_mode": "NORMAL",
+            "encryption_status": "DISABLED"
+          },
+          "network": {
+            "external_ip": "10.10.2.100",
+            "masquerading_ip": "10.10.2.100",
+            "masquerading_port": 9440,
+            "ntp_server_ip_list": [
+              "0.pool.ntp.org"
+            ]
+          },
+          "nodes": {
+            "hypervisor_server_list": [
+              {
+                "ip": "10.10.2.101",
+                "version": "el7.nutanix.20240802.100",
+                "type": "AHV"
+              }
+            ]
+          },
+          "analysis": {
+            "vm_count": 8,
+            "storage_summary": {
+              "total_capacity_bytes": 5497558138880,
+              "usage_bytes": 1099511627776
+            }
+          }
+        }
+      }
+    }
+  ]
+}

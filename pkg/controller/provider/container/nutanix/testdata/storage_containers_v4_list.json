@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "extId": "0005c123-4567-89ab-cdef-000000000001",
+      "name": "default-container-prod",
+      "clusterExtId": "0005e123-4567-89ab-cdef-000000000001",
+      "replicationFactor": 2,
+      "maxCapacityBytes": 8796093022208,
+      "usageBytes": 3221225472000,
+      "isCompressionEnabled": true,
+      "onDiskDedup": "OFF",
+      "erasureCode": "NONE"
+    },
+    {
+      "extId": "0005c123-4567-89ab-cdef-000000000003",
+      "name": "default-container-dev",
+      "clusterExtId": "0005e123-4567-89ab-cdef-000000000002",
+      "replicationFactor": 2,
+      "maxCapacityBytes": 4398046511104,
+      "usageBytes": 1073741824000,
+      "isCompressionEnabled": true,
+      "onDiskDedup": "OFF",
+      "erasureCode": "NONE"
+    }
+  ],
+  "metadata": {
+    "totalAvailableResults": 2
+  }
+}

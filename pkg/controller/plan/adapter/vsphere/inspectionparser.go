@@ -81,7 +81,7 @@ func ParseInspectionFromString(xmlData string) (InspectionV2V, error) {
 	var xmlConf InspectionV2V
 	err := xml.Unmarshal([]byte(xmlData), &xmlConf)
 	if err != nil {
-		return InspectionV2V{}, fmt.Errorf("Error unmarshalling XML: %v\n", err)
+		return InspectionV2V{}, fmt.Errorf("error unmarshalling XML: %v", err)
 	}
 	return xmlConf, nil
 }

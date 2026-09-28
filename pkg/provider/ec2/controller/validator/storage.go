@@ -3,7 +3,9 @@ package validator
 import (
 	"fmt"
 
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	"github.com/kubev2v/forklift/pkg/provider/ec2/controller/inventory"
 	"github.com/kubev2v/forklift/pkg/provider/ec2/controller/mapping"
 )
@@ -100,6 +102,48 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (bool, error) {
 		if !mapping.HasStorageMapping(r.Map.Storage, volumeType) {
 			return false, nil
 		}
+	}
+
+	return true, nil
+}
+
+// PVCNameTemplate validates the PVC name template renders valid DNS1123 labels for each disk.
+func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
+	awsInstance, err := r.getAWSInstance(vmRef)
+	if err != nil {
+		return false, err
+	}
+
+	blockDevices, found := getBlockDevices(awsInstance)
+	if !found {
+		return true, nil
+	}
+
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name)
+
+	diskIndex := 0
+	for _, dev := range blockDevices {
+		if !inventory.IsEBSVolume(dev) {
+			continue
+		}
+		volumeID := inventory.ExtractEBSVolumeID(dev)
+
+		// SnapshotID is not available at validation time (snapshots are created during migration),
+		// so templates using {{.SnapshotID}} will validate against an empty string.
+		testData := api.PVCNameTemplateData{
+			VmName:       vmRef.Name,
+			TargetVmName: targetVmName,
+			PlanName:     r.Plan.Name,
+			DiskIndex:    diskIndex,
+			VmId:         vmRef.ID,
+			VolumeID:     volumeID,
+		}
+
+		_, templateErr := planbase.ValidatePVCNameTemplate(pvcNameTemplate, testData)
+		if templateErr != nil {
+			return false, templateErr
+		}
+		diskIndex++
 	}
 
 	return true, nil

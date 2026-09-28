@@ -2,39 +2,90 @@
 $startdate = Get-Date
 $adapters = @()
 While (-Not $adapters -and $startdate.AddMinutes(5) -gt (Get-Date)) {
-    Start-Sleep -Seconds 5
-    $adapters = Get-NetAdapter -Physical | Where DriverFileName -eq "netkvm.sys"
-    Write-Host "Waiting for netkvm.sys adapters..."
+	Start-Sleep -Seconds 5
+	$adapters = Get-NetAdapter -Physical | Where DriverFileName -eq "netkvm.sys"
+	Write-Host "Waiting for netkvm.sys adapters..."
 }
 
-# Define MACs and IPs for each adapter
+# Network configurations populated by Go template (MAC, IPs with gateway/prefix, DNS)
 $networkConfigs = @(
 {{- range $i, $cfg := . }}
     @{
         MAC = '{{ lower $cfg.MAC }}'
         IPs = @{{ formatIPs $cfg.IPs }}
-        PrefixLength = {{ (index $cfg.IPs 0).PrefixLength }}
         DNS = @{{ formatDNS $cfg }}
     }{{ if ne (add $i 1) (len $) }},{{ end }}
 {{- end }}
 )
 
-
-
-
-# Apply settings
 foreach ($config in $networkConfigs) {
-    $adapter = Get-NetAdapter -Physical | Where-Object { $_.MacAddress -eq $config.MAC }
+    # Normalize MAC for comparison (Get-NetAdapter returns uppercase dash-separated)
+    $normalizedConfigMAC = $config.MAC.ToUpper() -replace '[:-]', '-'
+    $adapter = Get-NetAdapter -Physical | Where-Object { $_.MacAddress -eq $normalizedConfigMAC }
 
     if ($adapter) {
         $ifindex = $adapter.ifIndex
         $name = $adapter.Name
         Write-Host "Configuring adapter '$name' ($($config.MAC))"
 
+        $addedGateways = @{}
+
         foreach ($ip in $config.IPs) {
-            Write-Host "Setting IP $ip on '$name'"
-            New-NetIPAddress -InterfaceIndex $ifindex -IPAddress $ip -PrefixLength $config.PrefixLength
-            Set-DnsClientServerAddress -InterfaceIndex $ifindex -ServerAddresses $config.DNS
+            Write-Host "Setting IP $($ip.IPAddress) on '$name'"
+
+            $existing = Get-NetIPAddress -IPAddress $ip.IPAddress -InterfaceIndex $ifindex -ErrorAction SilentlyContinue
+            if (-not $existing) {
+                try {
+                    New-NetIPAddress -InterfaceIndex $ifindex -IPAddress $ip.IPAddress -PrefixLength $ip.PrefixLength -ErrorAction Stop
+                } catch {
+                    Write-Warning "Failed to add IP $($ip.IPAddress): $_"
+                    continue
+                }
+            }
+
+            # Add default route for this gateway (deduplicated)
+            if ($ip.Gateway -and $ip.Gateway -ne '') {
+                $gw = $ip.Gateway
+
+                if (-not $addedGateways.ContainsKey($gw)) {
+                    if ($gw -match '^(\d{1,3}\.){3}\d{1,3}$') {
+                        $existingRoute = Get-NetRoute -DestinationPrefix "0.0.0.0/0" -InterfaceIndex $ifindex -NextHop $gw -ErrorAction SilentlyContinue
+                        if (-not $existingRoute) {
+                            try {
+                                New-NetRoute -DestinationPrefix "0.0.0.0/0" -InterfaceIndex $ifindex -NextHop $gw -ErrorAction Stop | Out-Null
+                                Write-Host "Added IPv4 default route via $gw"
+                            } catch {
+                                Write-Warning "Failed to add IPv4 default route via $gw : $_"
+                            }
+                        }
+                    } elseif ($gw -match ':') {
+                        $existingRoute = Get-NetRoute -DestinationPrefix "::/0" -InterfaceIndex $ifindex -NextHop $gw -ErrorAction SilentlyContinue
+                        if (-not $existingRoute) {
+                            try {
+                                New-NetRoute -DestinationPrefix "::/0" -InterfaceIndex $ifindex -NextHop $gw -ErrorAction Stop | Out-Null
+                                Write-Host "Added IPv6 default route via $gw"
+                            } catch {
+                                Write-Warning "Failed to add IPv6 default route via $gw : $_"
+                            }
+                        }
+                    }
+                    $addedGateways[$gw] = $true
+                }
+            }
+        }
+
+        # Configure DNS (filter blanks, set once per adapter)
+        $dnsServers = @()
+        if ($config.DNS) {
+            $dnsServers = $config.DNS | Where-Object { $_ -and $_.Trim() -ne '' }
+        }
+        if ($dnsServers.Count -gt 0) {
+            try {
+                Set-DnsClientServerAddress -InterfaceIndex $ifindex -ServerAddresses $dnsServers
+                Write-Host "DNS configured: $($dnsServers -join ', ')"
+            } catch {
+                Write-Warning "Failed to set DNS for '$name': $_"
+            }
         }
     } else {
         Write-Warning "Adapter with MAC $($config.MAC) not found"

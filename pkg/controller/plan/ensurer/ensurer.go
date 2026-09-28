@@ -26,7 +26,7 @@ type Ensurer struct {
 // VMs are ensured by label, not by name.
 func (r *Ensurer) VirtualMachine(vm *planapi.VMStatus, target *cnv.VirtualMachine) (err error) {
 	vms := &cnv.VirtualMachineList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		vms,
 		&client.ListOptions{
@@ -41,7 +41,7 @@ func (r *Ensurer) VirtualMachine(vm *planapi.VMStatus, target *cnv.VirtualMachin
 
 	if len(vms.Items) == 0 {
 		r.Labeler.SetLabels(target, r.Labeler.MigrationVMLabels(vm.Ref))
-		err = r.Destination.Client.Create(context.TODO(), target)
+		err = r.Destination.Create(context.TODO(), target)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -62,7 +62,7 @@ func (r *Ensurer) VirtualMachine(vm *planapi.VMStatus, target *cnv.VirtualMachin
 // names they had on the source cluster, we search by label so that we notice conflicts with existing DVs.
 func (r *Ensurer) DataVolumes(vm *planapi.VMStatus, dvs []cdi.DataVolume) (err error) {
 	list := &cdi.DataVolumeList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.Background(),
 		list,
 		&client.ListOptions{
@@ -82,7 +82,7 @@ func (r *Ensurer) DataVolumes(vm *planapi.VMStatus, dvs []cdi.DataVolume) (err e
 	for _, dv := range dvs {
 		if !exists[dv.Annotations[api.AnnDiskSource]] {
 			r.Labeler.SetLabels(&dv, r.Labeler.MigrationVMLabels(vm.Ref))
-			err = r.Destination.Client.Create(context.Background(), &dv)
+			err = r.Destination.Create(context.Background(), &dv)
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
@@ -103,7 +103,7 @@ func (r *Ensurer) DataVolumes(vm *planapi.VMStatus, dvs []cdi.DataVolume) (err e
 // names they had on the source cluster, we search by label so that we notice conflicts with existing PVCs.
 func (r *Ensurer) PersistentVolumeClaims(vm *planapi.VMStatus, pvcs []core.PersistentVolumeClaim) (err error) {
 	list := &core.PersistentVolumeClaimList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.Background(),
 		list,
 		&client.ListOptions{
@@ -123,7 +123,7 @@ func (r *Ensurer) PersistentVolumeClaims(vm *planapi.VMStatus, pvcs []core.Persi
 	for _, pvc := range pvcs {
 		if !exists[pvc.Annotations[api.AnnDiskSource]] {
 			r.Labeler.SetLabels(&pvc, r.Labeler.MigrationVMLabels(vm.Ref))
-			err = r.Destination.Client.Create(context.Background(), &pvc)
+			err = r.Destination.Create(context.Background(), &pvc)
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
@@ -151,7 +151,7 @@ func (r *Ensurer) PersistentVolumeClaims(vm *planapi.VMStatus, pvcs []core.Persi
 // name already exists but does not have the annotation indicating that Forklift created it.
 func (r *Ensurer) SharedConfigMaps(vm *planapi.VMStatus, configMaps []core.ConfigMap) (err error) {
 	for _, configMap := range configMaps {
-		err = r.Destination.Client.Create(context.Background(), &configMap)
+		err = r.Destination.Create(context.Background(), &configMap)
 		if err != nil {
 			if k8serr.IsAlreadyExists(err) {
 				_, found := configMap.Annotations[api.AnnSource]
@@ -193,7 +193,7 @@ func (r *Ensurer) SharedConfigMaps(vm *planapi.VMStatus, configMaps []core.Confi
 // name already exists but does not have the annotation indicating that Forklift created it.
 func (r *Ensurer) SharedSecrets(vm *planapi.VMStatus, secrets []core.Secret) (err error) {
 	for _, secret := range secrets {
-		err = r.Destination.Client.Create(context.Background(), &secret)
+		err = r.Destination.Create(context.Background(), &secret)
 		if err != nil {
 			if k8serr.IsAlreadyExists(err) {
 				_, found := secret.Annotations[api.AnnSource]

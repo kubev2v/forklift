@@ -113,17 +113,17 @@ func (r *Workload) Expand(db libmodel.DB) (err error) {
 	}
 	err = db.Get(host)
 	if err != nil {
-		return fmt.Errorf("error from %w: For VM '%s', host id '%s' not found - probably due to permissions issue", err, r.VM.ID, r.Host.ID)
+		return fmt.Errorf("error from %w: For VM '%s', host id '%s' not found - probably due to permissions issue", err, r.ID, r.Host.ID)
 	}
-	r.Host.Host.With(host)
+	r.Host.With(host)
 	cluster := &model.Cluster{
 		Base: model.Base{ID: host.Cluster},
 	}
 	err = db.Get(cluster)
 	if err != nil {
-		return fmt.Errorf("error from %w: For VM '%s' cluster id '%s' not found - probably due to permissions issue", err, r.VM.ID, host.Cluster)
+		return fmt.Errorf("error from %w: For VM '%s' cluster id '%s' not found - probably due to permissions issue", err, r.ID, host.Cluster)
 	}
-	r.Host.Cluster.Cluster.With(cluster)
+	r.Host.Cluster.With(cluster)
 
 	return
 }

@@ -478,6 +478,35 @@ type ForkliftControllerSpec struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	ControllerMigrationServiceAccount string `json:"controller_migration_service_account,omitempty"`
+	// Global default Go template for generating PVC names during non-OCP migrations.
+	// Used when the Plan-level pvcNameTemplate is empty. When this field is also empty,
+	// the controller falls back to the hardcoded default:
+	// "\{\{trunc 15 .PlanName\}\}-\{\{trunc 15 .TargetVmName\}\}-disk-\{\{.DiskIndex\}\}".
+	// Does not apply to OpenShift sources (see controller_ocp_pvc_name_template).
+	//
+	// IMPORTANT: Curly braces must be escaped with a backslash (\{ and \}) to avoid
+	// conflicts with the operator's Ansible/Jinja2 templating engine.
+	// The controller unescapes them before parsing the Go template.
+	//
+	// Example: "\{\{trunc 10 .PlanName\}\}-\{\{.TargetVmName\}\}-\{\{.DiskIndex\}\}"
+	// +optional
+	// +kubebuilder:validation:Pattern=`^([^{}\\]|\\.)*$`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	ControllerPVCNameTemplate string `json:"controller_pvc_name_template,omitempty"`
+	// Global default Go template for generating PVC names during OpenShift (OCP) migrations.
+	// Used when the Plan-level pvcNameTemplate is empty. When this field is also empty,
+	// the controller falls back to "\{\{.SourcePVCName\}\}" (preserves the source PVC name).
+	// Does not apply to non-OCP providers (see controller_pvc_name_template).
+	//
+	// IMPORTANT: Curly braces must be escaped with a backslash (\{ and \}) to avoid
+	// conflicts with the operator's Ansible/Jinja2 templating engine.
+	// The controller unescapes them before parsing the Go template.
+	//
+	// Example: "\{\{.SourcePVCNamespace\}\}-\{\{.SourcePVCName\}\}"
+	// +optional
+	// +kubebuilder:validation:Pattern=`^([^{}\\]|\\.)*$`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	ControllerOCPPVCNameTemplate string `json:"controller_ocp_pvc_name_template,omitempty"`
 	// Max concurrent VM migrations.
 	// +optional
 	// +kubebuilder:default=20

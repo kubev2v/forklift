@@ -74,6 +74,8 @@ func listStorageOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 		data, err = providerClient.GetDatastores(ctx, 4)
 	case "ova":
 		data, err = providerClient.GetResourceCollection(ctx, "storages", 4)
+	case "nutanix":
+		data, err = providerClient.GetResourceCollection(ctx, "storagecontainers", 4)
 	case "openstack":
 		data, err = providerClient.GetVolumeTypes(ctx, 4)
 	case "openshift":

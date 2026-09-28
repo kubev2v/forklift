@@ -16,8 +16,11 @@ import (
 	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/ova"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
+	hypervCollector "github.com/kubev2v/forklift/pkg/controller/provider/container/hyperv"
 	vsphereCollector "github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	providervalidation "github.com/kubev2v/forklift/pkg/controller/provider/validation"
+	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/inventory/model"
@@ -29,6 +32,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -40,6 +44,7 @@ const (
 	SettingsNotValid        = "SettingsNotValid"
 	Validated               = "Validated"
 	ConnectionAuthFailed    = "ConnectionAuthFailed"
+	ConnectionAuthRetry     = "ConnectionAuthRetry"
 	ConnectionTestSucceeded = "ConnectionTestSucceeded"
 	ConnectionTestFailed    = "ConnectionTestFailed"
 	InventoryCreated        = "InventoryCreated"
@@ -52,7 +57,11 @@ const (
 	SMBCSIDriverNotReady    = "SMBCSIDriverNotReady"
 	SMBMountFailed          = "SMBMountFailed"
 	WaitingForService       = "WaitingForService"
+	ForkliftNotInstalled    = "ForkliftNotInstalled"
 )
+
+// Forklift operator is installed on a remote cluster.
+const forkliftControllerResource = "forkliftcontrollers"
 
 // CSI driver names
 const (
@@ -123,29 +132,11 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateVSpherePrivileges(provider)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
 	err = r.inventoryCreated(provider)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-
-	// Validate SSH readiness for vSphere providers when SSH method is enabled
-	err = r.validateSSHReadiness(provider, secret)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	// Validate SMB CSI driver for HyperV providers
-	err = r.validateSMBCSI(provider)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	// Validate Hyper-V settings (managementType)
-	err = r.validateHyperVSettings(provider)
+	err = providervalidation.Build(r, r.Client).Validate(provider, secret)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -428,6 +419,23 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		}
 		tlsURL := buildTLSURL(provider.Spec.URL, hvutil.WinRMPort(provider.Spec.Settings))
 		r.validateTLSConnection(provider, secret, tlsURL, insecureSkipVerify)
+	case api.Nutanix:
+		keyList = []string{
+			"user",
+			"password",
+		}
+
+		// Check insecure flag once and use it for both validation and connection status
+		insecureSkipVerify := base.GetInsecureSkipVerifyFlag(secret)
+
+		// Validate required keys based on TLS settings
+		if !insecureSkipVerify && !util.HasCACert(secret) {
+			keyList = append(keyList, "ca.crt")
+			break
+		}
+
+		// Validate connection status
+		r.validateTLSConnection(provider, secret, provider.Spec.URL, insecureSkipVerify)
 	}
 	for _, key := range keyList {
 		if _, found := secret.Data[key]; !found {
@@ -468,6 +476,13 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 	if err == nil {
 		log.Info(
 			"Connection test succeeded.")
+		if provider.Type() == api.HyperV {
+			if c, found := r.container.Get(provider); found {
+				if hv, ok := c.(*hypervCollector.Collector); ok {
+					hv.ConnTestSucceeded()
+				}
+			}
+		}
 		provider.Status.SetCondition(
 			libcnd.Condition{
 				Type:     ConnectionTestSucceeded,
@@ -480,19 +495,30 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 		// When the status is unauthorized controller stops the reconciliation, so the user account does not get locked.
 		// Providing bad credentials when requesting the token results in 400, and not 401.
 		if status == http.StatusUnauthorized || status == http.StatusBadRequest {
-			provider.Status.Phase = ConnectionFailed
-			provider.Status.SetCondition(
-				libcnd.Condition{
-					Type:     ConnectionAuthFailed,
-					Status:   True,
-					Reason:   Tested,
-					Category: Critical,
-					Message: fmt.Sprintf(
-						"Connection auth failed, error: %s",
-						err.Error()),
-				})
+			setAuthFailureConditions(provider, err)
 			return nil
 		}
+
+		// Tolerate transient WinRM failures while the collector has parity,
+		// up to maxConnTestFailures consecutive attempts.
+		if provider.Type() == api.HyperV {
+			if c, found := r.container.Get(provider); found {
+				if hv, ok := c.(*hypervCollector.Collector); ok && hv.ConnTestFailed() {
+					log.Info("WinRM connection test failed, suppressing (has parity)",
+						"reason", err.Error())
+					provider.Status.SetCondition(
+						libcnd.Condition{
+							Type:     ConnectionTestSucceeded,
+							Status:   True,
+							Reason:   Tested,
+							Category: Required,
+							Message:  "Connection test, succeeded (transient failure ignored — collector has parity).",
+						})
+					return nil
+				}
+			}
+		}
+
 		log.Info(
 			"Connection test failed.",
 			"reason",
@@ -514,7 +540,7 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 }
 
 // Validate vSphere service account privileges.
-func (r *Reconciler) validateVSpherePrivileges(provider *api.Provider) error {
+func (r *Reconciler) ValidateVSpherePrivileges(provider *api.Provider) error {
 	if provider.Type() != api.VSphere {
 		return nil
 	}
@@ -802,7 +828,7 @@ func smbMountBlocked(pod *core.Pod) (string, bool) {
 }
 
 func providerServicePendingTimeout() time.Duration {
-	return time.Duration(Settings.Providers.ProviderPendingTimeoutSeconds) * time.Second
+	return time.Duration(Settings.ProviderPendingTimeoutSeconds) * time.Second
 }
 
 func isPodReady(pod *core.Pod) bool {
@@ -1058,7 +1084,7 @@ func (r *Reconciler) loadHostIPs(provider *api.Provider) map[string]string {
 }
 
 // validateSSHReadiness validates SSH readiness for vSphere providers when SSH method is enabled
-func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.Secret) error {
+func (r *Reconciler) ValidateSSHReadiness(provider *api.Provider, secret *core.Secret) error {
 	// Only validate SSH for vSphere providers
 	if provider.Type() != api.VSphere {
 		r.Log.V(3).Info("SSH validation: skipping non-vSphere provider",
@@ -1270,9 +1296,9 @@ func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.S
 			// Parse "id|name|ip" format for human-readable display
 			parts := strings.Split(item, "|")
 			if len(parts) == 3 {
-				successSuggestion.WriteString(fmt.Sprintf("  - %s (%s)\n", parts[1], parts[2]))
+				fmt.Fprintf(&successSuggestion, "  - %s (%s)\n", parts[1], parts[2])
 			} else {
-				successSuggestion.WriteString(fmt.Sprintf("  - %s\n", item))
+				fmt.Fprintf(&successSuggestion, "  - %s\n", item)
 			}
 		}
 		successSuggestion.WriteString("\nTo use the xcopy volume populator, ensure your VMs are located on these ESXi hosts before starting the migration.\n")
@@ -1297,9 +1323,9 @@ func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.S
 		// Parse "id|name|ip" format for human-readable display
 		parts := strings.Split(item, "|")
 		if len(parts) == 3 {
-			failSuggestion.WriteString(fmt.Sprintf("  - %s (%s)\n", parts[1], parts[2]))
+			fmt.Fprintf(&failSuggestion, "  - %s (%s)\n", parts[1], parts[2])
 		} else {
-			failSuggestion.WriteString(fmt.Sprintf("  - %s\n", item))
+			fmt.Fprintf(&failSuggestion, "  - %s\n", item)
 		}
 	}
 	failSuggestion.WriteString("\n")
@@ -1344,7 +1370,7 @@ func isValidSMBPath(smbPath string) bool {
 
 // validateSMBCSI validates that the SMB CSI driver is installed for HyperV providers.
 // HyperV migrations require the SMB CSI driver (smb.csi.k8s.io) to mount SMB shares.
-func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
+func (r *Reconciler) ValidateSMBCSI(provider *api.Provider) error {
 	if provider.Type() != api.HyperV {
 		return nil
 	}
@@ -1373,7 +1399,7 @@ func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
 	return nil
 }
 
-func (r *Reconciler) validateHyperVSettings(provider *api.Provider) error {
+func (r *Reconciler) ValidateHyperVSettings(provider *api.Provider) error {
 	if provider.Type() != api.HyperV {
 		return nil
 	}
@@ -1398,4 +1424,110 @@ func (r *Reconciler) validateHyperVSettings(provider *api.Provider) error {
 
 	provider.Status.DeleteCondition(SettingsNotValid)
 	return nil
+}
+
+// ValidateForkliftInstalled checks whether the Forklift operator is installed
+// on a remote OpenShift cluster by looking up the operator CRD
+func (r *Reconciler) ValidateForkliftInstalled(provider *api.Provider, secret *core.Secret) error {
+	if provider.Type() != api.OpenShift {
+		return nil
+	}
+	// The host provider is the cluster Forklift already runs on.
+	if provider.IsHost() {
+		return nil
+	}
+	// Only meaningful once we know the remote cluster is reachable.
+	if provider.Status.HasBlockerCondition() || !provider.Status.HasCondition(ConnectionTestSucceeded) {
+		return nil
+	}
+
+	dc, err := discoveryClientForProvider(provider, secret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	installed, err := forkliftOperatorInstalled(dc)
+	if err != nil {
+		// The entire API group is absent: operator not installed.
+		if k8serrors.IsNotFound(err) {
+			r.setForkliftNotInstalled(provider)
+			return nil
+		}
+		// Transient/API error: let the reconcile retry.
+		return liberr.Wrap(err)
+	}
+
+	if installed {
+		// Operator CRD present: clear any stale warning.
+		provider.Status.DeleteCondition(ForkliftNotInstalled)
+		return nil
+	}
+
+	r.setForkliftNotInstalled(provider)
+	return nil
+}
+
+// discoveryClientForProvider builds a discovery client for a remote cluster.
+// Declared as a var so it can be overridden in tests.
+var discoveryClientForProvider = func(provider *api.Provider, secret *core.Secret) (discovery.DiscoveryInterface, error) {
+	cfg := ocp.RestCfg(provider, secret)
+	if cfg == nil {
+		return nil, liberr.New("failed to build REST config for remote cluster")
+	}
+	return discovery.NewDiscoveryClientForConfig(cfg)
+}
+
+// forkliftOperatorInstalled reports whether the Forklift operator CRD is served
+// by the cluster behind the given discovery client.
+func forkliftOperatorInstalled(dc discovery.DiscoveryInterface) (bool, error) {
+	resources, err := dc.ServerResourcesForGroupVersion(api.SchemeGroupVersion.String())
+	if err != nil {
+		return false, err
+	}
+	for _, res := range resources.APIResources {
+		if res.Name == forkliftControllerResource {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// setForkliftNotInstalled sets the advisory warning indicating the Forklift
+// operator was not found on the remote cluster.
+func (r *Reconciler) setForkliftNotInstalled(provider *api.Provider) {
+	provider.Status.SetCondition(libcnd.Condition{
+		Type:     ForkliftNotInstalled,
+		Status:   True,
+		Reason:   NotFound,
+		Category: Warn,
+		Message: "The Forklift operator is not installed on the remote cluster " +
+			"(the forkliftcontrollers.forklift.konveyor.io CRD was not found).",
+	})
+}
+
+// setAuthFailureConditions sets ConnectionAuthFailed on the provider.
+// For HyperV, it also sets ConnectionAuthRetry because a 401 may indicate
+// disabled WinRM Basic auth rather than wrong credentials.
+func setAuthFailureConditions(provider *api.Provider, connErr error) {
+	provider.Status.Phase = ConnectionFailed
+	provider.Status.SetCondition(
+		libcnd.Condition{
+			Type:     ConnectionAuthFailed,
+			Status:   True,
+			Reason:   Tested,
+			Category: Critical,
+			Message: fmt.Sprintf(
+				"Connection auth failed, error: %s",
+				connErr.Error()),
+		})
+	if provider.Type() == api.HyperV {
+		provider.Status.SetCondition(
+			libcnd.Condition{
+				Type:     ConnectionAuthRetry,
+				Status:   True,
+				Reason:   Tested,
+				Category: Advisory,
+				Message:  "HyperV auth failure may be a host-side WinRM configuration issue, periodic retry enabled.",
+			})
+	}
 }

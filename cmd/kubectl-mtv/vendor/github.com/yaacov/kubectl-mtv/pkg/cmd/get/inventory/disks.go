@@ -74,7 +74,7 @@ func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 	case "openstack":
 		data, err = providerClient.GetVolumes(ctx, 4)
 	case "ova":
-		data, err = providerClient.GetOVAFiles(ctx, 4)
+		data, err = providerClient.GetDisks(ctx, 4)
 	case "hyperv":
 		data, err = providerClient.GetDisks(ctx, 4)
 	default:

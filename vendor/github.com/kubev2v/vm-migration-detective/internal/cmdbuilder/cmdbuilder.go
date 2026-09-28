@@ -190,12 +190,16 @@ func (b *CmdBuilder) Command(ctx context.Context, name string) *exec.Cmd {
 }
 
 // RunSeparate runs the command and returns stdout and stderr independently.
+// Returns ctx.Err() directly on cancellation or timeout.
 func (b *CmdBuilder) RunSeparate(ctx context.Context, name string) (stdout, stderr []byte, err error) {
 	cmd := b.Command(ctx, name)
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf
 	err = cmd.Run()
+	if err != nil && ctx.Err() != nil {
+		return outBuf.Bytes(), errBuf.Bytes(), ctx.Err()
+	}
 	return outBuf.Bytes(), errBuf.Bytes(), err
 }
 

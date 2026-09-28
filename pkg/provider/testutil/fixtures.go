@@ -7,6 +7,7 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 )
 
 // PlanBuilder provides a fluent interface for building test Plan objects.
@@ -25,7 +26,7 @@ func NewPlanBuilder() *PlanBuilder {
 			},
 			Spec: api.PlanSpec{
 				TargetNamespace:                "test",
-				PVCNameTemplateUseGenerateName: true,
+				PVCNameTemplateUseGenerateName: ptr.To(true),
 			},
 		},
 	}
@@ -72,25 +73,25 @@ func (b *PlanBuilder) WithVMs(vms ...planapi.VM) *PlanBuilder {
 
 // WithSourceProvider sets the source provider reference.
 func (b *PlanBuilder) WithSourceProvider(provider *api.Provider) *PlanBuilder {
-	b.plan.Referenced.Provider.Source = provider
+	b.plan.Provider.Source = provider
 	return b
 }
 
 // WithDestinationProvider sets the destination provider reference.
 func (b *PlanBuilder) WithDestinationProvider(provider *api.Provider) *PlanBuilder {
-	b.plan.Referenced.Provider.Destination = provider
+	b.plan.Provider.Destination = provider
 	return b
 }
 
 // WithNetworkMap sets the network map reference.
 func (b *PlanBuilder) WithNetworkMap(networkMap *api.NetworkMap) *PlanBuilder {
-	b.plan.Referenced.Map.Network = networkMap
+	b.plan.Map.Network = networkMap
 	return b
 }
 
 // WithStorageMap sets the storage map reference.
 func (b *PlanBuilder) WithStorageMap(storageMap *api.StorageMap) *PlanBuilder {
-	b.plan.Referenced.Map.Storage = storageMap
+	b.plan.Map.Storage = storageMap
 	return b
 }
 
@@ -305,6 +306,15 @@ func (b *MigrationBuilder) WithCancel(vms ...ref.Ref) *MigrationBuilder {
 // WithCutover sets the cutover time for warm migrations.
 func (b *MigrationBuilder) WithCutover(cutover meta.Time) *MigrationBuilder {
 	b.migration.Spec.Cutover = &cutover
+	return b
+}
+
+// WithVMCutover adds a per-VM cutover time.
+func (b *MigrationBuilder) WithVMCutover(vmID string, cutover meta.Time) *MigrationBuilder {
+	b.migration.Spec.VMCutover = append(b.migration.Spec.VMCutover, api.VMCutover{
+		ID:      vmID,
+		Cutover: cutover,
+	})
 	return b
 }
 

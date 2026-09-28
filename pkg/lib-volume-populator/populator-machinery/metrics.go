@@ -159,7 +159,7 @@ func (pl promklog) Println(v ...interface{}) {
 }
 
 func (m *metricsManager) startListener(httpEndpoint, metricsPath string) {
-	if "" == httpEndpoint || "" == metricsPath {
+	if httpEndpoint == "" || metricsPath == "" {
 		return
 	}
 

@@ -78,7 +78,7 @@ func writeFile(filename, content string) {
 	if err != nil {
 		klog.Fatalf("Failed to create %s: %v", filename, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if _, err := file.Write([]byte(content)); err != nil {
 		klog.Fatalf("Failed to write to %s: %v", filename, err)

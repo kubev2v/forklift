@@ -510,7 +510,7 @@ func (p *ConversionPipeline) signalPodShutdown(podIP string) {
 		p.r.Log.V(3).Info("Could not signal pod shutdown; it will be deleted by the controller.", "error", err.Error())
 		return
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 // fetchInspectionResults calls GET /results on the deep-inspection pod and
@@ -522,7 +522,7 @@ func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.Inspecti
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusServiceUnavailable {
 		return nil, nil //nolint:nilnil
@@ -619,7 +619,7 @@ func (p *ConversionPipeline) podHandler() (podSucceeded bool, err error) {
 	case core.PodSucceeded:
 		return true, nil
 	case core.PodFailed:
-		return false, liberr.New("conversion pod failed", "pod", pod.Name, "phase", pod.Status.Phase)
+		return false, conversionPodFailure(pod)
 	case core.PodUnknown:
 		return false, liberr.New("conversion pod in unknown state", "pod", pod.Name)
 	case core.PodPending:

@@ -128,7 +128,7 @@ func (c *Client) fetchPathPrefixFromAPIDoc(ctx context.Context) (string, error) 
 	if err != nil {
 		return "", liberr.Wrap(err, "AAP/AWX: GET /api")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("GET /api: status %d", resp.StatusCode)
 	}
@@ -220,7 +220,7 @@ func (c *Client) LaunchJob(ctx context.Context, jobTemplateID int, extraVars map
 	if err != nil {
 		return 0, liberr.Wrap(err, "failed to launch AAP job")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
@@ -253,7 +253,7 @@ func (c *Client) GetJobStatus(ctx context.Context, jobID int) (*JobStatusRespons
 	if err != nil {
 		return nil, liberr.Wrap(err, "failed to get AAP job status")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -302,7 +302,7 @@ func (c *Client) ListJobTemplates(ctx context.Context, page, pageSize int) (*Job
 	if err != nil {
 		return nil, liberr.Wrap(err, "failed to list AAP job templates")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("AAP returned status %d: %s", resp.StatusCode, string(body))

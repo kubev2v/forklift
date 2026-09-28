@@ -5,6 +5,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
@@ -192,6 +193,27 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	// Nutanix
+	nutanixHandler := &nutanix.ProviderHandler{
+		Handler: base.Handler{
+			Container: h.Container,
+		},
+	}
+	status, err = nutanixHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
+		return
+	}
+	nutanixList, err := nutanixHandler.ListContent(ctx)
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
 	r := Provider{
 		string(api.OpenShift): ocpList,
 		string(api.VSphere):   vSphereList,
@@ -200,6 +222,7 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 		string(api.Ova):       ovaList,
 		string(api.EC2):       ec2List,
 		string(api.HyperV):    hypervList,
+		string(api.Nutanix):   nutanixList,
 	}
 
 	content := r

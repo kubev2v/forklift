@@ -53,7 +53,7 @@ func (h *NetworkHandler) List(ctx *gin.Context) {
 	var result []interface{}
 	for _, network := range list {
 		r := &Network{}
-		r.ID = network.UID
+		r.ID = network.ID
 		r.Name = network.Name
 		r.Revision = network.Revision
 		r.Link(h.Provider)
@@ -77,7 +77,7 @@ func (h *NetworkHandler) Get(ctx *gin.Context) {
 	}
 
 	network := &model.Network{}
-	network.UID = ctx.Param("id")
+	network.ID = ctx.Param("id")
 
 	db := h.Collector.DB()
 	err = db.Get(network)
@@ -87,7 +87,7 @@ func (h *NetworkHandler) Get(ctx *gin.Context) {
 	}
 
 	r := &Network{}
-	r.ID = network.UID
+	r.ID = network.ID
 	r.Name = network.Name
 	r.Revision = network.Revision
 	r.Link(h.Provider)
@@ -114,7 +114,7 @@ func (h *NetworkHandler) watch(ctx *gin.Context) {
 		func(in libmodel.Model) (r interface{}) {
 			m := in.(*model.Network)
 			network := &Network{}
-			network.ID = m.UID
+			network.ID = m.ID
 			network.Name = m.Name
 			network.Revision = m.Revision
 			network.Link(h.Provider)

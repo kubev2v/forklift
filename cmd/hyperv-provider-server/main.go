@@ -67,7 +67,7 @@ func main() {
 
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "ok")
+		_, _ = fmt.Fprintln(w, "ok")
 	})
 
 	mux.HandleFunc("/validate-disks", validateDisksHandler(catalogPath))

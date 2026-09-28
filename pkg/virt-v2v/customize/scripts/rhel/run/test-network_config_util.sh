@@ -40,6 +40,11 @@ test_dir() {
 
     cp -a $TEST_SRC_DIR/root/* $TEST_DIR
 
+    # Fix netplan config file permissions (netplan requires 600)
+    if [ -f "$TEST_DIR/etc/netplan/50-netplan.yaml" ]; then
+        chmod 600 "$TEST_DIR/etc/netplan/50-netplan.yaml"
+    fi
+
     # Clean up from previous runs
     rm -f "$UDEV_RULES_FILE"
     mkdir -p $(dirname "$UDEV_RULES_FILE")

@@ -23,7 +23,7 @@ func (r *Catalog) add(object interface{}) (kind uint16) {
 	defer r.Unlock()
 	ot := reflect.TypeOf(object)
 	ov := reflect.ValueOf(object)
-	if reflect.TypeOf(object).Kind() == reflect.Ptr {
+	if reflect.TypeOf(object).Kind() == reflect.Pointer {
 		ot = ot.Elem()
 		ov = ov.Elem()
 	}

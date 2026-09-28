@@ -29,7 +29,7 @@ type Validator struct {
 }
 
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Storage == nil {
+	if r.Plan.Map.Storage == nil {
 		return
 	}
 	vm := &model.Workload{}
@@ -39,13 +39,13 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 	for _, volType := range vm.VolumeTypes {
-		if !r.Plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: volType.ID}) {
+		if !r.Plan.Map.Storage.Status.Find(ref.Ref{ID: volType.ID}) {
 			return
 		}
 	}
 
 	// If vm is image based, we need to see glance in the storage map
-	if vm.ImageID != "" && !r.Plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{Name: api.GlanceSource}) {
+	if vm.ImageID != "" && !r.Plan.Map.Storage.Status.Find(ref.Ref{Name: api.GlanceSource}) {
 		return
 	}
 
@@ -55,7 +55,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
+	if r.Plan.Map.Network == nil {
 		return
 	}
 	vm := &model.Workload{}
@@ -65,7 +65,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 	for _, network := range vm.Networks {
-		if !r.Plan.Referenced.Map.Network.Status.Refs.Find(ref.Ref{ID: network.ID}) {
+		if !r.Plan.Map.Network.Status.Find(ref.Ref{ID: network.ID}) {
 			return
 		}
 	}
@@ -278,6 +278,11 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s
 	return
 }
 
+func (r *Validator) ExcludedDisks(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
+	ok = true
+	return
+}
+
 // HasSnapshot - OpenStack doesn't support warm migration, so no snapshot validation needed
 func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
 	ok = true
@@ -342,10 +347,37 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
-// NO-OP
 func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
-	ok = true
-	return
+	workload := &model.Workload{}
+	err = r.Source.Inventory.Find(workload, vmRef)
+	if err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef.String())
+	}
+
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name)
+
+	// Validate template for each volume plus the boot image if present
+	diskCount := len(workload.Volumes)
+	if workload.ImageID != "" {
+		diskCount++
+	}
+	if diskCount == 0 {
+		diskCount = 1
+	}
+	for i := 0; i < diskCount; i++ {
+		testData := &api.PVCNameTemplateData{
+			VmName:       vmRef.Name,
+			TargetVmName: targetVmName,
+			PlanName:     r.Plan.Name,
+			DiskIndex:    i,
+			VmId:         vmRef.ID,
+		}
+		_, err = planbase.ValidatePVCNameTemplate(pvcNameTemplate, testData)
+		if err != nil {
+			return false, liberr.Wrap(err, "vm", vmRef.String())
+		}
+	}
+	return true, nil
 }
 
 // NO-OP

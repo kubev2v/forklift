@@ -78,10 +78,10 @@ func downloadAndSaveImage(client *libclient.Client, config *AppConfig) {
 		klog.Fatal(err)
 	}
 
-	defer imageReader.Close()
+	defer func() { _ = imageReader.Close() }()
 
 	file := openFile(config.volumePath)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	progressVec := createProgressCounter()
 	writeData(imageReader, file, config, progressVec)

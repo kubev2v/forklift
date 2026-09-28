@@ -6,8 +6,6 @@ on:
 
 permissions:
   contents: read
-  # Optional: allow read access to pull request. Use with `only-new-issues` option.
-  pull-requests: read
 
 jobs:
   golangci:
@@ -15,6 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }}
       - name: Install libvirt dependencies
         run: |
           sudo apt-get update
@@ -37,10 +39,10 @@ jobs:
           #
           # Note: By default, the `.golangci.yml` file should be at the root of the repository.
           # The location of the configuration file can be changed by using `--config=`
-          args: --timeout=10m
+          args: --timeout=10m --new-from-merge-base=origin/${{ github.base_ref }}
 
-          # Optional: show only new issues if it's a pull request. The default value is `false`.
-          only-new-issues: true
+          # Compare against the merge base locally instead of fetching the PR
+          # patch from GitHub API (which fails when a PR touches 300+ files).
 
           # Optional: if set to true, then all caching functionality will be completely disabled,
           #           takes precedence over all other caching options.
@@ -54,3 +56,26 @@ jobs:
 
           # Optional: The mode to install golangci-lint. It can be 'binary' or 'goinstall'.
           install-mode: "goinstall"
+
+  verify-vendor-offload:
+    name: verify-vendor (offload)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Verify go mod vendor is up to date
+        working-directory: cmd/vsphere-copy-offload-populator
+        run: |
+          go mod vendor
+          if [[ -n $(git status --porcelain -- vendor go.mod go.sum) ]]; then
+            echo "ERROR: vendor directory is out of date."
+            echo "Run 'go mod vendor' in cmd/vsphere-copy-offload-populator and commit the changes."
+            git status --porcelain -- vendor go.mod go.sum
+            git diff -- vendor go.mod go.sum
+            exit 1
+          fi

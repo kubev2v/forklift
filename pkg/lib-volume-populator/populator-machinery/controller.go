@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -82,7 +83,7 @@ const (
 
 	qemuGroup = 107
 
-	labelSourceHost = "sourceHost"
+	labelSourceHost = api.LabelSourceHost
 )
 
 type empty struct{}
@@ -323,7 +324,7 @@ func getRecorder(kubeClient kubernetes.Interface, controllerName string) record.
 
 func (c *controller) addNotification(keyToCall, objType, namespace, name string) {
 	var key string
-	if 0 == len(namespace) {
+	if len(namespace) == 0 {
 		key = objType + "/" + name
 	} else {
 		key = objType + "/" + namespace + "/" + name
@@ -357,7 +358,7 @@ func (c *controller) cleanupNotifications(keyToCall string) {
 			continue
 		}
 		delete(t.set, keyToCall)
-		if 0 == len(t.set) {
+		if len(t.set) == 0 {
 			delete(c.notifyMap, key)
 		}
 	}
@@ -507,7 +508,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	if dataSourceRef.APIGroup != nil {
 		apiGroup = *dataSourceRef.APIGroup
 	}
-	if c.gk.Group != apiGroup || c.gk.Kind != dataSourceRef.Kind || "" == dataSourceRef.Name {
+	if c.gk.Group != apiGroup || c.gk.Kind != dataSourceRef.Kind || dataSourceRef.Name == "" {
 		// Ignore PVCs that aren't for this populator to handle
 		return nil
 	}
@@ -603,7 +604,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	// *** Here is the first place we start to create/modify objects ***
 
 	// If the PVC is unbound, we need to perform the population
-	if "" == pvc.Spec.VolumeName {
+	if pvc.Spec.VolumeName == "" {
 
 		// Record start time for populator metric
 		c.metrics.operationStart(pvc.UID)
@@ -611,12 +612,17 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		// If the pod doesn't exist yet, create it
 		if pod == nil {
 			sourceHost, _, _ := unstructured.NestedString(crInstance.Object, "metadata", "labels", labelSourceHost)
-			if c.maxInFlight > 0 && sourceHost != "" {
-				if active := c.countActivePopulatorPodsForHost(sourceHost); active >= c.maxInFlight {
+			migrationHost, _, _ := unstructured.NestedString(crInstance.Object, "spec", "migrationHost")
+			runtimeHost := sourceHost
+			if migrationHost != "" {
+				runtimeHost = migrationHost
+			}
+			if c.maxInFlight > 0 && runtimeHost != "" {
+				if active := c.countActivePopulatorPodsForHost(runtimeHost); active >= c.maxInFlight {
 					klog.V(2).Infof("Max populator pods in-flight reached for host %s (%d/%d), deferring PVC %s/%s",
-						sourceHost, active, c.maxInFlight, pvcNamespace, pvcName)
+						runtimeHost, active, c.maxInFlight, pvcNamespace, pvcName)
 					c.recorder.Eventf(pvc, corev1.EventTypeNormal, "PopulatorThrottled",
-						"Waiting for available populator slot on host %s (%d/%d in-flight)", sourceHost, active, c.maxInFlight)
+						"Waiting for available populator slot on host %s (%d/%d in-flight)", runtimeHost, active, c.maxInFlight)
 					c.workqueue.AddAfter(key, 10*time.Second)
 					return nil
 				}
@@ -645,8 +651,12 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			if plan, ok, _ := unstructured.NestedString(crInstance.Object, "metadata", "labels", "plan"); ok && plan != "" {
 				labels["plan"] = plan
 			}
-			if sourceHost != "" {
-				labels[labelSourceHost] = sourceHost
+			if runtimeHost != "" {
+				if errs := k8svalidation.IsValidLabelValue(runtimeHost); len(errs) == 0 {
+					labels[labelSourceHost] = runtimeHost
+				} else {
+					klog.Warningf("runtimeHost %q is not a valid label value, pod sourceHost label will be skipped: %v", runtimeHost, errs)
+				}
 			}
 
 			// Make the pod
@@ -672,7 +682,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			} else if sa, ok := pvc.Annotations[AnnPopulatorServiceAccount]; ok && sa != "" {
 				pod.Spec.ServiceAccountName = sa // Other populators use the annotation
 			}
-			pod.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName = pvcPrimeName
+			pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName = pvcPrimeName
 			con := &pod.Spec.Containers[0]
 			con.Image = c.imageName
 			con.Args = args
@@ -808,7 +818,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 		// This would be bad
 		if pvcPrime == nil {
-			return fmt.Errorf("Failed to find PVC for populator pod")
+			return fmt.Errorf("failed to find PVC for populator pod")
 		}
 
 		// Get PV
@@ -927,7 +937,7 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		return err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		klog.V(5).Info(err)
@@ -937,28 +947,9 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 	bodyStr := string(body)
 
 	// For xcopy populator: detect completion metrics from the scraped body.
+	var completion *completionData
 	if populatorKind == api.VSphereXcopyVolumePopulatorKind && !c.metrics.isCompletionRecorded(pvc.UID) {
-		c.parseAndRecordCompletion(bodyStr, pvc, cr)
-	}
-
-	// Pick the right progress regex for the populator type.
-	var importRegExp *regexp.Regexp
-	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
-		importRegExp = regexp.MustCompile(`vsphere_xcopy_volume_populator_progress\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+\.?\d*)`)
-	} else {
-		importRegExp = regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
-	}
-
-	match := importRegExp.FindStringSubmatch(bodyStr)
-	if match == nil {
-		klog.V(5).Info("Failed to find matches, regex: ", importRegExp)
-		return nil
-	}
-
-	progress, err := strconv.ParseFloat(string(match[1]), 64)
-	if err != nil {
-		klog.V(5).Info("Could not convert progress: ", err)
-		return err
+		completion = c.parseAndRecordCompletion(bodyStr, pvc, cr)
 	}
 
 	gvr := schema.GroupVersionResource{
@@ -973,25 +964,86 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		return err
 	}
 
-	err = updatePopulatorProgress(int64(progress), latestPopulator)
-	if err != nil {
-		klog.V(5).Info("Failed to update progress: ", err)
-		return err
+	dirty := false
+	var progress float64
+
+	// Pick the right progress regex for the populator type.
+	// Best-effort: a miss or parse/write failure here is logged and skipped, and must
+	// not prevent the independent xcopyUsed/vibVersion scrapes below from being applied.
+	var importRegExp *regexp.Regexp
+	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
+		importRegExp = regexp.MustCompile(`vsphere_xcopy_volume_populator_progress\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+\.?\d*)`)
+	} else {
+		importRegExp = regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
 	}
 
+	if match := importRegExp.FindStringSubmatch(bodyStr); match == nil {
+		klog.V(5).Info("Failed to find matches, regex: ", importRegExp)
+	} else if p, perr := strconv.ParseFloat(match[1], 64); perr != nil {
+		klog.V(5).Info("Could not convert progress: ", perr)
+	} else {
+		progress = p
+		if err := updatePopulatorProgress(int64(progress), latestPopulator); err != nil {
+			klog.V(5).Info("Failed to update progress: ", err)
+		} else {
+			dirty = true
+		}
+	}
+
+	// xcopyUsed / vibVersion: best-effort, independent of progress above so that a
+	// failure/miss on either side never blocks the other from reaching the CR.
 	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
 		xcopyRegExp := regexp.MustCompile(`vsphere_xcopy_volume_populator_xcopy_used\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+)`)
-		xcopyMatch := xcopyRegExp.FindStringSubmatch(string(body))
-		if xcopyMatch != nil {
+		if xcopyMatch := xcopyRegExp.FindStringSubmatch(bodyStr); xcopyMatch != nil {
 			if err := unstructured.SetNestedField(latestPopulator.Object, xcopyMatch[1], "status", "xcopyUsed"); err != nil {
 				klog.V(5).Info("Failed to update xcopyUsed: ", err)
-				return err
+			} else {
+				dirty = true
+			}
+		}
+
+		vibVerRegExp := regexp.MustCompile(`vsphere_xcopy_volume_populator_vib_version\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+)`)
+		if vibVerLine := vibVerRegExp.FindString(bodyStr); vibVerLine != "" {
+			if vibVersion := extractLabel(vibVerLine, "version"); vibVersion != "" {
+				if err := unstructured.SetNestedField(latestPopulator.Object, vibVersion, "status", "vibVersion"); err != nil {
+					klog.V(5).Info("Failed to update vibVersion: ", err)
+				} else {
+					dirty = true
+				}
 			}
 		}
 	}
 
-	_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), latestPopulator, metav1.UpdateOptions{})
-	if err != nil {
+	if completion != nil {
+		for field, value := range map[string]string{
+			"copyDurationSeconds": completion.duration,
+			"result":              completion.result,
+			"storageVendor":       completion.vendor,
+			"cloneMethod":         completion.method,
+			"storageProtocol":     completion.protocol,
+			"provisionedBytes":    completion.provisionedBytes,
+			"allocatedBytes":      completion.allocatedBytes,
+		} {
+			if value != "" {
+				if err := unstructured.SetNestedField(latestPopulator.Object, value, "status", field); err != nil {
+					klog.V(5).Info("Failed to update ", field, ": ", err)
+				} else {
+					dirty = true
+				}
+			}
+		}
+		if err := unstructured.SetNestedField(latestPopulator.Object, "true", "metadata", "labels", "forklift.konveyor.io/offload-completed"); err != nil {
+			klog.V(5).Info("Failed to set offload-completed label: ", err)
+		} else {
+			dirty = true
+		}
+	}
+
+	if !dirty {
+		return nil
+	}
+
+	if _, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), latestPopulator, metav1.UpdateOptions{}); err != nil {
 		klog.V(5).Info("Failed to update CR ", err)
 		return err
 	}
@@ -1003,16 +1055,28 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 	return nil
 }
 
+type completionData struct {
+	result           string
+	vendor           string
+	method           string
+	xcopy            string
+	protocol         string
+	duration         string
+	provisionedBytes string
+	allocatedBytes   string
+}
+
 // parseAndRecordCompletion extracts completion metrics from the populator pod's /metrics output.
 // The presence of copy_duration_seconds signals that the copy finished (success or failure).
-func (c *controller) parseAndRecordCompletion(body string, pvc *corev1.PersistentVolumeClaim, cr *unstructured.Unstructured) {
+// Returns the parsed data so the caller can persist it to the CR, or nil if no completion detected.
+func (c *controller) parseAndRecordCompletion(body string, pvc *corev1.PersistentVolumeClaim, cr *unstructured.Unstructured) *completionData {
 	ownerUID := string(pvc.UID)
 
 	// Use copy_duration_seconds as the completion signal — emitted on both success and failure.
 	durationRegex := regexp.MustCompile(`vsphere_xcopy_volume_populator_copy_duration_seconds\{[^}]*owner_uid="` + ownerUID + `"[^}]*\} ([0-9.]+)`)
 	durationMatch := durationRegex.FindStringSubmatch(body)
 	if durationMatch == nil {
-		return
+		return nil
 	}
 
 	duration, _ := strconv.ParseFloat(durationMatch[1], 64)
@@ -1021,13 +1085,16 @@ func (c *controller) parseAndRecordCompletion(body string, pvc *corev1.Persisten
 
 	// Parse source disk bytes by type
 	var provisionedBytes, allocatedBytes float64
+	var provisionedBytesStr, allocatedBytesStr string
 	provisionedRegex := regexp.MustCompile(`vsphere_xcopy_volume_populator_source_disk_bytes\{[^}]*owner_uid="` + ownerUID + `"[^}]*type="provisioned"[^}]*\} ([0-9.e+]+)`)
 	if m := provisionedRegex.FindStringSubmatch(body); m != nil {
 		provisionedBytes, _ = strconv.ParseFloat(m[1], 64)
+		provisionedBytesStr = fmt.Sprintf("%g", provisionedBytes)
 	}
 	allocatedRegex := regexp.MustCompile(`vsphere_xcopy_volume_populator_source_disk_bytes\{[^}]*owner_uid="` + ownerUID + `"[^}]*type="datastore_allocated"[^}]*\} ([0-9.e+]+)`)
 	if m := allocatedRegex.FindStringSubmatch(body); m != nil {
 		allocatedBytes, _ = strconv.ParseFloat(m[1], 64)
+		allocatedBytesStr = fmt.Sprintf("%g", allocatedBytes)
 	}
 
 	// Parse labels from the duration metric line
@@ -1039,6 +1106,17 @@ func (c *controller) parseAndRecordCompletion(body string, pvc *corev1.Persisten
 	protocol := extractLabel(durationLine, "storage_protocol")
 
 	c.metrics.recordCompletionFromScrape(pvc.UID, result, migration, ownerUID, vendor, method, xcopy, protocol, duration, provisionedBytes, allocatedBytes)
+
+	return &completionData{
+		result:           result,
+		vendor:           vendor,
+		method:           method,
+		xcopy:            xcopy,
+		protocol:         protocol,
+		duration:         durationMatch[1],
+		provisionedBytes: provisionedBytesStr,
+		allocatedBytes:   allocatedBytesStr,
+	}
 }
 
 // extractLabel extracts a label value from a Prometheus metric line.

@@ -9,6 +9,7 @@
 .DEFAULT_GOAL := help
 
 GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
 GOPATH ?= $(shell go env GOPATH)
 GOBIN ?= $(GOPATH)/bin
 # GO111MODULE is enabled by default in modern Go; uncomment to force
@@ -145,7 +146,7 @@ MUST_GATHER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-must-gather:$(REGISTRY
 UI_PLUGIN_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-console-plugin:$(REGISTRY_TAG)
 
 # Golangci-lint version
-GOLANGCI_LINT_VERSION ?= v1.64.2
+GOLANGCI_LINT_VERSION ?= v2.12
 GOLANGCI_LINT_BIN ?= $(GOBIN)/golangci-lint
 
 ##@ Main Targets
@@ -713,12 +714,15 @@ deploy-ocp-controller: kubectl ## Deploy ForkliftController CR on OpenShift. Usa
 	fi; \
 	KUBECTL=$(KUBECTL) ./hack/deploy-ocp-controller.sh $$NAMESPACE
 
+.PHONY: deploy-all
+deploy-all: deploy-operator-index deploy-ocp deploy-ocp-controller ## Deploy operator index, OLM subscription, and ForkliftController CR in sequence
+
 .PHONY: remove-deployment
 remove-deployment: ## Remove all Forklift resources from the cluster. Usage: make remove-deployment [NAMESPACE=konveyor-forklift] [DRY_RUN=true]
 	@ARGS=""; \
 	if [ "$(DRY_RUN)" = "true" ]; then ARGS="$$ARGS --dry-run"; fi; \
 	if [ -n "$(NAMESPACE)" ]; then ARGS="$$ARGS --namespace $(NAMESPACE)"; fi; \
-	KUBECTL=$(KUBECTL) ./hack/remove-deployment.sh $$ARGS
+	KUBECTL=$(KUBECTL) bash ./hack/remove-deployment.sh $$ARGS
 
 ##@ Tool Installation
 
@@ -730,7 +734,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 .PHONY: kubectl
 kubectl: $(KUBECTL) ## Install kubectl
 $(DEFAULT_KUBECTL):
-	curl -L https://dl.k8s.io/release/v1.25.10/bin/linux/amd64/kubectl -o $(GOBIN)/kubectl && chmod +x $(GOBIN)/kubectl
+	curl -L https://dl.k8s.io/release/v1.25.10/bin/$(GOOS)/$(GOARCH)/kubectl -o $(GOBIN)/kubectl && chmod +x $(GOBIN)/kubectl
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Install kustomize
@@ -775,7 +779,7 @@ export DEPLOYMENT_VARS
 .PHONY: lint-install
 lint-install: ## Install golangci-lint
 	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
-	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 	@echo "golangci-lint installed successfully."
 
 .PHONY: lint

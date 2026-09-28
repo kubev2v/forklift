@@ -151,11 +151,11 @@ func GetVirtV2vImage(cfg *PodConfig) string {
 		return cfg.Image
 	}
 	if cfg.XfsCompatibility {
-		if settings.Settings.Migration.VirtV2vImageXFS != "" {
-			return settings.Settings.Migration.VirtV2vImageXFS
+		if settings.Settings.VirtV2vImageXFS != "" {
+			return settings.Settings.VirtV2vImageXFS
 		}
 	}
-	return settings.Settings.Migration.VirtV2vImage
+	return settings.Settings.VirtV2vImage
 }
 
 // GetDeepInspectionImage resolves the deep inspection workload image from PodConfig.
@@ -166,7 +166,7 @@ func GetDeepInspectionImage(cfg *PodConfig) string {
 		return cfg.Image
 	}
 	if cfg.XfsCompatibility {
-		if settings.Settings.Migration.DeepInspectionImageXFS != "" {
+		if settings.Settings.DeepInspectionImageXFS != "" {
 			return settings.Settings.DeepInspectionImageXFS
 		}
 	}

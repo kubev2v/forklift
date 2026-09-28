@@ -249,7 +249,7 @@ func (r *Fault) ApplyTo(m *model.Fault) {
 
 func (r *Fault) equalsTo(m *model.Fault) bool {
 	return m.Code == r.Code &&
-		m.Created == r.Created &&
+		m.Created.Equal(r.Created) &&
 		m.Details == r.Details &&
 		m.Message == r.Message
 }

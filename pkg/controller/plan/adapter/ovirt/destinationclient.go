@@ -19,9 +19,9 @@ type DestinationClient struct {
 	*plancontext.Context
 }
 
-// Delete OvirtVolumePopulator CustomResource list.
+// Delete OvirtVolumePopulator CustomResource list for a specific VM.
 func (r *DestinationClient) DeletePopulatorDataSource(vm *plan.VMStatus) error {
-	populatorCrList, err := r.getPopulatorCrList()
+	populatorCrList, err := r.getPopulatorCrList(vm.ID)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -36,7 +36,7 @@ func (r *DestinationClient) DeletePopulatorDataSource(vm *plan.VMStatus) error {
 
 // Set the OvirtVolumePopulator CustomResource Ownership.
 func (r *DestinationClient) SetPopulatorCrOwnership() (err error) {
-	populatorCrList, err := r.getPopulatorCrList()
+	populatorCrList, err := r.getPopulatorCrList("")
 	if err != nil {
 		return
 	}
@@ -53,7 +53,7 @@ func (r *DestinationClient) SetPopulatorCrOwnership() (err error) {
 			continue
 		}
 		patch := client.MergeFrom(populatorCrCopy)
-		err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
+		err = r.Destination.Patch(context.TODO(), &populatorCr, patch)
 		if err != nil {
 			continue
 		}
@@ -62,21 +62,26 @@ func (r *DestinationClient) SetPopulatorCrOwnership() (err error) {
 }
 
 // Get the OvirtVolumePopulator CustomResource List.
-func (r *DestinationClient) getPopulatorCrList() (populatorCrList v1beta1.OvirtVolumePopulatorList, err error) {
+// When vmID is non-empty, results are filtered to that VM only.
+func (r *DestinationClient) getPopulatorCrList(vmID string) (populatorCrList v1beta1.OvirtVolumePopulatorList, err error) {
 	populatorCrList = v1beta1.OvirtVolumePopulatorList{}
-	err = r.Destination.Client.List(
+	labelSet := map[string]string{"migration": string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)}
+	if vmID != "" {
+		labelSet["vmID"] = vmID
+	}
+	err = r.Destination.List(
 		context.TODO(),
 		&populatorCrList,
 		&client.ListOptions{
 			Namespace:     r.Plan.Spec.TargetNamespace,
-			LabelSelector: labels.SelectorFromSet(map[string]string{"migration": string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)}),
+			LabelSelector: labels.SelectorFromSet(labelSet),
 		})
 	return
 }
 
 // Deletes an object from destination cluster associated with the VM.
 func (r *DestinationClient) DeleteObject(object client.Object, vm *plan.VMStatus, message, objType string) (err error) {
-	err = r.Destination.Client.Delete(context.TODO(), object)
+	err = r.Destination.Delete(context.TODO(), object)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			err = nil
@@ -98,7 +103,7 @@ func (r *DestinationClient) DeleteObject(object client.Object, vm *plan.VMStatus
 
 func (r *DestinationClient) findPVCByCR(cr *v1beta1.OvirtVolumePopulator) (pvc *core.PersistentVolumeClaim, err error) {
 	pvcList := core.PersistentVolumeClaimList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		&pvcList,
 		&client.ListOptions{

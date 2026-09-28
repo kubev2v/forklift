@@ -89,6 +89,7 @@ func Add(mgr manager.Manager) error {
 
 	// Gather migration metrics
 	metrics.RecordMigrationMetrics(mgr.GetClient())
+	metrics.RecordXcopyMetrics(mgr.GetClient())
 
 	return nil
 }
@@ -242,7 +243,7 @@ func (r *Reconciler) reflectPlan(plan *api.Plan, migration *api.Migration) {
 //   - error: An error if something goes wrong during the process.
 func (r *Reconciler) setOwnerReference(migration *api.Migration) error {
 	plan := &api.Plan{}
-	err := r.Client.Get(
+	err := r.Get(
 		context.TODO(),
 		client.ObjectKey{
 			Namespace: migration.Spec.Plan.Namespace,
@@ -263,12 +264,12 @@ func (r *Reconciler) setOwnerReference(migration *api.Migration) error {
 		return err
 	}
 
-	err = r.Client.Update(context.TODO(), migration)
+	err = r.Update(context.TODO(), migration)
 	if err != nil {
 		return err
 	}
 
-	err = r.Client.Get(
+	err = r.Get(
 		context.TODO(),
 		client.ObjectKey{
 			Namespace: migration.Namespace,

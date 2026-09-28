@@ -73,7 +73,7 @@ func (r *ProviderPredicate) Update(e event.TypedUpdateEvent[*api.Provider]) bool
 // Provider deleted event.
 func (r *ProviderPredicate) Delete(e event.TypedDeleteEvent[*api.Provider]) bool {
 	p := e.Object
-	r.WatchManager.Deleted(p)
+	r.Deleted(p)
 	return true
 }
 

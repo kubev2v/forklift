@@ -1,8 +1,9 @@
-// Generated-by: Claude
 package conversion
 
 import (
 	"errors"
+	"syscall"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -238,6 +239,93 @@ var _ = Describe("Disks", func() {
 			Entry("disk 51 -> sdaz", "/dev/block51", "/var/tmp/v2v/vm-sdaz"),
 			Entry("disk 52 -> sdba", "/dev/block52", "/var/tmp/v2v/vm-sdba"),
 		)
+	})
+
+	Describe("waitForBlockDeviceWith", func() {
+		noSleep := func(_ time.Duration) {}
+
+		It("succeeds on first attempt", func() {
+			calls := 0
+			err := waitForBlockDeviceWith("/dev/block0", 3, func(_ string) error {
+				calls++
+				return nil
+			}, noSleep)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(calls).To(Equal(1))
+		})
+
+		It("retries transient ENXIO then succeeds", func() {
+			calls := 0
+			err := waitForBlockDeviceWith("/dev/block0", 3, func(_ string) error {
+				calls++
+				if calls <= 2 {
+					return syscall.ENXIO
+				}
+				return nil
+			}, noSleep)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(calls).To(Equal(3))
+		})
+
+		It("retries transient ENOENT then succeeds", func() {
+			calls := 0
+			err := waitForBlockDeviceWith("/dev/block0", 3, func(_ string) error {
+				calls++
+				if calls == 1 {
+					return syscall.ENOENT
+				}
+				return nil
+			}, noSleep)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(calls).To(Equal(2))
+		})
+
+		It("retries transient EIO then succeeds", func() {
+			calls := 0
+			err := waitForBlockDeviceWith("/dev/block0", 3, func(_ string) error {
+				calls++
+				if calls == 1 {
+					return syscall.EIO
+				}
+				return nil
+			}, noSleep)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(calls).To(Equal(2))
+		})
+
+		It("fails immediately on permanent error (EPERM)", func() {
+			calls := 0
+			err := waitForBlockDeviceWith("/dev/block0", 3, func(_ string) error {
+				calls++
+				return syscall.EPERM
+			}, noSleep)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("block device /dev/block0"))
+			Expect(calls).To(Equal(1))
+		})
+
+		It("wraps last error after exhausting retries", func() {
+			err := waitForBlockDeviceWith("/dev/block0", 3, func(_ string) error {
+				return syscall.ENXIO
+			}, noSleep)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not ready after 3 attempts"))
+			Expect(errors.Is(err, syscall.ENXIO)).To(BeTrue())
+		})
+
+		It("uses correct backoff sequence", func() {
+			var delays []time.Duration
+			spy := func(d time.Duration) { delays = append(delays, d) }
+			_ = waitForBlockDeviceWith("/dev/block0", 5, func(_ string) error {
+				return syscall.ENXIO
+			}, spy)
+			Expect(delays).To(Equal([]time.Duration{
+				500 * time.Millisecond,
+				1 * time.Second,
+				2 * time.Second,
+				4 * time.Second,
+			}))
+		})
 	})
 
 })

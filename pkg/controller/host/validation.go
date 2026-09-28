@@ -30,6 +30,7 @@ const (
 	ConnectionTestFailed    = "ConnectionTestFailed"
 	InMaintenance           = "InMaintenance"
 	NotHealthy              = "NotHealthy"
+	HostStatusNotGreen      = "HostStatusNotGreen"
 )
 
 // Categories
@@ -106,7 +107,7 @@ func (r *Reconciler) validateProvider(host *api.Host) error {
 	if pVal.Referenced == nil {
 		return nil
 	}
-	host.Referenced.Provider.Source = pVal.Referenced
+	host.Provider.Source = pVal.Referenced
 	switch pVal.Referenced.Type() {
 	case api.VSphere:
 	default:
@@ -137,7 +138,7 @@ func (r *Reconciler) validateRef(host *api.Host) error {
 			})
 		return nil
 	}
-	provider := host.Referenced.Provider.Source
+	provider := host.Provider.Source
 	if provider == nil {
 		return nil
 	}
@@ -226,10 +227,10 @@ func (r *Reconciler) validateSecret(host *api.Host) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	host.Referenced.Secret = secret
+	host.Secret = secret
 	// DataErr
 	keyList := []string{}
-	provider := host.Referenced.Provider.Source
+	provider := host.Provider.Source
 	if provider != nil {
 		switch provider.Type() {
 		case api.VSphere:
@@ -267,8 +268,8 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 	if host.Status.HasBlockerCondition() {
 		return
 	}
-	provider := host.Referenced.Provider.Source
-	secret := host.Referenced.Secret
+	provider := host.Provider.Source
+	secret := host.Secret
 	inventory, err := web.NewClient(provider)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -295,17 +296,7 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 				},
 			)
 		}
-		if hostModel.Status != "green" {
-			host.Status.SetCondition(
-				libcnd.Condition{
-					Type:     NotHealthy,
-					Status:   True,
-					Reason:   StateEvaluated,
-					Category: Critical,
-					Message:  "Host status not 'green'.",
-				},
-			)
-		}
+		setOverallStatusConditions(host, hostModel.Status)
 		secret.Data["thumbprint"] = []byte(hostModel.Thumbprint)
 		h := adapter.EsxHost{
 			Secret: secret,
@@ -350,4 +341,32 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 	}
 
 	return
+}
+
+// setOverallStatusConditions maps vSphere HostSystem.overallStatus onto Host
+// conditions. Only red blocks Ready (Critical NotHealthy), any non-green value
+// is surfaced as a Warn concern.
+func setOverallStatusConditions(host *api.Host, overallStatus string) {
+	if overallStatus != "green" {
+		host.Status.SetCondition(
+			libcnd.Condition{
+				Type:     HostStatusNotGreen,
+				Status:   True,
+				Reason:   StateEvaluated,
+				Category: Warn,
+				Message:  fmt.Sprintf("Host overallStatus is %q (expected green).", overallStatus),
+			},
+		)
+	}
+	if overallStatus == "red" {
+		host.Status.SetCondition(
+			libcnd.Condition{
+				Type:     NotHealthy,
+				Status:   True,
+				Reason:   StateEvaluated,
+				Category: Critical,
+				Message:  "Host overallStatus is red.",
+			},
+		)
+	}
 }

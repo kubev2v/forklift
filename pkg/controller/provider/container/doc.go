@@ -3,6 +3,7 @@ package container
 import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/hyperv"
+	"github.com/kubev2v/forklift/pkg/controller/provider/container/nutanix"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/ova"
@@ -10,6 +11,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	azurecollector "github.com/kubev2v/forklift/pkg/provider/azure/inventory/collector"
 	ec2collector "github.com/kubev2v/forklift/pkg/provider/ec2/inventory/collector"
 	core "k8s.io/api/core/v1"
 )
@@ -35,6 +37,10 @@ func Build(
 		return ec2collector.New(db, provider, secret)
 	case api.HyperV:
 		return hyperv.New(db, provider, secret)
+	case api.Nutanix:
+		return nutanix.New(db, provider, secret)
+	case api.Azure:
+		return azurecollector.New(db, provider, secret)
 	}
 
 	return nil

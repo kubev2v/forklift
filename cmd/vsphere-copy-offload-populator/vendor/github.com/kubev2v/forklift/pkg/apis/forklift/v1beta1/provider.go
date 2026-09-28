@@ -45,6 +45,10 @@ const (
 
 	// HyperV
 	HyperV ProviderType = "hyperv"
+	// Nutanix
+	Nutanix ProviderType = "nutanix"
+	// Azure
+	Azure ProviderType = "azure"
 )
 
 var ProviderTypes = []ProviderType{
@@ -55,6 +59,8 @@ var ProviderTypes = []ProviderType{
 	Ova,
 	EC2,
 	HyperV,
+	Nutanix,
+	Azure,
 }
 
 func (t ProviderType) String() string {
@@ -78,12 +84,32 @@ const (
 	ESXiCloneMethod        = "esxiCloneMethod"
 	TargetAZ               = "target-az"
 	TargetRegion           = "target-region"
+	// Nutanix Prism endpoint settings.
+	NutanixPrismType   = "prismType"
+	NutanixClusterUUID = "clusterUuid"
+	AzureSnapshotSku   = "snapshotSku"
+	AzureSnapshotRG    = "snapshotResourceGroup"
+	AzureTargetRegion  = "targetRegion"
+	AzureSnapshotClass = "volumeSnapshotClassName"
+)
+
+// Nutanix Prism endpoint types.
+const (
+	NutanixPrismCentral = "central"
+	NutanixPrismElement = "element"
 )
 
 // ESXi clone method values.
 const (
 	ESXiCloneMethodVIB = "vib"
 	ESXiCloneMethodSSH = "ssh"
+)
+
+// Hyper-V management type setting key and values.
+const (
+	ManagementType   = "managementType"
+	HyperVStandalone = "standalone"
+	HyperVCluster    = "cluster"
 )
 
 const OvaProviderFinalizer = "forklift/ova-provider"
@@ -185,7 +211,7 @@ func (p *Provider) HasReconciled() bool {
 
 // This provider requires VM guest conversion.
 func (p *Provider) RequiresConversion() bool {
-	return p.Type() == VSphere || p.Type() == Ova || p.Type() == HyperV || p.Type() == EC2
+	return p.Type() == VSphere || p.Type() == Ova || p.Type() == HyperV || p.Type() == EC2 || p.Type() == Azure
 }
 
 // This provider support the vddk aio parameters.
@@ -199,4 +225,9 @@ func (p *Provider) UseVddkAioOptimization() bool {
 		return false
 	}
 	return parseBool
+}
+
+// Whether this Hyper-V provider is configured for Failover Cluster mode.
+func (p *Provider) IsHyperVCluster() bool {
+	return p.Type() == HyperV && p.Spec.Settings[ManagementType] == HyperVCluster
 }

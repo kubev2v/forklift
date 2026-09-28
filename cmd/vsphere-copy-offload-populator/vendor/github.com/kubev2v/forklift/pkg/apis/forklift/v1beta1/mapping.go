@@ -54,12 +54,29 @@ type NetworkSourceRef struct {
 	Vlan string `json:"vlan,omitempty"`
 }
 
+// NetworkIPMode defines the guest OS network configuration behavior
+// for interfaces mapped through this network pair.
+// +kubebuilder:validation:Enum=preserve;dhcp;none
+type NetworkIPMode string
+
+const (
+	// NetworkIPModePreserve migrates static IP configuration from the source VM.
+	NetworkIPModePreserve NetworkIPMode = "preserve"
+	// NetworkIPModeDHCP signals the NIC should use DHCP on the target.
+	NetworkIPModeDHCP NetworkIPMode = "dhcp"
+	// NetworkIPModeNone leaves the NIC untouched — no IP configuration is applied.
+	NetworkIPModeNone NetworkIPMode = "none"
+)
+
 // Mapped network.
 type NetworkPair struct {
 	// Source network.
 	Source NetworkSourceRef `json:"source"`
 	// Destination network.
 	Destination DestinationNetwork `json:"destination"`
+	// Network IP mode for this network, overrides plan-level preserveStaticIPs.
+	// +optional
+	NetworkIPMode NetworkIPMode `json:"networkIPMode,omitempty"`
 }
 
 // OffloadPlugin is a storage plugin that acts on the storage allocation and copying
@@ -77,7 +94,7 @@ type CsiVolumeImport struct {
 	// SecretRef is the name of the secret with storage credentials, in the source provider's namespace.
 	SecretRef string `json:"secretRef"`
 	// StorageVendorProduct identifies the storage array vendor.
-	// +kubebuilder:validation:Enum=primera3par
+	// +kubebuilder:validation:Enum=primera3par;ontap
 	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
 }
 

@@ -18,10 +18,10 @@ var _ = Describe("isCBTEnabledForDisks", func() {
 	Context("All disks with CBT enabled across types", func() {
 		BeforeEach(func() {
 			disks = []modelVsphere.Disk{
-				{ControllerKey: 16000, UnitNumber: 0, Bus: "scsi"}, // scsi0:0
-				{ControllerKey: 17000, UnitNumber: 1, Bus: "sata"}, // sata0:1
-				{ControllerKey: 18000, UnitNumber: 2, Bus: "nvme"}, // nvme0:2
-				{ControllerKey: 19000, UnitNumber: 0, Bus: "ide"},  // ide0:0
+				{ControllerKey: 16000, BusNumber: 0, UnitNumber: 0, Bus: "scsi"}, // scsi0:0
+				{ControllerKey: 17000, BusNumber: 0, UnitNumber: 1, Bus: "sata"}, // sata0:1
+				{ControllerKey: 18000, BusNumber: 0, UnitNumber: 2, Bus: "nvme"}, // nvme0:2
+				{ControllerKey: 19000, BusNumber: 0, UnitNumber: 0, Bus: "ide"},  // ide0:0
 			}
 			ctkMap = map[string]bool{
 				"scsi0:0": true,
@@ -42,10 +42,10 @@ var _ = Describe("isCBTEnabledForDisks", func() {
 	Context("Mixed CBT state and missing entries", func() {
 		BeforeEach(func() {
 			disks = []modelVsphere.Disk{
-				{ControllerKey: 16000, UnitNumber: 0, Bus: "scsi"}, // scsi0:0 → true
-				{ControllerKey: 17000, UnitNumber: 1, Bus: "sata"}, // sata0:1 → false
-				{ControllerKey: 18001, UnitNumber: 0, Bus: "nvme"}, // nvme1:0 → true
-				{ControllerKey: 19000, UnitNumber: 1, Bus: "ide"},  // ide0:1 → not in map
+				{ControllerKey: 16000, BusNumber: 0, UnitNumber: 0, Bus: "scsi"}, // scsi0:0 → true
+				{ControllerKey: 17000, BusNumber: 0, UnitNumber: 1, Bus: "sata"}, // sata0:1 → false
+				{ControllerKey: 18001, BusNumber: 1, UnitNumber: 0, Bus: "nvme"}, // nvme1:0 → true
+				{ControllerKey: 19000, BusNumber: 0, UnitNumber: 1, Bus: "ide"},  // ide0:1 → not in map
 			}
 			ctkMap = map[string]bool{
 				"scsi0:0": true,
@@ -67,8 +67,8 @@ var _ = Describe("isCBTEnabledForDisks", func() {
 	Context("No entries in the CBT map", func() {
 		BeforeEach(func() {
 			disks = []modelVsphere.Disk{
-				{ControllerKey: 16000, UnitNumber: 1, Bus: "scsi"},
-				{ControllerKey: 17000, UnitNumber: 2, Bus: "sata"},
+				{ControllerKey: 16000, BusNumber: 0, UnitNumber: 1, Bus: "scsi"},
+				{ControllerKey: 17000, BusNumber: 0, UnitNumber: 2, Bus: "sata"},
 			}
 		})
 
@@ -83,9 +83,9 @@ var _ = Describe("isCBTEnabledForDisks", func() {
 	Context("CBT enabled for some and missing others", func() {
 		BeforeEach(func() {
 			disks = []modelVsphere.Disk{
-				{ControllerKey: 16000, UnitNumber: 0, Bus: "scsi"}, // scsi0:0
-				{ControllerKey: 17000, UnitNumber: 1, Bus: "sata"}, // sata0:1
-				{ControllerKey: 18000, UnitNumber: 2, Bus: "nvme"}, // nvme0:2 (missing)
+				{ControllerKey: 16000, BusNumber: 0, UnitNumber: 0, Bus: "scsi"}, // scsi0:0
+				{ControllerKey: 17000, BusNumber: 0, UnitNumber: 1, Bus: "sata"}, // sata0:1
+				{ControllerKey: 18000, BusNumber: 0, UnitNumber: 2, Bus: "nvme"}, // nvme0:2 (missing)
 			}
 			ctkMap = map[string]bool{
 				"scsi0:0": true,
@@ -98,6 +98,24 @@ var _ = Describe("isCBTEnabledForDisks", func() {
 			Expect(disks[0].ChangeTrackingEnabled).To(BeTrue())  // scsi0:0
 			Expect(disks[1].ChangeTrackingEnabled).To(BeFalse()) // sata0:1
 			Expect(disks[2].ChangeTrackingEnabled).To(BeFalse()) // nvme0:2
+		})
+	})
+
+	Context("Key remainder differs from BusNumber", func() {
+		BeforeEach(func() {
+			// ControllerKey 16000 would derive scsi0; actual BusNumber is 2.
+			disks = []modelVsphere.Disk{
+				{ControllerKey: 16000, BusNumber: 2, UnitNumber: 0, Bus: "scsi"},
+			}
+			ctkMap = map[string]bool{
+				"scsi2:0": true,
+				"scsi0:0": false,
+			}
+		})
+
+		It("should match CBT using BusNumber, not ControllerKey", func() {
+			isCBTEnabledForDisks(ctkMap, disks)
+			Expect(disks[0].ChangeTrackingEnabled).To(BeTrue())
 		})
 	})
 

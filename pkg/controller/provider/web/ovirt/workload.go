@@ -112,7 +112,7 @@ type XDiskAttachment struct {
 
 func (r *XDiskAttachment) Expand(db libmodel.DB) (err error) {
 	disk := &model.Disk{
-		Base: model.Base{ID: r.DiskAttachment.ID},
+		Base: model.Base{ID: r.ID},
 	}
 	disk.ID = r.DiskAttachment.Disk
 	err = db.Get(disk)

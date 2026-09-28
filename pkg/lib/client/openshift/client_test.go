@@ -92,12 +92,12 @@ func TestRestCfg(t *testing.T) {
 				t.Fatalf("Expected non-nil config")
 			}
 
-			if config != nil && config.TLSClientConfig.Insecure != tc.expectedInsecure {
-				t.Errorf("Expected TLSClientConfig.Insecure to be %v, got %v", tc.expectedInsecure, config.TLSClientConfig.Insecure)
+			if config != nil && config.Insecure != tc.expectedInsecure {
+				t.Errorf("Expected TLSClientConfig.Insecure to be %v, got %v", tc.expectedInsecure, config.Insecure)
 			}
 
-			if config != nil && string(config.TLSClientConfig.CAData) != string(tc.expectedCAData) {
-				t.Errorf("Expected TLSClientConfig.CAData to be %s, got %s", string(tc.expectedCAData), string(config.TLSClientConfig.CAData))
+			if config != nil && string(config.CAData) != string(tc.expectedCAData) {
+				t.Errorf("Expected TLSClientConfig.CAData to be %s, got %s", string(tc.expectedCAData), string(config.CAData))
 			}
 		})
 	}

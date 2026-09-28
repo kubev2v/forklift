@@ -133,8 +133,8 @@ func getEnvBool(name string, def bool) bool {
 // GetVDDKImage gets the VDDK image from provider spec settings with fall back to global settings.
 func GetVDDKImage(providerSpecSettings map[string]string) string {
 	vddkImage := providerSpecSettings[api.VDDK]
-	if vddkImage == "" && Settings.Migration.VddkImage != "" {
-		vddkImage = Settings.Migration.VddkImage
+	if vddkImage == "" && Settings.VddkImage != "" {
+		vddkImage = Settings.VddkImage
 	}
 
 	return vddkImage

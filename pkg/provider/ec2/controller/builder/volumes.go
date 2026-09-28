@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
@@ -92,8 +93,8 @@ func (r *Builder) calculatePVCSize(volumeSizeBytes int64, volumeMode *core.Persi
 // ResolvePersistentVolumeClaimIdentifier extracts the EBS volume ID from a PVC's annotations.
 // Enables tracking which PVC corresponds to which source EBS volume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
-	if pvc.ObjectMeta.Annotations != nil {
-		return pvc.ObjectMeta.Annotations["forklift.konveyor.io/volume-id"]
+	if pvc.Annotations != nil {
+		return pvc.Annotations["forklift.konveyor.io/volume-id"]
 	}
 	return ""
 }
@@ -117,8 +118,8 @@ func (r *Builder) SupportsVolumePopulators() bool {
 	return false
 }
 
-func (r *Builder) PopulatorXcopyUsed(_ *core.PersistentVolumeClaim) (string, bool, error) {
-	return "", false, nil
+func (r *Builder) PopulatorOffloadInfo(_ *core.PersistentVolumeClaim) (map[string]string, error) {
+	return map[string]string{}, nil
 }
 
 // PopulatorTransferredBytes is a no-op for EC2 - direct volume creation doesn't use populators.
@@ -294,10 +295,9 @@ func (r *Builder) BuildDirectPVC(vmRef ref.Ref, volumeInfo *VolumeInfo, index in
 
 	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
-			GenerateName: fmt.Sprintf("%s-disk-", vmRef.Name),
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels:       pvcLabels,
-			Annotations:  pvcAnnotations,
+			Namespace:   r.Plan.Spec.TargetNamespace,
+			Labels:      pvcLabels,
+			Annotations: pvcAnnotations,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: []core.PersistentVolumeAccessMode{
@@ -314,12 +314,32 @@ func (r *Builder) BuildDirectPVC(vmRef ref.Ref, volumeInfo *VolumeInfo, index in
 		},
 	}
 
+	if err := r.setPVCNameFromTemplate(&pvc.ObjectMeta, vmRef, volumeInfo, index); err != nil {
+		return nil, err
+	}
+
 	r.log.Info("Built direct PVC spec",
 		"vm", vmRef.Name,
+		"pvcName", pvc.Name,
 		"pvcGenerateName", pvc.GenerateName,
 		"ebsVolumeID", volumeInfo.EBSVolumeID,
 		"storageClass", storageClass,
 		"pvcSize", pvcSize.String())
 
 	return pvc, nil
+}
+
+// setPVCNameFromTemplate sets PVC name/generateName using the PVC template.
+func (r *Builder) setPVCNameFromTemplate(objectMeta *meta.ObjectMeta, vmRef ref.Ref, volumeInfo *VolumeInfo, diskIndex int) error {
+	templateData := &api.PVCNameTemplateData{
+		VmName:       vmRef.Name,
+		TargetVmName: planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name),
+		PlanName:     r.Plan.Name,
+		DiskIndex:    diskIndex,
+		VmId:         vmRef.ID,
+		VolumeID:     volumeInfo.OriginalVolumeID,
+		SnapshotID:   volumeInfo.SnapshotID,
+	}
+
+	return planbase.SetPVCNameOnObject(objectMeta, planbase.GetPVCNameTemplate(r.Plan, vmRef.ID), planbase.GetPVCNameTemplateUseGenerateName(r.Plan), templateData)
 }

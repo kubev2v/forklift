@@ -99,6 +99,9 @@ mcp_server_state: absent
 profiler_volume_path: "/var/cache/profiler"
 inventory_volume_path: "/var/cache/inventory"
 forklift_operator_version: "latest"
+# Kinds listed here must resolve on every supported cluster; a kind that only
+# some clusters serve (like Route) must also be filtered out of the
+# cleanup_resources fact in tasks/main.yml, or cleanup fails where it is absent.
 forklift_resources:
   - Deployment
   - ConfigMap

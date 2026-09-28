@@ -40,10 +40,14 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 
 	// HyperV specific flags
 	var smbUrl, smbUser, smbPassword string
+	var hypervMgmtType string
 
 	// Azure specific flags
 	var azureTenantID, azureSubscriptionID, azureClientID, azureClientSecret string
 	var azureResourceGroup, azureTargetRegion, azureSnapshotSku, azureSnapshotResourceGroup string
+
+	// Nutanix specific flags
+	var nutanixPrismType, nutanixClusterUUID string
 
 	var dryRun bool
 	var outputFormat string
@@ -67,6 +71,7 @@ Providers represent source or target environments for VM migrations. Supported t
   - ec2: Amazon EC2 instances
   - hyperv: Microsoft Hyper-V
   - azure: Microsoft Azure VMs
+  - nutanix: Nutanix Prism (Central or Element)
 
 Credentials can be provided directly via flags or through an existing Kubernetes secret.`,
 		Example: `  # Create a vSphere provider
@@ -117,7 +122,16 @@ Credentials can be provided directly via flags or through an existing Kubernetes
     --azure-subscription-id "$AZURE_SUBSCRIPTION_ID" \
     --azure-client-id "$AZURE_CLIENT_ID" \
     --azure-client-secret "$AZURE_CLIENT_SECRET" \
-    --azure-resource-group "my-resource-group"`,
+    --azure-resource-group "my-resource-group"
+
+  # Create a Nutanix provider
+  kubectl-mtv create provider --name my-nutanix \
+    --type nutanix \
+    --url https://prism.example.com:9440 \
+    --username admin \
+    --password 'secret' \
+    --nutanix-prism-type central \
+    --nutanix-cluster-uuid 00000000-0000-0000-0000-000000000000`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -180,6 +194,7 @@ Credentials can be provided directly via flags or through an existing Kubernetes
 				SMBUrl:                     smbUrl,
 				SMBUser:                    smbUser,
 				SMBPassword:                smbPassword,
+				HyperVMgmtType:             hypervMgmtType,
 				AzureTenantID:              azureTenantID,
 				AzureSubscriptionID:        azureSubscriptionID,
 				AzureClientID:              azureClientID,
@@ -188,6 +203,8 @@ Credentials can be provided directly via flags or through an existing Kubernetes
 				AzureTargetRegion:          azureTargetRegion,
 				AzureSnapshotSku:           azureSnapshotSku,
 				AzureSnapshotResourceGroup: azureSnapshotResourceGroup,
+				NutanixPrismType:           nutanixPrismType,
+				NutanixClusterUUID:         nutanixClusterUUID,
 				DryRun:                     dryRun,
 				OutputFormat:               resolvedFormat,
 			}
@@ -197,7 +214,7 @@ Credentials can be provided directly via flags or through an existing Kubernetes
 	}
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Provider name")
-	cmd.Flags().VarP(providerType, "type", "t", "Provider type (openshift, vsphere, ovirt, openstack, ova, ec2, hyperv, azure)")
+	cmd.Flags().VarP(providerType, "type", "t", "Provider type (openshift, vsphere, ovirt, openstack, ova, ec2, hyperv, azure, nutanix)")
 	cmd.Flags().StringVar(&secret, "secret", "", "Secret containing provider credentials")
 
 	// Provider credential flags
@@ -236,6 +253,7 @@ Credentials can be provided directly via flags or through an existing Kubernetes
 	cmd.Flags().StringVar(&smbUrl, "smb-url", "", "SMB share URL for HyperV (e.g., //server/share)")
 	cmd.Flags().StringVar(&smbUser, "smb-user", "", "SMB username (defaults to HyperV username)")
 	cmd.Flags().StringVar(&smbPassword, "smb-password", "", "SMB password (defaults to HyperV password)")
+	cmd.Flags().StringVar(&hypervMgmtType, "hyperv-management-type", "", "HyperV management type (e.g., cluster)")
 
 	// Azure specific flags
 	cmd.Flags().StringVar(&azureTenantID, "azure-tenant-id", "", "Azure AD tenant ID")
@@ -246,6 +264,10 @@ Credentials can be provided directly via flags or through an existing Kubernetes
 	cmd.Flags().StringVar(&azureTargetRegion, "azure-target-region", "", "Target region for cross-region migrations (optional)")
 	cmd.Flags().StringVar(&azureSnapshotSku, "azure-snapshot-sku", "", "Snapshot SKU (Standard_LRS, Standard_ZRS, Premium_LRS; default: Standard_ZRS)")
 	cmd.Flags().StringVar(&azureSnapshotResourceGroup, "azure-snapshot-resource-group", "", "Resource group for snapshots (defaults to source resource group)")
+
+	// Nutanix specific flags
+	cmd.Flags().StringVar(&nutanixPrismType, "nutanix-prism-type", "", "Nutanix Prism endpoint type (central or element)")
+	cmd.Flags().StringVar(&nutanixClusterUUID, "nutanix-cluster-uuid", "", "Nutanix cluster UUID (used with Prism Central)")
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output Provider CR(s) to stdout instead of creating them")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format for dry-run (json, yaml). Defaults to yaml when --dry-run is used")
@@ -267,6 +289,12 @@ Credentials can be provided directly via flags or through an existing Kubernetes
 	// Add completion for esxi-clone-method flag
 	if err := cmd.RegisterFlagCompletionFunc("esxi-clone-method", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return esxiCloneMethod.GetValidValues(), cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		panic(err)
+	}
+
+	if err := cmd.RegisterFlagCompletionFunc("nutanix-prism-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"central", "element"}, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		panic(err)
 	}

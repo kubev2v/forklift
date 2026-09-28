@@ -1,0 +1,16 @@
+# Edit spec.url (Prism Central or Element base URL, no trailing slash), then:
+#   oc apply -f hack/dev-nutanix-secret.yaml
+#   oc apply -f hack/dev-nutanix-provider.yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: nutanix-demo
+  namespace: openshift-mtv
+spec:
+  type: nutanix
+  url: https://10.37.160.249:9440
+  secret:
+    name: nutanix-provider-secret
+    namespace: openshift-mtv
+  settings:
+    prismType: element

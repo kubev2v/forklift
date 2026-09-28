@@ -114,6 +114,14 @@ Feature gates enable or disable specific Forklift capabilities.
 | `controller_filesystem_overhead` | `10` | `FILESYSTEM_OVERHEAD` | Filesystem overhead percentage |
 | `controller_block_overhead` | `0` | `BLOCK_OVERHEAD` | Block storage fixed overhead (bytes) |
 
+### Naming Settings
+
+| Setting | Default | Environment Variable | Description |
+|---------|---------|---------------------|-------------|
+| `controller_pvc_name_template` | empty | `PVC_NAME_TEMPLATE` | Global default PVC name template for non-OCP providers. Empty falls back to `{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}`. Does not apply to OpenShift sources. |
+| `controller_ocp_pvc_name_template` | empty | `OCP_PVC_NAME_TEMPLATE` | Global default PVC name template for OpenShift sources. Empty falls back to `{{.SourcePVCName}}` (exact name). Does not apply to non-OCP providers. |
+| `controller_migration_service_account` | empty | `MIGRATION_SERVICE_ACCOUNT` | Global default ServiceAccount for migration pods (overridden by Plan `serviceAccount`) |
+
 ---
 
 ## Container Resource Settings

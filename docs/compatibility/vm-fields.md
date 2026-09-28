@@ -298,6 +298,34 @@ vms:
 
 ---
 
+## Exclude Disks
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `excludeDisks` | []string | omitted | vSphere bus addresses to skip (e.g. `scsi0:1`) |
+
+When omitted or empty, all disks are migrated (subject to `migrateSharedDisks`). When set, disks whose inventory `busAddress` matches an entry are not imported and are not attached to the target VM. Each entry must match a disk `busAddress` on the source VM.
+
+vSphere only. A non-empty list forces the CDI transfer path (virt-v2v copies every attached disk).
+
+### Support Matrix
+
+| Field | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV |
+|-------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|
+| `excludeDisks` | Yes | No | No | No | No | No | No |
+
+### Example
+
+```yaml
+vms:
+  - id: vm-123
+    excludeDisks:
+      - scsi0:1
+      - scsi0:2
+```
+
+---
+
 ## Complete Field Reference
 
 | Field | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV |
@@ -323,5 +351,7 @@ vms:
 | `deleteVmOnFailMigration` | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | **Shared Disks** | | | | | | | |
 | `migrateSharedDisks` | Yes | - | - | - | - | - | - |
+| **Exclude Disks** | | | | | | | |
+| `excludeDisks` | Yes | - | - | - | - | - | - |
 
 **Legend:** Req = Required, Yes = Supported, Opt = Optional, - = Not supported

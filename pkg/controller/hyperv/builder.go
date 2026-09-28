@@ -192,12 +192,12 @@ func (r *Builder) PodSpec(provider *api.Provider, secret *core.Secret, pvc *core
 				},
 				Resources: core.ResourceRequirements{
 					Requests: core.ResourceList{
-						core.ResourceCPU:    resource.MustParse(Settings.Providers.HyperV.Resources.CPU.Request),
-						core.ResourceMemory: resource.MustParse(Settings.Providers.HyperV.Resources.Memory.Request),
+						core.ResourceCPU:    resource.MustParse(Settings.HyperV.Resources.CPU.Request),
+						core.ResourceMemory: resource.MustParse(Settings.HyperV.Resources.Memory.Request),
 					},
 					Limits: core.ResourceList{
-						core.ResourceCPU:    resource.MustParse(Settings.Providers.HyperV.Resources.CPU.Limit),
-						core.ResourceMemory: resource.MustParse(Settings.Providers.HyperV.Resources.Memory.Limit),
+						core.ResourceCPU:    resource.MustParse(Settings.HyperV.Resources.CPU.Limit),
+						core.ResourceMemory: resource.MustParse(Settings.HyperV.Resources.Memory.Limit),
 					},
 				},
 				ReadinessProbe: &core.Probe{
@@ -274,5 +274,5 @@ func (r *Builder) Service(provider *api.Provider) (svc *core.Service) {
 }
 
 func (r *Builder) containerImage() string {
-	return Settings.Providers.HyperV.ContainerImage
+	return Settings.HyperV.ContainerImage
 }

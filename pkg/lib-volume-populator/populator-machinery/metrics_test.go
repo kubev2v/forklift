@@ -138,7 +138,7 @@ func verifyInFlightMetric(expected string, srvAddr string) error {
 	if err != nil {
 		return err
 	}
-	defer rsp.Body.Close()
+	defer func() { _ = rsp.Body.Close() }()
 
 	if rsp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to get response from serve: %s", http.StatusText(rsp.StatusCode))
@@ -160,7 +160,7 @@ func verifyMetric(expected, srvAddr string) error {
 	if err != nil {
 		return err
 	}
-	defer rsp.Body.Close()
+	defer func() { _ = rsp.Body.Close() }()
 
 	if rsp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to get response from serve: %s", http.StatusText(rsp.StatusCode))

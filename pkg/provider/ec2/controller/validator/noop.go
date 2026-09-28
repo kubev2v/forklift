@@ -2,7 +2,7 @@ package validator
 
 import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
-	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -42,7 +42,7 @@ func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
 }
 
 // MacConflicts validates MAC address conflicts (not applicable for EC2).
-func (r *Validator) MacConflicts(vmRef ref.Ref) ([]base.MacConflict, error) {
+func (r *Validator) MacConflicts(vmRef ref.Ref) ([]planbase.MacConflict, error) {
 	return nil, nil
 }
 
@@ -51,13 +51,14 @@ func (r *Validator) PowerState(vmRef ref.Ref) (ok bool, err error) {
 	return true, nil
 }
 
-// PVCNameTemplate validates PVC name template (not applicable for EC2).
-func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
-	return true, nil
-}
-
 // SharedDisks validates shared disk configuration (not applicable for EC2).
 func (r *Validator) SharedDisks(vmRef ref.Ref, c client.Client) (ok bool, msg string, category string, err error) {
+	ok = true
+	return
+}
+
+// ExcludedDisks validates excludeDisks (not applicable for EC2).
+func (r *Validator) ExcludedDisks(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
 	ok = true
 	return
 }

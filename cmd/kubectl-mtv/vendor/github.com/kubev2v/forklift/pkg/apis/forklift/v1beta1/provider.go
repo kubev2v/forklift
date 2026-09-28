@@ -45,6 +45,8 @@ const (
 
 	// HyperV
 	HyperV ProviderType = "hyperv"
+	// Nutanix
+	Nutanix ProviderType = "nutanix"
 )
 
 var ProviderTypes = []ProviderType{
@@ -55,6 +57,7 @@ var ProviderTypes = []ProviderType{
 	Ova,
 	EC2,
 	HyperV,
+	Nutanix,
 }
 
 func (t ProviderType) String() string {
@@ -78,12 +81,28 @@ const (
 	ESXiCloneMethod        = "esxiCloneMethod"
 	TargetAZ               = "target-az"
 	TargetRegion           = "target-region"
+	// Nutanix Prism endpoint settings.
+	NutanixPrismType   = "prismType"
+	NutanixClusterUUID = "clusterUuid"
+)
+
+// Nutanix Prism endpoint types.
+const (
+	NutanixPrismCentral = "central"
+	NutanixPrismElement = "element"
 )
 
 // ESXi clone method values.
 const (
 	ESXiCloneMethodVIB = "vib"
 	ESXiCloneMethodSSH = "ssh"
+)
+
+// Hyper-V management type setting key and values.
+const (
+	ManagementType   = "managementType"
+	HyperVStandalone = "standalone"
+	HyperVCluster    = "cluster"
 )
 
 const OvaProviderFinalizer = "forklift/ova-provider"
@@ -199,4 +218,9 @@ func (p *Provider) UseVddkAioOptimization() bool {
 		return false
 	}
 	return parseBool
+}
+
+// Whether this Hyper-V provider is configured for Failover Cluster mode.
+func (p *Provider) IsHyperVCluster() bool {
+	return p.Type() == HyperV && p.Spec.Settings[ManagementType] == HyperVCluster
 }

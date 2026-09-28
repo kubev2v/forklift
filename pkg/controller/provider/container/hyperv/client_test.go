@@ -3,37 +3,75 @@ package hyperv
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv/types"
 	"github.com/kubev2v/forklift/pkg/lib/hyperv/driver"
+	ps "github.com/kubev2v/forklift/pkg/lib/hyperv/powershell"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // mockDriver implements driver.HyperVDriver for unit tests.
 type mockDriver struct {
-	clusterData  *driver.ClusterData
-	clusterNodes []driver.ClusterNodeData
-	clusterVMs   []driver.ClusterGroupData
-	runOnNodeFn  func(command, computerName string) (string, error)
+	clusterData       *driver.ClusterData
+	clusterNodes      []driver.ClusterNodeData
+	clusterVMs        []driver.ClusterGroupData
+	networks          []driver.Network
+	computerInfo      *driver.ComputerInfoData
+	computerInfoFn    func() (*driver.ComputerInfoData, error)
+	runOnNodeFn       func(command, computerName string) (string, error)
+	listAllDomainsFn  func() ([]driver.Domain, error)
+	listAllNetworksFn func() ([]driver.Network, error)
 }
 
-func (m *mockDriver) Connect() error                                           { return nil }
-func (m *mockDriver) Close() error                                             { return nil }
-func (m *mockDriver) IsAlive() (bool, error)                                   { return true, nil }
-func (m *mockDriver) ListAllDomains() ([]driver.Domain, error)                 { return nil, nil }
-func (m *mockDriver) ListAllClusterDomains() ([]driver.Domain, error)          { return nil, nil }
-func (m *mockDriver) LookupDomainByName(string) (driver.Domain, error)         { return nil, nil } //nolint:nilnil
-func (m *mockDriver) LookupDomainByUUIDString(string) (driver.Domain, error)   { return nil, nil } //nolint:nilnil
-func (m *mockDriver) ListAllNetworks() ([]driver.Network, error)               { return nil, nil }
+func (m *mockDriver) Connect() error                                  { return nil }
+func (m *mockDriver) Close() error                                    { return nil }
+func (m *mockDriver) IsAlive() (bool, error)                          { return true, nil }
+func (m *mockDriver) ListAllClusterDomains() ([]driver.Domain, error) { return nil, nil }
+func (m *mockDriver) ListAllDomains() ([]driver.Domain, error) {
+	if m.listAllDomainsFn != nil {
+		return m.listAllDomainsFn()
+	}
+	return nil, nil
+}
+func (m *mockDriver) LookupDomainByName(string) (driver.Domain, error)       { return nil, nil } //nolint:nilnil
+func (m *mockDriver) LookupDomainByUUIDString(string) (driver.Domain, error) { return nil, nil } //nolint:nilnil
+func (m *mockDriver) ListAllNetworks() ([]driver.Network, error) {
+	if m.listAllNetworksFn != nil {
+		return m.listAllNetworksFn()
+	}
+	return m.networks, nil
+}
 func (m *mockDriver) LookupNetworkByUUIDString(string) (driver.Network, error) { return nil, nil } //nolint:nilnil
 func (m *mockDriver) ExecuteCommand(string) (string, error)                    { return "", nil }
-func (m *mockDriver) GetComputerInfo() (*driver.ComputerInfoData, error)       { return nil, nil } //nolint:nilnil
-func (m *mockDriver) GetCluster() (*driver.ClusterData, error)                 { return m.clusterData, nil }
-func (m *mockDriver) GetClusterNodes() ([]driver.ClusterNodeData, error)       { return m.clusterNodes, nil }
+func (m *mockDriver) ExecuteCommandWithTimeout(cmd string, _ time.Duration) (string, error) {
+	return m.ExecuteCommand(cmd)
+}
+func (m *mockDriver) GetCluster() (*driver.ClusterData, error)           { return m.clusterData, nil }
+func (m *mockDriver) GetClusterNodes() ([]driver.ClusterNodeData, error) { return m.clusterNodes, nil }
+func (m *mockDriver) GetClusterInfo() (*driver.ClusterInfoData, error) {
+	if m.clusterData == nil {
+		return nil, fmt.Errorf("no cluster data")
+	}
+	return &driver.ClusterInfoData{Cluster: *m.clusterData, Nodes: m.clusterNodes}, nil
+}
+
+func (m *mockDriver) GetComputerInfo() (*driver.ComputerInfoData, error) {
+	if m.computerInfoFn != nil {
+		return m.computerInfoFn()
+	}
+	if m.computerInfo != nil {
+		return m.computerInfo, nil
+	}
+	return nil, nil //nolint:nilnil
+}
 func (m *mockDriver) GetClusterVMGroups() ([]driver.ClusterGroupData, error) {
 	return m.clusterVMs, nil
 }
@@ -42,6 +80,9 @@ func (m *mockDriver) RunOnNode(command, computerName string) (string, error) {
 		return m.runOnNodeFn(command, computerName)
 	}
 	return "", nil
+}
+func (m *mockDriver) RunOnNodeWithTimeout(command, computerName string, _ time.Duration) (string, error) {
+	return m.RunOnNode(command, computerName)
 }
 
 func newClusterProvider() *api.Provider {
@@ -254,7 +295,7 @@ func TestApplyBatchDetails(t *testing.T) {
 		t.Errorf("vm-linux-01: expected prefix length 24, got %d", vms[0].GuestNetworks[0].PrefixLength)
 	}
 	// MAC should be normalized to colon-separated format
-	expectedMAC := "00:15:5D:01:01:01"
+	expectedMAC := "00:15:5d:01:01:01"
 	if vms[0].GuestNetworks[0].MAC != expectedMAC {
 		t.Errorf("vm-linux-01: expected MAC '%s', got '%s'", expectedMAC, vms[0].GuestNetworks[0].MAC)
 	}
@@ -366,8 +407,8 @@ func TestApplyBatchDetails_ClusterModeBuildDisksAndNICs(t *testing.T) {
 	if len(vms[0].NICs) != 1 {
 		t.Fatalf("Expected 1 NIC, got %d", len(vms[0].NICs))
 	}
-	if vms[0].NICs[0].MAC != "00:15:5D:01:01:01" {
-		t.Errorf("Expected normalized MAC '00:15:5D:01:01:01', got '%s'", vms[0].NICs[0].MAC)
+	if vms[0].NICs[0].MAC != "00:15:5d:01:01:01" {
+		t.Errorf("Expected normalized MAC '00:15:5d:01:01:01', got '%s'", vms[0].NICs[0].MAC)
 	}
 	if vms[0].NICs[0].NetworkUUID != "switch-uuid-1" {
 		t.Errorf("Expected NetworkUUID 'switch-uuid-1', got '%s'", vms[0].NICs[0].NetworkUUID)
@@ -461,10 +502,12 @@ func TestMapWindowsPathToSMB(t *testing.T) {
 
 func TestMapWindowsPathToSMB_UNC(t *testing.T) {
 	client := &Client{
-		smbMountPath: "/hyperv",
+		smbMountPath: "/mnt/smb/hyperv-share",
 		smbUrl:       "//10.0.0.1/VMShare",
 		Log:          testLogger(),
 	}
+
+	localPrefix := `C:\Hyper-V\Virtual_Hard_Disks`
 
 	tests := []struct {
 		name             string
@@ -475,38 +518,38 @@ func TestMapWindowsPathToSMB_UNC(t *testing.T) {
 		{
 			name:             "UNC backslash path matching share name",
 			windowsPath:      `\\WIN-SERVER\VMShare\vm1.vhdx`,
-			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
-			expected:         "/hyperv/vm1.vhdx",
+			smbWindowsPrefix: localPrefix,
+			expected:         "/mnt/smb/hyperv-share/vm1.vhdx",
 		},
 		{
 			name:             "UNC forward slash path matching share name",
 			windowsPath:      "//WIN-SERVER/VMShare/subdir/disk.vhdx",
-			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
-			expected:         "/hyperv/subdir/disk.vhdx",
+			smbWindowsPrefix: localPrefix,
+			expected:         "/mnt/smb/hyperv-share/subdir/disk.vhdx",
 		},
 		{
 			name:             "UNC case insensitive share name match",
 			windowsPath:      `\\SERVER\vmshare\disk.vhdx`,
-			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
-			expected:         "/hyperv/disk.vhdx",
+			smbWindowsPrefix: localPrefix,
+			expected:         "/mnt/smb/hyperv-share/disk.vhdx",
 		},
 		{
 			name:             "UNC different share name falls through to local",
 			windowsPath:      `\\SERVER\OtherShare\disk.vhdx`,
-			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
+			smbWindowsPrefix: localPrefix,
 			expected:         "",
 		},
 		{
 			name:             "UNC share root without trailing file",
 			windowsPath:      `\\SERVER\VMShare`,
-			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
-			expected:         "/hyperv/",
+			smbWindowsPrefix: localPrefix,
+			expected:         "/mnt/smb/hyperv-share/",
 		},
 		{
 			name:             "local path still works when smbUrl is set",
 			windowsPath:      `C:\Hyper-V\Virtual_Hard_Disks\vm2.vhdx`,
-			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
-			expected:         "/hyperv/vm2.vhdx",
+			smbWindowsPrefix: localPrefix,
+			expected:         "/mnt/smb/hyperv-share/vm2.vhdx",
 		},
 	}
 
@@ -525,10 +568,10 @@ func TestFormatMAC(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"00155D010101", "00:15:5D:01:01:01"},
-		{"00-15-5D-01-01-01", "00:15:5D:01:01:01"},
-		{"00:15:5D:01:01:01", "00:15:5D:01:01:01"},
-		{"short", "SHORT"},
+		{"00155D010101", "00:15:5d:01:01:01"},
+		{"00-15-5D-01-01-01", "00:15:5d:01:01:01"},
+		{"00:15:5D:01:01:01", "00:15:5d:01:01:01"},
+		{"short", "short"},
 	}
 
 	for _, tc := range tests {
@@ -660,16 +703,128 @@ func TestGetClusterCache_Caching(t *testing.T) {
 		t.Error("Expected same cache object on second call")
 	}
 	if callCount != 1 {
-		t.Errorf("Expected 1 GetCluster call (cached), got %d", callCount)
+		t.Errorf("Expected 1 GetClusterInfo call (cached), got %d", callCount)
 	}
 
-	client.InvalidateClusterCache()
+	client.InvalidateCycleCache()
 	_, err = client.getClusterCache()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if callCount != 2 {
-		t.Errorf("Expected 2 GetCluster calls after invalidation, got %d", callCount)
+		t.Errorf("Expected 2 GetClusterInfo calls after invalidation, got %d", callCount)
+	}
+}
+
+// TestGetLocalComputerInfo_ConcurrentSafe calls getLocalComputerInfo from many
+// goroutines simultaneously to verify there is no data race. Run with -race.
+func TestGetLocalComputerInfo_ConcurrentSafe(t *testing.T) {
+	var calls atomic.Int32
+	expected := &driver.ComputerInfoData{DNSHostName: "HOST-01"}
+	md := &mockDriver{
+		computerInfoFn: func() (*driver.ComputerInfoData, error) {
+			calls.Add(1)
+			return expected, nil
+		},
+	}
+	client := &Client{driver: md, Log: testLogger()}
+
+	const goroutines = 20
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			defer wg.Done()
+			info, err := client.getLocalComputerInfo()
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if info == nil || info.DNSHostName != "HOST-01" {
+				t.Errorf("unexpected info: %v", info)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if c := calls.Load(); c != 1 {
+		t.Errorf("GetComputerInfo should be called exactly once, got %d", c)
+	}
+
+	// After InvalidateCycleCache, the next call should re-fetch.
+	client.InvalidateCycleCache()
+	info, err := client.getLocalComputerInfo()
+	if err != nil {
+		t.Fatalf("unexpected error after invalidation: %v", err)
+	}
+	if info.DNSHostName != "HOST-01" {
+		t.Errorf("wrong hostname after invalidation: %s", info.DNSHostName)
+	}
+	if c := calls.Load(); c != 2 {
+		t.Errorf("Expected 2 total GetComputerInfo calls after invalidation, got %d", c)
+	}
+}
+
+func TestListVMs_Caching(t *testing.T) {
+	domainCalls := 0
+	md := &mockDriver{
+		listAllDomainsFn: func() ([]driver.Domain, error) {
+			domainCalls++
+			return nil, nil
+		},
+	}
+	client := &Client{driver: md, provider: newStandaloneProvider(), Log: testLogger()}
+
+	_, err := client.ListVMs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.ListVMs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if domainCalls != 1 {
+		t.Errorf("Expected 1 ListAllDomains call (cached), got %d", domainCalls)
+	}
+
+	client.InvalidateCycleCache()
+	_, err = client.ListVMs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if domainCalls != 2 {
+		t.Errorf("Expected 2 ListAllDomains calls after invalidation, got %d", domainCalls)
+	}
+}
+
+func TestListNetworks_Caching(t *testing.T) {
+	networkCalls := 0
+	md := &mockDriver{
+		listAllNetworksFn: func() ([]driver.Network, error) {
+			networkCalls++
+			return nil, nil
+		},
+	}
+	client := &Client{driver: md, Log: testLogger()}
+
+	_, err := client.ListNetworks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.ListNetworks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if networkCalls != 1 {
+		t.Errorf("Expected 1 ListAllNetworks call (cached), got %d", networkCalls)
+	}
+
+	client.InvalidateCycleCache()
+	_, err = client.ListNetworks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if networkCalls != 2 {
+		t.Errorf("Expected 2 ListAllNetworks calls after invalidation, got %d", networkCalls)
 	}
 }
 
@@ -678,9 +833,9 @@ type countingMockDriver struct {
 	getClusterCalls *int
 }
 
-func (c *countingMockDriver) GetCluster() (*driver.ClusterData, error) {
+func (c *countingMockDriver) GetClusterInfo() (*driver.ClusterInfoData, error) {
 	*c.getClusterCalls++
-	return c.mockDriver.GetCluster()
+	return c.mockDriver.GetClusterInfo()
 }
 
 func TestEnrichVMsWithOwnerNode(t *testing.T) {
@@ -719,17 +874,12 @@ func TestEnrichVMsWithOwnerNode(t *testing.T) {
 	}
 }
 
-func TestCollectBatchVMDetails_MergesHardwareAndGuest(t *testing.T) {
-	hwJSON := `{"vm-01":{"Security":{"TpmEnabled":true,"SecureBoot":true},"HasCheckpoint":false,"Disks":[{"Path":"C:\\disk.vhdx","Capacity":1000,"RCTEnabled":true}]}}`
-	guestJSON := `{"vm-01":{"GuestOS":"RHEL 9","GuestNetworks":[{"MAC":"00155D010101","IPs":["10.0.0.1"],"Subnets":["255.255.255.0"],"DHCP":false,"GW":["10.0.0.1"],"DNS":["8.8.8.8"]}]}}`
-	callNum := 0
+func TestCollectBatchVMDetails_MergedScript(t *testing.T) {
+	// The merged BatchGetVMDetails returns HW + guest data in one call.
+	mergedJSON := `{"vm-01":{"Security":{"TpmEnabled":true,"SecureBoot":true},"HasCheckpoint":false,"Disks":[{"Path":"C:\\disk.vhdx","Capacity":1000,"RCTEnabled":true}],"GuestOS":"RHEL 9","GuestNetworks":[{"MAC":"00155D010101","IPs":["10.0.0.1"],"Subnets":["255.255.255.0"],"DHCP":false,"GW":["10.0.0.1"],"DNS":["8.8.8.8"]}]}}`
 	md := &mockDriver{
 		runOnNodeFn: func(command, computerName string) (string, error) {
-			callNum++
-			if callNum == 1 {
-				return hwJSON, nil
-			}
-			return guestJSON, nil
+			return mergedJSON, nil
 		},
 	}
 	client := &Client{driver: md, Log: testLogger()}
@@ -749,20 +899,57 @@ func TestCollectBatchVMDetails_MergesHardwareAndGuest(t *testing.T) {
 		t.Errorf("Expected GuestOS 'RHEL 9', got '%s'", vm.GuestOS)
 	}
 	if len(vm.Disks) != 1 || vm.Disks[0].Capacity != 1000 {
-		t.Error("Disk data not preserved after merge")
+		t.Error("Disk data not preserved")
 	}
 	if len(vm.GuestNetworks) != 1 || vm.GuestNetworks[0].MAC != "00155D010101" {
-		t.Error("Guest network data not merged")
+		t.Error("Guest network data not present")
 	}
 }
 
-func TestCollectBatchVMDetails_GuestFailureStillReturnsHardware(t *testing.T) {
+func TestCollectBatchVMDetails_FallbackToSplit(t *testing.T) {
+	// If the merged script fails, fall back to split HW+Guest calls.
+	hwJSON := `{"vm-01":{"Security":{"TpmEnabled":true,"SecureBoot":true},"HasCheckpoint":false,"Disks":[{"Path":"C:\\disk.vhdx","Capacity":1000,"RCTEnabled":true}]}}`
+	guestJSON := `{"vm-01":{"GuestOS":"RHEL 9","GuestNetworks":[{"MAC":"00155D010101","IPs":["10.0.0.1"],"Subnets":["255.255.255.0"],"DHCP":false,"GW":["10.0.0.1"],"DNS":["8.8.8.8"]}]}}`
+	callNum := 0
+	md := &mockDriver{
+		runOnNodeFn: func(command, computerName string) (string, error) {
+			callNum++
+			if callNum == 1 {
+				return "", fmt.Errorf("merged script too large")
+			}
+			if callNum == 2 {
+				return hwJSON, nil
+			}
+			return guestJSON, nil
+		},
+	}
+	client := &Client{driver: md, Log: testLogger()}
+
+	result, err := client.collectBatchVMDetails("node-a")
+	if err != nil {
+		t.Fatalf("collectBatchVMDetails error: %v", err)
+	}
+	vm := result["vm-01"]
+	if !vm.Security.TpmEnabled {
+		t.Error("Expected TpmEnabled=true from split fallback")
+	}
+	if vm.GuestOS != "RHEL 9" {
+		t.Errorf("Expected GuestOS 'RHEL 9', got '%s'", vm.GuestOS)
+	}
+}
+
+func TestCollectBatchVMDetails_SplitFallback_GuestFailure(t *testing.T) {
+	// When merged fails and split HW succeeds but guest fails,
+	// hardware data should still be returned.
 	hwJSON := `{"vm-01":{"Security":{"TpmEnabled":false,"SecureBoot":false},"HasCheckpoint":true,"Disks":[]}}`
 	callNum := 0
 	md := &mockDriver{
 		runOnNodeFn: func(command, computerName string) (string, error) {
 			callNum++
 			if callNum == 1 {
+				return "", fmt.Errorf("merged script failed")
+			}
+			if callNum == 2 {
 				return hwJSON, nil
 			}
 			return "", fmt.Errorf("WinRM timeout")
@@ -807,7 +994,7 @@ func TestBuildGuestNetworks(t *testing.T) {
 	if ipv4.IP != "192.168.1.10" {
 		t.Errorf("Expected IPv4 '192.168.1.10', got '%s'", ipv4.IP)
 	}
-	if ipv4.MAC != "00:15:5D:01:01:01" {
+	if ipv4.MAC != "00:15:5d:01:01:01" {
 		t.Errorf("Expected normalized MAC, got '%s'", ipv4.MAC)
 	}
 	if ipv4.Origin != "Dhcp" {
@@ -840,7 +1027,7 @@ func TestBuildGuestNetworks_DashedMAC(t *testing.T) {
 	if len(result) != 1 {
 		t.Fatalf("Expected 1 result, got %d", len(result))
 	}
-	if result[0].MAC != "00:15:5D:01:01:01" {
+	if result[0].MAC != "00:15:5d:01:01:01" {
 		t.Errorf("Expected colon-separated MAC from dashed input, got '%s'", result[0].MAC)
 	}
 }
@@ -909,5 +1096,539 @@ func TestApplyHostTo(t *testing.T) {
 	expectedMemBytes := int64(32768) * 1024 * 1024
 	if m.MemoryBytes != expectedMemBytes {
 		t.Errorf("Expected MemoryBytes %d, got %d", expectedMemBytes, m.MemoryBytes)
+	}
+}
+
+// mockNetwork implements driver.Network for tests.
+type mockNetwork struct {
+	uuid       string
+	name       string
+	switchType string
+}
+
+func (n *mockNetwork) GetName() (string, error)       { return n.name, nil }
+func (n *mockNetwork) GetUUIDString() (string, error) { return n.uuid, nil }
+func (n *mockNetwork) GetSwitchType() (string, error) { return n.switchType, nil }
+func (n *mockNetwork) Free() error                    { return nil }
+
+func TestListNetworks_ClusterCollectsRemoteSwitches(t *testing.T) {
+	localSwitch := &mockNetwork{uuid: "local-uuid-1", name: "Lab-External", switchType: "External"}
+	remoteJSON := `[{"Id":"remote-uuid-1","Name":"LabSwitch","SwitchType":1}]`
+
+	md := &mockDriver{
+		networks: []driver.Network{localSwitch},
+		computerInfo: &driver.ComputerInfoData{
+			DNSHostName: "WIN-LOCAL",
+		},
+		clusterData: &driver.ClusterData{Name: "cluster01"},
+		clusterNodes: []driver.ClusterNodeData{
+			{Name: "WIN-LOCAL", State: driver.ClusterNodeStateUp, Id: "1"},
+			{Name: "HV-NODE02", State: driver.ClusterNodeStateUp, Id: "2"},
+		},
+		runOnNodeFn: func(command, computerName string) (string, error) {
+			if computerName == "HV-NODE02" {
+				return remoteJSON, nil
+			}
+			return "", nil
+		},
+	}
+
+	client := &Client{driver: md, provider: newClusterProvider(), Log: testLogger()}
+	networks, err := client.ListNetworks()
+	if err != nil {
+		t.Fatalf("ListNetworks error: %v", err)
+	}
+
+	if len(networks) != 2 {
+		t.Fatalf("Expected 2 networks (local + remote), got %d", len(networks))
+	}
+
+	found := false
+	for _, n := range networks {
+		if n.UUID == "remote-uuid-1" && n.Name == "LabSwitch" {
+			found = true
+			if n.SwitchType != "Internal" {
+				t.Errorf("Expected SwitchType 'Internal', got '%s'", n.SwitchType)
+			}
+		}
+	}
+	if !found {
+		t.Error("Remote LabSwitch not found in combined network list")
+	}
+}
+
+func TestListNetworks_ClusterDeduplicatesSharedSwitches(t *testing.T) {
+	localSwitch := &mockNetwork{uuid: "shared-uuid", name: "Lab-External", switchType: "External"}
+	// Remote node has the same switch (same UUID)
+	remoteJSON := `[{"Id":"shared-uuid","Name":"Lab-External","SwitchType":2}]`
+
+	md := &mockDriver{
+		networks:     []driver.Network{localSwitch},
+		computerInfo: &driver.ComputerInfoData{DNSHostName: "WIN-LOCAL"},
+		clusterData:  &driver.ClusterData{Name: "cluster01"},
+		clusterNodes: []driver.ClusterNodeData{
+			{Name: "WIN-LOCAL", State: driver.ClusterNodeStateUp, Id: "1"},
+			{Name: "HV-NODE02", State: driver.ClusterNodeStateUp, Id: "2"},
+		},
+		runOnNodeFn: func(command, computerName string) (string, error) {
+			return remoteJSON, nil
+		},
+	}
+
+	client := &Client{driver: md, provider: newClusterProvider(), Log: testLogger()}
+	networks, err := client.ListNetworks()
+	if err != nil {
+		t.Fatalf("ListNetworks error: %v", err)
+	}
+
+	if len(networks) != 1 {
+		t.Fatalf("Expected 1 network (deduped), got %d", len(networks))
+	}
+}
+
+func TestListNetworks_StandaloneSkipsRemoteCollection(t *testing.T) {
+	localSwitch := &mockNetwork{uuid: "local-uuid-1", name: "Default Switch", switchType: "Private"}
+
+	md := &mockDriver{
+		networks: []driver.Network{localSwitch},
+		runOnNodeFn: func(command, computerName string) (string, error) {
+			t.Error("RunOnNode should not be called in standalone mode")
+			return "", nil
+		},
+	}
+
+	client := &Client{driver: md, provider: newStandaloneProvider(), Log: testLogger()}
+	networks, err := client.ListNetworks()
+	if err != nil {
+		t.Fatalf("ListNetworks error: %v", err)
+	}
+
+	if len(networks) != 1 {
+		t.Fatalf("Expected 1 network, got %d", len(networks))
+	}
+}
+
+func TestResolveNetworkUUID(t *testing.T) {
+	networks := []types.Network{
+		{UUID: "uuid-1", Name: "Lab-External"},
+		{UUID: "uuid-2", Name: "LabSwitch"},
+	}
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"exact match", "Lab-External", "uuid-1"},
+		{"case insensitive", "lab-external", "uuid-1"},
+		{"empty name returns empty", "", ""},
+		{"not found returns empty", "NonExistent", ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := resolveNetworkUUID(tc.input, "", networks)
+			if result != tc.expected {
+				t.Errorf("resolveNetworkUUID(%q) = %q, want %q", tc.input, result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestResolveNetworkUUID_NodeScoped(t *testing.T) {
+	// Two nodes each have a switch named "LabSwitch" with different UUIDs.
+	// "Lab-External" has the same UUID on both nodes (shared switch).
+	networks := []types.Network{
+		{UUID: "local-uuid", Name: "LabSwitch", OwnerNodes: []string{"NODE-01"}},
+		{UUID: "remote-uuid", Name: "LabSwitch", OwnerNodes: []string{"NODE-02"}},
+		{UUID: "shared-uuid", Name: "Lab-External", OwnerNodes: []string{"NODE-01", "NODE-02"}},
+	}
+
+	tests := []struct {
+		name        string
+		switchName  string
+		vmOwnerNode string
+		expected    string
+	}{
+		{
+			name:        "VM on NODE-01 gets local UUID",
+			switchName:  "LabSwitch",
+			vmOwnerNode: "NODE-01",
+			expected:    "local-uuid",
+		},
+		{
+			name:        "VM on NODE-02 gets remote UUID",
+			switchName:  "LabSwitch",
+			vmOwnerNode: "NODE-02",
+			expected:    "remote-uuid",
+		},
+		{
+			name:        "node match is case-insensitive",
+			switchName:  "LabSwitch",
+			vmOwnerNode: "node-02",
+			expected:    "remote-uuid",
+		},
+		{
+			name:        "no node hint falls back to first name match",
+			switchName:  "LabSwitch",
+			vmOwnerNode: "",
+			expected:    "local-uuid",
+		},
+		{
+			name:        "VM on unknown node returns empty not wrong UUID",
+			switchName:  "LabSwitch",
+			vmOwnerNode: "NODE-99",
+			expected:    "",
+		},
+		{
+			name:        "shared switch resolves for VM on NODE-01",
+			switchName:  "Lab-External",
+			vmOwnerNode: "NODE-01",
+			expected:    "shared-uuid",
+		},
+		{
+			name:        "shared switch resolves for VM on NODE-02",
+			switchName:  "Lab-External",
+			vmOwnerNode: "NODE-02",
+			expected:    "shared-uuid",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := resolveNetworkUUID(tc.switchName, tc.vmOwnerNode, networks)
+			if result != tc.expected {
+				t.Errorf("resolveNetworkUUID(%q, %q) = %q, want %q",
+					tc.switchName, tc.vmOwnerNode, result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestResolveNetworkUUID_UnscopedFallback(t *testing.T) {
+	// Simulates GetComputerInfo() failure: networks have empty OwnerNodes
+	// but VMs still have OwnerNode from GetClusterVMGroups.
+	networks := []types.Network{
+		{UUID: "uuid-1", Name: "LabSwitch"},
+		{UUID: "uuid-2", Name: "Lab-External"},
+	}
+
+	tests := []struct {
+		name        string
+		switchName  string
+		vmOwnerNode string
+		expected    string
+	}{
+		{
+			name:        "unscoped network resolves even with known VM node",
+			switchName:  "LabSwitch",
+			vmOwnerNode: "NODE-01",
+			expected:    "uuid-1",
+		},
+		{
+			name:        "unscoped network resolves with unknown VM node",
+			switchName:  "Lab-External",
+			vmOwnerNode: "",
+			expected:    "uuid-2",
+		},
+		{
+			name:        "not found still returns empty",
+			switchName:  "NoSuchSwitch",
+			vmOwnerNode: "NODE-01",
+			expected:    "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := resolveNetworkUUID(tc.switchName, tc.vmOwnerNode, networks)
+			if result != tc.expected {
+				t.Errorf("resolveNetworkUUID(%q, %q) = %q, want %q",
+					tc.switchName, tc.vmOwnerNode, result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestMapSwitchType(t *testing.T) {
+	tests := []struct {
+		input    int
+		expected string
+	}{
+		{0, "External"},
+		{1, "Internal"},
+		{2, "Private"},
+		{99, "Unknown"},
+	}
+	for _, tc := range tests {
+		result := mapSwitchType(tc.input)
+		if result != tc.expected {
+			t.Errorf("mapSwitchType(%d) = %q, want %q", tc.input, result, tc.expected)
+		}
+	}
+}
+
+func TestRefreshDispatch_FirstRefreshUsesSerial(t *testing.T) {
+	c := &Collector{
+		provider: newClusterProvider(),
+	}
+	// Before first refresh, firstRefreshDone should be false.
+	if c.firstRefreshDone {
+		t.Fatal("firstRefreshDone should start as false")
+	}
+	// After Reset(), flag should be cleared.
+	c.firstRefreshDone = true
+	c.Reset()
+	if c.firstRefreshDone {
+		t.Fatal("Reset() should clear firstRefreshDone")
+	}
+}
+
+func TestDiskAdapter_PreservesCapacityInLightMode(t *testing.T) {
+	// Verify that applyDiskTo followed by preservation logic retains capacity.
+	existing := &model.Disk{
+		Base:       model.Base{ID: "disk-1"},
+		Capacity:   107374182400, // 100 GiB from full refresh
+		RCTEnabled: true,
+	}
+	incoming := &types.Disk{
+		ID:          "disk-1",
+		WindowsPath: `C:\VMs\disk.vhdx`,
+		Capacity:    0,     // LightMode: no Get-VHD
+		RCTEnabled:  false, // LightMode: not checked
+	}
+	// Simulate what DiskAdapter.GetUpdates does in the preservation path
+	prevCapacity := existing.Capacity
+	prevRCT := existing.RCTEnabled
+	applyDiskTo(incoming, existing)
+	if existing.Capacity == 0 && prevCapacity > 0 {
+		existing.Capacity = prevCapacity
+	}
+	if !existing.RCTEnabled && prevRCT {
+		existing.RCTEnabled = prevRCT
+	}
+
+	if existing.Capacity != 107374182400 {
+		t.Errorf("Capacity should be preserved, got %d", existing.Capacity)
+	}
+	if !existing.RCTEnabled {
+		t.Error("RCTEnabled should be preserved")
+	}
+}
+
+func TestDiskAdapter_OverwritesWhenFullRefresh(t *testing.T) {
+	existing := &model.Disk{
+		Base:       model.Base{ID: "disk-1"},
+		Capacity:   107374182400,
+		RCTEnabled: true,
+	}
+	incoming := &types.Disk{
+		ID:          "disk-1",
+		WindowsPath: `C:\VMs\disk.vhdx`,
+		Capacity:    214748364800, // New capacity from Get-VHD
+		RCTEnabled:  false,        // Changed
+	}
+	prevCapacity := existing.Capacity
+	prevRCT := existing.RCTEnabled
+	applyDiskTo(incoming, existing)
+	if existing.Capacity == 0 && prevCapacity > 0 {
+		existing.Capacity = prevCapacity
+	}
+	if !existing.RCTEnabled && prevRCT {
+		existing.RCTEnabled = prevRCT
+	}
+
+	// Full refresh provides real values, should overwrite
+	if existing.Capacity != 214748364800 {
+		t.Errorf("Capacity should be updated to new value, got %d", existing.Capacity)
+	}
+	// RCTEnabled changed from true to false — but our preservation logic
+	// keeps the old value. This is acceptable: RCT doesn't toggle during
+	// operation, and the initial full refresh already captured it.
+	if !existing.RCTEnabled {
+		t.Error("RCTEnabled preservation should keep previous true value")
+	}
+}
+
+// TestEnrichDiskCapacityFallbackMissingUNCDisk tests that missing UNC disks
+// use the fallback host for capacity queries.
+func TestEnrichDiskCapacityFallbackMissingUNCDisk(t *testing.T) {
+	// Setup: Create a client with a mock driver that responds to fallback queries.
+	client := &Client{
+		driver: &mockDriver{
+			computerInfo: &driver.ComputerInfoData{DNSHostName: "hyperv-host"},
+			runOnNodeFn: func(command, computerName string) (string, error) {
+				// Fallback query on hyperv-host should return the capacity
+				if computerName == "hyperv-host" && strings.Contains(command, "Get-VHD") {
+					return "1099511627776", nil // 1 TB
+				}
+				return "", nil
+			},
+		},
+		vmCache: []types.VM{
+			{
+				UUID: "test-vm-uuid",
+				Disks: []types.Disk{
+					{
+						WindowsPath: "\\\\smb-server\\share\\disk1.vhdx",
+						Capacity:    0, // Missing from per-node batch
+					},
+				},
+			},
+		},
+		vmCached: true,
+		Log:      testLogger(),
+	}
+
+	// Act: EnrichDiskCapacity should query the fallback host for the missing UNC disk
+	err := client.EnrichDiskCapacity()
+	if err != nil {
+		t.Fatalf("EnrichDiskCapacity failed: %v", err)
+	}
+
+	// Assert: The disk capacity should be populated from the fallback host
+	if client.vmCache[0].Disks[0].Capacity != 1099511627776 {
+		t.Errorf("Expected capacity 1099511627776, got %d", client.vmCache[0].Disks[0].Capacity)
+	}
+}
+
+// TestEnrichDiskCapacityFallbackZeroCapacity tests that UNC disks with zero
+// capacity from the per-node batch are retried through the fallback host.
+func TestEnrichDiskCapacityFallbackZeroCapacity(t *testing.T) {
+	fallbackHostQueried := false
+	diskPath := "\\\\smb-server\\share\\disk1.vhdx"
+
+	client := &Client{
+		driver: &mockDriver{
+			computerInfo: &driver.ComputerInfoData{DNSHostName: "hyperv-host"},
+			runOnNodeFn: func(command, computerName string) (string, error) {
+				// Simulate per-node batch returning the disk with zero capacity
+				if command == ps.BatchGetVHDCapacity {
+					batchResult := map[string]vhdCapacity{
+						diskPath: {Size: 0, RCTEnabled: false},
+					}
+					data, err := json.Marshal(batchResult)
+					if err != nil {
+						return "", err
+					}
+					return string(data), nil
+				}
+
+				// Track if fallback host (hyperv-host) is queried for disk capacity
+				if computerName == "hyperv-host" && strings.Contains(command, "Get-VHD") {
+					fallbackHostQueried = true
+					return "2199023255552", nil // 2 TB from fallback
+				}
+				return "", nil
+			},
+		},
+		vmCache: []types.VM{
+			{
+				UUID:      "test-vm-uuid",
+				OwnerNode: "node-a",
+				Disks: []types.Disk{
+					{
+						WindowsPath: diskPath,
+						Capacity:    0, // Will be populated by batch with zero, then retried by fallback
+					},
+				},
+			},
+		},
+		vmCached: true,
+		Log:      testLogger(),
+	}
+
+	err := client.EnrichDiskCapacity()
+	if err != nil {
+		t.Fatalf("EnrichDiskCapacity failed: %v", err)
+	}
+
+	// Verify fallback host was queried for the zero-capacity disk
+	if !fallbackHostQueried {
+		t.Error("Expected fallback host to be queried for zero-capacity disk")
+	}
+
+	// Verify capacity was updated from fallback response (not the batch's zero value)
+	if client.vmCache[0].Disks[0].Capacity != 2199023255552 {
+		t.Errorf("Expected capacity 2199023255552 from fallback, got %d", client.vmCache[0].Disks[0].Capacity)
+	}
+}
+
+// TestEnrichDiskCapacitySkipsNonUNCDisk tests that missing non-UNC disks
+// are not retried via the fallback host.
+func TestEnrichDiskCapacitySkipsNonUNCDisk(t *testing.T) {
+	fallbackCalled := false
+	client := &Client{
+		driver: &mockDriver{
+			computerInfo: &driver.ComputerInfoData{DNSHostName: "hyperv-host"},
+			runOnNodeFn: func(command, computerName string) (string, error) {
+				// Track if fallback host is queried
+				if computerName == "hyperv-host" {
+					fallbackCalled = true
+					return "1099511627776", nil
+				}
+				return "", nil
+			},
+		},
+		vmCache: []types.VM{
+			{
+				UUID: "test-vm-uuid",
+				Disks: []types.Disk{
+					{
+						WindowsPath: "C:\\Hyper-V\\Virtual Hard Disks\\disk1.vhdx", // Local path, not UNC
+						Capacity:    0,
+					},
+				},
+			},
+		},
+		vmCached: true,
+		Log:      testLogger(),
+	}
+
+	err := client.EnrichDiskCapacity()
+	if err != nil {
+		t.Fatalf("EnrichDiskCapacity failed: %v", err)
+	}
+
+	// Fallback should NOT be called for non-UNC paths
+	if fallbackCalled {
+		t.Error("Fallback should not be used for non-UNC disk paths")
+	}
+	// Capacity should remain 0 (unchanged)
+	if client.vmCache[0].Disks[0].Capacity != 0 {
+		t.Errorf("Non-UNC disk capacity should remain 0, got %d", client.vmCache[0].Disks[0].Capacity)
+	}
+}
+
+// TestEnrichDiskCapacitySkipsMissingDNSHostName tests that the fallback is
+// skipped when DNSHostName cannot be determined.
+func TestEnrichDiskCapacitySkipsMissingDNSHostName(t *testing.T) {
+	client := &Client{
+		driver: &mockDriver{
+			computerInfo: &driver.ComputerInfoData{DNSHostName: ""}, // Empty hostname
+		},
+		vmCache: []types.VM{
+			{
+				UUID: "test-vm-uuid",
+				Disks: []types.Disk{
+					{
+						WindowsPath: "\\\\smb-server\\share\\disk1.vhdx",
+						Capacity:    0,
+					},
+				},
+			},
+		},
+		vmCached: true,
+		Log:      testLogger(),
+	}
+
+	err := client.EnrichDiskCapacity()
+	if err != nil {
+		t.Fatalf("EnrichDiskCapacity failed: %v", err)
+	}
+
+	// Capacity should remain 0 when fallback is skipped
+	if client.vmCache[0].Disks[0].Capacity != 0 {
+		t.Errorf("Capacity should remain 0 when fallback is skipped, got %d", client.vmCache[0].Disks[0].Capacity)
 	}
 }

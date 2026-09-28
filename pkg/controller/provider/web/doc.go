@@ -4,6 +4,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/aap"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
@@ -11,6 +12,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	"github.com/kubev2v/forklift/pkg/lib/inventory/container"
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	azureweb "github.com/kubev2v/forklift/pkg/provider/azure/inventory/web"
 	ec2web "github.com/kubev2v/forklift/pkg/provider/ec2/inventory/web"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -47,5 +49,11 @@ func All(container *container.Container, k8s client.Client) (all []libweb.Reques
 	all = append(
 		all,
 		hyperv.Handlers(container)...)
+	all = append(
+		all,
+		nutanix.Handlers(container)...)
+	all = append(
+		all,
+		azureweb.Handlers(container)...)
 	return
 }

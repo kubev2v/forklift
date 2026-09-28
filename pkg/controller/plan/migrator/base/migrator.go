@@ -19,7 +19,7 @@ type BaseMigrator struct {
 }
 
 func (r *BaseMigrator) Init() (err error) {
-	a, err := adapter.New(r.Context.Source.Provider)
+	a, err := adapter.New(r.Source.Provider)
 	if err != nil {
 		return
 	}
@@ -42,9 +42,9 @@ func (r *BaseMigrator) Complete(vm *plan.VMStatus) {
 }
 
 func (r *BaseMigrator) Status(vm plan.VM) (status *plan.VMStatus) {
-	if current, found := r.Context.Plan.Status.Migration.FindVM(vm.Ref); !found {
+	if current, found := r.Plan.Status.Migration.FindVM(vm.Ref); !found {
 		status = &plan.VMStatus{VM: vm}
-		if r.Context.Plan.IsWarm() {
+		if r.Plan.IsWarm() {
 			status.Warm = &plan.Warm{}
 		}
 	} else {
@@ -61,7 +61,11 @@ func (r *BaseMigrator) Reset(vm *plan.VMStatus, pipeline []*plan.Step) {
 	vm.Phase = step.Name
 	vm.Pipeline = pipeline
 	vm.Error = nil
-	if r.Context.Plan.IsWarm() {
+	if r.IsResumeConversion() {
+		return
+	}
+	vm.DisksCopied = false
+	if r.Plan.IsWarm() {
 		vm.Warm = &plan.Warm{}
 	}
 }
@@ -250,12 +254,14 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 }
 
 func (r *BaseMigrator) Itinerary(vm plan.VM) (itinerary *libitr.Itinerary) {
-	// Plan.Spec.Type supersedes the deprecated Warm boolean.
-	if r.Context.Plan.Spec.Type == api.MigrationOnlyConversion {
+	switch {
+	case r.IsResumeConversion():
+		itinerary = r.resumeConversionItinerary()
+	case r.Plan.Spec.Type == api.MigrationOnlyConversion:
 		itinerary = r.onlyConversionItinerary()
-	} else if r.Context.Plan.IsWarm() {
+	case r.Plan.IsWarm():
 		itinerary = r.warmItinerary()
-	} else {
+	default:
 		itinerary = r.coldItinerary()
 	}
 	itinerary.Predicate = &BasePredicate{vm: &vm, context: r.Context}
@@ -282,7 +288,7 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	case api.PhaseCreateDataVolumes:
 		// This phase should be present in DiskTransfer step only when executing Preflight Inspection to avoid UI pipeline artifacts.
 		// If not executing Preflight Inspection, keep the Initialize step.
-		if r.Context.Plan.ShouldRunPreflightInspection() {
+		if r.Plan.ShouldRunPreflightInspection() {
 			step = DiskTransfer
 		} else {
 			step = Initialize
@@ -301,7 +307,7 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	case api.PhasePreHook, api.PhasePostHook:
 		step = status.Phase
 	case api.PhaseStorePowerState, api.PhasePowerOffSource, api.PhaseWaitForPowerOff:
-		if r.Context.Plan.IsWarm() {
+		if r.Plan.IsWarm() {
 			step = Cutover
 		} else {
 			step = Initialize
@@ -401,6 +407,24 @@ func (r *BaseMigrator) onlyConversionItinerary() *libitr.Itinerary {
 	}
 }
 
+// resumeConversionItinerary skips disk copy AND power-off (source was already
+// powered off during the original migration's cutover).
+func (r *BaseMigrator) resumeConversionItinerary() *libitr.Itinerary {
+	return &libitr.Itinerary{
+		Name: "ResumeConversion",
+		Pipeline: libitr.Pipeline{
+			{Name: api.PhaseStarted},
+			{Name: api.PhasePreHook, All: HasPreHook},
+			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
+			{Name: api.PhaseConvertGuest, All: RequiresConversion},
+			{Name: api.PhaseCreateVM},
+			{Name: api.PhaseWaitForGuestReboots, All: WindowsWaitForGuestReboot},
+			{Name: api.PhasePostHook, All: HasPostHook},
+			{Name: api.PhaseCompleted},
+		},
+	}
+}
+
 // Step predicate.
 type BasePredicate struct {
 	// VM listed on the plan.
@@ -421,7 +445,7 @@ func (r *BasePredicate) ensureUseV2vForTransfer() (bool, error) {
 		}
 		return *r.useV2vForTransfer, nil
 	}
-	result, vErr := r.context.Plan.ShouldUseV2vForTransfer(r.vm.Ref, r.context.Destination.Client)
+	result, vErr := r.context.Plan.ShouldUseV2vForTransfer(r.vm.Ref)
 	r.useV2vResolved = true
 	if vErr != nil {
 		r.useV2vErr = vErr

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/fields"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -22,11 +23,13 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator"
 	planmigrbase "github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler"
+	util "github.com/kubev2v/forklift/pkg/controller/plan/util"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/settings"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/errorreporting"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,7 +54,15 @@ const (
 	// moved into base migrators.
 	ImageConversion = "ImageConversion"
 	DiskTransferV2v = "DiskTransferV2v"
+
+	// annCookieRefreshedAt records when import credentials were last
+	// refreshed for a DataVolume so short-lived download cookies are not
+	// rotated on every reconcile while the importer is crash-looping.
+	annCookieRefreshedAt = "forklift.konveyor.io/download-cookie-refreshed-at"
 )
+
+// Minimum time between download-cookie refreshes for the same DataVolume.
+const cookieRefreshCooldown = time.Minute
 
 // Migration.
 type Migration struct {
@@ -97,6 +108,17 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 	err = r.begin()
 	if err != nil {
 		err = liberr.Wrap(err)
+		return
+	}
+
+	// begin() may reject the migration early (setting Failed/Canceled
+	// without Executing). Return now to prevent end() from overwriting
+	// the specific error with a generic status.
+	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
+	if !snapshot.HasCondition(api.ConditionExecuting) {
+		if snapshot.HasAnyCondition(api.ConditionFailed, api.ConditionCanceled) {
+			reQ = NoReQ
+		}
 		return
 	}
 
@@ -154,7 +176,7 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 
 // Get/Build resources.
 func (r *Migration) init() (err error) {
-	adapter, err := adapter.New(r.Context.Source.Provider)
+	adapter, err := adapter.New(r.Source.Provider)
 	if err != nil {
 		return
 	}
@@ -198,6 +220,41 @@ func (r *Migration) begin() (err error) {
 	if snapshot.HasAnyCondition(api.ConditionExecuting, api.ConditionSucceeded, api.ConditionFailed, api.ConditionCanceled) {
 		return
 	}
+
+	// Validate resume-conversion prerequisites
+	if r.Migration.Spec.ResumeConversion {
+		hasResumable := false
+		for _, specVM := range r.Plan.Spec.VMs {
+			if !util.HasSeparateCopyAndConversion(r.Plan, specVM.Ref) {
+				snapshot.SetCondition(libcnd.Condition{
+					Type:     api.ConditionFailed,
+					Status:   True,
+					Category: api.CategoryCritical,
+					Message: fmt.Sprintf(
+						"Resume conversion is not supported for VM %q: disk copy and conversion are not separate phases.",
+						specVM.ID),
+					Durable: true,
+				})
+				return
+			}
+			if status, found := r.Plan.Status.Migration.FindVM(specVM.Ref); found &&
+				status.DisksCopied && status.HasCondition(api.ConditionFailed) {
+				hasResumable = true
+			}
+		}
+		if !hasResumable {
+			snapshot.SetCondition(libcnd.Condition{
+				Type:     api.ConditionFailed,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  "Resume conversion requires VMs with completed disk copy (DisksCopied=true).",
+				Durable:  true,
+			})
+			return
+		}
+		r.Log.Info("Resume-conversion mode: skipping disk copy, running conversion only.")
+	}
+
 	r.Plan.Status.Migration.MarkReset()
 	r.Plan.Status.Migration.MarkStarted()
 	snapshot.SetCondition(
@@ -246,6 +303,17 @@ func (r *Migration) begin() (err error) {
 	for _, vm := range r.Plan.Spec.VMs {
 		status := r.migrator.Status(vm)
 		if status.Phase != api.PhaseCompleted || status.HasAnyCondition(api.ConditionCanceled, api.ConditionFailed) {
+			// For resume-conversion, only reset VMs that actually have their disks copied.
+			// VMs that failed before disk copy completed cannot be resumed — exclude them
+			// from this migration's VM list so stale failures don't cause end() to
+			// mark the overall migration as failed.
+			if r.IsResumeConversion() && !status.DisksCopied {
+				log.Info(
+					"Skipping VM without completed disk copy in resume-conversion.",
+					"vm",
+					vm.String())
+				continue
+			}
 			pipeline, pErr := r.migrator.Pipeline(vm)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
@@ -415,9 +483,12 @@ func markStartedStepsCompleted(vm *plan.VMStatus) {
 func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, forceDeleteGuestConversionPod bool) error {
 	r.Log.Info("Starting cleanup of migration resources.", "vm", vm.String())
 
-	// If the migration fails and the DeleteVmOnFailMigration is enabled, clean up the VM.
+	// If the migration fails, DeleteVmOnFailMigration is enabled and the disks were NOT fully copied, clean up the VM.
 	// When DeleteVmOnFailMigration is disabled, VM resources are preserved on failure.
-	if !vm.HasCondition(api.ConditionSucceeded) && (r.Plan.Spec.DeleteVmOnFailMigration || vm.DeleteVmOnFailMigration) && r.Plan.Spec.Type != api.MigrationOnlyConversion {
+	// During archive/cancel (forceDeleteGuestConversionPod=true), allow deletion even when
+	// DisksCopied is set — there's no opportunity to resume from those contexts.
+	if !vm.HasCondition(api.ConditionSucceeded) && (r.Plan.Spec.DeleteVmOnFailMigration || vm.DeleteVmOnFailMigration) &&
+		r.Plan.Spec.Type != api.MigrationOnlyConversion && (!vm.DisksCopied || forceDeleteGuestConversionPod) {
 		r.Log.Info("Deleting VM (failed migration with deleteVmOnFailMigration enabled).", "vm", vm.String())
 		if err := r.kubevirt.DeleteVM(vm); failOnErr(err) {
 			return err
@@ -508,10 +579,85 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, force
 		return err
 	}
 
-	r.removeLastWarmSnapshot(vm)
+	if !r.IsResumeConversion() {
+		r.removeLastWarmSnapshot(vm)
+	}
 
 	r.Log.Info("Cleanup of migration resources completed.", "vm", vm.String())
 	return nil
+}
+
+// ensureStaleObjectDeleted checks whether a stale object is terminating and
+// either waits (returns done=false) or force-deletes it after the timeout.
+// If the object has no DeletionTimestamp, it issues a normal delete via deleteFn.
+// When forceDeleteDirect is true and the timeout has elapsed, a zero-grace-period
+// client delete is issued (used for pods). Otherwise deleteFn is called on timeout
+// as well (used for Conversion CRs where DeleteConversion performs full teardown).
+// Always returns done=false after issuing a delete — the caller should requeue
+// and will observe done=true on the next reconciliation when no objects remain.
+func (r *Migration) ensureStaleObjectDeleted(obj client.Object, vm *plan.VMStatus, kind string, deleteFn func() error, forceDeleteDirect bool) (done bool, err error) {
+	if obj.GetDeletionTimestamp() != nil {
+		timeout := time.Duration(settings.Settings.StaleConversionTimeout) * time.Second
+		if time.Since(obj.GetDeletionTimestamp().Time) < timeout {
+			r.Log.Info("Stale object still terminating, will requeue.",
+				"kind", kind, "name", obj.GetName(), "namespace", obj.GetNamespace(), "vm", vm.String())
+			return false, nil
+		}
+		r.Log.Info("Stale object stuck terminating, force-deleting.",
+			"kind", kind, "name", obj.GetName(), "namespace", obj.GetNamespace(), "vm", vm.String(),
+			"terminatingSince", obj.GetDeletionTimestamp().Time)
+		var delErr error
+		if forceDeleteDirect {
+			grace := int64(0)
+			delErr = r.Destination.Delete(context.TODO(), obj, &client.DeleteOptions{GracePeriodSeconds: &grace})
+		} else {
+			delErr = deleteFn()
+		}
+		if delErr != nil {
+			if k8serr.IsNotFound(delErr) {
+				return false, nil
+			}
+			return false, delErr
+		}
+		return false, nil
+	}
+	if delErr := deleteFn(); delErr != nil {
+		return false, delErr
+	}
+	return false, nil
+}
+
+// deleteStaleConversionWorkloads requests deletion of guest-conversion pods
+// and CRs left over from a prior failed migration. Returns done=true when
+// no stale objects remain (safe to proceed), or done=false when objects are
+// still terminating (caller should requeue and retry). If an object has been
+// terminating longer than staleTerminationTimeout, it is force-deleted.
+func (r *Migration) deleteStaleConversionWorkloads(vm *plan.VMStatus) (done bool, err error) {
+	r.Log.Info("Checking for stale conversion workloads.", "vm", vm.String())
+
+	stalePod, err := r.kubevirt.GetConversionPod(vm.Ref, VirtV2vConversionPod, true)
+	if err != nil {
+		return false, err
+	}
+	if stalePod != nil {
+		return r.ensureStaleObjectDeleted(stalePod, vm, "pod", func() error {
+			return r.kubevirt.DeleteObject(stalePod, vm, "Deleted stale conversion pod.", "pod")
+		}, true)
+	}
+
+	if settings.Settings.UseConversionCR {
+		gConv, gErr := r.kubevirt.GetGuestConversion(vm)
+		if gErr != nil {
+			return false, gErr
+		}
+		if gConv != nil {
+			return r.ensureStaleObjectDeleted(gConv, vm, "conversion", func() error {
+				return r.kubevirt.DeleteConversion(gConv)
+			}, false)
+		}
+	}
+
+	return true, nil
 }
 
 func (r *Migration) removeLastWarmSnapshot(vm *plan.VMStatus) {
@@ -599,7 +745,7 @@ func (r *Migration) deleteProviderPVs(getPVs func(client.Client, string) (*core.
 	}
 
 	for _, pv := range pvList.Items {
-		err := r.Destination.Client.Delete(context.TODO(), &pv)
+		err := r.Destination.Delete(context.TODO(), &pv)
 		if err != nil {
 			r.Log.Error(err, "Failed to delete "+pvType+" PV", "pv", pv.Name)
 			return err
@@ -617,7 +763,7 @@ func (r *Migration) deleteProviderPVCs(getPVCs func(client.Client, string, strin
 	}
 
 	for _, pvc := range pvcList.Items {
-		err := r.Destination.Client.Delete(context.TODO(), &pvc)
+		err := r.Destination.Delete(context.TODO(), &pvc)
 		if err != nil {
 			r.Log.Error(err, "Failed to delete "+pvcType+" PVC", "pvc", pvc.Name)
 			return err
@@ -632,7 +778,7 @@ func (r *Migration) deleteConfigMap() (err error) {
 		kUse:  VddkConf,
 	})
 	list := &core.ConfigMapList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -646,7 +792,7 @@ func (r *Migration) deleteConfigMap() (err error) {
 	for _, configmap := range list.Items {
 		background := meta.DeletePropagationBackground
 		opts := &client.DeleteOptions{PropagationPolicy: &background}
-		err = r.Destination.Client.Delete(context.TODO(), &configmap, opts)
+		err = r.Destination.Delete(context.TODO(), &configmap, opts)
 		if err != nil {
 			r.Log.Error(err, "Failed to delete vddk-config", "configmap", configmap)
 		} else {
@@ -659,7 +805,7 @@ func (r *Migration) deleteConfigMap() (err error) {
 func (r *Migration) deleteValidateVddkJob() (err error) {
 	selector := labels.SelectorFromSet(map[string]string{"plan": string(r.Plan.UID)})
 	jobs := &batchv1.JobList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		jobs,
 		&client.ListOptions{
@@ -673,7 +819,7 @@ func (r *Migration) deleteValidateVddkJob() (err error) {
 	for _, job := range jobs.Items {
 		background := meta.DeletePropagationBackground
 		opts := &client.DeleteOptions{PropagationPolicy: &background}
-		err = r.Destination.Client.Delete(context.TODO(), &job, opts)
+		err = r.Destination.Delete(context.TODO(), &job, opts)
 		if err != nil {
 			r.Log.Error(err, "Failed to delete validate-vddk job", "job", job)
 		}
@@ -683,9 +829,9 @@ func (r *Migration) deleteValidateVddkJob() (err error) {
 
 // Best effort attempt to resolve canceled refs.
 func (r *Migration) resolveCanceledRefs() {
-	for i := range r.Context.Migration.Spec.Cancel {
+	for i := range r.Migration.Spec.Cancel {
 		// resolve the VM ref in place
-		ref := &r.Context.Migration.Spec.Cancel[i]
+		ref := &r.Migration.Spec.Cancel[i]
 		_, _ = r.Source.Inventory.VM(ref)
 	}
 }
@@ -706,7 +852,7 @@ func (r *Migration) runningVMs() (vms []*plan.VMStatus) {
 func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	vm.DeleteCondition(api.ConditionPending)
 	// check whether the VM has been canceled by the user
-	if r.Context.Migration.Spec.Canceled(vm.Ref) {
+	if r.Migration.Spec.Canceled(vm.Ref) {
 		vm.SetCondition(
 			libcnd.Condition{
 				Type:     api.ConditionCanceled,
@@ -755,11 +901,34 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.MarkStarted()
 			step.MarkStarted()
 			step.Phase = api.StepRunning
-			err = r.cleanup(vm, func(err error) bool { return err != nil }, true)
+			// Resume-conversion passes forceCleanup=false to preserve copied PVCs/DVs,
+			// but we must still remove stale conversion pods/CRs from the prior
+			// failed migration so the new workload can mount the reused disks.
+			forceCleanup := !r.IsResumeConversion()
+			err = r.cleanup(vm, func(err error) bool { return err != nil }, forceCleanup)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
 				break
+			}
+			if r.IsResumeConversion() {
+				var staleGone bool
+				staleGone, err = r.deleteStaleConversionWorkloads(vm)
+				if err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+				if !staleGone {
+					r.Log.Info("Stale conversion workloads still terminating, requeuing.",
+						"vm", vm.String())
+					return
+				}
+				if err = r.kubevirt.ValidateResumePVCs(vm.Ref); err != nil {
+					step.AddError(fmt.Sprintf("Resume-conversion PVC validation failed: %v", err))
+					err = nil
+					break
+				}
 			}
 
 			// Check if user provided explicit a target virtual machine name
@@ -865,7 +1034,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			csiPVCs, csiErr := r.kubevirt.CsiImportPVCs(vm)
 			if csiErr != nil {
 				if !errors.As(csiErr, &web.ProviderNotReadyError{}) {
-					r.Log.Error(csiErr, "error creating CSI import PVCs", "vm", vm.Name)
+					r.Log.Error(csiErr, "error building CSI import PVCs", "vm", vm.Name)
 					step.AddError(csiErr.Error())
 					err = nil
 					break
@@ -874,6 +1043,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					return
 				}
 			}
+			var resolvedCsiPVCs []*core.PersistentVolumeClaim
 			if len(csiPVCs) > 0 {
 				if csiErr = r.ensurer.PersistentVolumeClaims(vm, csiPVCs); csiErr != nil {
 					if !errors.As(csiErr, &web.ProviderNotReadyError{}) {
@@ -885,11 +1055,23 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 						return
 					}
 				}
+				var migrationPVCs []*core.PersistentVolumeClaim
+				if migrationPVCs, csiErr = r.kubevirt.getPVCs(vm.Ref); csiErr != nil {
+					if !errors.As(csiErr, &web.ProviderNotReadyError{}) {
+						step.AddError(csiErr.Error())
+						err = nil
+						break
+					} else {
+						err = csiErr
+						return
+					}
+				}
+				resolvedCsiPVCs = resolveCsiPVCs(csiPVCs, migrationPVCs)
 			}
 
+			var populatorPVCs []*core.PersistentVolumeClaim
 			if r.builder.SupportsVolumePopulators() {
-				var pvcs []*core.PersistentVolumeClaim
-				if pvcs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
+				if populatorPVCs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
 					if !errors.As(err, &web.ProviderNotReadyError{}) {
 						r.Log.Error(err, "error creating volumes", "vm", vm.Name)
 						step.AddError(err.Error())
@@ -899,7 +1081,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 						return
 					}
 				}
-				err = r.kubevirt.EnsurePopulatorVolumes(vm, pvcs)
+			}
+
+			bindPVCs := append(populatorPVCs, resolvedCsiPVCs...)
+			if len(bindPVCs) > 0 {
+				err = r.kubevirt.EnsurePVCInitPod(vm, bindPVCs)
 				if err != nil {
 					if !errors.As(err, &web.ProviderNotReadyError{}) {
 						step.AddError(err.Error())
@@ -968,7 +1154,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 							continue
 						}
 						dataVolume := &cdi.DataVolume{}
-						err = r.Destination.Client.Get(
+						err = r.Destination.Get(
 							context.TODO(),
 							types.NamespacedName{Namespace: pvc.Namespace, Name: owner.Name},
 							dataVolume)
@@ -986,7 +1172,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 						// allows forklift to reuse all the existing warm migration
 						// logic to continue after a storage offload initial copy.
 						dataVolume.Annotations[base.AnnAllowClaimAdoption] = "false"
-						err = r.Destination.Client.Update(context.TODO(), dataVolume)
+						err = r.Destination.Update(context.TODO(), dataVolume)
 						if err != nil {
 							r.Log.Error(err, "error updating DataVolume, retrying", "dv", dataVolume.Name)
 							return
@@ -1194,11 +1380,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			if r.converter == nil {
 				labels := map[string]string{
 					"plan":      string(r.Plan.GetUID()),
-					"migration": string(r.Context.Migration.UID),
+					"migration": string(r.Migration.UID),
 					"vmID":      vm.ID,
 					"app":       "forklift",
 				}
-				r.converter = adapter.NewConverter(&r.Context.Destination, r.Log.WithName("converter"), labels, getVirtV2vImage(r.Plan), resolveServiceAccount(r.Plan))
+				r.converter = adapter.NewConverter(&r.Destination, r.Log.WithName("converter"), labels, getVirtV2vImage(r.Plan), resolveServiceAccount(r.Plan))
 				r.converter.FilterFn = func(pvc *core.PersistentVolumeClaim) bool {
 					val, ok := pvc.Annotations[base.AnnRequiresConversion]
 					return ok && val == "true"
@@ -1236,7 +1422,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				r.NextPhase(vm)
 			}
 		case api.PhaseCopyingPaused:
-			if r.Migration.Spec.Cutover != nil && !r.Migration.Spec.Cutover.After(time.Now()) {
+			cutover := r.Migration.Spec.CutoverFor(vm.Ref)
+			if cutover != nil && !cutover.After(time.Now()) {
 				vm.Phase = api.PhaseStorePowerState
 			} else if vm.Warm.NextPrecopyAt != nil && !vm.Warm.NextPrecopyAt.After(time.Now()) {
 				r.NextPhase(vm)
@@ -1426,6 +1613,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 			}
 		case api.PhaseCreateGuestConversionPod:
+
+			if !vm.DisksCopied && !r.IsResumeConversion() &&
+				util.HasSeparateCopyAndConversion(r.Plan, vm.Ref) {
+				vm.DisksCopied = true
+				r.Log.Info("All disks copied, marking VM as resumable on conversion failure.",
+					"vm", vm.String())
+			}
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -1472,7 +1666,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			switch r.Source.Provider.Type() {
-			case api.Ova, api.VSphere, api.HyperV, api.EC2:
+			case api.Ova, api.VSphere, api.HyperV, api.EC2, api.Azure:
 				// fetch config from the conversion pod
 				pod, err := r.kubevirt.GetGuestConversionPod(vm)
 				if err != nil {
@@ -1573,7 +1767,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			var pod *core.Pod
-			pod, err = r.kubevirt.GetConversionPod(vm.Ref, VirtV2vInspectionPod)
+			pod, err = r.kubevirt.GetConversionPod(vm.Ref, VirtV2vInspectionPod, true)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -1652,7 +1846,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 		// Failed warm migration can't follow its planned itinerary to snapshot removal phase
 		// so we remove the snapshot here to prevent an orphaned snapshot.
-		if r.Plan.IsWarm() && !vm.HasCondition(api.ConditionFailed) {
+		if r.Plan.IsWarm() && !vm.HasCondition(api.ConditionFailed) && !r.IsResumeConversion() {
 			r.removeLastWarmSnapshot(vm)
 		}
 
@@ -1667,6 +1861,23 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	}
 
 	return
+}
+
+// Matches by AnnDiskSource, not name — CSI import PVC names may be unset until creation.
+func resolveCsiPVCs(csiSpecs []core.PersistentVolumeClaim, migrationPVCs []*core.PersistentVolumeClaim) []*core.PersistentVolumeClaim {
+	wanted := make(map[string]bool, len(csiSpecs))
+	for i := range csiSpecs {
+		if src := csiSpecs[i].Annotations[base.AnnDiskSource]; src != "" {
+			wanted[src] = true
+		}
+	}
+	var matched []*core.PersistentVolumeClaim
+	for _, pvc := range migrationPVCs {
+		if src := pvc.Annotations[base.AnnDiskSource]; src != "" && wanted[src] {
+			matched = append(matched, pvc)
+		}
+	}
+	return matched
 }
 
 const schedulerQueuedReasonFmt = "Waiting to start migration: in-flight limit reached (max %d)."
@@ -1840,7 +2051,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				r.setTaskCompleted(task)
 			case cdi.Paused:
 				pvc := &core.PersistentVolumeClaim{}
-				err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
+				err = r.Destination.Get(context.TODO(), types.NamespacedName{
 					Namespace: r.Plan.Spec.TargetNamespace,
 					Name:      dv.Status.ClaimName,
 				}, pvc)
@@ -1900,7 +2111,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 					found = false
 				} else {
 					pvc := &core.PersistentVolumeClaim{}
-					err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
+					err = r.Destination.Get(context.TODO(), types.NamespacedName{
 						Namespace: r.Plan.Spec.TargetNamespace,
 						Name:      dv.Status.ClaimName,
 					}, pvc)
@@ -1914,7 +2125,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 							path.Join(dv.Namespace, dv.Name))
 						continue
 					}
-					err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
+					err = r.Destination.Get(context.TODO(), types.NamespacedName{
 						Namespace: r.Plan.Spec.TargetNamespace,
 						Name:      fmt.Sprintf("prime-%s", pvc.UID),
 					}, pvc)
@@ -1961,10 +2172,30 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				if r.Plan.IsWarm() && len(importer.Status.ContainerStatuses) > 0 {
 					vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
 				}
+				r.maybeRefreshImportCredentials(vm, dv.DataVolume, importer)
 				if restartLimitExceeded(importer) {
 					task.MarkedCompleted()
 					msg, _ := terminationMessage(importer)
 					task.AddError(msg)
+
+					if r.Plan.Status.Migration.Started == nil { // Check for failure events since plan start time
+						continue
+					}
+					events, evtErr := r.failedImporterEvents(dv.Status.ClaimName)
+					if evtErr != nil {
+						log.Error(
+							evtErr,
+							"Could not get importer pod events from DataVolume, failed disk transfer will only show the final error message.",
+							"vm",
+							vm.String(),
+							"dv",
+							path.Join(dv.Namespace, dv.Name))
+					}
+					for _, event := range events.Items {
+						if event.LastTimestamp.After(r.Plan.Status.Migration.Started.Time) {
+							task.AddError(event.Message) // Depend on AddError to avoid duplicate messages
+						}
+					}
 				}
 			}
 		}
@@ -2041,14 +2272,18 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 		}
 	case core.PodFailed:
 		step.MarkCompleted()
-		step.AddError("Guest conversion failed. See pod logs for details.")
+		if failure, ok := errorreporting.ExtractFromPod(pod); ok {
+			step.AddError(errorreporting.Format(failure))
+		} else {
+			step.AddError("Guest conversion failed. See pod logs for details.")
+		}
 	default:
 		if pod.Status.PodIP == "" {
 			// we get the progress from the pod and we cannot connect to the pod without PodIP
 			break
 		}
 
-		useV2vForTransfer, err := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref, r.Destination.Client)
+		useV2vForTransfer, err := r.Plan.ShouldUseV2vForTransfer(vm.Ref)
 		switch {
 		case err != nil:
 			return liberr.Wrap(err)
@@ -2069,7 +2304,7 @@ func (r *Migration) updateConversionProgressV2vMonitor(pod *core.Pod, step *plan
 	resp, err := http.Get(url)
 	switch {
 	case err == nil:
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 	case strings.Contains(err.Error(), "connection refused"):
 		return nil
 	default:
@@ -2130,7 +2365,7 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 		return
 	}
 	for i := range dvs {
-		err = r.Destination.Client.Update(context.TODO(), &dvs[i])
+		err = r.Destination.Update(context.TODO(), &dvs[i])
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -2167,13 +2402,15 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 
 		taskSeen[taskName] = true
 
-		if xcopyUsed, xcopyFound, xcopyErr := r.builder.PopulatorXcopyUsed(pvc); xcopyErr != nil {
-			r.Log.Info("Failed to get xcopyUsed", "pvc", pvc.Name, "error", xcopyErr)
-		} else if xcopyFound {
+		if offloadInfo, offloadErr := r.builder.PopulatorOffloadInfo(pvc); offloadErr != nil {
+			r.Log.Info("Failed to get populator offload info", "pvc", pvc.Name, "error", offloadErr)
+		} else if len(offloadInfo) > 0 {
 			if task.Annotations == nil {
 				task.Annotations = make(map[string]string)
 			}
-			task.Annotations["xcopyUsed"] = xcopyUsed
+			for k, v := range offloadInfo {
+				task.Annotations[k] = v
+			}
 		}
 
 		if pvc.Status.Phase == core.ClaimBound {
@@ -2276,6 +2513,23 @@ func (r *Migration) propagateInspectionConcerns(vm *plan.VMStatus, result *api.I
 	return
 }
 
+// Get an importer pod's failure events from its PVC. Sometimes the very first
+// error is different from subsequent ones, so it is useful to try to get them
+// all for debugging.
+func (r *Migration) failedImporterEvents(pvcName string) (*core.EventList, error) {
+	events := &core.EventList{}
+	err := r.Destination.List(context.TODO(), events, &client.ListOptions{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		FieldSelector: fields.AndSelectors(
+			fields.OneTermEqualSelector("involvedObject.kind", "PersistentVolumeClaim"),
+			fields.OneTermEqualSelector("involvedObject.name", pvcName),
+			fields.OneTermEqualSelector("reason", "ErrImportFailed"),
+			fields.OneTermEqualSelector("type", "Warning"),
+		),
+	})
+	return events, err
+}
+
 // Retrieve the termination message from a pod's first container.
 func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 	if len(pod.Status.ContainerStatuses) > 0 &&
@@ -2283,6 +2537,97 @@ func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 		pod.Status.ContainerStatuses[0].LastTerminationState.Terminated.ExitCode > 0 {
 		msg = pod.Status.ContainerStatuses[0].LastTerminationState.Terminated.Message
 		ok = true
+	}
+	return
+}
+
+// maybeRefreshImportCredentials rotates short-lived download credentials
+// (e.g. Nutanix Prism Central cookies) when the CDI importer fails with an
+// auth error, then deletes the importer pod so CDI recreates it with the
+// updated SecretExtraHeaders Secret mounted — without recreating the DV.
+func (r *Migration) maybeRefreshImportCredentials(vm *plan.VMStatus, dv *cdi.DataVolume, importer *core.Pod) {
+	if !isImportAuthFailure(importer) {
+		return
+	}
+	if dv.Annotations != nil {
+		if last, err := time.Parse(time.RFC3339, dv.Annotations[annCookieRefreshedAt]); err == nil {
+			if time.Since(last) < cookieRefreshCooldown {
+				return
+			}
+		}
+	}
+
+	refreshed, err := r.builder.RefreshImportCredentials(dv)
+	if err != nil {
+		log.Error(err, "Failed to refresh import credentials.",
+			"vm", vm.String(),
+			"dv.name", dv.Name,
+			"dv.namespace", dv.Namespace)
+		return
+	}
+	if !refreshed {
+		return
+	}
+
+	fresh := &cdi.DataVolume{}
+	err = r.Destination.Get(
+		context.TODO(),
+		types.NamespacedName{Namespace: dv.Namespace, Name: dv.Name},
+		fresh,
+	)
+	if err != nil {
+		log.Error(err, "Failed to get DataVolume after credential refresh.",
+			"dv.name", dv.Name,
+			"dv.namespace", dv.Namespace)
+		return
+	}
+	if fresh.Annotations == nil {
+		fresh.Annotations = map[string]string{}
+	}
+	fresh.Annotations[annCookieRefreshedAt] = time.Now().UTC().Format(time.RFC3339)
+	if err = r.Destination.Update(context.TODO(), fresh); err != nil {
+		log.Error(err, "Failed to annotate DataVolume after credential refresh.",
+			"dv.name", dv.Name,
+			"dv.namespace", dv.Namespace)
+		return
+	}
+
+	if err = r.Destination.Delete(context.TODO(), importer); err != nil && !k8serr.IsNotFound(err) {
+		log.Error(err, "Failed to restart importer after credential refresh.",
+			"pod.name", importer.Name,
+			"pod.namespace", importer.Namespace,
+			"dv.name", dv.Name,
+			"dv.namespace", dv.Namespace)
+		return
+	}
+	log.Info("Restarted importer after credential refresh.",
+		"pod.name", importer.Name,
+		"pod.namespace", importer.Namespace,
+		"dv.name", dv.Name,
+		"dv.namespace", dv.Namespace,
+		"vm", vm.String())
+}
+
+func isImportAuthFailure(pod *core.Pod) bool {
+	msg, ok := importFailureMessage(pod)
+	if !ok {
+		return false
+	}
+	return strings.Contains(msg, "got 401") ||
+		strings.Contains(msg, "401 Unauthorized") ||
+		strings.Contains(msg, "status code 401")
+}
+
+func importFailureMessage(pod *core.Pod) (msg string, ok bool) {
+	if msg, ok = terminationMessage(pod); ok {
+		return
+	}
+	if len(pod.Status.ContainerStatuses) == 0 {
+		return
+	}
+	terminated := pod.Status.ContainerStatuses[0].State.Terminated
+	if terminated != nil && terminated.ExitCode > 0 {
+		return terminated.Message, true
 	}
 	return
 }

@@ -82,7 +82,7 @@ func (r *Reconciler) Record(object runtime.Object, cnd libcnd.Conditions) {
 		default:
 			event = core.EventTypeNormal
 		}
-		r.EventRecorder.Event(
+		r.Event(
 			object,
 			event,
 			cnd.Type,
@@ -165,7 +165,7 @@ func VerifyTLSConnection(rawURL string, secret *core.Secret) (*x509.Certificate,
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a secure TLS connection: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	return cert, nil
 }

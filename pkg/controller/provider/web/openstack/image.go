@@ -59,9 +59,9 @@ func (h *ImageHandler) AddRoutes(e *gin.Engine) {
 
 // Build the resource using the model.
 func (r *Image) With(m *model.Image) {
-	r.Resource.ID = m.ID
-	r.Resource.Revision = m.Revision
-	r.Resource.Name = m.Name
+	r.ID = m.ID
+	r.Revision = m.Revision
+	r.Name = m.Name
 	r.Status = string(m.Status)
 	r.Tags = m.Tags
 	r.ContainerFormat = m.ContainerFormat

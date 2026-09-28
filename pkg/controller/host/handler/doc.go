@@ -3,6 +3,7 @@ package handler
 import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/host/handler/hyperv"
+	"github.com/kubev2v/forklift/pkg/controller/host/handler/nutanix"
 	"github.com/kubev2v/forklift/pkg/controller/host/handler/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/host/handler/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/host/handler/ova"
@@ -10,6 +11,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/host/handler/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/watch/handler"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	azurehandler "github.com/kubev2v/forklift/pkg/provider/azure/controller/handler"
 	ec2handler "github.com/kubev2v/forklift/pkg/provider/ec2/controller/handler"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -64,6 +66,13 @@ func New(
 		// EC2 provider does not support host-level operations
 		// Return a no-op handler that satisfies the interface
 		h = &ec2handler.NoOpHostHandler{}
+	case api.Nutanix:
+		h, err = nutanix.New(
+			client,
+			channel,
+			provider)
+	case api.Azure:
+		h = &azurehandler.NoOpHostHandler{}
 	default:
 		err = liberr.New("provider not supported.")
 	}

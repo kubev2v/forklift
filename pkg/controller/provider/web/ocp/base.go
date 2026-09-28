@@ -96,7 +96,7 @@ func (r *PathBuilder) forNamespace(id, leaf string) (path string, err error) {
 	name, cached := r.cache[id]
 	if !cached {
 		list := core.NamespaceList{}
-		err = r.Client.List(context.TODO(), &list,
+		err = r.List(context.TODO(), &list,
 			ocpclient.MatchingFieldsSelector{
 				Selector: fields.OneTermEqualSelector(metav1.ObjectNameField, id),
 			},

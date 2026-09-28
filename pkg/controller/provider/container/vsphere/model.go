@@ -734,13 +734,23 @@ func applyNasDatastoreNfsInfo(info types.NasDatastoreInfo, ds *model.Datastore) 
 
 func applyIormConfiguration(info *types.StorageIORMInfo, ds *model.Datastore) {
 	ds.IORMEnabled = info.Enabled
-	ds.IORMCongestionThreshold = info.CongestionThreshold
+	// vSphere returns 0 when SIOC is disabled/unconfigured; downstream requires 5-100ms range, default 30ms
+	threshold := info.CongestionThreshold
+	if threshold < 5 {
+		threshold = 30
+	} else if threshold > 100 {
+		threshold = 100
+	}
+	ds.IORMCongestionThreshold = threshold
 	ds.IORMCongestionThresholdMode = model.IORMThresholdModeAutomatic
 	if model.IORMThresholdMode(info.CongestionThresholdMode) == model.IORMThresholdModeManual {
 		ds.IORMCongestionThresholdMode = model.IORMThresholdModeManual
 	}
+	// vSphere returns 0 when SIOC is disabled; valid range 50-100, default 90
 	pct := info.PercentOfPeakThroughput
-	if pct > 100 {
+	if pct < 50 {
+		pct = 90
+	} else if pct > 100 {
 		pct = 100
 	}
 	ds.IORMPercentOfPeakThroughput = pct
@@ -1088,19 +1098,6 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 						SortNICsByGuestNetworkOrder(&v.model)
 					}
 				}
-			case fAvailableField:
-				if customFields, cast := p.Val.(types.ArrayOfCustomFieldDef); cast {
-					customDef := []model.CustomFieldDef{}
-					for _, f := range customFields.CustomFieldDef {
-						customDef = append(customDef, model.CustomFieldDef{
-							Name:              f.Name,
-							Key:               f.Key,
-							ManagedObjectType: f.ManagedObjectType,
-						})
-					}
-
-					v.model.CustomDef = customDef
-				}
 			case fCustomValue:
 				customValues := []model.CustomFieldValue{}
 				switch cv := p.Val.(type) {
@@ -1141,16 +1138,28 @@ func hasDiskPrefix(key string) bool {
 		strings.HasPrefix(keyLower, NVME)
 }
 
+// diskBusAddress returns the vSphere bus address for a disk (e.g. scsi0:0)
+// using the controller's BusNumber, which can differ from the device Key.
+func diskBusAddress(bus string, busNumber, unitNumber int32) string {
+	if bus == "" {
+		return ""
+	}
+	return strings.ToLower(fmt.Sprintf("%s%d:%d", bus, busNumber, unitNumber))
+}
+
+func withBusAddress(md model.Disk, busNumber int32) model.Disk {
+	md.BusNumber = busNumber
+	md.BusAddress = diskBusAddress(md.Bus, busNumber, md.UnitNumber)
+	return md
+}
+
 func isCBTEnabledForDisks(ctkPerDisk map[string]bool, disks []model.Disk) {
 	for i := range disks {
 		disk := &disks[i]
-
-		// In vSphere, ControllerKey values are typically large integers that encode the controller bus number.
-		// To extract the actual controller index (e.g., scsi0, scsi1), we round down to the nearest 100 to get the base,
-		// then subtract it from the ControllerKey. For example, 16001 → controllerIndex 1 (16001 - 16000).
-		baseKey := (disk.ControllerKey / 100) * 100
-		controllerIndex := disk.ControllerKey - baseKey
-		deviceKey := strings.ToLower(fmt.Sprintf("%s%d:%d", disk.Bus, controllerIndex, disk.UnitNumber))
+		deviceKey := disk.BusAddress
+		if deviceKey == "" {
+			deviceKey = diskBusAddress(disk.Bus, disk.BusNumber, disk.UnitNumber)
+		}
 
 		if ctkPerDisk[deviceKey] {
 			disk.ChangeTrackingEnabled = true
@@ -1369,51 +1378,59 @@ func (v *VmAdapter) updateControllers(devArray *types.ArrayOfVirtualDevice) {
 		switch controller := dev.(type) {
 		case *types.VirtualIDEController:
 			md = model.Controller{
-				Bus:   IDE,
-				Disks: controller.Device,
-				Key:   controller.Key,
+				Bus:       IDE,
+				Disks:     controller.Device,
+				Key:       controller.Key,
+				BusNumber: controller.BusNumber,
 			}
 		case *types.VirtualBusLogicController:
 			md = model.Controller{
-				Bus:   SCSI,
-				Disks: controller.Device,
-				Key:   controller.Key,
+				Bus:       SCSI,
+				Disks:     controller.Device,
+				Key:       controller.Key,
+				BusNumber: controller.BusNumber,
 			}
 		case *types.VirtualLsiLogicController:
 			md = model.Controller{
-				Bus:   SCSI,
-				Disks: controller.Device,
-				Key:   controller.Key,
+				Bus:       SCSI,
+				Disks:     controller.Device,
+				Key:       controller.Key,
+				BusNumber: controller.BusNumber,
 			}
 		case *types.VirtualLsiLogicSASController:
 			md = model.Controller{
-				Bus:   SCSI,
-				Disks: controller.Device,
-				Key:   controller.Key,
+				Bus:       SCSI,
+				Disks:     controller.Device,
+				Key:       controller.Key,
+				BusNumber: controller.BusNumber,
 			}
 		case *types.ParaVirtualSCSIController:
 			md = model.Controller{
-				Bus:   SCSI,
-				Disks: controller.Device,
-				Key:   controller.Key,
+				Bus:       SCSI,
+				Disks:     controller.Device,
+				Key:       controller.Key,
+				BusNumber: controller.BusNumber,
 			}
 		case *types.VirtualAHCIController:
 			md = model.Controller{
-				Bus:   SATA,
-				Disks: controller.Device,
-				Key:   controller.Key,
+				Bus:       SATA,
+				Disks:     controller.Device,
+				Key:       controller.Key,
+				BusNumber: controller.BusNumber,
 			}
 		case *types.VirtualUSBController:
 			md = model.Controller{
-				Bus:   USB,
-				Disks: controller.Device,
-				Key:   controller.Key,
+				Bus:       USB,
+				Disks:     controller.Device,
+				Key:       controller.Key,
+				BusNumber: controller.BusNumber,
 			}
 		case *types.VirtualNVMEController:
 			md = model.Controller{
-				Bus:   NVME,
-				Disks: controller.Device,
-				Key:   controller.Key,
+				Bus:       NVME,
+				Disks:     controller.Device,
+				Key:       controller.Key,
+				BusNumber: controller.BusNumber,
 			}
 		}
 		controllers = append(controllers, md)
@@ -1453,8 +1470,10 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 
 			// If controller is not nil, get the disk bus from the controller
 			bus := ""
+			busNumber := int32(0)
 			if controller != nil {
 				bus = controller.Bus
+				busNumber = controller.BusNumber
 			}
 
 			// Try to extract the Windows drive letter from the guest disk info
@@ -1485,7 +1504,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				if backing.Parent != nil {
 					md.ParentFile = backing.Parent.FileName
 				}
-				disks = append(disks, md)
+				disks = append(disks, withBusAddress(md, busNumber))
 			case *types.VirtualDiskFlatVer2BackingInfo:
 				md := model.Disk{
 					Key:            disk.Key,
@@ -1510,7 +1529,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 						ID:   datastoreId,
 					}
 				}
-				disks = append(disks, md)
+				disks = append(disks, withBusAddress(md, busNumber))
 			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
 				md := model.Disk{
 					Key:            disk.Key,
@@ -1535,7 +1554,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 						ID:   datastoreId,
 					}
 				}
-				disks = append(disks, md)
+				disks = append(disks, withBusAddress(md, busNumber))
 			case *types.VirtualDiskRawDiskVer2BackingInfo:
 				md := model.Disk{
 					Key:           disk.Key,
@@ -1553,7 +1572,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					WinDriveLetter: winDriveLetter,
 					DeviceName:     backing.DeviceName,
 				}
-				disks = append(disks, md)
+				disks = append(disks, withBusAddress(md, busNumber))
 			}
 		}
 	}

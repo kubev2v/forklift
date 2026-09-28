@@ -168,8 +168,8 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		return util.ToAdmissionResponseError(err)
 	}
 
-	admitter.plan.Referenced.Provider.Source = &admitter.sourceProvider
-	admitter.plan.Referenced.Provider.Destination = &admitter.destinationProvider
+	admitter.plan.Provider.Source = &admitter.sourceProvider
+	admitter.plan.Provider.Destination = &admitter.destinationProvider
 
 	if admitter.destinationProvider.IsHost() {
 		// Check whether the user has permission to create VMs in the target namespace

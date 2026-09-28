@@ -73,7 +73,7 @@ func (r *DestinationClient) getPopulatorCrList(vmID string) (populatorCrList v1b
 		"vmID", vmID)
 
 	populatorCrList = v1beta1.VSphereXcopyVolumePopulatorList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		&populatorCrList,
 		&client.ListOptions{
@@ -98,7 +98,7 @@ func (r *DestinationClient) DeleteObject(object client.Object, vm *plan.VMStatus
 		"namespace", object.GetNamespace(),
 		"vm", vm.String())
 
-	err = r.Destination.Client.Delete(context.TODO(), object)
+	err = r.Destination.Delete(context.TODO(), object)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			r.Log.Info("Object not found, already deleted",
@@ -135,7 +135,7 @@ func (r *DestinationClient) findPVCByCR(cr *v1beta1.VSphereXcopyVolumePopulator)
 		"migrationUID", migUID)
 
 	pvcList := core.PersistentVolumeClaimList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		&pvcList,
 		&client.ListOptions{

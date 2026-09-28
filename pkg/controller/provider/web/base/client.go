@@ -203,11 +203,11 @@ func (c *RestClient) Get(resource interface{}, id string) (status int, err error
 	}
 	lv := reflect.ValueOf(resource)
 	switch lv.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 	default:
 		return -1, libmodel.MustBePtrErr
 	}
-	path, err := c.Resolver.Path(resource, id)
+	path, err := c.Path(resource, id)
 	if err != nil {
 		return
 	}
@@ -223,7 +223,7 @@ func (c *RestClient) List(list interface{}, param ...Param) (status int, err err
 	lt := reflect.TypeOf(list)
 	lv := reflect.ValueOf(list)
 	switch lv.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		lt := lt.Elem()
 		lv = lv.Elem()
 		switch lv.Kind() {
@@ -235,7 +235,7 @@ func (c *RestClient) List(list interface{}, param ...Param) (status int, err err
 	default:
 		return -1, libmodel.MustBeSlicePtrErr
 	}
-	path, err := c.Resolver.Path(resource, "/")
+	path, err := c.Path(resource, "/")
 	if err != nil {
 		return
 	}
@@ -260,12 +260,12 @@ func (c *RestClient) Watch(resource interface{}, h EventHandler) (status int, w 
 	}
 	lv := reflect.ValueOf(resource)
 	switch lv.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 	default:
 		err = libmodel.MustBePtrErr
 		return
 	}
-	path, err := c.Resolver.Path(resource, "/")
+	path, err := c.Path(resource, "/")
 	if err != nil {
 		return
 	}
@@ -334,13 +334,13 @@ func (c *RestClient) url(path string) string {
 	if c.Host == "" {
 		c.Host = fmt.Sprintf(
 			"%s:%d",
-			Settings.Inventory.Host,
+			Settings.Host,
 			Settings.Inventory.Port)
 	}
 	path = (&Handler{}).Link(path, c.Params)
 	url, _ := liburl.Parse(path)
 	if url.Host == "" {
-		url.Scheme = Settings.Inventory.Scheme
+		url.Scheme = Settings.Scheme
 		url.Host = c.Host
 	}
 

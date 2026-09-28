@@ -2,7 +2,10 @@ package hyperv
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
@@ -18,6 +21,17 @@ import (
 )
 
 var log = logging.WithName("hyperv|client")
+
+const clusterPowerOffTimeout = 5 * time.Minute
+
+func isTimeoutError(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	// WinRM may wrap the context error in its own message string
+	// rather than chaining it, so fall back to a substring check.
+	return strings.Contains(err.Error(), "context deadline exceeded")
+}
 
 // HyperV VM Client
 type Client struct {
@@ -68,13 +82,71 @@ func (r *Client) PowerState(vmRef ref.Ref) (planapi.VMPowerState, error) {
 		return planapi.VMPowerStateUnknown, err
 	}
 
-	switch vm.PowerState {
-	case model.PowerStateOn:
+	drv, err := r.connect()
+	if err != nil {
+		log.Info("WinRM connect failed, falling back to inventory cache", "vm", vm.Name, "error", err)
+		return r.powerStateFromInventory(vm), nil
+	}
+
+	// In cluster mode the VM may reside on a different node than the
+	// provider entry-point. Route the Get-VM query to the owner node.
+	if r.Source.Provider.IsHyperVCluster() && vm.Host != "" {
+		cmd := ps.BuildCommand(ps.GetVMState, vm.Name)
+		out, err := drv.RunOnNode(cmd, vm.Host)
+		if err != nil {
+			log.Info("RunOnNode Get-VM failed, falling back to inventory cache",
+				"vm", vm.Name, "node", vm.Host, "error", err)
+			return r.powerStateFromInventory(vm), nil
+		}
+		return r.parseStateString(out), nil
+	}
+
+	domain, err := drv.LookupDomainByName(vm.Name)
+	if err != nil {
+		log.Info("VM not found via WinRM, falling back to inventory cache", "vm", vm.Name, "error", err)
+		return r.powerStateFromInventory(vm), nil
+	}
+	defer func() { _ = domain.Free() }()
+
+	state, _, err := domain.GetState()
+	if err != nil {
+		log.Info("Failed to get VM state via WinRM, falling back to inventory cache", "vm", vm.Name, "error", err)
+		return r.powerStateFromInventory(vm), nil
+	}
+
+	switch state {
+	case driver.DOMAIN_RUNNING:
 		return planapi.VMPowerStateOn, nil
-	case model.PowerStateOff:
+	case driver.DOMAIN_SHUTOFF:
 		return planapi.VMPowerStateOff, nil
 	default:
 		return planapi.VMPowerStateUnknown, nil
+	}
+}
+
+// parseStateString maps the textual output of PowerShell's VM State property
+// (e.g. "Off", "Running") to the plan VMPowerState enum.
+func (r *Client) parseStateString(raw string) planapi.VMPowerState {
+	s := strings.TrimSpace(strings.ToLower(raw))
+	switch {
+	case strings.Contains(s, "off"):
+		return planapi.VMPowerStateOff
+	case strings.Contains(s, "running"):
+		return planapi.VMPowerStateOn
+	default:
+		log.Info("Unrecognised VM state string from WinRM", "raw", raw)
+		return planapi.VMPowerStateUnknown
+	}
+}
+
+func (r *Client) powerStateFromInventory(vm *hyperv.VM) planapi.VMPowerState {
+	switch vm.PowerState {
+	case model.PowerStateOn:
+		return planapi.VMPowerStateOn
+	case model.PowerStateOff:
+		return planapi.VMPowerStateOff
+	default:
+		return planapi.VMPowerStateUnknown
 	}
 }
 
@@ -99,11 +171,22 @@ func (r *Client) PowerOff(vmRef ref.Ref) error {
 		return err
 	}
 
-	// In cluster mode, the VM may be on a different node than the entry
-	// point. Route the Stop-VM command to the correct node via RunOnNode.
+	// Cluster mode: route Stop-VM to the owner node with an extended
+	// timeout (the multi-hop WinRM call can exceed the default 60s).
 	if r.Source.Provider.IsHyperVCluster() && vm.Host != "" {
 		cmd := ps.BuildCommand(ps.StopVM, vm.Name)
-		if _, err = drv.RunOnNode(cmd, vm.Host); err != nil {
+		if _, err = drv.RunOnNodeWithTimeout(cmd, vm.Host, clusterPowerOffTimeout); err != nil {
+			// Timeouts are non-fatal: Stop-VM -Force is accepted by
+			// VMMS before the WinRM response. Returning nil here lets
+			// PhasePowerOffSource state call NextPhase(vm),
+			// advancing to WaitForPowerOff which polls the actual
+			// power state via WinRM and will only proceed once the
+			// VM is truly off.
+			if isTimeoutError(err) {
+				log.Info("Stop-VM timed out, deferring to WaitForPowerOff",
+					"vm", vm.Name, "node", vm.Host, "error", err)
+				return nil
+			}
 			return fmt.Errorf("failed to power off VM %s on node %s: %w", vm.Name, vm.Host, err)
 		}
 		log.Info("Powered off VM via RunOnNode", "vm", vm.Name, "node", vm.Host)

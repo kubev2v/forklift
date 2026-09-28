@@ -14,6 +14,8 @@ type CopyContext struct {
 	CloneMethod string
 	// StorageProtocol is the storage protocol when known (e.g. "iscsi", "fc"). May be empty.
 	StorageProtocol string
+	// VibVersion is the installed VIB version when known. Empty if unavailable (old or missing VIB).
+	VibVersion string
 	// SourceDiskCapacityBytes is provisioned (guest-visible) size of the source disk.
 	SourceDiskCapacityBytes int64
 	// SourceDiskDatastoreAllocatedBytes is datastore footprint (layoutEx diskExtent sizes) when known.
@@ -28,12 +30,14 @@ type Populator interface {
 	GetCopyContext() CopyContext
 	// Populate will populate the volume identified by volumeHanle with the content of
 	// the sourceVMDKFile.
+	// ctx controls the lifetime of the operation — cancelling it (e.g. on SIGTERM)
+	// aborts in-flight work and lets deferred cleanup run before the process exits.
 	// vmId the vm that has the source vmdk
 	// migrationHostId the ESX that will perform the population. If empty the ESX of the vm will be used.
 	// sourceVMDKFile the path to the vmdk file
 	// persistentVolume is a slim version of k8s PersistentVolume created by the CSI driver,
 	// to help identify its underlying LUN in the storage system.
-	Populate(vmId string, migrationHostId string, sourceVMDKFile string, persistentVolume PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) error
+	Populate(ctx context.Context, vmId string, migrationHostId string, sourceVMDKFile string, persistentVolume PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) error
 }
 
 //go:generate go run go.uber.org/mock/mockgen -destination=mocks/hostlocker_mock.go -package=mocks . Hostlocker

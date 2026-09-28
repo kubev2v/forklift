@@ -3,7 +3,7 @@
 set -e
 
 TMP_PREFIX="/tmp/vmkfstools-wrapper-"
-SCRIPT_VERSION="0.3.1"
+SCRIPT_VERSION="0.3.3"
 LOGIN_TAG="vmkfstools-wrapper"
 
 xml_output() {

@@ -15,6 +15,7 @@ import (
 const (
 	SourceNetworkNotValid      = "SourceNetworkNotValid"
 	DestinationNetworkNotValid = "DestinationNetworkNotValid"
+	NetworkIPModeNotValid      = "NetworkIPModeNotValid"
 )
 
 // Categories
@@ -28,9 +29,10 @@ const (
 
 // Reasons
 const (
-	NotSet    = "NotSet"
-	NotFound  = "NotFound"
-	Ambiguous = "Ambiguous"
+	NotSet                 = "NotSet"
+	NotFound               = "NotFound"
+	Ambiguous              = "Ambiguous"
+	NotValidForDestination = "NotValidForDestination"
 )
 
 // Statuses
@@ -61,8 +63,8 @@ func (r *Reconciler) validate(mp *api.NetworkMap) error {
 		validation.DestinationProviderNotReady) {
 		return nil
 	}
-	mp.Referenced.Provider.Source = pv.Referenced.Source
-	mp.Referenced.Provider.Destination = pv.Referenced.Destination
+	mp.Provider.Source = pv.Referenced.Source
+	mp.Provider.Destination = pv.Referenced.Destination
 
 	err = r.validateSource(mp)
 	if err != nil {
@@ -143,7 +145,7 @@ func (r *Reconciler) validateSource(mp *api.NetworkMap) (err error) {
 
 // Validate destination refs.
 func (r *Reconciler) validateDestination(mp *api.NetworkMap) (err error) {
-	provider := mp.Referenced.Provider.Destination
+	provider := mp.Provider.Destination
 	inventory, err := web.NewClient(provider)
 	if err != nil {
 		return
@@ -151,8 +153,12 @@ func (r *Reconciler) validateDestination(mp *api.NetworkMap) (err error) {
 	list := mp.Spec.Map
 	notFound := []string{}
 	ambiguous := []string{}
+	networkIPModeInvalid := []string{}
 next:
 	for _, entry := range list {
+		if (entry.Destination.Type == Ignored || entry.Destination.Type == Pod) && entry.NetworkIPMode != "" {
+			networkIPModeInvalid = append(networkIPModeInvalid, entry.Source.String())
+		}
 		switch entry.Destination.Type {
 		case Ignored, Pod:
 			continue next
@@ -201,6 +207,16 @@ next:
 			Category: Critical,
 			Message:  "Destination network (NAD) namespace required.",
 			Items:    ambiguous,
+		})
+	}
+	if len(networkIPModeInvalid) > 0 {
+		mp.Status.SetCondition(libcnd.Condition{
+			Type:     NetworkIPModeNotValid,
+			Status:   True,
+			Reason:   NotValidForDestination,
+			Category: Critical,
+			Message:  "networkIPMode is not valid for pod or ignored networks.",
+			Items:    networkIPModeInvalid,
 		})
 	}
 

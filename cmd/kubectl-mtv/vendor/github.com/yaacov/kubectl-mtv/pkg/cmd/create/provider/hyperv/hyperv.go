@@ -114,6 +114,13 @@ func CreateProvider(configFlags *genericclioptions.ConfigFlags, options provider
 	provider.Spec.Type = &providerTypeValue
 	provider.Spec.URL = options.URL
 
+	// Set settings if provided
+	if options.HyperVMgmtType != "" {
+		provider.Spec.Settings = map[string]string{
+			"managementType": options.HyperVMgmtType,
+		}
+	}
+
 	// Create or use the Secret
 	var createdSecret *corev1.Secret
 	var err error

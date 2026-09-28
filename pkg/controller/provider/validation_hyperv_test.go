@@ -18,7 +18,7 @@ func hypervProvider(settings map[string]string) *api.Provider {
 func TestValidateHyperVSettings_ValidCluster(t *testing.T) {
 	p := hypervProvider(map[string]string{api.ManagementType: api.HyperVCluster})
 	r := Reconciler{}
-	if err := r.validateHyperVSettings(p); err != nil {
+	if err := r.ValidateHyperVSettings(p); err != nil {
 		t.Fatal(err)
 	}
 	if p.Status.HasCondition(SettingsNotValid) {
@@ -29,7 +29,7 @@ func TestValidateHyperVSettings_ValidCluster(t *testing.T) {
 func TestValidateHyperVSettings_ValidStandalone(t *testing.T) {
 	p := hypervProvider(map[string]string{api.ManagementType: api.HyperVStandalone})
 	r := Reconciler{}
-	if err := r.validateHyperVSettings(p); err != nil {
+	if err := r.ValidateHyperVSettings(p); err != nil {
 		t.Fatal(err)
 	}
 	if p.Status.HasCondition(SettingsNotValid) {
@@ -40,7 +40,7 @@ func TestValidateHyperVSettings_ValidStandalone(t *testing.T) {
 func TestValidateHyperVSettings_EmptyDefaultsToValid(t *testing.T) {
 	p := hypervProvider(map[string]string{})
 	r := Reconciler{}
-	if err := r.validateHyperVSettings(p); err != nil {
+	if err := r.ValidateHyperVSettings(p); err != nil {
 		t.Fatal(err)
 	}
 	if p.Status.HasCondition(SettingsNotValid) {
@@ -51,7 +51,7 @@ func TestValidateHyperVSettings_EmptyDefaultsToValid(t *testing.T) {
 func TestValidateHyperVSettings_InvalidType(t *testing.T) {
 	p := hypervProvider(map[string]string{api.ManagementType: "bogus"})
 	r := Reconciler{}
-	if err := r.validateHyperVSettings(p); err != nil {
+	if err := r.ValidateHyperVSettings(p); err != nil {
 		t.Fatal(err)
 	}
 	if !p.Status.HasCondition(SettingsNotValid) {
@@ -69,7 +69,7 @@ func TestValidateHyperVSettings_NonHyperVSkipped(t *testing.T) {
 		Spec:       api.ProviderSpec{Type: &pt, Settings: map[string]string{api.ManagementType: "bogus"}},
 	}
 	r := Reconciler{}
-	if err := r.validateHyperVSettings(p); err != nil {
+	if err := r.ValidateHyperVSettings(p); err != nil {
 		t.Fatal(err)
 	}
 	if p.Status.HasCondition(SettingsNotValid) {

@@ -399,9 +399,6 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 	// For fields with +kubebuilder:default:=true, the API server auto-sets them
 	// to true on creation. When the user explicitly sets them to false, we need
 	// a post-create patch to override the kubebuilder default.
-	if !opts.PlanSpec.PVCNameTemplateUseGenerateName {
-		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "pvcNameTemplateUseGenerateName")
-	}
 	if !opts.PlanSpec.MigrateSharedDisks {
 		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "migrateSharedDisks")
 	}

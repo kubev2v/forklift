@@ -1,6 +1,7 @@
 package populator
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
@@ -25,7 +26,7 @@ func NewVvolPopulator(storageApi VVolCapable, vmwareClient vmware.Client, copyCt
 	}, nil
 }
 
-func (p *VvolPopulator) Populate(vmId string, migrationHostId, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
+func (p *VvolPopulator) Populate(ctx context.Context, vmId string, migrationHostId, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
 	log := klog.Background().WithName("copy-offload").WithName("vvol")
 	defer func() {
 		r := recover()

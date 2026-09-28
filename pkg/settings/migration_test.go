@@ -297,6 +297,54 @@ func TestMigration_ServiceAccount(t *testing.T) {
 	}
 }
 
+func TestMigration_PVCNameTemplates(t *testing.T) {
+	tests := []struct {
+		name     string
+		pvcEnv   string
+		ocpEnv   string
+		unsetPVC bool
+		unsetOCP bool
+		wantPVC  string
+		wantOCP  string
+	}{
+		{
+			name:     "unset defaults to empty",
+			unsetPVC: true,
+			unsetOCP: true,
+		},
+		{
+			name:    "loads both templates",
+			pvcEnv:  "{{.PlanName}}-disk-{{.DiskIndex}}",
+			ocpEnv:  "{{.SourcePVCName}}",
+			wantPVC: "{{.PlanName}}-disk-{{.DiskIndex}}",
+			wantOCP: "{{.SourcePVCName}}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(Roles, InventoryRole)
+			if !tt.unsetPVC {
+				t.Setenv(PVCNameTemplate, tt.pvcEnv)
+			}
+			if !tt.unsetOCP {
+				t.Setenv(OCPPVCNameTemplate, tt.ocpEnv)
+			}
+
+			var migration Migration
+			if err := migration.Load(); err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if migration.PVCNameTemplate != tt.wantPVC {
+				t.Errorf("PVCNameTemplate = %q, want %q", migration.PVCNameTemplate, tt.wantPVC)
+			}
+			if migration.OCPPVCNameTemplate != tt.wantOCP {
+				t.Errorf("OCPPVCNameTemplate = %q, want %q", migration.OCPPVCNameTemplate, tt.wantOCP)
+			}
+		})
+	}
+}
+
 // TestMigration_VirtV2vImageXFS tests the loading of the VIRT_V2V_IMAGE_RHEL9 environment
 // variable for XFS compatibility mode. This XFS-compatible image supports XFSv4 filesystems
 // and can be selected per-plan via the XfsCompatibility flag.

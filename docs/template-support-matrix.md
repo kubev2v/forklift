@@ -59,14 +59,13 @@ Templates can be specified at two levels:
 | Feature | VMware (vSphere) | OpenShift | oVirt | OpenStack | OVA |
 |---------|------------------|-----------|-------|-----------|-----|
 | **PVCNameTemplate** | Full | Full | No | No | No |
-| **PVCNameTemplateUseGenerateName** | Full | Full* | No | No | No |
+| **PVCNameTemplateUseGenerateName** | Full | Full | No | No | No |
 | **VolumeNameTemplate** | Full | No | No | No | No |
 | **NetworkNameTemplate** | Full | No | No | No | No |
 
 ### Legend
 
 - **Full** - Feature is fully supported
-- **Full*** - Feature is supported only when a custom `pvcNameTemplate` is set; otherwise the default behavior (exact name) is preserved
 - **No** - Feature is not supported
 - **Ignored** - Field exists but is ignored by the provider
 
@@ -82,20 +81,22 @@ VMware has full support for all template features.
 
 #### PVCNameTemplate
 
-**Data Structure:** `VSpherePVCNameTemplateData`
+**Data Structure:** `PVCNameTemplateData` (unified across all providers)
 
-| Variable | Type | Description | K8s Compliant |
-|----------|------|-------------|---------------|
-| `.VmName` | string | Name of the VM in the source cluster (original source name) | No, may need `lower` |
-| `.TargetVmName` | string | Final VM name in the target cluster (DNS1123 normalized) | Yes |
-| `.PlanName` | string | Name of the migration plan | Yes |
-| `.DiskIndex` | int | Initial volume index of the disk (0-based) | Yes |
-| `.WinDriveLetter` | string | Windows drive letter (lowercase, e.g., "c"). Requires guest agent | Yes |
-| `.RootDiskIndex` | int | Index of the root/boot disk | Yes |
-| `.Shared` | bool | `true` if the volume is shared by multiple VMs | Yes |
-| `.FileName` | string | Name of the vmdk file in the source provider (includes .vmdk suffix) | No, may need `lower` |
+| Variable | Type | Description | Providers | K8s Compliant |
+|----------|------|-------------|-----------|---------------|
+| `.VmName` | string | Name of the VM in the source cluster (original source name) | All | No, may need `lower` |
+| `.TargetVmName` | string | Final VM name in the target cluster (DNS1123 normalized) | All | Yes |
+| `.PlanName` | string | Name of the migration plan | All | Yes |
+| `.DiskIndex` | int | Initial volume index of the disk (0-based) | All | Yes |
+| `.VmId` | string | Source VM identifier from the provider | All | Depends on provider |
+| `.DiskId` | string | Provider-specific disk identifier (Hyper-V VHDX GUID, oVirt disk attachment ID) | Hyper-V, oVirt | No, may need `lower` |
+| `.WinDriveLetter` | string | Windows drive letter (lowercase, e.g., "c"). Requires guest agent | vSphere | Yes |
+| `.RootDiskIndex` | int | Index of the root/boot disk | vSphere | Yes |
+| `.Shared` | bool | `true` if the volume is shared by multiple VMs | vSphere | Yes |
+| `.FileName` | string | Name of the vmdk file in the source provider (includes .vmdk suffix) | vSphere | No, may need `lower` |
 
-**Default Template:** `{{trunc 4 .PlanName}}-{{trunc 4 .VmName}}-disk-{{.DiskIndex}}`
+**Default Template:** `{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}`
 
 **Examples:**
 ```yaml
@@ -112,14 +113,15 @@ pvcNameTemplate: "{{if .Shared}}shared-{{end}}{{trunc 30 .VmName | lower}}-{{.Di
 
 #### PVCNameTemplateUseGenerateName
 
-**Type:** bool
+**Type:** *bool
 
-**Default:** `true`
+**Default when unset:** `true` (non-OCP) / `false` (OCP)
 
 | Value | Behavior |
 |-------|----------|
 | `true` | Template output is used as `generateName` prefix, Kubernetes adds a random suffix (e.g., "my-vm-disk-0-" becomes "my-vm-disk-0-abc12") |
 | `false` | Template output is used as the exact PVC name. Warning: may cause conflicts if names are not unique |
+| unset | Provider default: `true` for non-OCP, `false` for OCP |
 
 #### VolumeNameTemplate
 
@@ -173,18 +175,19 @@ OpenShift supports PVC naming templates only.
 
 #### PVCNameTemplate
 
-**Data Structure:** `OCPPVCNameTemplateData`
+**Data Structure:** `PVCNameTemplateData` (unified across all providers)
 
-| Variable | Type | Description | K8s Compliant |
-|----------|------|-------------|---------------|
-| `.VmName` | string | Name of the VM in the source OpenShift cluster | Yes |
-| `.TargetVmName` | string | Final VM name in the target cluster | Yes |
-| `.PlanName` | string | Name of the migration plan | Yes |
-| `.DiskIndex` | int | Index of the disk (0-based) | Yes |
-| `.SourcePVCName` | string | Original name of the PVC in the source cluster | Yes |
-| `.SourcePVCNamespace` | string | Namespace of the PVC in the source cluster | Yes |
+| Variable | Type | Description | Providers | K8s Compliant |
+|----------|------|-------------|-----------|---------------|
+| `.VmName` | string | Name of the VM in the source OpenShift cluster | All | Yes |
+| `.TargetVmName` | string | Final VM name in the target cluster | All | Yes |
+| `.PlanName` | string | Name of the migration plan | All | Yes |
+| `.DiskIndex` | int | Index of the disk (0-based) | All | Yes |
+| `.VmId` | string | Source VM identifier from the provider | All | Yes |
+| `.SourcePVCName` | string | Original name of the PVC in the source cluster | OpenShift | Yes |
+| `.SourcePVCNamespace` | string | Namespace of the PVC in the source cluster | OpenShift | Yes |
 
-**Default Template:** `{{.SourcePVCName}}` (preserves original PVC name)
+**Default Template:** `{{.SourcePVCName}}` (with `useGenerateName` default `false`; preserves original PVC name)
 
 **Examples:**
 ```yaml
@@ -200,16 +203,15 @@ pvcNameTemplate: "{{.TargetVmName}}-disk-{{.DiskIndex}}"
 
 #### PVCNameTemplateUseGenerateName
 
-**Type:** bool
+**Type:** *bool
 
-**Default:** `true`
+**Default when unset:** `false` (OCP)
 
-This field is only honored when a custom `pvcNameTemplate` is explicitly set (plan-level or VM-level). When no custom template is set, the default `{{.SourcePVCName}}` behavior always uses exact names regardless of this field.
-
-| Value | Behavior (with custom template) |
+| Value | Behavior |
 |-------|----------|
 | `true` | Template output is used as `generateName` prefix, Kubernetes adds a random suffix (e.g., "my-vm-disk-0-" becomes "my-vm-disk-0-abc12") |
 | `false` | Template output is used as the exact PVC name. Warning: may cause conflicts if names are not unique |
+| unset | `false` for OCP sources |
 
 #### VolumeNameTemplate / NetworkNameTemplate
 

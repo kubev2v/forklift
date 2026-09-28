@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/aap"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,26 +41,26 @@ func hookTestScheme(t *testing.T) *runtime.Scheme {
 
 func savedHookRunnerSettings(t *testing.T) func() {
 	t.Helper()
-	savedServiceAccount := Settings.Migration.ServiceAccount
-	savedRequestsCPU := Settings.Migration.HooksContainerRequestsCpu
-	savedRequestsMemory := Settings.Migration.HooksContainerRequestsMemory
-	savedLimitsCPU := Settings.Migration.HooksContainerLimitsCpu
-	savedLimitsMemory := Settings.Migration.HooksContainerLimitsMemory
-	Settings.Migration.HooksContainerRequestsCpu = "100m"
-	Settings.Migration.HooksContainerRequestsMemory = "128Mi"
-	Settings.Migration.HooksContainerLimitsCpu = "1"
-	Settings.Migration.HooksContainerLimitsMemory = "512Mi"
+	savedServiceAccount := Settings.ServiceAccount
+	savedRequestsCPU := Settings.HooksContainerRequestsCpu
+	savedRequestsMemory := Settings.HooksContainerRequestsMemory
+	savedLimitsCPU := Settings.HooksContainerLimitsCpu
+	savedLimitsMemory := Settings.HooksContainerLimitsMemory
+	Settings.HooksContainerRequestsCpu = "100m"
+	Settings.HooksContainerRequestsMemory = "128Mi"
+	Settings.HooksContainerLimitsCpu = "1"
+	Settings.HooksContainerLimitsMemory = "512Mi"
 	return func() {
-		Settings.Migration.ServiceAccount = savedServiceAccount
-		Settings.Migration.HooksContainerRequestsCpu = savedRequestsCPU
-		Settings.Migration.HooksContainerRequestsMemory = savedRequestsMemory
-		Settings.Migration.HooksContainerLimitsCpu = savedLimitsCPU
-		Settings.Migration.HooksContainerLimitsMemory = savedLimitsMemory
+		Settings.ServiceAccount = savedServiceAccount
+		Settings.HooksContainerRequestsCpu = savedRequestsCPU
+		Settings.HooksContainerRequestsMemory = savedRequestsMemory
+		Settings.HooksContainerLimitsCpu = savedLimitsCPU
+		Settings.HooksContainerLimitsMemory = savedLimitsMemory
 	}
 }
 
 func newHookRunnerForTemplateTest(hookSA, planSA, globalSA string) *HookRunner {
-	Settings.Migration.ServiceAccount = globalSA
+	Settings.ServiceAccount = globalSA
 	return &HookRunner{
 		Context: &plancontext.Context{
 			Plan: &api.Plan{
@@ -289,5 +291,45 @@ func TestGetAAPTokenFromSecretName(t *testing.T) {
 				t.Fatalf("token = %q, want %q", tok, tt.want)
 			}
 		})
+	}
+}
+
+func TestAAPLaunchFailureIsTerminalViaReflectPipeline(t *testing.T) {
+	t.Parallel()
+
+	vm := &planapi.VMStatus{
+		Phase: api.PhasePreHook,
+		Pipeline: []*planapi.Step{
+			{Task: planapi.Task{Name: api.PhasePreHook}},
+		},
+	}
+	step, found := vm.FindStep(api.PhasePreHook)
+	if !found {
+		t.Fatal("PreHook step missing")
+	}
+
+	// Mimic runAAPJob after LaunchJob failure: record on step, clear err, return.
+	step.AddError("failed to launch AAP job: tls: failed to verify certificate: x509: certificate signed by unknown authority")
+	step.MarkCompleted()
+
+	if step.MarkedCompleted() && step.Error == nil {
+		t.Fatal("must not advance phase on hook failure")
+	}
+
+	vm.ReflectPipeline()
+	if vm.Error == nil {
+		t.Fatal("expected ReflectPipeline to copy step error onto VM")
+	}
+
+	vm.Phase = api.PhaseCompleted
+	vm.SetCondition(libcnd.Condition{
+		Type:     api.ConditionFailed,
+		Status:   libcnd.True,
+		Category: api.CategoryAdvisory,
+		Message:  "The VM migration has FAILED.",
+		Durable:  true,
+	})
+	if !vm.HasCondition(api.ConditionFailed) {
+		t.Fatal("expected Failed condition")
 	}
 }

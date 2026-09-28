@@ -43,7 +43,7 @@ type Page struct {
 func (p *Page) Slice(collection interface{}) {
 	v := reflect.ValueOf(collection)
 	switch v.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		v = v.Elem()
 	default:
 		return
@@ -94,7 +94,7 @@ func Clone(model Model) Model {
 	mt := reflect.TypeOf(model)
 	mv := reflect.ValueOf(model)
 	switch mt.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		mt = mt.Elem()
 		mv = mv.Elem()
 	}

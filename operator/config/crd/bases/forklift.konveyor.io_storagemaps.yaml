@@ -90,6 +90,7 @@ spec:
                                 array vendor.
                               enum:
                               - primera3par
+                              - ontap
                               type: string
                           required:
                           - secretRef

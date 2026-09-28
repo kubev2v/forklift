@@ -14,7 +14,7 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cnv "kubevirt.io/api/core/v1"
-	export "kubevirt.io/api/export/v1alpha1"
+	export "kubevirt.io/api/export/v1beta1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -182,10 +182,6 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 
 		// Create VM export
 		vmExport = &export.VirtualMachineExport{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "VirtualMachineExport",
-				APIVersion: "kubevirt.io/v1alpha3",
-			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      vmRef.Name,
 				Namespace: vmRef.Namespace,

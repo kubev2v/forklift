@@ -86,7 +86,7 @@ func (h NamespaceHandler) Get(ctx *gin.Context) {
 	}
 	uid := types.UID(ctx.Param(NsParam))
 	for _, ns := range namespaces {
-		if ns.Object.ObjectMeta.UID == uid {
+		if ns.Object.UID == uid {
 			r := Namespace{}
 			r.With(&ns)
 			r.Link(h.Provider)

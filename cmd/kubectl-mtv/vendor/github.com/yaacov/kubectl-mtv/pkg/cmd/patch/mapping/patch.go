@@ -15,12 +15,12 @@ func PatchNetwork(configFlags *genericclioptions.ConfigFlags, name, namespace, a
 
 // PatchStorage patches a storage mapping (wrapper for backward compatibility)
 func PatchStorage(configFlags *genericclioptions.ConfigFlags, name, namespace, addPairs, updatePairs, removePairs, inventoryURL string) error {
-	return PatchStorageWithOptions(configFlags, name, namespace, addPairs, updatePairs, removePairs, inventoryURL, false, "", "", "", "", "")
+	return PatchStorageWithOptions(configFlags, name, namespace, addPairs, updatePairs, removePairs, inventoryURL, false, "", "", "", "", "", "")
 }
 
 // PatchStorageWithOptions patches a storage mapping with additional options for VolumeMode, AccessMode, and OffloadPlugin
-func PatchStorageWithOptions(configFlags *genericclioptions.ConfigFlags, name, namespace, addPairs, updatePairs, removePairs, inventoryURL string, inventoryInsecureSkipTLS bool, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor string) error {
-	return patchStorageMappingWithOptions(configFlags, name, namespace, addPairs, updatePairs, removePairs, inventoryURL, inventoryInsecureSkipTLS, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor)
+func PatchStorageWithOptions(configFlags *genericclioptions.ConfigFlags, name, namespace, addPairs, updatePairs, removePairs, inventoryURL string, inventoryInsecureSkipTLS bool, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor, defaultOffloadMigrationHosts string) error {
+	return patchStorageMappingWithOptions(configFlags, name, namespace, addPairs, updatePairs, removePairs, inventoryURL, inventoryInsecureSkipTLS, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor, defaultOffloadMigrationHosts)
 }
 
 // getSourceProviderFromMapping extracts the source provider name and namespace from a mapping

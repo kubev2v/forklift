@@ -7,7 +7,7 @@ import (
 // MigrationType validates migration type. EC2 only supports cold migration (or empty/default).
 // Warm/live migration not supported - EC2 requires instance shutdown for consistent EBS snapshots.
 func (r *Validator) MigrationType() bool {
-	if r.Context.Plan.Spec.Type == "" || r.Context.Plan.Spec.Type == api.MigrationCold {
+	if r.Plan.Spec.Type == "" || r.Plan.Spec.Type == api.MigrationCold {
 		return true
 	}
 	return false

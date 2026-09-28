@@ -1,0 +1,205 @@
+{
+  "api_version": "3.1",
+  "metadata": {
+    "total_matches": 4,
+    "kind": "subnet",
+    "length": 4,
+    "offset": 0
+  },
+  "entities": [
+    {
+      "metadata": {
+        "kind": "subnet",
+        "uuid": "0005d123-4567-89ab-cdef-000000000001",
+        "spec_version": 1,
+        "name": "Production-VLAN-100",
+        "categories": {}
+      },
+      "spec": {
+        "name": "Production-VLAN-100",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000001",
+          "name": "prod-cluster-01"
+        },
+        "resources": {
+          "vlan_id": 100,
+          "subnet_type": "VLAN",
+          "ip_config": {
+            "subnet_ip": "192.168.100.0",
+            "prefix_length": 24,
+            "default_gateway_ip": "192.168.100.1",
+            "pool_list": [
+              {
+                "range": "192.168.100.100 192.168.100.200"
+              }
+            ],
+            "dhcp_options": {
+              "domain_name_server_list": [
+                "192.168.100.10",
+                "192.168.100.11"
+              ],
+              "domain_name": "prod.example.com"
+            },
+            "dhcp_server_address": {
+              "ip": "192.168.100.1"
+            }
+          }
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "vlan_id": 100,
+          "subnet_type": "VLAN",
+          "ip_config": {
+            "subnet_ip": "192.168.100.0",
+            "prefix_length": 24,
+            "default_gateway_ip": "192.168.100.1"
+          }
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "subnet",
+        "uuid": "0005d123-4567-89ab-cdef-000000000002",
+        "spec_version": 1,
+        "name": "Production-VLAN-200",
+        "categories": {}
+      },
+      "spec": {
+        "name": "Production-VLAN-200",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000001",
+          "name": "prod-cluster-01"
+        },
+        "resources": {
+          "vlan_id": 200,
+          "subnet_type": "VLAN",
+          "ip_config": {
+            "subnet_ip": "192.168.200.0",
+            "prefix_length": 24,
+            "default_gateway_ip": "192.168.200.1",
+            "pool_list": [
+              {
+                "range": "192.168.200.50 192.168.200.150"
+              }
+            ],
+            "dhcp_options": {
+              "domain_name_server_list": [
+                "192.168.100.10"
+              ],
+              "domain_name": "prod.example.com"
+            }
+          }
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "vlan_id": 200,
+          "subnet_type": "VLAN",
+          "ip_config": {
+            "subnet_ip": "192.168.200.0",
+            "prefix_length": 24,
+            "default_gateway_ip": "192.168.200.1"
+          }
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "subnet",
+        "uuid": "0005d123-4567-89ab-cdef-000000000003",
+        "spec_version": 1,
+        "name": "Dev-Network",
+        "categories": {}
+      },
+      "spec": {
+        "name": "Dev-Network",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000002",
+          "name": "dev-cluster-01"
+        },
+        "resources": {
+          "vlan_id": 10,
+          "subnet_type": "VLAN",
+          "ip_config": {
+            "subnet_ip": "10.0.10.0",
+            "prefix_length": 24,
+            "default_gateway_ip": "10.0.10.1",
+            "pool_list": [
+              {
+                "range": "10.0.10.100 10.0.10.200"
+              }
+            ],
+            "dhcp_options": {
+              "domain_name_server_list": [
+                "8.8.8.8",
+                "8.8.4.4"
+              ]
+            }
+          }
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "vlan_id": 10,
+          "subnet_type": "VLAN",
+          "ip_config": {
+            "subnet_ip": "10.0.10.0",
+            "prefix_length": 24,
+            "default_gateway_ip": "10.0.10.1"
+          }
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "subnet",
+        "uuid": "0005d123-4567-89ab-cdef-000000000004",
+        "spec_version": 1,
+        "name": "Management-Network",
+        "categories": {}
+      },
+      "spec": {
+        "name": "Management-Network",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000001",
+          "name": "prod-cluster-01"
+        },
+        "resources": {
+          "vlan_id": 1,
+          "subnet_type": "VLAN",
+          "ip_config": {
+            "subnet_ip": "10.10.1.0",
+            "prefix_length": 24,
+            "default_gateway_ip": "10.10.1.1",
+            "dhcp_options": {
+              "domain_name_server_list": [
+                "10.10.1.10"
+              ]
+            }
+          }
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "vlan_id": 1,
+          "subnet_type": "VLAN",
+          "ip_config": {
+            "subnet_ip": "10.10.1.0",
+            "prefix_length": 24,
+            "default_gateway_ip": "10.10.1.1"
+          }
+        }
+      }
+    }
+  ]
+}

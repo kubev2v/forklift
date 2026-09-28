@@ -67,9 +67,15 @@ type Context struct {
 	Labeler Labeler
 }
 
+// IsResumeConversion returns true when the active migration is a
+// resume-conversion run (disk copy skipped, only virt-v2v conversion).
+func (r *Context) IsResumeConversion() bool {
+	return r.Migration != nil && r.Migration.IsResumeConversion()
+}
+
 // Build.
 func (r *Context) build() (err error) {
-	r.Map.Network = r.Plan.Referenced.Map.Network
+	r.Map.Network = r.Plan.Map.Network
 	if r.Map.Network == nil {
 		err = liberr.Wrap(NotEnoughDataError{},
 			"Network map not found.",
@@ -77,7 +83,7 @@ func (r *Context) build() (err error) {
 			"namespace", r.Plan.Spec.Map.Network.Namespace)
 		return
 	}
-	r.Map.Storage = r.Plan.Referenced.Map.Storage
+	r.Map.Storage = r.Plan.Map.Storage
 	if r.Map.Storage == nil && r.Plan.Spec.Type != api.MigrationOnlyConversion {
 		err = liberr.Wrap(NotEnoughDataError{},
 			"Storage map not found.",
@@ -128,6 +134,20 @@ func (r *Context) NestedVirtualizationSetting(vmRef ref.Ref, sourceDefault bool)
 	return nil
 }
 
+func (r *Context) SelinuxRelabelAtBoot(vmRef ref.Ref) bool {
+	if vm, found := r.Plan.Spec.FindVM(vmRef); found && vm.SelinuxRelabelAtBoot != nil {
+		return *vm.SelinuxRelabelAtBoot
+	}
+	return r.Plan.Spec.SelinuxRelabelAtBoot
+}
+
+func (r *Context) SelinuxRelabelExclude(vmRef ref.Ref) []string {
+	if vm, found := r.Plan.Spec.FindVM(vmRef); found && vm.SelinuxRelabelExclude != nil {
+		return vm.SelinuxRelabelExclude
+	}
+	return r.Plan.Spec.SelinuxRelabelExclude
+}
+
 // Source.
 type Source struct {
 	// Provider
@@ -143,7 +163,7 @@ type Source struct {
 //
 //	Plan.Referenced.Source is not complete.
 func (r *Source) build(ctx *Context) (err error) {
-	r.Provider = ctx.Plan.Referenced.Provider.Source
+	r.Provider = ctx.Plan.Provider.Source
 	if r.Provider == nil {
 		err = liberr.Wrap(NotEnoughDataError{},
 			"Source provider not found.",
@@ -192,7 +212,7 @@ type Destination struct {
 //
 //	Plan.Referenced.Destination is not complete.
 func (r *Destination) build(ctx *Context) (err error) {
-	r.Provider = ctx.Plan.Referenced.Provider.Destination
+	r.Provider = ctx.Plan.Provider.Destination
 	if r.Provider == nil {
 		err = liberr.Wrap(NotEnoughDataError{},
 			"Destination provider not found.",

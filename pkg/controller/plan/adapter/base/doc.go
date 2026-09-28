@@ -13,6 +13,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// Labels
+const (
+	// LabelVMUUID is the PVC/DV label that carries the source VM UUID,
+	// used by resume-conversion and conversion-only flows to discover
+	// PVCs across migration boundaries.
+	LabelVMUUID = "vmUUID"
+)
+
 // Annotations
 const (
 	// JSON map of original → sanitized label/annotation keys on the destination VM.
@@ -166,6 +174,10 @@ type Builder interface {
 	VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) error
 	// Build DataVolumes.
 	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error)
+	// Adopt ownership of provider-specific HTTP download cookie Secrets on the DataVolume.
+	AdoptDownloadCookieSecretOwner(dv *cdi.DataVolume) error
+	// Refresh short-lived HTTP import credentials on auth failure (e.g. Nutanix PC cookies).
+	RefreshImportCredentials(dv *cdi.DataVolume) (refreshed bool, err error)
 	// Build tasks.
 	Tasks(vmRef ref.Ref) ([]*planapi.Task, error)
 	// Build template labels.
@@ -186,8 +198,8 @@ type Builder interface {
 	PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) ([]*core.PersistentVolumeClaim, error)
 	// Transferred bytes
 	PopulatorTransferredBytes(persistentVolumeClaim *core.PersistentVolumeClaim) (transferredBytes int64, err error)
-	// Whether xcopy offload was used for populator copy
-	PopulatorXcopyUsed(pvc *core.PersistentVolumeClaim) (xcopyUsed string, found bool, err error)
+	// Storage offload metadata for the populator copy (e.g. "xcopyUsed"), surfaced as task annotations.
+	PopulatorOffloadInfo(pvc *core.PersistentVolumeClaim) (info map[string]string, err error)
 	// Set the populator PVC labels
 	SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error)
 	// Get the populator task name associated to a PVC
@@ -268,6 +280,8 @@ type Validator interface {
 	UdnStaticIPs(vmRef ref.Ref, client client.Client) (ok bool, err error)
 	// Validate the shared disk, returns msg and category as the errors depends on the provider implementations
 	SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, msg string, category string, err error)
+	// Validate excludeDisks. Returns msg and category; providers that do not support disk exclusion should no-op (ok=true).
+	ExcludedDisks(vmRef ref.Ref) (ok bool, msg string, category string, err error)
 	// Validate that the vm has the change tracking enabled
 	ChangeTrackingEnabled(vmRef ref.Ref) (bool, error)
 	// Validate that VM has no pre-existing snapshots for warm migration

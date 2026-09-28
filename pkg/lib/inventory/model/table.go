@@ -122,6 +122,8 @@ LIMIT {{.Page.Limit}} OFFSET {{.Page.Offset}}
 `
 
 // Errors
+//
+//nolint:staticcheck // legacy exported error names; rename in follow-up
 var (
 	// Must have PK.
 	MustHavePkErr = errors.New("must have PK field")
@@ -488,7 +490,7 @@ func (t Table) List(list interface{}, options ListOptions) (err error) {
 	lt := reflect.TypeOf(list)
 	lv := reflect.ValueOf(list)
 	switch lt.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		lt = lt.Elem()
 		lv = lv.Elem()
 	default:

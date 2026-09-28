@@ -179,54 +179,18 @@ func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
 }
 
 func (r *Validator) MacConflicts(vmRef ref.Ref) ([]planbase.MacConflict, error) {
-	// Only check MAC conflicts for live migrations
-	// For cold migrations, the source VM is shut down, so no conflicts occur
-	if r.Plan.Spec.Type != api.MigrationLive {
-		r.log.V(1).Info("Skipping MAC conflict check for non-live migration",
-			"migrationType", r.Plan.Spec.Type, "vm", vmRef.String())
-		return []planbase.MacConflict{}, nil
-	}
-
-	r.log.Info("Checking MAC conflicts for live migration", "vm", vmRef.String())
-
-	// Get source VM using common helper
-	vm, err := planbase.FindSourceVM[inventory.VM](r.Source.Inventory, vmRef)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get destination VMs and extract their MACs using common helper
-	destinationVMs, err := planbase.GetDestinationVMsFromInventory(r.Destination.Inventory, web.Param{
-		Key:   web.DetailParam,
-		Value: "all",
-	})
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-
-	// Extract source VM MACs
-	var sourceMacs []string
-	if vm.Object.Spec.Template != nil {
-		for _, iface := range vm.Object.Spec.Template.Spec.Domain.Devices.Interfaces {
-			// Include all MACs, even empty ones - the helper function will handle filtering
-			sourceMacs = append(sourceMacs, iface.MacAddress)
-		}
-	}
-
-	// Use common helper to detect conflicts
-	conflicts := planbase.CheckMacConflicts(sourceMacs, destinationVMs)
-
-	if len(conflicts) > 0 {
-		r.log.Info("MAC conflicts detected for live migration",
-			"vm", vmRef.String(), "conflicts", len(conflicts))
-	} else {
-		r.log.V(1).Info("No MAC conflicts detected", "vm", vmRef.String())
-	}
-
-	return conflicts, nil
+	// OCP does not check MAC conflicts. The source VM is already off, or
+	// will be shut down after migration, so the MAC is not used on both
+	// sides. See MTV-6524.
+	return []planbase.MacConflict{}, nil
 }
 
 func (r *Validator) SharedDisks(vmRef ref.Ref, client k8sclient.Client) (ok bool, s string, s2 string, err error) {
+	ok = true
+	return
+}
+
+func (r *Validator) ExcludedDisks(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
 	ok = true
 	return
 }
@@ -238,7 +202,7 @@ func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category st
 }
 
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Storage == nil {
+	if r.Plan.Map.Storage == nil {
 		return
 	}
 
@@ -284,7 +248,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 			return false, nil
 		}
 
-		_, found := r.Plan.Referenced.Map.Storage.FindStorageByName(*storageClass)
+		_, found := r.Plan.Map.Storage.FindStorageByName(*storageClass)
 		if !found {
 			err = liberr.Wrap(
 				err,
@@ -301,7 +265,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
+	if r.Plan.Map.Network == nil {
 		return
 	}
 
@@ -318,7 +282,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 
 	for _, net := range vm.Spec.Template.Spec.Networks {
 		if net.Pod != nil {
-			_, found := r.Plan.Referenced.Map.Network.FindNetworkByType(Pod)
+			_, found := r.Plan.Map.Network.FindNetworkByType(Pod)
 			if !found {
 				err = liberr.Wrap(
 					err,
@@ -332,7 +296,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 			}
 		} else if net.Multus != nil {
 			name, namespace := ocpclient.GetNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
-			_, found := r.Plan.Referenced.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
+			_, found := r.Plan.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
 			if !found {
 				err = liberr.Wrap(
 					err,
@@ -393,10 +357,6 @@ func (r *KubeVirt) FeatureGate(feature string) (enabled bool) {
 
 // PVCNameTemplate validates that the PVC name template is valid for the given VM
 func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
-	if pvcNameTemplate == "" {
-		return true, nil
-	}
-
 	// Get the VM from source
 	vm := &cnv.VirtualMachine{}
 	err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
@@ -405,16 +365,7 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok b
 		return
 	}
 
-	// Get target VM name (either from VM status NewName or source VM name)
-	targetVmName := vmRef.Name
-	if r.Plan != nil && r.Plan.Status.Migration.VMs != nil {
-		for _, vmStatus := range r.Plan.Status.Migration.VMs {
-			if vmStatus.ID == vmRef.ID && vmStatus.NewName != "" {
-				targetVmName = vmStatus.NewName
-				break
-			}
-		}
-	}
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name)
 
 	// Test template with sample data for each disk
 	diskIndex := 0
@@ -428,15 +379,15 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok b
 			pvcName = vol.DataVolume.Name
 			pvcNamespace = vmRef.Namespace
 		default:
-			// Skip non-PVC volumes
 			continue
 		}
 
-		testData := api.OCPPVCNameTemplateData{
+		testData := api.PVCNameTemplateData{
 			VmName:             vmRef.Name,
 			TargetVmName:       targetVmName,
 			PlanName:           r.Plan.Name,
 			DiskIndex:          diskIndex,
+			VmId:               vmRef.ID,
 			SourcePVCName:      pvcName,
 			SourcePVCNamespace: pvcNamespace,
 		}

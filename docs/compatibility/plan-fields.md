@@ -172,8 +172,8 @@ Templates for customizing resource names. See [Template Support Matrix](../templ
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `pvcNameTemplate` | string | Provider-specific | Template for PVC names |
-| `pvcNameTemplateUseGenerateName` | bool | `true` | Use `generateName` instead of exact name |
+| `pvcNameTemplate` | string | empty | Template for PVC names. When empty, falls back to ForkliftController globals, then hardcoded defaults |
+| `pvcNameTemplateUseGenerateName` | *bool | unset | Use `generateName` instead of exact name. Unset: `false` for OCP, `true` otherwise |
 | `volumeNameTemplate` | string | `vol-{{.VolumeIndex}}` | Template for volume interface names |
 | `networkNameTemplate` | string | `net-{{.NetworkIndex}}` | Template for network interface names |
 
@@ -181,19 +181,19 @@ Templates for customizing resource names. See [Template Support Matrix](../templ
 
 | Field | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV |
 |-------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|
-| `pvcNameTemplate` | Yes | No | No | Yes | No | No | No |
-| `pvcNameTemplateUseGenerateName` | Yes | No | No | Yes* | No | No | No |
+| `pvcNameTemplate` | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| `pvcNameTemplateUseGenerateName` | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | `volumeNameTemplate` | Yes | No | No | No | No | No | No |
 | `networkNameTemplate` | Yes | No | No | No | No | No | No |
-
-*Only applies when a custom `pvcNameTemplate` is set; default behavior (exact name) is preserved otherwise.
 
 ### Default Templates
 
 | Provider | PVC Name Default |
 |----------|------------------|
-| vSphere | `{{trunc 4 .PlanName}}-{{trunc 4 .VmName}}-disk-{{.DiskIndex}}` |
-| OpenShift | `{{.SourcePVCName}}` (preserves original) |
+| Non-OCP providers | `{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}` with `useGenerateName` default `true` (overridable via `controller_pvc_name_template`) |
+| OpenShift | `{{.SourcePVCName}}` with `useGenerateName` default `false` (overridable via `controller_ocp_pvc_name_template`) |
+
+Resolution order: VM `pvcNameTemplate` → Plan `pvcNameTemplate` → provider-specific ForkliftController setting → hardcoded default above.
 
 ---
 
@@ -301,8 +301,8 @@ All providers support `deleteVmOnFailMigration`.
 | `conversionTempStorageClass` | Yes | - | - | - | Yes | Yes | Yes |
 | `conversionTempStorageSize` | Yes | - | - | - | Yes | Yes | Yes |
 | **Templates** | | | | | | | |
-| `pvcNameTemplate` | Yes | - | - | Yes | - | - | - |
-| `pvcNameTemplateUseGenerateName` | Yes | - | - | Yes* | - | - | - |
+| `pvcNameTemplate` | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| `pvcNameTemplateUseGenerateName` | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | `volumeNameTemplate` | Yes | - | - | - | - | - | - |
 | `networkNameTemplate` | Yes | - | - | - | - | - | - |
 | **Conversion** | | | | | | | |

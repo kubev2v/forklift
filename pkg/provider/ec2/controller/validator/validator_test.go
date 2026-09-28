@@ -169,18 +169,18 @@ var _ = Describe("EC2 Controller Validator", func() {
 
 	Describe("MigrationType", func() {
 		It("should return true for empty migration type", func() {
-			validator.Context.Plan.Spec.Type = ""
+			validator.Plan.Spec.Type = ""
 			Expect(validator.MigrationType()).To(BeTrue())
 		})
 
 		It("should return true for cold migration", func() {
-			validator.Context.Plan.Spec.Type = api.MigrationCold
+			validator.Plan.Spec.Type = api.MigrationCold
 			Expect(validator.MigrationType()).To(BeTrue())
 		})
 
 		table.DescribeTable("should return false for unsupported migration types",
 			func(migrationType api.MigrationType) {
-				validator.Context.Plan.Spec.Type = migrationType
+				validator.Plan.Spec.Type = migrationType
 				Expect(validator.MigrationType()).To(BeFalse())
 			},
 			table.Entry("warm migration", api.MigrationWarm),

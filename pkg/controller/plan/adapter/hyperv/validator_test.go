@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
@@ -211,5 +212,124 @@ func TestMaintenanceMode_VMNotFound(t *testing.T) {
 	_, err := v.MaintenanceMode(ref.Ref{ID: "nonexistent"})
 	if err == nil {
 		t.Error("expected error when VM lookup fails")
+	}
+}
+
+func TestNetworksMapped_UnresolvedNICTreatedAsUnmapped(t *testing.T) {
+	vm := &hyperv.VM{}
+	vm.ID = "vm-1"
+	vm.NICs = []model.NIC{
+		{Name: "nic-0", Network: model.Ref{Kind: model.NetKind, ID: ""}, NetworkName: "LabSwitch"},
+	}
+
+	inv := &stubInventory{vms: map[string]*hyperv.VM{"vm-1": vm}}
+	v := &Validator{
+		Context: &plancontext.Context{
+			Source: plancontext.Source{Inventory: inv},
+			Plan: &api.Plan{
+				Spec: api.PlanSpec{},
+			},
+		},
+	}
+	v.Map.Network = &api.NetworkMap{}
+
+	ok, err := v.NetworksMapped(ref.Ref{ID: "vm-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok {
+		t.Error("expected ok=false: NIC with networkName but empty network.ID should be treated as unmapped, not disconnected")
+	}
+}
+
+func TestNetworksMapped_TrulyDisconnectedNICSkipped(t *testing.T) {
+	vm := &hyperv.VM{}
+	vm.ID = "vm-1"
+	vm.NICs = []model.NIC{
+		{Name: "nic-0", Network: model.Ref{Kind: model.NetKind, ID: ""}, NetworkName: ""},
+	}
+
+	inv := &stubInventory{vms: map[string]*hyperv.VM{"vm-1": vm}}
+	v := &Validator{
+		Context: &plancontext.Context{
+			Source: plancontext.Source{Inventory: inv},
+			Plan:   &api.Plan{},
+		},
+	}
+	v.Map.Network = &api.NetworkMap{}
+
+	ok, err := v.NetworksMapped(ref.Ref{ID: "vm-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Error("expected ok=true: truly disconnected NIC (empty name and ID) should be skipped")
+	}
+}
+func TestPVCNameTemplate_UsesInventoryVMIdentity(t *testing.T) {
+	// lookupID differs from inventoryID to prove that Find() resolves the
+	// actual inventory VM, and ResolveTargetVmName uses the inventory vm.ID
+	// (not the vmRef.ID from the caller).
+	lookupID := "lookup-ref-id"
+	inventoryID := "358ce831-f790-4ad9-8ee0-ee272b0ecac4"
+	inventoryName := "rhel9-node_2"
+
+	vm := &hyperv.VM{}
+	vm.ID = inventoryID
+	vm.Name = inventoryName
+	vm.Disks = []model.Disk{
+		{Base: model.Base{ID: inventoryID + "-disk-0"}, Capacity: 16 * 1024 * 1024 * 1024},
+	}
+
+	inv := &stubInventory{vms: map[string]*hyperv.VM{lookupID: vm}}
+
+	plan := &api.Plan{}
+	plan.Name = "test-plan"
+	plan.Spec.VMs = []planapi.VM{{
+		Ref:        ref.Ref{ID: inventoryID},
+		TargetName: "my-custom-target",
+	}}
+
+	v := &Validator{
+		Context: &plancontext.Context{
+			Source: plancontext.Source{Inventory: inv},
+			Plan:   plan,
+		},
+	}
+
+	// Template that only produces a valid name when TargetVmName equals the
+	// explicit targetName from the plan spec.
+	tmpl := `{{if eq .TargetVmName "my-custom-target"}}ok-{{.DiskIndex}}{{else}}INVALID{{end}}`
+
+	ok, err := v.PVCNameTemplate(ref.Ref{ID: lookupID}, tmpl)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Error("expected ok=true: PVC name template should be valid when TargetVmName resolves to spec.targetName")
+	}
+}
+
+func TestPVCNameTemplate_ValidatesDottedVMName(t *testing.T) {
+	vmID := "vm-dotted"
+	vm := &hyperv.VM{}
+	vm.ID = vmID
+	vm.Name = "mtv.redhat.com"
+	vm.Disks = []model.Disk{{Base: model.Base{ID: "disk-1"}}}
+
+	plan := &api.Plan{}
+	plan.Name = "test-plan"
+	plan.Spec.PVCNameTemplate = "{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}"
+	validator := &Validator{Context: &plancontext.Context{
+		Plan:   plan,
+		Source: plancontext.Source{Inventory: &stubInventory{vms: map[string]*hyperv.VM{vmID: vm}}},
+	}}
+
+	ok, err := validator.PVCNameTemplate(ref.Ref{ID: vmID}, plan.Spec.PVCNameTemplate)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected the default PVC name template to validate for a dotted VM name")
 	}
 }

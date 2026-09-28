@@ -1,6 +1,9 @@
 package driver
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // DomainState represents VM power state
 type DomainState int
@@ -42,15 +45,18 @@ type HyperVDriver interface {
 	// Failover Cluster queries
 	GetCluster() (*ClusterData, error)
 	GetClusterNodes() ([]ClusterNodeData, error)
+	GetClusterInfo() (*ClusterInfoData, error)
 	GetClusterVMGroups() ([]ClusterGroupData, error)
 	GetComputerInfo() (*ComputerInfoData, error)
 
 	// Raw command execution
 	ExecuteCommand(command string) (string, error)
+	ExecuteCommandWithTimeout(command string, timeout time.Duration) (string, error)
 	// RunOnNode wraps a command to execute on a specific cluster node via
 	// Invoke-Command with explicit credentials. Returns the command output.
 	// If computerName is empty, executes locally.
 	RunOnNode(command, computerName string) (string, error)
+	RunOnNodeWithTimeout(command, computerName string, timeout time.Duration) (string, error)
 }
 
 // Domain represents a virtual machine

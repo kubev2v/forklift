@@ -442,7 +442,7 @@ func (r Client) Finalize(vms []*planapi.VMStatus, planName string) {
 	for _, vm := range vms {
 		_, vmService, err := r.getVM(vm.Ref)
 		if err != nil {
-			r.Log.Error(err, "Failed to get VM", "vm", vm.Ref.String())
+			r.Log.Error(err, "Failed to get VM", "vm", vm.String())
 			continue
 		}
 
@@ -464,7 +464,7 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 		snapshotID := precopies[i].Snapshot
 		snapService := snapsService.SnapshotService(snapshotID)
 		correlationID := fmt.Sprintf("%s_finalize", snapshotID[0:8])
-		cleanupTimeout := time.Now().Add(time.Duration(settings.Settings.Migration.SnapshotRemovalTimeout) * time.Minute)
+		cleanupTimeout := time.Now().Add(time.Duration(settings.Settings.SnapshotRemovalTimeout) * time.Minute)
 		for {
 			_, err := snapService.Get().Send()
 			if err != nil {
@@ -502,7 +502,7 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 				r.Log.Info("Timeout waiting for snapshot removal")
 				return
 			} else {
-				time.Sleep(time.Duration(settings.Settings.Migration.SnapshotStatusCheckRate) * time.Second)
+				time.Sleep(time.Duration(settings.Settings.SnapshotStatusCheckRate) * time.Second)
 			}
 		}
 	}

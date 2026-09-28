@@ -240,8 +240,21 @@ done < <(
 # --- Delete namespaces ---
 header "Deleting namespaces"
 
+is_protected_ns() {
+    local ns="$1"
+    case "$ns" in
+        openshift-mtv) return 1 ;;
+        openshift-*|kube-*|default|openshift) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 for ns in "${ALL_NS[@]+"${ALL_NS[@]}"}"; do
     [[ -z "$ns" ]] && continue
+    if is_protected_ns "$ns"; then
+        echo "  Namespace $ns: SKIPPED (protected system namespace)"
+        continue
+    fi
     status=$($KUBECTL get ns "$ns" -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
     if [[ "$status" == "NotFound" ]]; then
         echo "  Namespace $ns: already gone"
@@ -303,6 +316,7 @@ if ! $DRY_RUN && [[ ${#ALL_NS[@]} -gt 0 ]]; then
     header "Waiting for namespace deletion"
     for ns in "${ALL_NS[@]+"${ALL_NS[@]}"}"; do
         [[ -z "$ns" ]] && continue
+        is_protected_ns "$ns" && continue
         ELAPSED=0
         TIMEOUT=120
         while [[ $ELAPSED -lt $TIMEOUT ]]; do
