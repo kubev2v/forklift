@@ -300,7 +300,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 // for Multus networks based on ForkliftController settings and namespace comparison.
 func (r *Builder) shouldUseQualifiedNetworkName(nadNamespace, targetVMNamespace string) bool {
 	// If global setting forces qualified names, always use qualified format
-	if settings.Settings.Migration.MultusNetworkNameAlwaysQualified {
+	if settings.Settings.MultusNetworkNameAlwaysQualified {
 		return true
 	}
 
