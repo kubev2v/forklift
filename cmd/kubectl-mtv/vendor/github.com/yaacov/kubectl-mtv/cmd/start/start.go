@@ -8,7 +8,7 @@ import (
 )
 
 // NewStartCmd creates the start command with all its subcommands
-func NewStartCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() get.GlobalConfigGetter) *cobra.Command {
+func NewStartCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig get.GlobalConfigGetter) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "start",
 		Short:        "Start resources",
@@ -17,7 +17,7 @@ func NewStartCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig
 	}
 
 	// Add plan subcommand with plural alias
-	planCmd := NewPlanCmd(kubeConfigFlags, getGlobalConfig)
+	planCmd := NewPlanCmd(kubeConfigFlags, globalConfig)
 	planCmd.Aliases = []string{"plans"}
 	cmd.AddCommand(planCmd)
 	return cmd

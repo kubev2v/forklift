@@ -51,7 +51,7 @@ func (m *VSphereNetworkMapper) CreateNetworkPairs(sourceNetworks []ref.Ref, targ
 		}
 
 		networkPairs = append(networkPairs, forkliftv1beta1.NetworkPair{
-			Source:      sourceNetwork,
+			Source:      forkliftv1beta1.NetworkSourceRef{Ref: sourceNetwork},
 			Destination: destination,
 		})
 	}

@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -51,6 +51,7 @@ func (s *DistributedVirtualPortgroup) ReconfigureDVPortgroupTask(ctx *Context, r
 		s.Config.PortNameFormat = req.Spec.PortNameFormat
 		s.Config.VmVnicNetworkResourcePoolKey = req.Spec.VmVnicNetworkResourcePoolKey
 		s.Config.LogicalSwitchUuid = req.Spec.LogicalSwitchUuid
+		s.Config.SubnetId = req.Spec.SubnetId
 		s.Config.BackingType = req.Spec.BackingType
 
 		return nil, nil

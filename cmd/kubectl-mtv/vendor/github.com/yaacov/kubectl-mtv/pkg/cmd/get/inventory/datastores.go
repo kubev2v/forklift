@@ -3,7 +3,6 @@ package inventory
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -12,18 +11,16 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListDatastores queries the provider's datastore inventory and displays the results
-func ListDatastores(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listDatastoresOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListDatastoresWithInsecure queries the provider's datastore inventory with optional insecure TLS skip verification
+func ListDatastoresWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listDatastoresOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listDatastoresOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listDatastoresOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listDatastoresOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -31,7 +28,7 @@ func listDatastoresOnce(ctx context.Context, kubeConfigFlags *genericclioptions.
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify datastore support
 	providerType, err := providerClient.GetProviderType()
@@ -40,17 +37,17 @@ func listDatastoresOnce(ctx context.Context, kubeConfigFlags *genericclioptions.
 	}
 
 	// Define default headers based on provider type
-	var defaultHeaders []output.Header
+	var defaultHeaders []output.Column
 	switch providerType {
 	case "vsphere":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "TYPE", JSONPath: "type"},
-			{DisplayName: "CAPACITY", JSONPath: "capacityFormatted"},
-			{DisplayName: "FREE", JSONPath: "freeSpaceFormatted"},
-			{DisplayName: "ACCESSIBLE", JSONPath: "accessible"},
-			{DisplayName: "REVISION", JSONPath: "revision"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "TYPE", Key: "type"},
+			{Title: "CAPACITY", Key: "capacityFormatted"},
+			{Title: "FREE", Key: "freeSpaceFormatted"},
+			{Title: "ACCESSIBLE", Key: "accessible", ColorFunc: output.ColorizeBooleanString},
+			{Title: "REVISION", Key: "revision"},
 		}
 	default:
 		return fmt.Errorf("provider type '%s' does not support datastore inventory", providerType)
@@ -60,7 +57,7 @@ func listDatastoresOnce(ctx context.Context, kubeConfigFlags *genericclioptions.
 	var data interface{}
 	switch providerType {
 	case "vsphere":
-		data, err = providerClient.GetDatastores(4)
+		data, err = providerClient.GetDatastores(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support datastore inventory", providerType)
 	}
@@ -131,6 +128,8 @@ func listDatastoresOnce(ctx context.Context, kubeConfigFlags *genericclioptions.
 		return output.PrintJSONWithEmpty(datastores, emptyMessage)
 	case "yaml":
 		return output.PrintYAMLWithEmpty(datastores, emptyMessage)
+	case "markdown":
+		return output.PrintMarkdownWithQuery(datastores, defaultHeaders, queryOpts, emptyMessage)
 	default:
 		return output.PrintTableWithQuery(datastores, defaultHeaders, queryOpts, emptyMessage)
 	}

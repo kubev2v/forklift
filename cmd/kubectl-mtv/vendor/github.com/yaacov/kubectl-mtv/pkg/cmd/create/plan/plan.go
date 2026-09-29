@@ -14,16 +14,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	mapping "github.com/yaacov/kubectl-mtv/pkg/cmd/create/mapping"
+	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/mapping/offload"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/defaultprovider"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/inventory"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
+	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 )
 
 // CreatePlanOptions encapsulates the parameters for the Create function.
@@ -37,6 +40,7 @@ type CreatePlanOptions struct {
 	NetworkMapping            string
 	StorageMapping            string
 	InventoryURL              string
+	InventoryInsecureSkipTLS  bool
 	DefaultTargetNetwork      string
 	DefaultTargetStorageClass string
 	PlanSpec                  forkliftv1beta1.PlanSpec
@@ -45,11 +49,12 @@ type CreatePlanOptions struct {
 	StoragePairs              string
 
 	// Storage enhancement options
-	DefaultVolumeMode    string
-	DefaultAccessMode    string
-	DefaultOffloadPlugin string
-	DefaultOffloadSecret string
-	DefaultOffloadVendor string
+	DefaultVolumeMode            string
+	DefaultAccessMode            string
+	DefaultOffloadPlugin         string
+	DefaultOffloadSecret         string
+	DefaultOffloadVendor         string
+	DefaultOffloadMigrationHosts string
 
 	// Offload secret creation fields
 	OffloadVSphereUsername string
@@ -60,6 +65,9 @@ type CreatePlanOptions struct {
 	OffloadStorageEndpoint string
 	OffloadCACert          string
 	OffloadInsecureSkipTLS bool
+
+	DryRun       bool
+	OutputFormat string
 }
 
 // parseProviderName parses a provider name that might contain namespace/name pattern
@@ -88,12 +96,14 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 	opts.SourceProvider = sourceProviderName
 	opts.SourceProviderNamespace = sourceProviderNamespace
 
-	// If the plan already exists, return an error
-	_, err = c.Resource(client.PlansGVR).Namespace(opts.Namespace).Get(context.TODO(), opts.Name, metav1.GetOptions{})
-	if err == nil {
-		return fmt.Errorf("plan '%s' already exists in namespace '%s'", opts.Name, opts.Namespace)
-	} else if !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to check if plan exists: %v", err)
+	// If the plan already exists, return an error (skip check for dry-run)
+	if !opts.DryRun {
+		_, err = c.Resource(client.PlansGVR).Namespace(opts.Namespace).Get(ctx, opts.Name, metav1.GetOptions{})
+		if err == nil {
+			return fmt.Errorf("plan '%s' already exists in namespace '%s'", opts.Name, opts.Namespace)
+		} else if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to check if plan exists: %v", err)
+		}
 	}
 
 	// If target provider is not provided, find the first OpenShift provider
@@ -120,11 +130,19 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 	// Track which maps we create for cleanup if needed
 	createdNetworkMap := false
 	createdStorageMap := false
+	var createdOffloadSecretName string
 
 	// Extract VM names from the plan
 	var planVMNames []string
 	for _, planVM := range opts.PlanSpec.VMs {
 		planVMNames = append(planVMNames, planVM.Name)
+	}
+
+	// If target namespace is not provided, use the plan's namespace
+	// This must happen before creating network/storage maps so they can use it
+	if opts.PlanSpec.TargetNamespace == "" {
+		opts.PlanSpec.TargetNamespace = opts.Namespace
+		fmt.Printf("No target namespace specified, using plan namespace: %s\n", opts.PlanSpec.TargetNamespace)
 	}
 
 	// If network map is not provided, create a default network map
@@ -141,32 +159,40 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 			if opts.TargetProviderNamespace != opts.Namespace {
 				targetProviderRef = fmt.Sprintf("%s/%s", opts.TargetProviderNamespace, opts.TargetProvider)
 			}
-			err := mapping.CreateNetwork(opts.ConfigFlags, networkMapName, opts.Namespace, sourceProviderRef, targetProviderRef, opts.NetworkPairs, opts.InventoryURL)
+			err := mapping.CreateNetworkWithInsecure(opts.ConfigFlags, networkMapName, opts.Namespace, sourceProviderRef, targetProviderRef, opts.NetworkPairs, opts.InventoryURL, opts.InventoryInsecureSkipTLS, opts.DryRun, opts.OutputFormat)
 			if err != nil {
 				return fmt.Errorf("failed to create network map from pairs: %v", err)
 			}
 			opts.NetworkMapping = networkMapName
-			createdNetworkMap = true
-			fmt.Printf("Created network mapping '%s' from provided pairs\n", networkMapName)
+			if !opts.DryRun {
+				createdNetworkMap = true
+				fmt.Printf("Created network mapping '%s' from provided pairs\n", networkMapName)
+			}
 		} else {
 			// Create default network mapping using existing logic
 			networkMapName, err := network.CreateNetworkMap(ctx, network.NetworkMapperOptions{
-				Name:                    opts.Name,
-				Namespace:               opts.Namespace,
-				SourceProvider:          opts.SourceProvider,
-				SourceProviderNamespace: opts.SourceProviderNamespace,
-				TargetProvider:          opts.TargetProvider,
-				TargetProviderNamespace: opts.TargetProviderNamespace,
-				ConfigFlags:             opts.ConfigFlags,
-				InventoryURL:            opts.InventoryURL,
-				PlanVMNames:             planVMNames,
-				DefaultTargetNetwork:    opts.DefaultTargetNetwork,
+				Name:                     opts.Name,
+				Namespace:                opts.Namespace,
+				TargetNamespace:          opts.PlanSpec.TargetNamespace,
+				SourceProvider:           opts.SourceProvider,
+				SourceProviderNamespace:  opts.SourceProviderNamespace,
+				TargetProvider:           opts.TargetProvider,
+				TargetProviderNamespace:  opts.TargetProviderNamespace,
+				ConfigFlags:              opts.ConfigFlags,
+				InventoryURL:             opts.InventoryURL,
+				InventoryInsecureSkipTLS: opts.InventoryInsecureSkipTLS,
+				PlanVMNames:              planVMNames,
+				DefaultTargetNetwork:     opts.DefaultTargetNetwork,
+				DryRun:                   opts.DryRun,
+				OutputFormat:             opts.OutputFormat,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to create default network map: %v", err)
 			}
 			opts.NetworkMapping = networkMapName
-			createdNetworkMap = true
+			if !opts.DryRun {
+				createdNetworkMap = true
+			}
 		}
 	}
 
@@ -186,18 +212,22 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 				targetProviderRef = fmt.Sprintf("%s/%s", opts.TargetProviderNamespace, opts.TargetProvider)
 			}
 			err := mapping.CreateStorageWithOptions(mapping.StorageCreateOptions{
-				ConfigFlags:          opts.ConfigFlags,
-				Name:                 storageMapName,
-				Namespace:            opts.Namespace,
-				SourceProvider:       sourceProviderRef,
-				TargetProvider:       targetProviderRef,
-				StoragePairs:         opts.StoragePairs,
-				InventoryURL:         opts.InventoryURL,
-				DefaultVolumeMode:    opts.DefaultVolumeMode,
-				DefaultAccessMode:    opts.DefaultAccessMode,
-				DefaultOffloadPlugin: opts.DefaultOffloadPlugin,
-				DefaultOffloadSecret: opts.DefaultOffloadSecret,
-				DefaultOffloadVendor: opts.DefaultOffloadVendor,
+				ConfigFlags:                  opts.ConfigFlags,
+				Name:                         storageMapName,
+				Namespace:                    opts.Namespace,
+				SourceProvider:               sourceProviderRef,
+				TargetProvider:               targetProviderRef,
+				StoragePairs:                 opts.StoragePairs,
+				InventoryURL:                 opts.InventoryURL,
+				InventoryInsecureSkipTLS:     opts.InventoryInsecureSkipTLS,
+				DefaultVolumeMode:            opts.DefaultVolumeMode,
+				DefaultAccessMode:            opts.DefaultAccessMode,
+				DefaultOffloadPlugin:         opts.DefaultOffloadPlugin,
+				DefaultOffloadSecret:         opts.DefaultOffloadSecret,
+				DefaultOffloadVendor:         opts.DefaultOffloadVendor,
+				DefaultOffloadMigrationHosts: opts.DefaultOffloadMigrationHosts,
+				DryRun:                       opts.DryRun,
+				OutputFormat:                 opts.OutputFormat,
 				// Offload secret creation options
 				OffloadVSphereUsername: opts.OffloadVSphereUsername,
 				OffloadVSpherePassword: opts.OffloadVSpherePassword,
@@ -218,21 +248,41 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 				return fmt.Errorf("failed to create storage map from pairs: %v", err)
 			}
 			opts.StorageMapping = storageMapName
-			createdStorageMap = true
-			fmt.Printf("Created storage mapping '%s' from provided pairs\n", storageMapName)
+			if !opts.DryRun {
+				createdStorageMap = true
+				fmt.Printf("Created storage mapping '%s' from provided pairs\n", storageMapName)
+			}
 		} else {
 			// Create default storage mapping using existing logic
-			storageMapName, err := storage.CreateStorageMap(ctx, storage.StorageMapperOptions{
-				Name:                      opts.Name,
-				Namespace:                 opts.Namespace,
-				SourceProvider:            opts.SourceProvider,
-				SourceProviderNamespace:   opts.SourceProviderNamespace,
-				TargetProvider:            opts.TargetProvider,
-				TargetProviderNamespace:   opts.TargetProviderNamespace,
-				ConfigFlags:               opts.ConfigFlags,
-				InventoryURL:              opts.InventoryURL,
-				PlanVMNames:               planVMNames,
-				DefaultTargetStorageClass: opts.DefaultTargetStorageClass,
+			var storageMapName string
+			storageMapName, createdOffloadSecretName, err = storage.CreateStorageMap(ctx, storage.StorageMapperOptions{
+				Name:                         opts.Name,
+				Namespace:                    opts.Namespace,
+				SourceProvider:               opts.SourceProvider,
+				SourceProviderNamespace:      opts.SourceProviderNamespace,
+				TargetProvider:               opts.TargetProvider,
+				TargetProviderNamespace:      opts.TargetProviderNamespace,
+				ConfigFlags:                  opts.ConfigFlags,
+				InventoryURL:                 opts.InventoryURL,
+				InventoryInsecureSkipTLS:     opts.InventoryInsecureSkipTLS,
+				PlanVMNames:                  planVMNames,
+				DefaultTargetStorageClass:    opts.DefaultTargetStorageClass,
+				DryRun:                       opts.DryRun,
+				OutputFormat:                 opts.OutputFormat,
+				DefaultVolumeMode:            opts.DefaultVolumeMode,
+				DefaultAccessMode:            opts.DefaultAccessMode,
+				DefaultOffloadPlugin:         opts.DefaultOffloadPlugin,
+				DefaultOffloadSecret:         opts.DefaultOffloadSecret,
+				DefaultOffloadVendor:         opts.DefaultOffloadVendor,
+				DefaultOffloadMigrationHosts: opts.DefaultOffloadMigrationHosts,
+				OffloadVSphereUsername:       opts.OffloadVSphereUsername,
+				OffloadVSpherePassword:       opts.OffloadVSpherePassword,
+				OffloadVSphereURL:            opts.OffloadVSphereURL,
+				OffloadStorageUsername:       opts.OffloadStorageUsername,
+				OffloadStoragePassword:       opts.OffloadStoragePassword,
+				OffloadStorageEndpoint:       opts.OffloadStorageEndpoint,
+				OffloadCACert:                opts.OffloadCACert,
+				OffloadInsecureSkipTLS:       opts.OffloadInsecureSkipTLS,
 			})
 			if err != nil {
 				// Clean up the network map if we created it
@@ -244,14 +294,10 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 				return fmt.Errorf("failed to create default storage map: %v", err)
 			}
 			opts.StorageMapping = storageMapName
-			createdStorageMap = true
+			if !opts.DryRun {
+				createdStorageMap = true
+			}
 		}
-	}
-
-	// If target namespace is not provided, use the plan's namespace
-	if opts.PlanSpec.TargetNamespace == "" {
-		opts.PlanSpec.TargetNamespace = opts.Namespace
-		fmt.Printf("No target namespace specified, using plan namespace: %s\n", opts.PlanSpec.TargetNamespace)
 	}
 
 	// Create a new Plan object using the PlanSpec
@@ -301,6 +347,10 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 	planObj.Kind = "Plan"
 	planObj.APIVersion = forkliftv1beta1.SchemeGroupVersion.String()
 
+	if opts.DryRun {
+		return output.OutputResource(planObj, opts.OutputFormat)
+	}
+
 	// Convert Plan object to Unstructured
 	unstructuredPlan, err := runtime.DefaultUnstructuredConverter.ToUnstructured(planObj)
 	if err != nil {
@@ -313,6 +363,11 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 		if createdStorageMap {
 			if delErr := deleteMap(opts.ConfigFlags, client.StorageMapGVR, opts.StorageMapping, opts.Namespace); delErr != nil {
 				fmt.Printf("Warning: failed to delete storage map: %v\n", delErr)
+			}
+		}
+		if createdOffloadSecretName != "" {
+			if delErr := offload.CleanupSecret(opts.ConfigFlags, opts.Namespace, createdOffloadSecretName); delErr != nil {
+				fmt.Printf("Warning: failed to clean up offload secret '%s': %v\n", createdOffloadSecretName, delErr)
 			}
 		}
 		return fmt.Errorf("failed to convert Plan to Unstructured: %v", err)
@@ -333,142 +388,34 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 				fmt.Printf("Warning: failed to delete storage map: %v\n", delErr)
 			}
 		}
+		if createdOffloadSecretName != "" {
+			if delErr := offload.CleanupSecret(opts.ConfigFlags, opts.Namespace, createdOffloadSecretName); delErr != nil {
+				fmt.Printf("Warning: failed to clean up offload secret '%s': %v\n", createdOffloadSecretName, delErr)
+			}
+		}
 		return fmt.Errorf("failed to create plan: %v", err)
 	}
 
-	// MTV automatically sets the PVCNameTemplateUseGenerateName field to true, if opts.PlanSpec.PVCNameTemplateUseGenerateName is false
-	// we need to patch the plan to re-set the PVCNameTemplateUseGenerateName field to false.
+	// For fields with +kubebuilder:default:=true, the API server auto-sets them
+	// to true on creation. When the user explicitly sets them to false, we need
+	// a post-create patch to override the kubebuilder default.
 	if !opts.PlanSpec.PVCNameTemplateUseGenerateName {
-		patch := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"pvcNameTemplateUseGenerateName": false,
-			},
-		}
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			// Ignore error here, we will still create the plan
-			fmt.Printf("Warning: failed to marshal patch for PVCNameTemplateUseGenerateName: %v\n", err)
-		} else {
-			_, err = c.Resource(client.PlansGVR).Namespace(opts.Namespace).Patch(
-				context.TODO(),
-				createdPlan.GetName(),
-				types.MergePatchType,
-				patchBytes,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				// Ignore error here, we will still create the plan
-				fmt.Printf("Warning: failed to patch plan for PVCNameTemplateUseGenerateName: %v\n", err)
-			}
-		}
+		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "pvcNameTemplateUseGenerateName")
 	}
-
-	// MTV automatically sets the MigrateSharedDisks field to true, if opts.PlanSpec.MigrateSharedDisks is false
-	// we need to patch the plan to re-set the MigrateSharedDisks field to false.
 	if !opts.PlanSpec.MigrateSharedDisks {
-		patch := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"migrateSharedDisks": false,
-			},
-		}
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			// Ignore error here, we will still create the plan
-			fmt.Printf("Warning: failed to marshal patch for MigrateSharedDisks: %v\n", err)
-		} else {
-			_, err = c.Resource(client.PlansGVR).Namespace(opts.Namespace).Patch(
-				context.TODO(),
-				createdPlan.GetName(),
-				types.MergePatchType,
-				patchBytes,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				// Ignore error here, we will still create the plan
-				fmt.Printf("Warning: failed to patch plan for MigrateSharedDisks: %v\n", err)
-			}
-		}
+		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "migrateSharedDisks")
 	}
-
-	// MTV UseCompatibilityMode sets the UseCompatibilityMode field to true, if opts.PlanSpec.UseCompatibilityMode is false
-	// we need to patch the plan to re-set the UseCompatibilityMode field to false.
 	if !opts.PlanSpec.UseCompatibilityMode {
-		patch := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"useCompatibilityMode": false,
-			},
-		}
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			// Ignore error here, we will still create the plan
-			fmt.Printf("Warning: failed to marshal patch for UseCompatibilityMode: %v\n", err)
-		} else {
-			_, err = c.Resource(client.PlansGVR).Namespace(opts.Namespace).Patch(
-				context.TODO(),
-				createdPlan.GetName(),
-				types.MergePatchType,
-				patchBytes,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				// Ignore error here, we will still create the plan
-				fmt.Printf("Warning: failed to patch plan for UseCompatibilityMode: %v\n", err)
-			}
-		}
+		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "useCompatibilityMode")
 	}
-
-	// MTV automatically sets the PreserveStaticIPs field to true, if opts.PlanSpec.PreserveStaticIPs is false
-	// we need to patch the plan to re-set the PreserveStaticIPs field to false.
 	if !opts.PlanSpec.PreserveStaticIPs {
-		patch := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"preserveStaticIPs": false,
-			},
-		}
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			// Ignore error here, we will still create the plan
-			fmt.Printf("Warning: failed to marshal patch for PreserveStaticIPs: %v\n", err)
-		} else {
-			_, err = c.Resource(client.PlansGVR).Namespace(opts.Namespace).Patch(
-				context.TODO(),
-				createdPlan.GetName(),
-				types.MergePatchType,
-				patchBytes,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				// Ignore error here, we will still create the plan
-				fmt.Printf("Warning: failed to patch plan for PreserveStaticIPs: %v\n", err)
-			}
-		}
+		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "preserveStaticIPs")
 	}
-
-	// MTV automatically sets the RunPreflightInspection field to true, if opts.PlanSpec.RunPreflightInspection is false
-	// we need to patch the plan to re-set the RunPreflightInspection field to false.
 	if !opts.PlanSpec.RunPreflightInspection {
-		patch := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"runPreflightInspection": false,
-			},
-		}
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			// Ignore error here, we will still create the plan
-			fmt.Printf("Warning: failed to marshal patch for RunPreflightInspection: %v\n", err)
-		} else {
-			_, err = c.Resource(client.PlansGVR).Namespace(opts.Namespace).Patch(
-				context.TODO(),
-				createdPlan.GetName(),
-				types.MergePatchType,
-				patchBytes,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				// Ignore error here, we will still create the plan
-				fmt.Printf("Warning: failed to patch plan for RunPreflightInspection: %v\n", err)
-			}
-		}
+		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "runPreflightInspection")
+	}
+	if !opts.PlanSpec.DeleteVmOnFailMigration {
+		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "deleteVmOnFailMigration")
 	}
 
 	// Set ownership of maps if we created them
@@ -501,9 +448,15 @@ func validateVMs(ctx context.Context, configFlags *genericclioptions.ConfigFlags
 	}
 
 	// Fetch source VMs inventory
-	sourceVMsInventory, err := client.FetchProviderInventory(configFlags, opts.InventoryURL, sourceProvider, "vms")
+	sourceVMsInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, opts.InventoryURL, sourceProvider, "vms", opts.InventoryInsecureSkipTLS)
 	if err != nil {
 		return fmt.Errorf("failed to fetch source VMs inventory: %v", err)
+	}
+
+	// Extract objects from EC2 envelope
+	providerType, found, err := unstructured.NestedString(sourceProvider.Object, "spec", "type")
+	if err == nil && found && providerType == "ec2" {
+		sourceVMsInventory = inventory.ExtractEC2Objects(sourceVMsInventory)
 	}
 
 	sourceVMsArray, ok := sourceVMsInventory.([]interface{})
@@ -570,7 +523,16 @@ func validateVMs(ctx context.Context, configFlags *genericclioptions.ConfigFlags
 				planVM.ID = vmID
 				validVMs = append(validVMs, planVM)
 			} else {
-				fmt.Printf("Warning: VM with name '%s' not found in source provider, removing from plan\n", planVM.Name)
+				// Fallback: check if the provided name is actually a VM ID
+				if vmName, existsAsID := vmIDToNameMap[planVM.Name]; existsAsID {
+					// The provided "name" is actually an ID
+					planVM.ID = planVM.Name
+					planVM.Name = vmName
+					validVMs = append(validVMs, planVM)
+					fmt.Printf("Info: VM ID '%s' found in source provider (name: '%s')\n", planVM.ID, planVM.Name)
+				} else {
+					fmt.Printf("Warning: VM with name '%s' not found in source provider, removing from plan\n", planVM.Name)
+				}
 			}
 		}
 	}
@@ -654,6 +616,33 @@ func deleteMap(configFlags *genericclioptions.ConfigFlags, mapGVR schema.GroupVe
 	}
 
 	return nil
+}
+
+// patchBoolFieldToFalse patches a kubebuilder-defaulted-to-true boolean field
+// back to false after plan creation. The API server auto-sets these fields to
+// true via kubebuilder defaults, so an explicit post-create patch is needed
+// when the user wants false.
+func patchBoolFieldToFalse(c dynamic.Interface, namespace, planName, jsonFieldName string) {
+	patch := map[string]interface{}{
+		"spec": map[string]interface{}{
+			jsonFieldName: false,
+		},
+	}
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		fmt.Printf("Warning: failed to marshal patch for %s: %v\n", jsonFieldName, err)
+		return
+	}
+	_, err = c.Resource(client.PlansGVR).Namespace(namespace).Patch(
+		context.TODO(),
+		planName,
+		types.MergePatchType,
+		patchBytes,
+		metav1.PatchOptions{},
+	)
+	if err != nil {
+		fmt.Printf("Warning: failed to patch plan for %s: %v\n", jsonFieldName, err)
+	}
 }
 
 // boolPtr returns a pointer to a bool

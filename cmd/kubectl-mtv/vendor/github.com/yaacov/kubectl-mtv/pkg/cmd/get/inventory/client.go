@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -12,22 +13,24 @@ import (
 
 // ProviderClient provides a unified client for all provider types
 type ProviderClient struct {
-	configFlags  *genericclioptions.ConfigFlags
-	provider     *unstructured.Unstructured
-	inventoryURL string
+	configFlags     *genericclioptions.ConfigFlags
+	provider        *unstructured.Unstructured
+	inventoryURL    string
+	insecureSkipTLS bool
 }
 
-// NewProviderClient creates a new provider client
-func NewProviderClient(configFlags *genericclioptions.ConfigFlags, provider *unstructured.Unstructured, inventoryURL string) *ProviderClient {
+// NewProviderClientWithInsecure creates a new provider client with optional insecure TLS skip verification
+func NewProviderClientWithInsecure(configFlags *genericclioptions.ConfigFlags, provider *unstructured.Unstructured, inventoryURL string, insecureSkipTLS bool) *ProviderClient {
 	return &ProviderClient{
-		configFlags:  configFlags,
-		provider:     provider,
-		inventoryURL: inventoryURL,
+		configFlags:     configFlags,
+		provider:        provider,
+		inventoryURL:    inventoryURL,
+		insecureSkipTLS: insecureSkipTLS,
 	}
 }
 
 // GetResource fetches a resource from the provider using the specified path
-func (pc *ProviderClient) GetResource(resourcePath string) (interface{}, error) {
+func (pc *ProviderClient) GetResource(ctx context.Context, resourcePath string) (interface{}, error) {
 	// Get provider info for logging
 	providerName := pc.GetProviderName()
 	providerNamespace := pc.GetProviderNamespace()
@@ -40,10 +43,10 @@ func (pc *ProviderClient) GetResource(resourcePath string) (interface{}, error) 
 	}
 
 	// Log the inventory fetch request
-	klog.V(2).Infof("Fetching inventory from provider %s/%s (type=%s, uid=%s) - path: %s, baseURL: %s",
-		providerNamespace, providerName, providerType, providerUID, resourcePath, pc.inventoryURL)
+	klog.V(2).Infof("Fetching inventory from provider %s/%s (type=%s, uid=%s) - path: %s, baseURL: %s, insecure=%v",
+		providerNamespace, providerName, providerType, providerUID, resourcePath, pc.inventoryURL, pc.insecureSkipTLS)
 
-	result, err := client.FetchProviderInventory(pc.configFlags, pc.inventoryURL, pc.provider, resourcePath)
+	result, err := client.FetchProviderInventoryWithInsecure(ctx, pc.configFlags, pc.inventoryURL, pc.provider, resourcePath, pc.insecureSkipTLS)
 
 	if err != nil {
 		klog.V(1).Infof("Failed to fetch inventory from provider %s/%s - path: %s, error: %v",
@@ -75,268 +78,268 @@ func (pc *ProviderClient) GetResource(resourcePath string) (interface{}, error) 
 }
 
 // GetResourceWithQuery fetches a resource with query parameters
-func (pc *ProviderClient) GetResourceWithQuery(resourcePath, query string) (interface{}, error) {
+func (pc *ProviderClient) GetResourceWithQuery(ctx context.Context, resourcePath, query string) (interface{}, error) {
 	if query != "" {
 		resourcePath = fmt.Sprintf("%s?%s", resourcePath, query)
 	}
-	return pc.GetResource(resourcePath)
+	return pc.GetResource(ctx, resourcePath)
 }
 
 // GetResourceCollection fetches a collection of resources
-func (pc *ProviderClient) GetResourceCollection(collection string, detail int) (interface{}, error) {
-	return pc.GetResourceWithQuery(collection, fmt.Sprintf("detail=%d", detail))
+func (pc *ProviderClient) GetResourceCollection(ctx context.Context, collection string, detail int) (interface{}, error) {
+	return pc.GetResourceWithQuery(ctx, collection, fmt.Sprintf("detail=%d", detail))
 }
 
 // GetResourceByID fetches a specific resource by ID
-func (pc *ProviderClient) GetResourceByID(collection, id string, detail int) (interface{}, error) {
-	return pc.GetResourceWithQuery(fmt.Sprintf("%s/%s", collection, id), fmt.Sprintf("detail=%d", detail))
+func (pc *ProviderClient) GetResourceByID(ctx context.Context, collection, id string, detail int) (interface{}, error) {
+	return pc.GetResourceWithQuery(ctx, fmt.Sprintf("%s/%s", collection, id), fmt.Sprintf("detail=%d", detail))
 }
 
 // oVirt Provider Resources
-func (pc *ProviderClient) GetDataCenters(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("datacenters", detail)
+func (pc *ProviderClient) GetDataCenters(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "datacenters", detail)
 }
 
-func (pc *ProviderClient) GetDataCenter(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("datacenters", id, detail)
+func (pc *ProviderClient) GetDataCenter(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "datacenters", id, detail)
 }
 
-func (pc *ProviderClient) GetClusters(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("clusters", detail)
+func (pc *ProviderClient) GetClusters(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "clusters", detail)
 }
 
-func (pc *ProviderClient) GetCluster(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("clusters", id, detail)
+func (pc *ProviderClient) GetCluster(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "clusters", id, detail)
 }
 
-func (pc *ProviderClient) GetHosts(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("hosts", detail)
+func (pc *ProviderClient) GetHosts(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "hosts", detail)
 }
 
-func (pc *ProviderClient) GetHost(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("hosts", id, detail)
+func (pc *ProviderClient) GetHost(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "hosts", id, detail)
 }
 
-func (pc *ProviderClient) GetVMs(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("vms", detail)
+func (pc *ProviderClient) GetVMs(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "vms", detail)
 }
 
-func (pc *ProviderClient) GetVM(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("vms", id, detail)
+func (pc *ProviderClient) GetVM(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "vms", id, detail)
 }
 
-func (pc *ProviderClient) GetStorageDomains(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("storagedomains", detail)
+func (pc *ProviderClient) GetStorageDomains(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "storagedomains", detail)
 }
 
-func (pc *ProviderClient) GetStorageDomain(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("storagedomains", id, detail)
+func (pc *ProviderClient) GetStorageDomain(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "storagedomains", id, detail)
 }
 
-func (pc *ProviderClient) GetNetworks(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("networks", detail)
+func (pc *ProviderClient) GetNetworks(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "networks", detail)
 }
 
-func (pc *ProviderClient) GetNetwork(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("networks", id, detail)
+func (pc *ProviderClient) GetNetwork(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "networks", id, detail)
 }
 
-func (pc *ProviderClient) GetDisks(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("disks", detail)
+func (pc *ProviderClient) GetDisks(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "disks", detail)
 }
 
-func (pc *ProviderClient) GetDisk(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("disks", id, detail)
+func (pc *ProviderClient) GetDisk(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "disks", id, detail)
 }
 
-func (pc *ProviderClient) GetDiskProfiles(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("diskprofiles", detail)
+func (pc *ProviderClient) GetDiskProfiles(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "diskprofiles", detail)
 }
 
-func (pc *ProviderClient) GetDiskProfile(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("diskprofiles", id, detail)
+func (pc *ProviderClient) GetDiskProfile(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "diskprofiles", id, detail)
 }
 
-func (pc *ProviderClient) GetNICProfiles(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("nicprofiles", detail)
+func (pc *ProviderClient) GetNICProfiles(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "nicprofiles", detail)
 }
 
-func (pc *ProviderClient) GetNICProfile(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("nicprofiles", id, detail)
+func (pc *ProviderClient) GetNICProfile(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "nicprofiles", id, detail)
 }
 
-func (pc *ProviderClient) GetWorkloads(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("workloads", detail)
+func (pc *ProviderClient) GetWorkloads(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "workloads", detail)
 }
 
-func (pc *ProviderClient) GetWorkload(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("workloads", id, detail)
+func (pc *ProviderClient) GetWorkload(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "workloads", id, detail)
 }
 
-func (pc *ProviderClient) GetTree() (interface{}, error) {
-	return pc.GetResource("tree")
+func (pc *ProviderClient) GetTree(ctx context.Context) (interface{}, error) {
+	return pc.GetResource(ctx, "tree")
 }
 
-func (pc *ProviderClient) GetClusterTree() (interface{}, error) {
-	return pc.GetResource("tree/cluster")
+func (pc *ProviderClient) GetClusterTree(ctx context.Context) (interface{}, error) {
+	return pc.GetResource(ctx, "tree/cluster")
 }
 
 // vSphere Provider Resources (aliases to generic resources with vSphere context)
-func (pc *ProviderClient) GetDatastores(detail int) (interface{}, error) {
+func (pc *ProviderClient) GetDatastores(ctx context.Context, detail int) (interface{}, error) {
 	// vSphere datastores map to generic storage resources
-	return pc.GetResourceCollection("datastores", detail)
+	return pc.GetResourceCollection(ctx, "datastores", detail)
 }
 
-func (pc *ProviderClient) GetDatastore(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("datastores", id, detail)
+func (pc *ProviderClient) GetDatastore(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "datastores", id, detail)
 }
 
-func (pc *ProviderClient) GetResourcePools(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("resourcepools", detail)
+func (pc *ProviderClient) GetResourcePools(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "resourcepools", detail)
 }
 
-func (pc *ProviderClient) GetResourcePool(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("resourcepools", id, detail)
+func (pc *ProviderClient) GetResourcePool(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "resourcepools", id, detail)
 }
 
-func (pc *ProviderClient) GetFolders(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("folders", detail)
+func (pc *ProviderClient) GetFolders(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "folders", detail)
 }
 
-func (pc *ProviderClient) GetFolder(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("folders", id, detail)
+func (pc *ProviderClient) GetFolder(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "folders", id, detail)
 }
 
 // OpenStack Provider Resources
-func (pc *ProviderClient) GetInstances(detail int) (interface{}, error) {
+func (pc *ProviderClient) GetInstances(ctx context.Context, detail int) (interface{}, error) {
 	// OpenStack instances are equivalent to VMs
-	return pc.GetResourceCollection("instances", detail)
+	return pc.GetResourceCollection(ctx, "instances", detail)
 }
 
-func (pc *ProviderClient) GetInstance(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("instances", id, detail)
+func (pc *ProviderClient) GetInstance(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "instances", id, detail)
 }
 
-func (pc *ProviderClient) GetImages(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("images", detail)
+func (pc *ProviderClient) GetImages(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "images", detail)
 }
 
-func (pc *ProviderClient) GetImage(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("images", id, detail)
+func (pc *ProviderClient) GetImage(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "images", id, detail)
 }
 
-func (pc *ProviderClient) GetFlavors(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("flavors", detail)
+func (pc *ProviderClient) GetFlavors(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "flavors", detail)
 }
 
-func (pc *ProviderClient) GetFlavor(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("flavors", id, detail)
+func (pc *ProviderClient) GetFlavor(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "flavors", id, detail)
 }
 
-func (pc *ProviderClient) GetSubnets(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("subnets", detail)
+func (pc *ProviderClient) GetSubnets(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "subnets", detail)
 }
 
-func (pc *ProviderClient) GetSubnet(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("subnets", id, detail)
+func (pc *ProviderClient) GetSubnet(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "subnets", id, detail)
 }
 
-func (pc *ProviderClient) GetPorts(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("ports", detail)
+func (pc *ProviderClient) GetPorts(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "ports", detail)
 }
 
-func (pc *ProviderClient) GetPort(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("ports", id, detail)
+func (pc *ProviderClient) GetPort(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "ports", id, detail)
 }
 
-func (pc *ProviderClient) GetVolumeTypes(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("volumetypes", detail)
+func (pc *ProviderClient) GetVolumeTypes(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "volumetypes", detail)
 }
 
-func (pc *ProviderClient) GetVolumeType(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("volumetypes", id, detail)
+func (pc *ProviderClient) GetVolumeType(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "volumetypes", id, detail)
 }
 
-func (pc *ProviderClient) GetVolumes(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("volumes", detail)
+func (pc *ProviderClient) GetVolumes(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "volumes", detail)
 }
 
-func (pc *ProviderClient) GetVolume(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("volumes", id, detail)
+func (pc *ProviderClient) GetVolume(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "volumes", id, detail)
 }
 
-func (pc *ProviderClient) GetSecurityGroups(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("securitygroups", detail)
+func (pc *ProviderClient) GetSecurityGroups(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "securitygroups", detail)
 }
 
-func (pc *ProviderClient) GetSecurityGroup(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("securitygroups", id, detail)
+func (pc *ProviderClient) GetSecurityGroup(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "securitygroups", id, detail)
 }
 
-func (pc *ProviderClient) GetFloatingIPs(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("floatingips", detail)
+func (pc *ProviderClient) GetFloatingIPs(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "floatingips", detail)
 }
 
-func (pc *ProviderClient) GetFloatingIP(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("floatingips", id, detail)
+func (pc *ProviderClient) GetFloatingIP(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "floatingips", id, detail)
 }
 
-func (pc *ProviderClient) GetProjects(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("projects", detail)
+func (pc *ProviderClient) GetProjects(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "projects", detail)
 }
 
-func (pc *ProviderClient) GetProject(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("projects", id, detail)
+func (pc *ProviderClient) GetProject(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "projects", id, detail)
 }
 
-func (pc *ProviderClient) GetSnapshots(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("snapshots", detail)
+func (pc *ProviderClient) GetSnapshots(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "snapshots", detail)
 }
 
-func (pc *ProviderClient) GetSnapshot(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("snapshots", id, detail)
+func (pc *ProviderClient) GetSnapshot(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "snapshots", id, detail)
 }
 
 // Kubernetes/OpenShift Provider Resources
-func (pc *ProviderClient) GetStorageClasses(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("storageclasses", detail)
+func (pc *ProviderClient) GetStorageClasses(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "storageclasses", detail)
 }
 
-func (pc *ProviderClient) GetStorageClass(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("storageclasses", id, detail)
+func (pc *ProviderClient) GetStorageClass(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "storageclasses", id, detail)
 }
 
-func (pc *ProviderClient) GetPersistentVolumeClaims(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("persistentvolumeclaims", detail)
+func (pc *ProviderClient) GetPersistentVolumeClaims(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "persistentvolumeclaims", detail)
 }
 
-func (pc *ProviderClient) GetPersistentVolumeClaim(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("persistentvolumeclaims", id, detail)
+func (pc *ProviderClient) GetPersistentVolumeClaim(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "persistentvolumeclaims", id, detail)
 }
 
-func (pc *ProviderClient) GetNamespaces(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("namespaces", detail)
+func (pc *ProviderClient) GetNamespaces(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "namespaces", detail)
 }
 
-func (pc *ProviderClient) GetNamespace(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("namespaces", id, detail)
+func (pc *ProviderClient) GetNamespace(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "namespaces", id, detail)
 }
 
-func (pc *ProviderClient) GetDataVolumes(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("datavolumes", detail)
+func (pc *ProviderClient) GetDataVolumes(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "datavolumes", detail)
 }
 
-func (pc *ProviderClient) GetDataVolume(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("datavolumes", id, detail)
+func (pc *ProviderClient) GetDataVolume(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "datavolumes", id, detail)
 }
 
 // OVA Provider Resources
-func (pc *ProviderClient) GetOVAFiles(detail int) (interface{}, error) {
-	return pc.GetResourceCollection("ovafiles", detail)
+func (pc *ProviderClient) GetOVAFiles(ctx context.Context, detail int) (interface{}, error) {
+	return pc.GetResourceCollection(ctx, "ovafiles", detail)
 }
 
-func (pc *ProviderClient) GetOVAFile(id string, detail int) (interface{}, error) {
-	return pc.GetResourceByID("ovafiles", id, detail)
+func (pc *ProviderClient) GetOVAFile(ctx context.Context, id string, detail int) (interface{}, error) {
+	return pc.GetResourceByID(ctx, "ovafiles", id, detail)
 }
 
 // Generic helper functions for provider-agnostic operations
