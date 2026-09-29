@@ -4,6 +4,8 @@
     "github>konflux-ci/mintmaker-presets:refresh-rpm-lockfiles",
     "github>konflux-ci/mintmaker-presets:cve-automerge-high"
   ],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
   "rpm-lockfile": {
     "lockFileMaintenance": {
       "enabled": false
@@ -16,11 +18,12 @@
       "enabled": false
     },
     {
-      "description": "Group go non-major; CVE automerge via cve-automerge-high preset",
+      "description": "Group + automerge go non-major dependencies",
       "matchBaseBranches": ["/^release.*/", "main"],
       "matchManagers": ["gomod"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "groupName": "all go non-major dependencies"
+      "groupName": "all go non-major dependencies",
+      "automerge": true
     },
     {
       "matchBaseBranches": ["main"],
@@ -29,17 +32,30 @@
       "groupName": "all go major dependencies"
     },
     {
-      "description": "Group dockerfile non-major; RPM locks refresh via refresh-rpm-lockfiles preset",
+      "description": "Group + automerge dockerfile non-major dependencies",
       "matchBaseBranches": ["/^release.*/", "main"],
       "matchManagers": ["dockerfile"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "groupName": "all dockerfile non-major dependencies"
+      "groupName": "all dockerfile non-major dependencies",
+      "automerge": true
     },
     {
       "matchBaseBranches": ["main"],
       "matchManagers": ["dockerfile"],
       "matchUpdateTypes": ["major"],
       "groupName": "all dockerfile major dependencies"
+    },
+    {
+      "matchBaseBranches": ["/^release.*/", "main"],
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "all go major dependencies"
+    },
+    {
+      "description": "Group + automerge GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "groupName": "github action dependencies",
+      "automerge": true
     },
     {
       "description": "Disable all updates for EOL branches",
