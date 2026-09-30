@@ -1,0 +1,20 @@
+# CentOS Stream 10 repos for the builder stage (libvirt-devel only).
+# libvirt-devel lives in CRB; its dependency libvirt-libs lives in AppStream.
+# BaseOS and EPEL 10 are not needed for the builder.
+[cs10-appstream]
+name=CentOS Stream 10 - AppStream
+baseurl=https://mirror.stream.centos.org/10-stream/AppStream/$basearch/os/
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official-SHA256
+enabled=1
+skip_if_unavailable=0
+
+[cs10-crb]
+name=CentOS Stream 10 - CRB
+baseurl=https://mirror.stream.centos.org/10-stream/CRB/$basearch/os/
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official-SHA256
+enabled=1
+skip_if_unavailable=0

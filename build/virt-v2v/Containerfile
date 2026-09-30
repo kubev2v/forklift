@@ -1,25 +1,15 @@
-FROM registry.access.redhat.com/ubi9:9.7-1778576335 AS appliance
+FROM registry.access.redhat.com/ubi10:10.2-1777462922 AS winlegacyiso
 
-RUN subscription-manager refresh && \
-    dnf install -y --setopt=install_weak_deps=False \
-        qemu-img \
-        libguestfs-devel \
-        libguestfs-winsupport \
-        libguestfs-xfs
+COPY build/virt-v2v/prefetch/ /tmp/virtio-win-prefetch/
+RUN rpm -Uvh --nodeps /tmp/virtio-win-prefetch/virtio-win-*.noarch.rpm
 
-# Create tarball for the appliance.
-#
-# LIBGUESTFS_BACKEND=direct is required to work around the following bug:
-# https://issues.redhat.com/browse/RHEL-104684
-# and it can be removed when that bug gets fixed.
-RUN mkdir -p /usr/local/lib/guestfs/appliance && \
-    cd /usr/local/lib/guestfs/appliance && \
-    LIBGUESTFS_BACKEND=direct libguestfs-make-fixed-appliance . && \
-    qemu-img convert -c -O qcow2 root root.qcow2 && \
-    mv -vf root.qcow2 root
-
-FROM registry.access.redhat.com/ubi9/go-toolset:9.8-1788409979 AS builder
+FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1788411200 AS builder
 USER 0
+COPY build/virt-v2v/repos/centos-stream10-builder.repo /tmp/cs10-repos/centos-stream10-builder.repo
+COPY build/virt-v2v/scripts/enable-cs10-repos.sh /tmp/enable-cs10-repos.sh
+RUN --mount=type=cache,target=/var/cache/dnf \
+    chmod 755 /tmp/enable-cs10-repos.sh && /tmp/enable-cs10-repos.sh centos-stream10-builder.repo && \
+    dnf install -y libvirt-devel
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
 ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
@@ -31,26 +21,74 @@ RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldfl
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o forklift-wait-for-reboot github.com/kubev2v/forklift/cmd/forklift-wait-for-reboot
 
-FROM registry.access.redhat.com/ubi9:9.7-1778576335
+FROM registry.access.redhat.com/ubi10:10.2-1777462922 AS runtime
 
-# RUN rm /etc/pki/tls/fips_local.cnf && \
-#     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
-#     sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
-# RUN mv /etc/pki/tls/certs/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt.bak && \
-#     ln -sf /opt/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt
+# Upstream-specific: downstream installs a pinned RHEL 10.1 kernel with local
+# kernel-modules-internal and libguestfs-fssupport RPMs here; those packages
+# are not available from registry.access.redhat.com. Instead, enable the
+# CentOS Stream 10 repos and install the prefetched kernel-modules-internal
+# RPM (its kernel deps resolve from CS10; it provides btrfs.ko for the
+# libguestfs appliance). UBI is updated before CS10 is enabled so base
+# packages (glibc, systemd, openssl-libs) are not mixed between UBI and CS10.
+COPY build/virt-v2v/prefetch/ /tmp/virt-v2v-prefetch/
+COPY build/virt-v2v/repos/centos-stream10-runtime.repo /tmp/cs10-repos/centos-stream10-runtime.repo
+COPY build/virt-v2v/scripts/enable-cs10-repos.sh /tmp/enable-cs10-repos.sh
 
-RUN subscription-manager refresh && \
-    mkdir /disks && \
-    source /etc/os-release && \
-    dnf install -y \
-        virt-v2v \
-        virtio-win && \
-    dnf clean all
+RUN dnf update -y
+
+RUN chmod 755 /tmp/enable-cs10-repos.sh && \
+    /tmp/enable-cs10-repos.sh centos-stream10-runtime.repo && \
+    dnf install -y /tmp/virt-v2v-prefetch/kernel-modules-internal-*.rpm
+
+RUN rm /etc/pki/tls/fips_local.cnf && \
+    echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
+    sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
+
+# Downstream runs `source /etc/os-release && dnf update -y --exclude=kernel,...`
+# before installing virt-v2v; the equivalent UBI update above already ran
+# before CS10 was enabled (a second update after enabling would mix UBI and
+# CS10). virt-v2v pulls its guestfs/nbdkit/kernel deps from CS10 automatically.
+RUN mkdir /disks && \
+    dnf install -y --setopt=install_weak_deps=False \
+    virt-v2v \
+    virtio-win \
+    libvirt-libs
+
+# Upstream-specific: virt-v2v invokes the nbdkit CLI at runtime, but the
+# nbdkit package is not a hard dep of virt-v2v (its nbdkit plugins only
+# require nbdkit-server), so it is installed explicitly.
+RUN dnf install -y nbdkit
+
+# Upstream-specific: libguestfs builds its appliance at runtime from the
+# supermin skeleton in /usr/lib64/guestfs/supermin.d (no fixed appliance is
+# used; the skeleton is found first on LIBGUESTFS_PATH). That build copies
+# the kernel modules from /lib/modules/<kver>/kernel/, but CS10 ships
+# btrfs.ko under /lib/modules/<kver>/internal/, which is not copied. Move it
+# next to the other filesystem modules (upstream counterpart of the
+# downstream kernel + fssupport block).
+RUN kver="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core | tail -n1)" && \
+    mkdir -p "/lib/modules/${kver}/kernel/fs/btrfs" && \
+    cp -a "/lib/modules/${kver}/internal/fs/btrfs/btrfs.ko.xz" "/lib/modules/${kver}/kernel/fs/btrfs/" && \
+    depmod "${kver}"
+
+# Btrfs guests need the btrfs-progs userspace tools in the appliance.
+# libguestfs list_filesystems runs `btrfs subvolume list` on each btrfs
+# mount to map subvolumes (SUSE uses btrfs with @ and boot subvolumes);
+# mkfs, convert, tune, and the other programs are separate binaries.
+# btrfs-progs is not in the CS10 repos, so it comes from EPEL 10 (see
+# repos/centos-stream10-runtime.repo). Add the package to the supermin
+# skeleton packages list so supermin copies its files and RPM Requires
+# (libgcrypt, libzstd, …) into the appliance.
+RUN dnf install -y btrfs-progs && \
+    echo btrfs-progs >> /usr/lib64/guestfs/supermin.d/packages
 
 # This prevents libvirt from attempting to create files in the root directory,
-# which would lead to permission errors.
+# which would lead to permission errors. /home/qemu/.cache must be pre-created
+# and owned by the qemu user, otherwise the qemu user cannot create the libvirt
+# runtime directory at /home/qemu/.cache/libvirt (build-time dnf running with
+# HOME=/home/qemu leaves /home/qemu/.cache owned by root).
 # Refer to: https://issues.redhat.com/browse/RHEL-105490
-RUN mkdir /home/qemu && chown qemu:qemu /home/qemu
+RUN mkdir -p /home/qemu/.cache/libvirt && chown -R qemu:qemu /home/qemu
 ENV HOME=/home/qemu
 
 # The libvirt can hang when destroying libguestfs domains due to the
@@ -63,9 +101,7 @@ RUN dnf install -y catatonit
 # the officially tested and supported flow, is utilized instead of direct connections.
 ENV LIBGUESTFS_BACKEND=libvirt:qemu:///session
 
-
-RUN mkdir -p /usr/lib64/guestfs/appliance
-COPY --from=appliance /usr/local/lib/guestfs/appliance /usr/lib64/guestfs/appliance
+ENV PATH="$PATH:/usr/libexec"
 
 COPY --from=builder /app/virt-v2v-monitor /usr/local/bin/virt-v2v-monitor
 
@@ -74,6 +110,8 @@ COPY --from=builder /app/image-converter /usr/local/bin/image-converter
 COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
 
 COPY --from=builder /app/forklift-wait-for-reboot /usr/local/bin/forklift-wait-for-reboot
+
+COPY --from=winlegacyiso /usr/share/virtio-win/virtio-win.iso /usr/local/virtio-win-legacy.iso
 
 # Replace xfs_repair with a wrapper that can ignore failures; register the
 # original binary in supermin hostfiles so both get copied into the appliance.
@@ -86,15 +124,15 @@ RUN cp /usr/sbin/xfs_repair /usr/sbin/xfs_repair.original && \
 ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 
 LABEL \
-        com.redhat.component="mtv-virt-v2v-container" \
-        name="migration-toolkit-virtualization/mtv-virt-v2v-rhel9" \
-        license="Apache License 2.0" \
-        io.k8s.display-name="Migration Toolkit for Virtualization" \
-        io.k8s.description="Migration Toolkit for Virtualization - Virt-V2V" \
-        io.openshift.tags="migration,mtv,forklift" \
-        summary="Migration Toolkit for Virtualization - Virt-V2V" \
-        description="Migration Toolkit for Virtualization - Virt-V2V" \
-        vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-        distribution-scope="public" \
-        url="https://github.com/kubev2v/forklift"
+    com.redhat.component="mtv-virt-v2v-container" \
+    name="migration-toolkit-virtualization/mtv-virt-v2v-rhel9" \
+    license="Apache License 2.0" \
+    io.k8s.display-name="Migration Toolkit for Virtualization" \
+    io.k8s.description="Migration Toolkit for Virtualization - Virt-V2V" \
+    io.openshift.tags="migration,mtv,forklift" \
+    summary="Migration Toolkit for Virtualization - Virt-V2V" \
+    description="Migration Toolkit for Virtualization - Virt-V2V" \
+    vendor="Red Hat, Inc." \
+    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    distribution-scope="public" \
+    url="https://github.com/kubev2v/forklift"
