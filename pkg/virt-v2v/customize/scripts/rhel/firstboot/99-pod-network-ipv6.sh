@@ -2,16 +2,17 @@
 # Activate Pod-network NICs and ensure IPv6 connectivity on first boot (MTV-6872).
 # Handles IPv4-only, dual-stack, and IPv6-only clusters.
 #
-# Unconditionally assign the well-known masquerade guest IPv6 address.
-# On IPv4-only clusters the address is harmless (may-fail keeps the
-# connection up). On IPv6-only clusters it is required because the
-# masquerade bridge suppresses Router Advertisements.
-POD_MACS=/tmp/podNetworkMACs
+# On IPv6-enabled clusters: assign the well-known masquerade guest IPv6
+# address (required because the bridge suppresses Router Advertisements).
+# On IPv4-only clusters: skip IPv6 config entirely to avoid unreachable
+# routes that would cause applications to stall before falling back.
+POD_MACS=/tmp/podNetworkIPv6MACs
 GW6=fd10:0:2::1
 GUEST_IP6=fd10:0:2::2
 GUEST_CIDR6=120
 MAX_ATTEMPTS=10
 
+# This file only exists on IPv6-enabled clusters.
 [ ! -s "$POD_MACS" ] && exit 0
 
 exec >>/var/log/pod-network-ipv6-firstboot.log 2>&1
@@ -76,10 +77,6 @@ while read -r mac; do
     echo "  Connection profile: ${con:-<none>}"
 
     if [ -n "$con" ]; then
-        # Static IPv6 + DHCP IPv4 (may-fail on both).
-        # ipv6.method=manual avoids waiting for SLAAC/DHCPv6 that may
-        # never arrive (masquerade bridge has forwarding=1, no RAs).
-        # On IPv4-only clusters the static IPv6 is harmless.
         # Fix may-fail so DHCP timeout doesn't kill the connection.
         nmcli con modify "$con" ipv4.may-fail yes 2>/dev/null || true
         nmcli con modify "$con" ipv6.may-fail yes 2>/dev/null || true
@@ -121,7 +118,7 @@ while read -r mac; do
         nmcli device connect "$dev" 2>/dev/null || true
     fi
 
-    # Belt-and-suspenders: ensure IPv6 is configured regardless of NM.
+    # ensure IPv6 is configured regardless of NM.
     ip link set "$dev" up 2>/dev/null || true
     if ! ip -6 addr show dev "$dev" scope global 2>/dev/null | grep -q "$GUEST_IP6"; then
         ip -6 addr add "${GUEST_IP6}/${GUEST_CIDR6}" dev "$dev" 2>/dev/null || true

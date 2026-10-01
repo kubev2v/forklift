@@ -258,8 +258,8 @@ func (c *Customize) renderIPv6PodGatewayScript(windowsScriptsPath string) error 
 	}
 
 	var podMACs []string
-	if c.appConfig.PodNetworkMACs != "" {
-		podMACs = strings.Split(c.appConfig.PodNetworkMACs, ",")
+	if c.appConfig.PodNetworkIPv6MACs != "" {
+		podMACs = strings.Split(c.appConfig.PodNetworkIPv6MACs, ",")
 		for i := range podMACs {
 			podMACs[i] = strings.TrimSpace(podMACs[i])
 		}
@@ -385,7 +385,7 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) erro
 
 	// Render IPv6 Pod network gateway script with the list of Pod network MACs.
 	// Only render if the template exists and at least one Pod MAC is configured.
-	if c.appConfig.PodNetworkMACs != "" {
+	if c.appConfig.PodNetworkIPv6MACs != "" {
 		if err := c.renderIPv6PodGatewayScript(windowsScriptsPath); err != nil {
 			return err
 		}
@@ -453,7 +453,7 @@ func (c *Customize) customizeLinux() (err error) {
 	if err := c.handleStaticIPConfiguration(cmdBuilder); err != nil {
 		return err
 	}
-	if err := c.handlePodNetworkMACsFile(cmdBuilder); err != nil {
+	if err := c.handlePodNetworkIPv6MACsFile(cmdBuilder); err != nil {
 		return err
 	}
 
@@ -504,12 +504,12 @@ func (c *Customize) handleStaticIPConfiguration(cmdBuilder utils.CommandBuilder)
 	return nil
 }
 
-func (c *Customize) handlePodNetworkMACsFile(cmdBuilder utils.CommandBuilder) error {
-	if c.appConfig.PodNetworkMACs == "" {
+func (c *Customize) handlePodNetworkIPv6MACsFile(cmdBuilder utils.CommandBuilder) error {
+	if c.appConfig.PodNetworkIPv6MACs == "" {
 		return nil
 	}
 	var lines []string
-	for _, mac := range strings.Split(c.appConfig.PodNetworkMACs, ",") {
+	for _, mac := range strings.Split(c.appConfig.PodNetworkIPv6MACs, ",") {
 		mac = strings.TrimSpace(mac)
 		if mac != "" {
 			lines = append(lines, mac)
@@ -518,11 +518,11 @@ func (c *Customize) handlePodNetworkMACsFile(cmdBuilder utils.CommandBuilder) er
 	if len(lines) == 0 {
 		return nil
 	}
-	podMacsPath := filepath.Join(c.appConfig.Workdir, "podNetworkMACs")
+	podMacsPath := filepath.Join(c.appConfig.Workdir, "podNetworkIPv6MACs")
 	if err := c.fileSystem.WriteFile(podMacsPath, []byte(strings.Join(lines, "\n")+"\n"), 0644); err != nil {
-		return fmt.Errorf("failed to write Pod network MAC file: %w", err)
+		return fmt.Errorf("failed to write Pod network IPv6 MAC file: %w", err)
 	}
-	cmdBuilder.AddArg(UploadCmd, fmt.Sprintf("%s:/tmp/podNetworkMACs", podMacsPath))
+	cmdBuilder.AddArg(UploadCmd, fmt.Sprintf("%s:/tmp/podNetworkIPv6MACs", podMacsPath))
 	return nil
 }
 

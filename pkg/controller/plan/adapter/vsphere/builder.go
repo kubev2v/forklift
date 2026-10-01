@@ -311,18 +311,26 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		})
 	}
 
-	// Only collect Pod-network MACs for masquerade interfaces.
-	// UDN namespaces use l2bridge binding, not masquerade, so the
-	// masquerade-specific IPv6 config must not be applied there.
+	// Only collect Pod-network MACs for masquerade interfaces on IPv6-enabled
+	// clusters. UDN namespaces use l2bridge (not masquerade) and IPv4-only
+	// clusters need no special Pod network config.
 	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
 	if !hasUDN {
+		hasIPv6, detectErr := planbase.PodNetworkHasIPv6(context.TODO(), r.Destination.Client)
+		if detectErr != nil {
+			err = liberr.Wrap(detectErr, "podNetworkHasIPv6")
+			return
+		}
+		if !hasIPv6 {
+			return
+		}
 		if nicKeys, pairsBySource, resolverErr := r.buildNICResolver(vm.NICs); resolverErr == nil {
 			podMacs := planbase.CollectPodNetworkMACs(nicKeys, pairsBySource, vm.NICs, func(nic vsphere.NIC) string {
 				return nic.MAC
 			})
 			if len(podMacs) > 0 {
 				env = append(env, core.EnvVar{
-					Name:  "V2V_podNetworkMACs",
+					Name:  "V2V_podNetworkIPv6MACs",
 					Value: strings.Join(podMacs, ","),
 				})
 			}

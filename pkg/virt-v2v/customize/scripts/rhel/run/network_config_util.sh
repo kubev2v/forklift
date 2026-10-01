@@ -2,7 +2,7 @@
 
 # Global variables with default values
 V2V_MAP_FILE="${V2V_MAP_FILE:-/tmp/macToIP}"
-V2V_POD_NETWORK_MACS_FILE="${V2V_POD_NETWORK_MACS_FILE:-/tmp/podNetworkMACs}"
+V2V_POD_NETWORK_IPV6_MACS_FILE="${V2V_POD_NETWORK_IPV6_MACS_FILE:-/tmp/podNetworkIPv6MACs}"
 KVIRT_POD_IPV6_GW="fd10:0:2::1"
 NETWORK_SCRIPTS_DIR="${NETWORK_SCRIPTS_DIR:-/etc/sysconfig/network-scripts}"
 NETWORK_SCRIPTS_DIR_SUSE="${NETWORK_SCRIPTS_DIR_SUSE:-/etc/sysconfig/network}"
@@ -35,7 +35,7 @@ mac_in_pod_list() {
         line=$(normalize_mac "$line")
         [ -z "$line" ] && continue
         [ "$line" = "$want" ] && return 0
-    done < "$V2V_POD_NETWORK_MACS_FILE"
+    done < "$V2V_POD_NETWORK_IPV6_MACS_FILE"
     return 1
 }
 
@@ -59,7 +59,7 @@ ifcfg_mac() {
 set_nm_keyfile_kv() {
     local f="$1" key="$2" val="$3"
     if sed -n "/^\[ipv6\]/,/^\[/{ /^${key}=/p; }" "$f" | grep -q .; then
-        sed -i "/^\[ipv6\]/,/^\[/ s/^${key}=.*/${key}=${val}/" "$f"
+        sed -i "/^\[ipv6\]/,/^\[/ s|^${key}=.*|${key}=${val}|" "$f"
     else
         sed -i "/^\[ipv6\]/a ${key}=${val}" "$f"
     fi
@@ -151,7 +151,7 @@ patch_ifcfg_pod() {
         echo "IPV4_FAILURE_FATAL=no" >> "$IFCFG"
     fi
 
-    # Enable IPv6 with autoconf, non-fatal, and static gateway.
+    # Enable IPv6 with autoconf and non-fatal.
     grep -q '^IPV6INIT=' "$IFCFG" || echo "IPV6INIT=yes" >> "$IFCFG"
     grep -q '^IPV6_AUTOCONF=' "$IFCFG" || echo "IPV6_AUTOCONF=yes" >> "$IFCFG"
     if grep -q '^IPV6_FAILURE_FATAL=' "$IFCFG"; then
@@ -216,8 +216,8 @@ IPV4_FAILURE_FATAL=no
 IPV6INIT=yes
 IPV6_AUTOCONF=yes
 IPV6_FAILURE_FATAL=no
-IPV6_DEFAULTGW=${KVIRT_POD_IPV6_GW}
 EOF
+        echo "IPV6_DEFAULTGW=${KVIRT_POD_IPV6_GW}" >> "$IFCFG"
         # Only pin DEVICE when we know the correct name from udev.
         # A wrong DEVICE (e.g. eth0 when the NIC is ens3) prevents activation.
         if [ -n "$udev_name" ]; then
@@ -251,19 +251,19 @@ may-fail=true
 [ipv6]
 method=auto
 may-fail=true
-gateway=${KVIRT_POD_IPV6_GW}
-route1=::/0,${KVIRT_POD_IPV6_GW}
 EOF
+    echo "gateway=${KVIRT_POD_IPV6_GW}" >> "$NM_FILE"
+    echo "route1=::/0,${KVIRT_POD_IPV6_GW}" >> "$NM_FILE"
     # Remove blank interface-name line when udev name was not available.
     sed -i '/^$/d' "$NM_FILE"
     chmod 600 "$NM_FILE"
 }
 
 # Pod masquerade: static IPv6 gateway + non-fatal IPv6 (keeps DHCP connections up).
-# Does not use macToIP, requires /tmp/podNetworkMACs from the controller.
+# Only runs when /tmp/podNetworkIPv6MACs exists (IPv6-enabled clusters only).
 fix_pod_network_ipv6() {
-    if [ ! -s "$V2V_POD_NETWORK_MACS_FILE" ]; then
-        log "No $V2V_POD_NETWORK_MACS_FILE; skipping Pod network IPv6 fix."
+    if [ ! -s "$V2V_POD_NETWORK_IPV6_MACS_FILE" ]; then
+        log "No $V2V_POD_NETWORK_IPV6_MACS_FILE; skipping Pod network IPv6 fix."
         return 0
     fi
 
@@ -297,7 +297,7 @@ fix_pod_network_ipv6() {
                 patched_macs="${patched_macs} ${want_mac}"
                 break
             done
-        done < "$V2V_POD_NETWORK_MACS_FILE"
+        done < "$V2V_POD_NETWORK_IPV6_MACS_FILE"
     fi
 
     # For any Pod MAC that had no config file on disk, create a new keyfile.
@@ -308,7 +308,7 @@ fix_pod_network_ipv6() {
             *"$line"*) continue ;;
         esac
         create_pod_network_config "$line"
-    done < "$V2V_POD_NETWORK_MACS_FILE"
+    done < "$V2V_POD_NETWORK_IPV6_MACS_FILE"
 }
 
 # Sanity checks
