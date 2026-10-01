@@ -1029,8 +1029,12 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, _ *core.Secret) (env []core.EnvV
 	}
 	env = append(env, core.EnvVar{Name: "V2V_vmName", Value: vm.Name})
 
-	if r.Plan.Spec.PreserveStaticIPs {
-		staticIPs, staticErr := r.mapMacStaticIps(vm)
+	nicRefs := planbase.NICRefsFrom(vm.NICs, func(n model.NIC) planbase.NICRef {
+		return planbase.NICRef{MAC: n.MACAddress, NetworkID: n.SubnetUUID}
+	})
+	modeByMAC := planbase.ResolveNICModes(nicRefs, r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
+	if planbase.HasPreserveMode(modeByMAC) {
+		staticIPs, staticErr := r.mapMacStaticIps(vm, modeByMAC)
 		if staticErr != nil {
 			err = staticErr
 			return
@@ -1051,10 +1055,13 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, _ *core.Secret) (env []core.EnvV
 //
 // Multiple entries are joined with "_". NICs whose subnet cannot be found or
 // has no gateway are skipped with a warning rather than failing the migration.
-func (r *Builder) mapMacStaticIps(vm *model.VM) (string, error) {
+func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) (string, error) {
 	var entries []string
 	for _, nic := range vm.NICs {
 		if len(nic.StaticIPConfigs) == 0 {
+			continue
+		}
+		if mode, ok := modeByMAC[nic.MACAddress]; ok && mode != string(api.NetworkIPModePreserve) {
 			continue
 		}
 
