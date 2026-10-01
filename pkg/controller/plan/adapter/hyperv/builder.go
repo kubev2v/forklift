@@ -613,6 +613,23 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		env = append(env, core.EnvVar{Name: "V2V_firmware", Value: "uefi"})
 	}
 
+	// Only collect Pod-network MACs for masquerade interfaces.
+	// UDN namespaces use l2bridge binding, not masquerade, so the
+	// masquerade-specific IPv6 config must not be applied there.
+	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
+	if !hasUDN {
+		nicKeys, pairsBySource := r.buildNICResolver(vm.NICs)
+		podMacs := planbase.CollectPodNetworkMACs(nicKeys, pairsBySource, vm.NICs, func(nic hyperv.NIC) string {
+			return nic.MAC
+		})
+		if len(podMacs) > 0 {
+			env = append(env, core.EnvVar{
+				Name:  "V2V_podNetworkMACs",
+				Value: strings.Join(podMacs, ","),
+			})
+		}
+	}
+
 	return
 }
 

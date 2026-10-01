@@ -250,6 +250,27 @@ func templateFuncMap() template.FuncMap {
 	}
 }
 
+// renderIPv6PodGatewayScript renders the IPv6 gateway template with Pod network MACs.
+// If no Pod MACs are configured, renders with an empty list (script will self-skip).
+func (c *Customize) renderIPv6PodGatewayScript(windowsScriptsPath string) error {
+	type TemplateData struct {
+		PodMACs []string
+	}
+
+	var podMACs []string
+	if c.appConfig.PodNetworkMACs != "" {
+		podMACs = strings.Split(c.appConfig.PodNetworkMACs, ",")
+		for i := range podMACs {
+			podMACs[i] = strings.TrimSpace(podMACs[i])
+		}
+	}
+
+	templatePath := filepath.Join(windowsScriptsPath, "9999-ensure-ipv6-pod-gateway.ps1.tmpl")
+	outputPath := filepath.Join(windowsScriptsPath, "9999-ensure-ipv6-pod-gateway.ps1")
+
+	return renderTemplate(templatePath, outputPath, "ipv6PodGatewayScript", TemplateData{PodMACs: podMACs})
+}
+
 // renderTemplate parses a Go template from file, executes it with data, and writes the result.
 func renderTemplate(templatePath, outputPath, name string, data interface{}) error {
 	tmplContent, err := os.ReadFile(templatePath)
@@ -361,6 +382,16 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) erro
 			uploadPreserveMultipleIpPath = c.formatUpload(preserveMultipleNicsPath, WinFirstbootScriptsPath)
 		}
 	}
+
+	// Render IPv6 Pod network gateway script with the list of Pod network MACs.
+	// Only render if the template exists and at least one Pod MAC is configured.
+	if c.appConfig.PodNetworkMACs != "" {
+		if err := c.renderIPv6PodGatewayScript(windowsScriptsPath); err != nil {
+			return err
+		}
+		ipv6GwScript := filepath.Join(windowsScriptsPath, "9999-ensure-ipv6-pod-gateway.ps1")
+		cmdBuilder.AddArg(UploadCmd, c.formatUpload(ipv6GwScript, WinFirstbootScriptsPath))
+	}
 	// TODO: Remove once https://redhat.atlassian.net/browse/RHEL-184971 is resolved.
 	qemuGAPath := filepath.Join(windowsScriptsPath, qemuGAInstallScript)
 	cmdBuilder.AddArg(UploadCmd, c.formatUpload(qemuGAPath, filepath.Join(WinFirstbootScriptsPath, qemuGAInstallScript)))
@@ -422,6 +453,9 @@ func (c *Customize) customizeLinux() (err error) {
 	if err := c.handleStaticIPConfiguration(cmdBuilder); err != nil {
 		return err
 	}
+	if err := c.handlePodNetworkMACsFile(cmdBuilder); err != nil {
+		return err
+	}
 
 	// Step 3: Add dynamic scripts from the configmap
 	if _, err := c.fileSystem.Stat(c.appConfig.DynamicScriptsDir); !os.IsNotExist(err) {
@@ -467,6 +501,28 @@ func (c *Customize) handleStaticIPConfiguration(cmdBuilder utils.CommandBuilder)
 		cmdBuilder.AddArg(UploadCmd, fmt.Sprintf("%s:/tmp/macToIP", macToIPFilePath))
 	}
 
+	return nil
+}
+
+func (c *Customize) handlePodNetworkMACsFile(cmdBuilder utils.CommandBuilder) error {
+	if c.appConfig.PodNetworkMACs == "" {
+		return nil
+	}
+	var lines []string
+	for _, mac := range strings.Split(c.appConfig.PodNetworkMACs, ",") {
+		mac = strings.TrimSpace(mac)
+		if mac != "" {
+			lines = append(lines, mac)
+		}
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+	podMacsPath := filepath.Join(c.appConfig.Workdir, "podNetworkMACs")
+	if err := c.fileSystem.WriteFile(podMacsPath, []byte(strings.Join(lines, "\n")+"\n"), 0644); err != nil {
+		return fmt.Errorf("failed to write Pod network MAC file: %w", err)
+	}
+	cmdBuilder.AddArg(UploadCmd, fmt.Sprintf("%s:/tmp/podNetworkMACs", podMacsPath))
 	return nil
 }
 
