@@ -78,9 +78,13 @@ func (r *Collector) Start() error {
 			r.log.Info("Collection loop stopped.")
 		}()
 
+		healer := &libmodel.IOErrHealer{DB: r.db, Log: r.log}
+
 		if err := r.Collect(); err != nil {
+			healer.Observe(err)
 			r.log.Error(err, "Initial collection failed")
 		} else {
+			healer.Observe(nil)
 			r.parity = true
 			r.log.Info("Initial collection completed, parity achieved.")
 		}
@@ -95,9 +99,11 @@ func (r *Collector) Start() error {
 			case <-ticker.C:
 				r.log.V(1).Info("Starting periodic collection")
 				if err := r.Collect(); err != nil {
+					healer.Observe(err)
 					r.log.Error(err, "Periodic collection failed")
 					r.parity = false
 				} else {
+					healer.Observe(nil)
 					r.parity = true
 					r.log.V(1).Info("Periodic collection completed")
 				}
