@@ -67,7 +67,7 @@ inspection, in-place, and remote virt-v2v operations.`,
 
 	cmd.Flags().StringVarP(&convName, "name", "M", "", "Conversion name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where phase = 'Running'\")")
+	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 

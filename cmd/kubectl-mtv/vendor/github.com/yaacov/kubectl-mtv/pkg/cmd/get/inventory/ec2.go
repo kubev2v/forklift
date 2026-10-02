@@ -342,7 +342,116 @@ func listEC2NetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	}
 }
 
+// ListEC2SnapshotsWithInsecure queries the provider's EC2 EBS snapshot inventory with optional insecure TLS skip verification
+func ListEC2SnapshotsWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
+
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listEC2SnapshotsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
+}
+
+func listEC2SnapshotsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
+	// Get the provider object
+	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
+	if err != nil {
+		return err
+	}
+
+	// Create a new provider client
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
+
+	// Get provider type to verify EC2 support
+	providerType, err := providerClient.GetProviderType()
+	if err != nil {
+		return fmt.Errorf("failed to get provider type: %v", err)
+	}
+
+	// Verify this is an EC2 provider
+	if providerType != "ec2" {
+		return fmt.Errorf("provider type '%s' is not an EC2 provider", providerType)
+	}
+
+	// Define default headers for EC2 snapshots
+	// Note: AWS API returns PascalCase field names (object extracted)
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "SIZE", Key: "sizeHuman"},
+		{Title: "STATE", Key: "State", ColorFunc: output.ColorizeStatus},
+		{Title: "PROGRESS", Key: "Progress"},
+		{Title: "VOLUME-ID", Key: "VolumeId"},
+		{Title: "ENCRYPTED", Key: "Encrypted", ColorFunc: output.ColorizeBooleanString},
+	}
+
+	// Fetch EC2 snapshots from the provider
+	data, err := providerClient.GetSnapshots(ctx, 4)
+	if err != nil {
+		return fmt.Errorf("failed to get EC2 snapshots from provider: %v", err)
+	}
+
+	// Extract objects from EC2 envelope
+	data = ExtractEC2Objects(data)
+
+	// Process data to add human-readable fields
+	data = addEC2SnapshotFields(data)
+
+	// Parse query options for advanced query features
+	var queryOpts *querypkg.QueryOptions
+	if query != "" {
+		queryOpts, err = querypkg.ParseQueryString(query)
+		if err != nil {
+			return fmt.Errorf("failed to parse query: %v", err)
+		}
+
+		// Apply query filter
+		data, err = querypkg.ApplyQueryInterface(data, query)
+		if err != nil {
+			return fmt.Errorf("failed to apply query: %v", err)
+		}
+	}
+
+	// Format and display the results
+	emptyMessage := fmt.Sprintf("No EC2 snapshots found for provider %s", providerName)
+	switch outputFormat {
+	case "json":
+		return output.PrintJSONWithEmpty(data, emptyMessage)
+	case "yaml":
+		return output.PrintYAMLWithEmpty(data, emptyMessage)
+	case "markdown":
+		return output.PrintMarkdownWithQuery(data, defaultHeaders, queryOpts, emptyMessage)
+	case "table":
+		return output.PrintTableWithQuery(data, defaultHeaders, queryOpts, emptyMessage)
+	default:
+		return fmt.Errorf("unsupported output format: %s", outputFormat)
+	}
+}
+
 // Helper functions for EC2 data processing
+
+// addEC2SnapshotFields adds human-readable fields to snapshot data
+func addEC2SnapshotFields(data interface{}) interface{} {
+	switch v := data.(type) {
+	case []interface{}:
+		for _, item := range v {
+			if snapshot, ok := item.(map[string]interface{}); ok {
+				processEC2Snapshot(snapshot)
+			}
+		}
+	case map[string]interface{}:
+		processEC2Snapshot(v)
+	}
+	return data
+}
+
+func processEC2Snapshot(snapshot map[string]interface{}) {
+	// Add human-readable size (VolumeSize is in GiB)
+	if size, exists := snapshot["VolumeSize"]; exists {
+		if sizeVal, ok := size.(float64); ok {
+			snapshot["sizeHuman"] = humanizeBytes(sizeVal * 1024 * 1024 * 1024)
+		}
+	}
+}
 
 // addEC2VolumeFields adds human-readable fields to volume data
 func addEC2VolumeFields(data interface{}) interface{} {

@@ -57,7 +57,7 @@ func NewInventoryProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, glo
 	}
 	cmd.Flags().StringVarP(&providerName, "name", "M", "", "Provider name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
+	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 

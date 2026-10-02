@@ -169,7 +169,7 @@ func (group *RouterGroup) StaticFile(relativePath, filepath string) IRoutes {
 	})
 }
 
-// StaticFileFS works just like `StaticFile` but a custom `http.FileSystem` can be used instead..
+// StaticFileFS works just like `StaticFile` but a custom `http.FileSystem` can be used instead.
 // router.StaticFileFS("favicon.ico", "./resources/favicon.ico", Dir{".", false})
 // Gin by default uses: gin.Dir()
 func (group *RouterGroup) StaticFileFS(relativePath, filepath string, fs http.FileSystem) IRoutes {
@@ -218,7 +218,7 @@ func (group *RouterGroup) createStaticHandler(relativePath string, fs http.FileS
 	fileServer := http.StripPrefix(absolutePath, http.FileServer(fs))
 
 	return func(c *Context) {
-		if _, noListing := fs.(*onlyFilesFS); noListing {
+		if _, noListing := fs.(*OnlyFilesFS); noListing {
 			c.Writer.WriteHeader(http.StatusNotFound)
 		}
 

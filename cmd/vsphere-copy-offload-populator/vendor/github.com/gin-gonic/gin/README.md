@@ -2,121 +2,153 @@
 
 <img align="right" width="159px" src="https://raw.githubusercontent.com/gin-gonic/logo/master/color.png">
 
-[![Build Status](https://github.com/gin-gonic/gin/workflows/Run%20Tests/badge.svg?branch=master)](https://github.com/gin-gonic/gin/actions?query=branch%3Amaster)
+[![Build Status](https://github.com/gin-gonic/gin/actions/workflows/gin.yml/badge.svg?branch=master)](https://github.com/gin-gonic/gin/actions/workflows/gin.yml)
+[![Trivy Security Scan](https://github.com/gin-gonic/gin/actions/workflows/trivy-scan.yml/badge.svg)](https://github.com/gin-gonic/gin/actions/workflows/trivy-scan.yml)
 [![codecov](https://codecov.io/gh/gin-gonic/gin/branch/master/graph/badge.svg)](https://codecov.io/gh/gin-gonic/gin)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gin-gonic/gin)](https://goreportcard.com/report/github.com/gin-gonic/gin)
-[![GoDoc](https://pkg.go.dev/badge/github.com/gin-gonic/gin?status.svg)](https://pkg.go.dev/github.com/gin-gonic/gin?tab=doc)
+[![Go Reference](https://pkg.go.dev/badge/github.com/gin-gonic/gin?status.svg)](https://pkg.go.dev/github.com/gin-gonic/gin?tab=doc)
 [![Sourcegraph](https://sourcegraph.com/github.com/gin-gonic/gin/-/badge.svg)](https://sourcegraph.com/github.com/gin-gonic/gin?badge)
 [![Open Source Helpers](https://www.codetriage.com/gin-gonic/gin/badges/users.svg)](https://www.codetriage.com/gin-gonic/gin)
 [![Release](https://img.shields.io/github/release/gin-gonic/gin.svg?style=flat-square)](https://github.com/gin-gonic/gin/releases)
-[![TODOs](https://badgen.net/https/api.tickgit.com/badgen/github.com/gin-gonic/gin)](https://www.tickgit.com/browse?repo=github.com/gin-gonic/gin)
 
-Gin is a web framework written in [Go](https://go.dev/). It features a martini-like API with performance that is up to 40 times faster thanks to [httprouter](https://github.com/julienschmidt/httprouter). If you need performance and good productivity, you will love Gin.
+## 📰 [Announcing Gin 1.12.0!](https://gin-gonic.com/en/blog/news/gin-1-12-0-release-announcement/)
 
-**The key features of Gin are:**
+Read about the latest features and improvements in Gin 1.11.0 on our official blog.
 
-- Zero allocation router
-- Fast
-- Middleware support
-- Crash-free
-- JSON validation
-- Routes grouping
-- Error management
-- Rendering built-in
-- Extendable
+---
 
+Gin is a high-performance HTTP web framework written in [Go](https://go.dev/). It provides a Martini-like API but with significantly better performance—up to 40 times faster—thanks to [httprouter](https://github.com/julienschmidt/httprouter). Gin is designed for building REST APIs, web applications, and microservices where speed and developer productivity are essential.
 
-## Getting started
+**Why choose Gin?**
+
+Gin combines the simplicity of Express.js-style routing with Go's performance characteristics, making it ideal for:
+
+- Building high-throughput REST APIs
+- Developing microservices that need to handle many concurrent requests
+- Creating web applications that require fast response times
+- Prototyping web services quickly with minimal boilerplate
+
+**Gin's key features:**
+
+- **Zero allocation router** - Extremely memory-efficient routing with no heap allocations
+- **High performance** - Benchmarks show superior speed compared to other Go web frameworks
+- **Middleware support** - Extensible middleware system for authentication, logging, CORS, etc.
+- **Crash-free** - Built-in recovery middleware prevents panics from crashing your server
+- **JSON validation** - Automatic request/response JSON binding and validation
+- **Route grouping** - Organize related routes and apply common middleware
+- **Error management** - Centralized error handling and logging
+- **Built-in rendering** - Support for JSON, XML, HTML templates, and more
+- **Extensible** - Large ecosystem of community middleware and plugins
+
+## Getting Started
 
 ### Prerequisites
 
-- **[Go](https://go.dev/)**: any one of the **three latest major** [releases](https://go.dev/doc/devel/release) (we test it with these).
+- **Go version**: Gin requires [Go](https://go.dev/) version [1.25](https://go.dev/doc/devel/release#go1.25.0) or above
+- **Basic Go knowledge**: Familiarity with Go syntax and package management is helpful
 
-### Getting Gin
+### Installation
 
-With [Go module](https://github.com/golang/go/wiki/Modules) support, simply add the following import
+With [Go's module support](https://go.dev/wiki/Modules#how-to-use-modules), simply import Gin in your code and Go will automatically fetch it during build:
 
-```
+```go
 import "github.com/gin-gonic/gin"
 ```
 
-to your code, and then `go [build|run|test]` will automatically fetch the necessary dependencies.
+### Your First Gin Application
 
-Otherwise, run the following Go command to install the `gin` package:
-
-```sh
-$ go get -u github.com/gin-gonic/gin
-```
-
-### Running Gin
-
-First you need to import Gin package for using Gin, one simplest example likes the follow `example.go`:
+Here's a complete example that demonstrates Gin's simplicity:
 
 ```go
 package main
 
 import (
+  "log"
   "net/http"
 
   "github.com/gin-gonic/gin"
 )
 
 func main() {
+  // Create a Gin router with default middleware (logger and recovery)
   r := gin.Default()
+
+  // Define a simple GET endpoint
   r.GET("/ping", func(c *gin.Context) {
+    // Return JSON response
     c.JSON(http.StatusOK, gin.H{
       "message": "pong",
     })
   })
-  r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+
+  // Start server on port 8080 (default)
+  // Server will listen on 0.0.0.0:8080 (localhost:8080 on Windows)
+  if err := r.Run(); err != nil {
+    log.Fatalf("failed to run server: %v", err)
+  }
 }
 ```
 
-And use the Go command to run the demo:
+**Running the application:**
 
-```
-# run example.go and visit 0.0.0.0:8080/ping on browser
-$ go run example.go
-```
+1. Save the code above as `main.go`
+2. Run the application:
 
-### Learn more examples
+   ```sh
+   go run main.go
+   ```
 
-#### Quick Start
+3. Open your browser and visit [`http://localhost:8080/ping`](http://localhost:8080/ping)
+4. You should see: `{"message":"pong"}`
 
-Learn and practice more examples, please read the [Gin Quick Start](docs/doc.md) which includes API examples and builds tag.
+**What this example demonstrates:**
 
-#### Examples
+- Creating a Gin router with default middleware
+- Defining HTTP endpoints with simple handler functions
+- Returning JSON responses
+- Starting an HTTP server
 
-A number of ready-to-run examples demonstrating various use cases of Gin on the [Gin examples](https://github.com/gin-gonic/examples) repository.
+### Next Steps
 
+After running your first Gin application, explore these resources to learn more:
 
-## Documentation
+#### 📚 Learning Resources
 
-See [API documentation and descriptions](https://godoc.org/github.com/gin-gonic/gin) for package.
+- **[Gin Quick Start Guide](docs/doc.md)** - Comprehensive tutorial with API examples and build configurations
+- **[Example Repository](https://github.com/gin-gonic/examples)** - Ready-to-run examples demonstrating various Gin use cases:
+  - REST API development
+  - Authentication & middleware
+  - File uploads and downloads
+  - WebSocket connections
+  - Template rendering
 
-All documentation is available on the Gin website.
+## 📖 Documentation
 
-- [English](https://gin-gonic.com/docs/)
-- [简体中文](https://gin-gonic.com/zh-cn/docs/)
-- [繁體中文](https://gin-gonic.com/zh-tw/docs/)
-- [日本語](https://gin-gonic.com/ja/docs/)
-- [Español](https://gin-gonic.com/es/docs/)
-- [한국어](https://gin-gonic.com/ko-kr/docs/)
-- [Turkish](https://gin-gonic.com/tr/docs/)
-- [Persian](https://gin-gonic.com/fa/docs/)
+### API Reference
 
-### Articles about Gin
+- **[Go.dev API Documentation](https://pkg.go.dev/github.com/gin-gonic/gin)** - Complete API reference with examples
 
-A curated list of awesome Gin framework.
+### User Guides
 
-- [Tutorial: Developing a RESTful API with Go and Gin](https://go.dev/doc/tutorial/web-service-gin)
+The comprehensive documentation is available on [gin-gonic.com](https://gin-gonic.com) in multiple languages:
 
-## Benchmarks
+- [English](https://gin-gonic.com/en/docs/) | [简体中文](https://gin-gonic.com/zh-cn/docs/) | [繁體中文](https://gin-gonic.com/zh-tw/docs/)
+- [日本語](https://gin-gonic.com/ja/docs/) | [한국어](https://gin-gonic.com/ko-kr/docs/) | [Español](https://gin-gonic.com/es/docs/)
+- [Turkish](https://gin-gonic.com/tr/docs/) | [Persian](https://gin-gonic.com/fa/docs/) | [Português](https://gin-gonic.com/pt/docs/)
+- [Russian](https://gin-gonic.com/ru/docs/) | [Indonesian](https://gin-gonic.com/id/docs/)
 
-Gin uses a custom version of [HttpRouter](https://github.com/julienschmidt/httprouter), [see all benchmarks details](/BENCHMARKS.md).
+### Official Tutorials
+
+- [Go.dev Tutorial: Developing a RESTful API with Go and Gin](https://go.dev/doc/tutorial/web-service-gin)
+
+## ⚡ Performance Benchmarks
+
+Gin demonstrates exceptional performance compared to other Go web frameworks. It uses a custom version of [HttpRouter](https://github.com/julienschmidt/httprouter) for maximum efficiency. [View detailed benchmarks →](/BENCHMARKS.md)
+
+**Gin vs. Other Go Frameworks** (GitHub API routing benchmark):
 
 | Benchmark name                 |       (1) |             (2) |          (3) |             (4) |
-| ------------------------------ | ---------:| ---------------:| ------------:| ---------------:|
+| ------------------------------ | --------: | --------------: | -----------: | --------------: |
 | BenchmarkGin_GithubAll         | **43550** | **27364 ns/op** |   **0 B/op** | **0 allocs/op** |
 | BenchmarkAce_GithubAll         |     40543 |     29670 ns/op |       0 B/op |     0 allocs/op |
 | BenchmarkAero_GithubAll        |     57632 |     20648 ns/op |       0 B/op |     0 allocs/op |
@@ -153,26 +185,43 @@ Gin uses a custom version of [HttpRouter](https://github.com/julienschmidt/httpr
 - (3): Heap Memory (B/op), lower is better
 - (4): Average Allocations per Repetition (allocs/op), lower is better
 
+## 🔌 Middleware Ecosystem
 
-## Middlewares
+Gin has a rich ecosystem of middleware for common web development needs. Explore community-contributed middleware:
 
-You can find many useful Gin middlewares at [gin-contrib](https://github.com/gin-contrib).
+- **[gin-contrib](https://github.com/gin-contrib)** - Official middleware collection including:
+  - Authentication (JWT, Basic Auth, Sessions)
+  - CORS, Rate limiting, Compression
+  - Logging, Metrics, Tracing
+  - Static file serving, Template engines
+- **[gin-gonic/contrib](https://github.com/gin-gonic/contrib)** - Additional community middleware
 
+## 🏢 Production Usage
 
-## Users
+Gin powers many high-traffic applications and services in production:
 
-Awesome project lists using [Gin](https://github.com/gin-gonic/gin) web framework.
+- **[gorush](https://github.com/appleboy/gorush)** - High-performance push notification server
+- **[fnproject](https://github.com/fnproject/fn)** - Container-native, serverless platform
+- **[photoprism](https://github.com/photoprism/photoprism)** - AI-powered personal photo management
+- **[lura](https://github.com/luraproject/lura)** - Ultra-performant API Gateway framework
+- **[picfit](https://github.com/thoas/picfit)** - Real-time image processing server
+- **[dkron](https://github.com/distribworks/dkron)** - Distributed job scheduling system
 
-* [gorush](https://github.com/appleboy/gorush): A push notification server written in Go.
-* [fnproject](https://github.com/fnproject/fn): The container native, cloud agnostic serverless platform.
-* [photoprism](https://github.com/photoprism/photoprism): Personal photo management powered by Go and Google TensorFlow.
-* [lura](https://github.com/luraproject/lura): Ultra performant API Gateway with middlewares.
-* [picfit](https://github.com/thoas/picfit): An image resizing server written in Go.
-* [dkron](https://github.com/distribworks/dkron): Distributed, fault tolerant job scheduling system.
+## 🤝 Contributing
 
+Gin is the work of hundreds of contributors from around the world. We welcome and appreciate your contributions!
 
-## Contributing
+### How to Contribute
 
-Gin is the work of hundreds of contributors. We appreciate your help!
+- 🐛 **Report bugs** - Help us identify and fix issues
+- 💡 **Suggest features** - Share your ideas for improvements
+- 📝 **Improve documentation** - Help make our docs clearer
+- 🔧 **Submit code** - Fix bugs or implement new features
+- 🧪 **Write tests** - Improve our test coverage
 
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details on submitting patches and the contribution workflow.
+### Getting Started with Contributing
+
+1. Check out our [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines
+2. Join our community discussions and ask questions
+
+**All contributions are valued and help make Gin better for everyone!**

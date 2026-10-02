@@ -7,6 +7,8 @@ The *Goscaleio* project represents API bindings that can be used to provide Scal
 - [Licensing](#licensing)
 - [Support](#support)
 
+
+
 ## Use Cases
 Any application written in Go can take advantage of these bindings.  Specifically, things that are involved in monitoring, management, and more specifically infrastructrue as code would find these bindings relevant.
 
@@ -91,3 +93,4 @@ Unless required by applicable law or agreed to in writing, software distributed 
 -------
 
 For any issues, questions or feedback, please follow our [support process](https://github.com/dell/csm/blob/main/docs/SUPPORT.md)
+
