@@ -9,6 +9,7 @@ import (
 const (
 	forkliftPropertyOriginalVolumeID = "forklift_original_volume_id"
 	forkliftPropertyOriginalImageID  = "forklift_original_image_id"
+	annImageName                     = "forklift.konveyor.io/image-name"
 )
 
 func getMigrationID(ctx *plancontext.Context) string {
