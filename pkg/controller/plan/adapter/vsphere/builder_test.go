@@ -1082,17 +1082,19 @@ var _ = Describe("vSphere builder", func() {
 	// Tests covering PodEnvironment env-var logic for DHCP/preserve/mixed modes.
 	// Exercises ResolveNICModes → HasPreserveMode/HasDHCPMode → mapMacStaticIps → env construction.
 	Context("PodEnvironment env vars for networkIPMode", func() {
-		// Helper: simulates the PodEnvironment env-var logic block
+		// Helper: mirrors PodEnvironment env-var construction for a given mode map.
 		buildEnvVars := func(b *Builder, vm *model.VM, modeByMAC map[string]string) []core.EnvVar {
 			var env []core.EnvVar
-			if planbase.HasPreserveMode(modeByMAC) || planbase.HasDHCPMode(modeByMAC) {
+			shouldPreserve := planbase.HasPreserveMode(modeByMAC) ||
+				(b.Plan.Spec.PreserveStaticIPs && len(modeByMAC) == 0)
+			if shouldPreserve || planbase.HasDHCPMode(modeByMAC) {
 				macsToIps, err := b.mapMacStaticIps(vm, modeByMAC)
 				Expect(err).NotTo(HaveOccurred())
 				if macsToIps != "" {
+					if shouldPreserve {
+						env = append(env, core.EnvVar{Name: "V2V_preserveStaticIPs", Value: "true"})
+					}
 					env = append(env, core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps})
-				}
-				if planbase.HasPreserveMode(modeByMAC) {
-					env = append(env, core.EnvVar{Name: "V2V_preserveStaticIPs", Value: "true"})
 				}
 			}
 			return env
@@ -1181,6 +1183,242 @@ var _ = Describe("vSphere builder", func() {
 			}
 			env := buildEnvVars(b, vm, modeByMAC)
 			Expect(env).To(BeEmpty(), "no env vars when all modes are none")
+		})
+	})
+
+	Context("PodEnvironment with a name-based NetworkMap", func() {
+		staticIPsEnv := func(env []core.EnvVar) (string, bool) {
+			for _, e := range env {
+				if e.Name == "V2V_staticIPs" {
+					return e.Value, true
+				}
+			}
+			return "", false
+		}
+		hasPreserveFlagEnv := func(env []core.EnvVar) bool {
+			for _, e := range env {
+				if e.Name == "V2V_preserveStaticIPs" && e.Value == "true" {
+					return true
+				}
+			}
+			return false
+		}
+
+		It("should populate V2V_staticIPs when the plan requests preservation (Defect A)", func() {
+			vm := model.VM{
+				VM1: model.VM1{VM0: model.VM0{ID: "vm-1", Name: "test-vm"}},
+			}
+			vm.GuestID = "windows9Guest"
+			vm.NICs = []vsphere.NIC{
+				{MAC: "00:50:56:83:25:47", Network: vsphere.Ref{ID: "net-A"}},
+			}
+			vm.GuestNetworks = []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+			}
+			vm.GuestIpStacks = []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}}
+
+			builder := createBuilder()
+			builder.Plan.Spec.PreserveStaticIPs = true
+			builder.Source.Inventory = &mockInventory{
+				vm: vm,
+				networksByName: map[string]model.Network{
+					"network-a": {Resource: model.Resource{ID: "net-A"}},
+				},
+			}
+			builder.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{Map: []v1beta1.NetworkPair{
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-a"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}},
+				}},
+			}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			staticIPs, found := staticIPsEnv(env)
+			Expect(found).To(BeTrue())
+			Expect(staticIPs).To(ContainSubstring("00:50:56:83:25:47"))
+			Expect(hasPreserveFlagEnv(env)).To(BeTrue())
+		})
+
+		It("should honor a per-network 'preserve' override when the plan-level flag is false", func() {
+			vm := model.VM{
+				VM1: model.VM1{VM0: model.VM0{ID: "vm-1", Name: "test-vm"}},
+			}
+			vm.GuestID = "windows9Guest"
+			vm.NICs = []vsphere.NIC{
+				{MAC: "00:50:56:83:25:47", Network: vsphere.Ref{ID: "net-A"}},
+				{MAC: "00:50:56:83:25:48", Network: vsphere.Ref{ID: "net-B"}},
+			}
+			vm.GuestNetworks = []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+				{MAC: "00:50:56:83:25:48", IP: "172.29.3.194", Origin: ManualOrigin, PrefixLength: 16},
+			}
+			vm.GuestIpStacks = []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}}
+
+			builder := createBuilder()
+			builder.Plan.Spec.PreserveStaticIPs = false
+			builder.Source.Inventory = &mockInventory{
+				vm: vm,
+				networksByName: map[string]model.Network{
+					"network-a": {Resource: model.Resource{ID: "net-A"}},
+					"network-b": {Resource: model.Resource{ID: "net-B"}},
+				},
+			}
+			builder.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{Map: []v1beta1.NetworkPair{
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-a"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}, NetworkIPMode: v1beta1.NetworkIPModePreserve},
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-b"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}},
+				}},
+			}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			staticIPs, found := staticIPsEnv(env)
+			Expect(found).To(BeTrue())
+			Expect(staticIPs).To(ContainSubstring("00:50:56:83:25:47"))
+			Expect(staticIPs).NotTo(ContainSubstring("00:50:56:83:25:48"))
+			Expect(hasPreserveFlagEnv(env)).To(BeTrue())
+		})
+
+		It("should honor a per-network 'none' override on a name-based NetworkMap (Defect B)", func() {
+			vm := model.VM{
+				VM1: model.VM1{VM0: model.VM0{ID: "vm-1", Name: "test-vm"}},
+			}
+			vm.GuestID = "windows9Guest"
+			vm.NICs = []vsphere.NIC{
+				{MAC: "00:50:56:83:25:47", Network: vsphere.Ref{ID: "net-A"}},
+				{MAC: "00:50:56:83:25:48", Network: vsphere.Ref{ID: "net-B"}},
+			}
+			vm.GuestNetworks = []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+				{MAC: "00:50:56:83:25:48", IP: "172.29.3.194", Origin: ManualOrigin, PrefixLength: 16},
+			}
+			vm.GuestIpStacks = []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}}
+
+			builder := createBuilder()
+			builder.Plan.Spec.PreserveStaticIPs = true
+			builder.Source.Inventory = &mockInventory{
+				vm: vm,
+				networksByName: map[string]model.Network{
+					"network-a": {Resource: model.Resource{ID: "net-A"}},
+					"network-b": {Resource: model.Resource{ID: "net-B"}},
+				},
+			}
+			builder.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{Map: []v1beta1.NetworkPair{
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-a"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}},
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-b"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}, NetworkIPMode: v1beta1.NetworkIPModeNone},
+				}},
+			}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			staticIPs, found := staticIPsEnv(env)
+			Expect(found).To(BeTrue())
+			Expect(staticIPs).To(ContainSubstring("00:50:56:83:25:47"))
+			Expect(staticIPs).NotTo(ContainSubstring("00:50:56:83:25:48"))
+		})
+
+		It("Linux DHCP override must not set V2V_preserveStaticIPs when the plan-level flag is true", func() {
+			vm := model.VM{
+				VM1: model.VM1{VM0: model.VM0{ID: "vm-1", Name: "test-vm"}},
+			}
+			vm.GuestID = "rhel8Guest"
+			vm.NICs = []vsphere.NIC{
+				{MAC: "00:50:56:83:25:47", Network: vsphere.Ref{ID: "net-A"}},
+			}
+			vm.GuestNetworks = []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+			}
+			vm.GuestIpStacks = []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}}
+
+			builder := createBuilder()
+			builder.Plan.Spec.PreserveStaticIPs = true
+			builder.Source.Inventory = &mockInventory{
+				vm: vm,
+				networksByName: map[string]model.Network{
+					"network-a": {Resource: model.Resource{ID: "net-A"}},
+				},
+			}
+			builder.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{Map: []v1beta1.NetworkPair{
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-a"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}, NetworkIPMode: v1beta1.NetworkIPModeDHCP},
+				}},
+			}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			staticIPs, found := staticIPsEnv(env)
+			Expect(found).To(BeTrue(), "Linux DHCP still needs V2V_staticIPs for udev naming")
+			Expect(staticIPs).To(ContainSubstring("00:50:56:83:25:47"))
+			Expect(hasPreserveFlagEnv(env)).To(BeFalse(), "networkIPMode=dhcp must override plan-level PreserveStaticIPs")
+		})
+
+		It("ID-based Linux DHCP override must not set V2V_preserveStaticIPs when the plan-level flag is true", func() {
+			vm := model.VM{
+				VM1: model.VM1{VM0: model.VM0{ID: "vm-1", Name: "test-vm"}},
+			}
+			vm.GuestID = "rhel8Guest"
+			vm.NICs = []vsphere.NIC{
+				{MAC: "00:50:56:83:25:47", Network: vsphere.Ref{ID: "net-A"}},
+			}
+			vm.GuestNetworks = []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+			}
+			vm.GuestIpStacks = []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}}
+
+			builder := createBuilder()
+			builder.Plan.Spec.PreserveStaticIPs = true
+			builder.Source.Inventory = &mockInventory{
+				vm: vm,
+				networks: map[string]model.Network{
+					"net-A": {Resource: model.Resource{ID: "net-A"}},
+				},
+			}
+			builder.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{Map: []v1beta1.NetworkPair{
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "net-A"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}, NetworkIPMode: v1beta1.NetworkIPModeDHCP},
+				}},
+			}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			staticIPs, found := staticIPsEnv(env)
+			Expect(found).To(BeTrue())
+			Expect(staticIPs).To(ContainSubstring("00:50:56:83:25:47"))
+			Expect(hasPreserveFlagEnv(env)).To(BeFalse(), "networkIPMode=dhcp must override plan-level PreserveStaticIPs")
+		})
+
+		It("Windows DHCP override with plan-level preserve must not emit V2V_staticIPs", func() {
+			vm := model.VM{
+				VM1: model.VM1{VM0: model.VM0{ID: "vm-1", Name: "test-vm"}},
+			}
+			vm.GuestID = "windows9Guest"
+			vm.NICs = []vsphere.NIC{
+				{MAC: "00:50:56:83:25:47", Network: vsphere.Ref{ID: "net-A"}},
+			}
+			vm.GuestNetworks = []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+			}
+
+			builder := createBuilder()
+			builder.Plan.Spec.PreserveStaticIPs = true
+			builder.Source.Inventory = &mockInventory{
+				vm: vm,
+				networksByName: map[string]model.Network{
+					"network-a": {Resource: model.Resource{ID: "net-A"}},
+				},
+			}
+			builder.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{Map: []v1beta1.NetworkPair{
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-a"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}, NetworkIPMode: v1beta1.NetworkIPModeDHCP},
+				}},
+			}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			_, found := staticIPsEnv(env)
+			Expect(found).To(BeFalse())
+			Expect(hasPreserveFlagEnv(env)).To(BeFalse())
 		})
 	})
 
