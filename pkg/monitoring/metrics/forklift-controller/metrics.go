@@ -1,27 +1,43 @@
 package forklift_controller
 
 import (
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
-	Succeeded = "Succeeded"
-	Failed    = "Failed"
-	Executing = "Executing"
-	Running   = "Running"
-	Pending   = "Pending"
-	Canceled  = "Canceled"
-	Completed = "Completed"
-	Blocked   = "Blocked"
-	Ready     = "Ready"
-	Deleted   = "Deleted"
-	Warm      = "Warm"
-	Cold      = "Cold"
-	Live      = "Live"
-	Local     = "Local"
-	Remote    = "Remote"
+	Succeeded  = "Succeeded"
+	Failed     = "Failed"
+	Executing  = "Executing"
+	Running    = "Running"
+	Pending    = "Pending"
+	Canceled   = "Canceled"
+	Completed  = "Completed"
+	Blocked    = "Blocked"
+	Ready      = "Ready"
+	Deleted    = "Deleted"
+	Warm       = "Warm"
+	Cold       = "Cold"
+	Live       = "Live"
+	Conversion = "Conversion"
+	Local      = "Local"
+	Remote     = "Remote"
 )
+
+// modeForType maps a plan's migration type to the Prometheus 'mode' label value.
+func modeForType(t api.MigrationType) string {
+	switch t {
+	case api.MigrationWarm:
+		return Warm
+	case api.MigrationLive:
+		return Live
+	case api.MigrationOnlyConversion:
+		return Conversion
+	default:
+		return Cold
+	}
+}
 
 var (
 	// 'status' - [ Succeeded, Failed, Canceled]
