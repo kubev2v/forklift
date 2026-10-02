@@ -708,7 +708,7 @@ var _ = Describe("Customize", func() {
 			// DynamicScriptsDir does not exist
 			mockFileSystem.EXPECT().Stat(appConfig.DynamicScriptsDir).Return(nil, os.ErrNotExist)
 
-			// addWinFirstbootScripts - QEMU GA upload + batch upload
+			// addWinFirstbootScripts - QEMU GA upload + batch upload (IPv6 script only if PodNetworkMACs set)
 			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
 
@@ -814,6 +814,7 @@ var _ = Describe("Customize", func() {
 			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
 
+			// QEMU GA upload + VMware driver removal uploads
 			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder).Times(3)
 
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
