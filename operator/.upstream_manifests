@@ -11017,6 +11017,12 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - networks
+  verbs:
+  - get
+- apiGroups:
   - ""
   resources:
   - pods

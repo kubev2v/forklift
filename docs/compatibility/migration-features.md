@@ -14,7 +14,7 @@ Forklift supports four migration types, specified via `spec.type` in the Plan CR
 
 | Type | Description |
 |------|-------------|
-| `cold` | VM is shut down before migration. Most reliable method. |
+| `cold` | The controller shuts down the source VM before disk copy (works whether the VM starts on or off). Most reliable method. |
 | `warm` | Initial disk copy while VM runs, brief downtime for final sync. |
 | `live` | Minimal downtime migration using KubeVirt live migration. |
 | `conversion` | Only perform guest OS conversion without disk transfer. |

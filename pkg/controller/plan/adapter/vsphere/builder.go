@@ -310,6 +310,33 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Value: macsToIps,
 		})
 	}
+
+	// Only collect Pod-network MACs for masquerade interfaces on IPv6-enabled
+	// clusters. UDN namespaces use l2bridge (not masquerade) and IPv4-only
+	// clusters need no special Pod network config.
+	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
+	if !hasUDN {
+		hasIPv6, detectErr := planbase.PodNetworkHasIPv6(context.TODO(), r.Destination.Client)
+		if detectErr != nil {
+			err = liberr.Wrap(detectErr, "podNetworkHasIPv6")
+			return
+		}
+		if !hasIPv6 {
+			return
+		}
+		if nicKeys, pairsBySource, resolverErr := r.buildNICResolver(vm.NICs); resolverErr == nil {
+			podMacs := planbase.CollectPodNetworkMACs(nicKeys, pairsBySource, vm.NICs, func(nic vsphere.NIC) string {
+				return nic.MAC
+			})
+			if len(podMacs) > 0 {
+				env = append(env, core.EnvVar{
+					Name:  "V2V_podNetworkIPv6MACs",
+					Value: strings.Join(podMacs, ","),
+				})
+			}
+		}
+	}
+
 	return
 }
 
@@ -3002,4 +3029,8 @@ func sanitizeForK8sMetadata(s string) string {
 		sanitized = strings.TrimRight(sanitized, "_.-")
 	}
 	return sanitized
+}
+
+func (r *Builder) DomainXML(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (string, error) {
+	return "", nil
 }

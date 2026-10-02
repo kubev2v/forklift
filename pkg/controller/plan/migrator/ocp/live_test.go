@@ -202,6 +202,35 @@ var _ = Describe("requestSize", func() {
 	})
 })
 
+var _ = Describe("target PVC", func() {
+	var builder *Builder
+	var sourcePvc *model.PersistentVolumeClaim
+	var storage api.DestinationStorage
+
+	BeforeEach(func() {
+		builder = &Builder{}
+		builder.Context = &plancontext.Context{}
+		builder.Plan = &api.Plan{}
+		builder.Plan.Spec = api.PlanSpec{}
+		builder.Plan.Spec.TargetNamespace = "test"
+		sourcePvc = &model.PersistentVolumeClaim{}
+		storage = api.DestinationStorage{}
+	})
+
+	It("should set the access mode from the storage map if available", func() {
+		storage.AccessMode = core.ReadWriteOnce
+		pvc := builder.targetPvc(sourcePvc, storage)
+		Expect(pvc.Spec.AccessModes[0]).To(Equal(core.ReadWriteOnce))
+	})
+
+	It("should copy the accessmode from the source PVC if not in the storage map", func() {
+		sourcePvc.Object.Spec.AccessModes = []core.PersistentVolumeAccessMode{core.ReadWriteMany}
+		pvc := builder.targetPvc(sourcePvc, storage)
+		Expect(pvc.Spec.AccessModes[0]).To(Equal(core.ReadWriteMany))
+	})
+
+})
+
 func makeBuilder(networkPairs ...api.NetworkPair) *Builder {
 	b := &Builder{}
 	b.Context = &plancontext.Context{}

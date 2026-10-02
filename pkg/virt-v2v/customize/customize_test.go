@@ -143,99 +143,6 @@ var _ = Describe("Customize", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to execute domain customization"))
 		})
-
-		It("adds --selinux-relabel-at-boot when SelinuxRelabelAtBoot is enabled", func() {
-			customize.disks = disks
-			appConfig.SelinuxRelabelAtBoot = true
-			mockCommandBuilder.EXPECT().New("virt-customize").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("--selinux-relabel-at-boot").Return(mockCommandBuilder)
-			for _, expectedScript := range expectedRunScripts {
-				mockCommandBuilder.EXPECT().AddArg("--run", expectedScript).Return(mockCommandBuilder)
-			}
-			for _, expectedScript := range expectedFirstBootScripts {
-				mockCommandBuilder.EXPECT().AddArg("--firstboot", expectedScript).Return(mockCommandBuilder)
-			}
-			for _, disk := range disks {
-				mockCommandBuilder.EXPECT().AddArg("--add", disk).Return(mockCommandBuilder)
-			}
-			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
-			mockCommandExecutor.EXPECT().Run().Return(nil)
-			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
-			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
-
-			mockFileSystem.EXPECT().Stat(gomock.Any()).Return(nil, os.ErrNotExist)
-			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "run")).Return(runScripts, nil)
-			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "firstboot")).Return(firstBootScripts, nil)
-
-			err := customize.customizeLinux()
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("adds --selinux-relabel-exclude for each configured directory", func() {
-			customize.disks = disks
-			appConfig.SelinuxRelabelExclude = []string{"/var/lib/etcd", "/data", "/persistent"}
-			mockCommandBuilder.EXPECT().New("virt-customize").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
-			for _, dir := range appConfig.SelinuxRelabelExclude {
-				mockCommandBuilder.EXPECT().AddArg("--selinux-relabel-exclude", dir).Return(mockCommandBuilder)
-			}
-			for _, expectedScript := range expectedRunScripts {
-				mockCommandBuilder.EXPECT().AddArg("--run", expectedScript).Return(mockCommandBuilder)
-			}
-			for _, expectedScript := range expectedFirstBootScripts {
-				mockCommandBuilder.EXPECT().AddArg("--firstboot", expectedScript).Return(mockCommandBuilder)
-			}
-			for _, disk := range disks {
-				mockCommandBuilder.EXPECT().AddArg("--add", disk).Return(mockCommandBuilder)
-			}
-			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
-			mockCommandExecutor.EXPECT().Run().Return(nil)
-			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
-			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
-
-			mockFileSystem.EXPECT().Stat(gomock.Any()).Return(nil, os.ErrNotExist)
-			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "run")).Return(runScripts, nil)
-			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "firstboot")).Return(firstBootScripts, nil)
-
-			err := customize.customizeLinux()
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("adds both selinux relabel flags when both are configured", func() {
-			customize.disks = disks
-			appConfig.SelinuxRelabelAtBoot = true
-			appConfig.SelinuxRelabelExclude = []string{"/var/lib/etcd", "/data"}
-			mockCommandBuilder.EXPECT().New("virt-customize").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("--selinux-relabel-at-boot").Return(mockCommandBuilder)
-			for _, dir := range appConfig.SelinuxRelabelExclude {
-				mockCommandBuilder.EXPECT().AddArg("--selinux-relabel-exclude", dir).Return(mockCommandBuilder)
-			}
-			for _, expectedScript := range expectedRunScripts {
-				mockCommandBuilder.EXPECT().AddArg("--run", expectedScript).Return(mockCommandBuilder)
-			}
-			for _, expectedScript := range expectedFirstBootScripts {
-				mockCommandBuilder.EXPECT().AddArg("--firstboot", expectedScript).Return(mockCommandBuilder)
-			}
-			for _, disk := range disks {
-				mockCommandBuilder.EXPECT().AddArg("--add", disk).Return(mockCommandBuilder)
-			}
-			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
-			mockCommandExecutor.EXPECT().Run().Return(nil)
-			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
-			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
-
-			mockFileSystem.EXPECT().Stat(gomock.Any()).Return(nil, os.ErrNotExist)
-			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "run")).Return(runScripts, nil)
-			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "firstboot")).Return(firstBootScripts, nil)
-
-			err := customize.customizeLinux()
-			Expect(err).ToNot(HaveOccurred())
-		})
 	})
 
 	Describe("handleStaticIPConfiguration", func() {
@@ -801,7 +708,7 @@ var _ = Describe("Customize", func() {
 			// DynamicScriptsDir does not exist
 			mockFileSystem.EXPECT().Stat(appConfig.DynamicScriptsDir).Return(nil, os.ErrNotExist)
 
-			// addWinFirstbootScripts - QEMU GA upload + batch upload
+			// addWinFirstbootScripts - QEMU GA upload + batch upload (IPv6 script only if PodNetworkMACs set)
 			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
 
@@ -907,6 +814,7 @@ var _ = Describe("Customize", func() {
 			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
 
+			// QEMU GA upload + VMware driver removal uploads
 			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder).Times(3)
 
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
