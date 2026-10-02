@@ -270,6 +270,22 @@ spec:
           value: "{{ virt_v2v_container_requests_cpu }}"
         - name: VIRT_V2V_CONTAINER_REQUESTS_MEMORY
           value: "{{ virt_v2v_container_requests_memory }}"
+{% if virt_v2v_seccomp_profile_type is defined and virt_v2v_seccomp_profile_type != "" %}
+        - name: VIRT_V2V_SECCOMP_PROFILE_TYPE
+          value: "{{ virt_v2v_seccomp_profile_type }}"
+{% endif %}
+{% if virt_v2v_seccomp_profile_type is defined and virt_v2v_seccomp_profile_type == "Localhost" and virt_v2v_seccomp_profile_path is defined and virt_v2v_seccomp_profile_path != "" %}
+        - name: VIRT_V2V_SECCOMP_PROFILE_PATH
+          value: "{{ virt_v2v_seccomp_profile_path }}"
+{% endif %}
+{% if virt_v2v_apparmor_profile_type is defined and virt_v2v_apparmor_profile_type != "" %}
+        - name: VIRT_V2V_APPARMOR_PROFILE_TYPE
+          value: "{{ virt_v2v_apparmor_profile_type }}"
+{% endif %}
+{% if virt_v2v_apparmor_profile_type is defined and virt_v2v_apparmor_profile_type == "Localhost" and virt_v2v_apparmor_profile_path is defined and virt_v2v_apparmor_profile_path != "" %}
+        - name: VIRT_V2V_APPARMOR_PROFILE_PATH
+          value: "{{ virt_v2v_apparmor_profile_path }}"
+{% endif %}
         - name: HOOKS_CONTAINER_LIMITS_CPU
           value: "{{ hooks_container_limits_cpu }}"
         - name: HOOKS_CONTAINER_LIMITS_MEMORY
