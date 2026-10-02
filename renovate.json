@@ -5,7 +5,6 @@
     "github>konflux-ci/mintmaker-presets:cve-automerge-high"
   ],
   "prConcurrentLimit": 5,
-  "prHourlyLimit": 2,
   "rpm-lockfile": {
     "lockFileMaintenance": {
       "enabled": false
@@ -26,12 +25,6 @@
       "automerge": true
     },
     {
-      "matchBaseBranches": ["main"],
-      "matchManagers": ["gomod"],
-      "matchUpdateTypes": ["major"],
-      "groupName": "all go major dependencies"
-    },
-    {
       "description": "Group + automerge dockerfile non-major dependencies",
       "matchBaseBranches": ["/^release.*/", "main"],
       "matchManagers": ["dockerfile"],
@@ -40,23 +33,33 @@
       "automerge": true
     },
     {
-      "matchBaseBranches": ["main"],
+      "description": "Group dockerfile major dependencies",
+      "matchBaseBranches": ["/^release.*/", "main"],
       "matchManagers": ["dockerfile"],
       "matchUpdateTypes": ["major"],
       "groupName": "all dockerfile major dependencies"
     },
     {
+      "description": "Group go major dependencies",
       "matchBaseBranches": ["/^release.*/", "main"],
       "matchManagers": ["gomod"],
       "matchUpdateTypes": ["major"],
       "groupName": "all go major dependencies"
     },
     {
-      "description": "Group + automerge GitHub Actions updates",
+      "description": "Group + automerge GitHub Actions non-major dependencies",
+      "matchBaseBranches": ["/^release.*/", "main"],
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "groupName": "github action dependencies",
+      "groupName": "all github action non-major dependencies",
       "automerge": true
+    },
+    {
+      "description": "Group GitHub Actions major dependencies",
+      "matchBaseBranches": ["/^release.*/", "main"],
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "all github action major dependencies"
     },
     {
       "description": "Disable all updates for EOL branches",
