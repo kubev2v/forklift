@@ -54,6 +54,7 @@
     {
       "description": "Group + automerge GitHub Actions updates",
       "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "groupName": "github action dependencies",
       "automerge": true
     },
