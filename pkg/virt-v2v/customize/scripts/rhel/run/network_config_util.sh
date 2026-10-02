@@ -486,11 +486,21 @@ udev_from_ifquery() {
         $IFQUERY_CMD -i "$NETWORK_INTERFACES_DIR" "$@" 2>&3
     }
 
+    list_ifquery_interfaces() {
+        # Interfaces may belong to more than one allow class, so keep the first
+        # occurrence while preserving ifquery's order.
+        {
+            ifquery_get -l
+            ifquery_get -l --allow=hotplug
+        } | awk 'NF && !seen[$0]++'
+        return $?
+    }
+
     # Loop over all interface names and return the one with target_ip, or null
     find_interface_by_ip() {
         target_ip="$1"
         # Loop through all interfaces and check for the given IP address
-        ifquery_get -l | while read -r IFNAME; do
+        list_ifquery_interfaces | while read -r IFNAME; do
             if ifquery_get "$IFNAME" | grep -q "$target_ip\b"; then
                 echo "$IFNAME"
                 return
