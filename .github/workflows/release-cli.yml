@@ -25,7 +25,7 @@ jobs:
             echo "assets_exist=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.check_assets.outputs.assets_exist != 'true'
         with:
           fetch-depth: 0
