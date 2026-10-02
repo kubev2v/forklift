@@ -5,6 +5,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/kubev2v/forklift/pkg/settings"
 )
 
 var _ = Describe("vSphere permissions", func() {
@@ -199,6 +201,40 @@ var _ = Describe("vSphere permissions", func() {
 			missing, checked := c.MissingPrivileges()
 			Expect(checked).To(BeTrue())
 			Expect(missing).To(BeNil())
+		})
+	})
+
+	Describe("getRequiredPrivileges", func() {
+		It("should include tag privileges when tagging is enabled", func() {
+			original := settings.Settings.PostMigrationTaggingEnabled
+			defer func() { settings.Settings.PostMigrationTaggingEnabled = original }()
+			settings.Settings.PostMigrationTaggingEnabled = true
+
+			privs := getRequiredPrivileges()
+			var found bool
+			for _, group := range privs {
+				if group.Description == "Post-Migration VM Tagging" {
+					Expect(group.Privileges).To(ConsistOf(
+						"InventoryService.Tagging.CreateCategory",
+						"InventoryService.Tagging.CreateTag",
+						"InventoryService.Tagging.AttachTag",
+					))
+					found = true
+					break
+				}
+			}
+			Expect(found).To(BeTrue(), "tag privileges not found when tagging enabled")
+		})
+
+		It("should exclude tag privileges when tagging is disabled", func() {
+			original := settings.Settings.PostMigrationTaggingEnabled
+			defer func() { settings.Settings.PostMigrationTaggingEnabled = original }()
+			settings.Settings.PostMigrationTaggingEnabled = false
+
+			privs := getRequiredPrivileges()
+			for _, group := range privs {
+				Expect(group.Description).NotTo(Equal("Post-Migration VM Tagging"))
+			}
 		})
 	})
 })

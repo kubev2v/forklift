@@ -632,6 +632,22 @@ type ForkliftControllerSpec struct {
 	// +kubebuilder:validation:Enum="true";"false"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	ControllerVSphereIncrementalBackup string `json:"controller_vsphere_incremental_backup,omitempty"`
+	// Enable post-migration tagging for successfully migrated vSphere VMs.
+	// +optional
+	// +kubebuilder:default="true"
+	// +kubebuilder:validation:Enum="true";"false"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	ControllerVSpherePostMigrationTagging string `json:"controller_vsphere_post_migration_tagging,omitempty"`
+	// vSphere tag category name for post-migration tagging.
+	// +optional
+	// +kubebuilder:default="Forklift"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	ControllerVSpherePostMigrationTagCategory string `json:"controller_vsphere_post_migration_tag_category,omitempty"`
+	// vSphere tag name for post-migration tagging.
+	// +optional
+	// +kubebuilder:default="migrated"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	ControllerVSpherePostMigrationTagName string `json:"controller_vsphere_post_migration_tag_name,omitempty"`
 	// Enable oVirt warm migration.
 	// +optional
 	// +kubebuilder:default="true"
