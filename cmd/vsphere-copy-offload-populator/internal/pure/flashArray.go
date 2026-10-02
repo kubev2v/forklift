@@ -19,6 +19,7 @@ const FlashProviderID = "624a9370"
 // Ensure FlashArrayClonner implements required interfaces
 var _ populator.RDMCapable = &FlashArrayClonner{}
 var _ populator.VVolCapable = &FlashArrayClonner{}
+var _ populator.NFSCapable = &FlashArrayClonner{}
 var _ populator.VMDKCapable = &FlashArrayClonner{}
 var _ populator.StorageArrayInfoProvider = &FlashArrayClonner{}
 
@@ -300,6 +301,72 @@ func (f *FlashArrayClonner) RDMCopy(vsphereClient vmware.Client, vmId string, so
 
 	f.log.Info("RDM copy completed successfully")
 	return nil
+}
+
+// nfsTargetPath is the file KubeVirt reads as the disk of a Filesystem volume.
+const nfsTargetPath = "/disk.img"
+
+// NFSCopy performs a copy operation for NFS-backed disks using Pure FlashArray APIs ("purefile copy").
+func (f *FlashArrayClonner) NFSCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
+	f.log.Info("NFS copy started", "vm", vmId, "source", sourceVMDKFile)
+
+	backing, err := vsphereClient.GetVMDiskBacking(context.Background(), vmId, sourceVMDKFile)
+	if err != nil {
+		return fmt.Errorf("failed to get NFS disk backing info: %w", err)
+	}
+
+	if !backing.IsNAS {
+		return fmt.Errorf("disk %s is not on an NFS datastore", sourceVMDKFile)
+	}
+
+	f.log.Info("found NFS backing", "remote_path", backing.NasRemotePath)
+
+	// The datastore mounts <array>:/<export name>, so its remote path names the export
+	sourceDirectory, err := f.restClient.FindDirectoryByExportName(strings.TrimPrefix(backing.NasRemotePath, "/"))
+	if err != nil {
+		return fmt.Errorf("failed to resolve source datastore export: %w", err)
+	}
+
+	// The CSI driver names each PVC's export "<cluster prefix>-<pv name>", the same
+	// convention block volumes follow
+	targetExport := fmt.Sprintf("%s-%s", f.clusterPrefix, persistentVolume.Name)
+	targetDirectory, err := f.restClient.FindDirectoryByExportName(targetExport)
+	if err != nil {
+		return fmt.Errorf("failed to resolve target PV export %s: %w", targetExport, err)
+	}
+
+	sourcePath, err := nfsSourcePath(backing.DeviceName)
+	if err != nil {
+		return err
+	}
+
+	f.log.Info("copying file", "source", sourceDirectory+":"+sourcePath, "target", targetDirectory+":"+nfsTargetPath)
+
+	progress <- 10
+
+	// Copy the flat extent straight to disk.img, the raw image KubeVirt expects at
+	// the root of a Filesystem volume
+	err = f.restClient.CopyFile(sourceDirectory, sourcePath, targetDirectory, nfsTargetPath)
+	if err != nil {
+		return fmt.Errorf("Pure FlashArray CopyFile failed: %w", err)
+	}
+
+	progress <- 100
+
+	f.log.Info("NFS copy completed successfully")
+	return nil
+}
+
+// nfsSourcePath turns a VMDK path into the path of its flat extent within the
+// export, e.g. "[ds] vm/vm.vmdk" -> "/vm/vm-flat.vmdk". The descriptor holds no
+// data, so the extent is what gets copied.
+func nfsSourcePath(vmdkPath string) (string, error) {
+	disk, err := populator.ParseVmdkPath(vmdkPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse source vmdk path %q: %w", vmdkPath, err)
+	}
+	flat := strings.TrimSuffix(disk.VmdkFile, ".vmdk") + "-flat.vmdk"
+	return fmt.Sprintf("/%s/%s", disk.VmHomeDir, flat), nil
 }
 
 // resolveRDMToLUN resolves an RDM device name to a Pure FlashArray LUN

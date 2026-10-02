@@ -751,3 +751,106 @@ func compareVersions(v1, v2 string) int {
 
 	return 0
 }
+
+// FileCopySource identifies the directory a file copy reads from. Only a live
+// managed directory is accepted as a source (not a directory snapshot).
+type FileCopySource struct {
+	Name         string `json:"name"`
+	ResourceType string `json:"resource_type"`
+}
+
+// CopyFileRequest represents the request for copying a file between two managed
+// directories, i.e. the body of POST /files ("purefile copy").
+type CopyFileRequest struct {
+	Source         FileCopySource `json:"source"`
+	SourcePath     string         `json:"source_path"`
+	DirectoryNames string         `json:"directory_names"`
+	Paths          string         `json:"paths"`
+	Overwrite      bool           `json:"overwrite"`
+}
+
+// DirectoryExportsResponse represents the response from the directory-exports API
+type DirectoryExportsResponse struct {
+	Items []struct {
+		ExportName string `json:"export_name"`
+		Directory  struct {
+			Name string `json:"name"`
+			ID   string `json:"id"`
+		} `json:"directory"`
+	} `json:"items"`
+}
+
+// FindDirectoryByExportName returns the managed directory backing an NFS export.
+// NFS clients mount <array>:/<export name>, so this is how a mounted export path
+// is translated into the directory name the file API works with.
+func (c *RestClient) FindDirectoryByExportName(exportName string) (string, error) {
+	baseURL := fmt.Sprintf("https://%s/api/%s/directory-exports", c.hostname, c.apiV2)
+
+	params := url.Values{}
+	params.Set("filter", fmt.Sprintf("export_name='%s'", exportName))
+
+	req, err := http.NewRequest("GET", baseURL+"?"+params.Encode(), nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create directory export request: %w", err)
+	}
+
+	resp, body, err := c.doWithReauth(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to send directory export request: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("directory export request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var exportsResponse DirectoryExportsResponse
+	if err := json.Unmarshal(body, &exportsResponse); err != nil {
+		return "", fmt.Errorf("failed to parse directory export response: %w", err)
+	}
+
+	if len(exportsResponse.Items) == 0 {
+		return "", fmt.Errorf("no directory export found named %s", exportName)
+	}
+
+	directory := exportsResponse.Items[0].Directory.Name
+	klog.Infof("Pure REST Client: Export %s is served by directory %s", exportName, directory)
+	return directory, nil
+}
+
+// CopyFile copies a file between two managed directories on the array.
+// Requires API version 2.26 or later.
+func (c *RestClient) CopyFile(sourceDirectory, sourcePath, targetDirectory, targetPath string) error {
+	url := fmt.Sprintf("https://%s/api/%s/files", c.hostname, c.apiV2)
+
+	requestBody := CopyFileRequest{
+		Source:         FileCopySource{Name: sourceDirectory, ResourceType: "directories"},
+		SourcePath:     sourcePath,
+		DirectoryNames: targetDirectory,
+		Paths:          targetPath,
+		Overwrite:      true,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal copy file request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create copy file request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, body, err := c.doWithReauth(req)
+	if err != nil {
+		return fmt.Errorf("failed to send copy file request: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("copy file request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	klog.Infof("Pure REST Client: Successfully copied %s:%s to %s:%s", sourceDirectory, sourcePath, targetDirectory, targetPath)
+	return nil
+}

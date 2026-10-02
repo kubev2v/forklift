@@ -1643,6 +1643,13 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					labels[Shareable] = "true"
 				}
 				r.Log.Info("target namespace for migration", "namespace", namespace)
+				// An NFS source disk is offloaded by an array file copy into an NFS
+				// destination export, which is a Filesystem volume. Block offload
+				// (XCOPY) targets stay Block.
+				volumeMode := pvblock
+				if !disk.RDM && strings.HasPrefix(ds.Type, "NFS") {
+					volumeMode = core.PersistentVolumeFilesystem
+				}
 				pvc := core.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:   namespace,
@@ -1651,7 +1658,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					},
 					Spec: core.PersistentVolumeClaimSpec{
 						StorageClassName: &storageClass,
-						VolumeMode:       &pvblock,
+						VolumeMode:       &volumeMode,
 						Resources: core.VolumeResourceRequirements{
 							Requests: core.ResourceList{
 								core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
