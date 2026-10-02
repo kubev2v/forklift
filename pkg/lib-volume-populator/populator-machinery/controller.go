@@ -83,7 +83,8 @@ const (
 
 	qemuGroup = 107
 
-	labelSourceHost = api.LabelSourceHost
+	labelSourceHost  = api.LabelSourceHost
+	labelTemplateNAA = "volume.csi.k8s.io/affinity-source-naa"
 )
 
 type empty struct{}
@@ -718,7 +719,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			// If PVC' doesn't exist yet, create it
 			if pvcPrime == nil {
 				pvcPrimeLabels := make(map[string]string)
-				for _, key := range []string{"migration", "plan", "vmID"} {
+				for _, key := range []string{"migration", "plan", "vmID", labelTemplateNAA} {
 					if val, ok := pvc.Labels[key]; ok {
 						pvcPrimeLabels[key] = val
 					}
