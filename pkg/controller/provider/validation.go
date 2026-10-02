@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1420,6 +1421,23 @@ func (r *Reconciler) ValidateHyperVSettings(provider *api.Provider) error {
 				mt, api.HyperVStandalone, api.HyperVCluster),
 		})
 		return nil
+	}
+
+	if s, ok := provider.Spec.Settings[hvutil.SettingSMBMaxChannels]; ok && s != "" {
+		n, parseErr := strconv.Atoi(s)
+		if parseErr != nil || n < 0 || n > hvutil.MaxSMBChannels {
+			provider.Status.Phase = ValidationFailed
+			provider.Status.SetCondition(libcnd.Condition{
+				Type:     SettingsNotValid,
+				Status:   True,
+				Category: Critical,
+				Reason:   "InvalidSMBMaxChannels",
+				Message: fmt.Sprintf(
+					"Invalid smbMaxChannels '%s'. Must be an integer 0-%d (0 disables multichannel).",
+					s, hvutil.MaxSMBChannels),
+			})
+			return nil //nolint:nilerr // parse error is surfaced as a provider status condition
+		}
 	}
 
 	provider.Status.DeleteCondition(SettingsNotValid)
