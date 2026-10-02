@@ -902,6 +902,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				v.model.ToolsRunningStatus = fmt.Sprint(p.Val)
 			case fToolsVersionStatus:
 				v.model.ToolsVersionStatus = fmt.Sprint(p.Val)
+			case fGuestTimezone:
+				if s, cast := p.Val.(string); cast {
+					v.model.Timezone = s
+				}
 			case fTpmPresent:
 				if b, cast := p.Val.(bool); cast {
 					v.model.TpmEnabled = b
