@@ -498,8 +498,8 @@ github.com/munnerz/goautoneg
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 ## explicit
 github.com/mxk/go-flowrate/flowrate
-# github.com/ncruces/go-strftime v0.1.9
-## explicit; go 1.17
+# github.com/ncruces/go-strftime v1.1.0
+## explicit; go 1.24
 github.com/ncruces/go-strftime
 # github.com/nxadm/tail v1.4.11
 ## explicit; go 1.13
