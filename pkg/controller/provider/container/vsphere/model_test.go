@@ -1064,3 +1064,164 @@ func TestUpdateDisks_usesBusNumberWhenKeyDiffers(t *testing.T) {
 		t.Errorf("Disk.BusNumber = %d, want 2", v.model.Disks[0].BusNumber)
 	}
 }
+
+func TestUpdateDisks_preservesChangeTrackingEnabled(t *testing.T) {
+	unit := int32(0)
+	v := &VmAdapter{
+		model: model.VM{
+			Controllers: []model.Controller{{Key: 1000, BusNumber: 0, Bus: SCSI}},
+			Disks: []model.Disk{
+				{
+					Key:                   2000,
+					ControllerKey:         1000,
+					BusNumber:             0,
+					UnitNumber:            0,
+					Bus:                   SCSI,
+					BusAddress:            "scsi0:0",
+					Capacity:              18253611008,
+					ChangeTrackingEnabled: true,
+				},
+			},
+		},
+	}
+
+	// Simulate a device-only inventory update (e.g. snapshot or disk resize)
+	// that rebuilds disks without ExtraConfig.
+	v.updateDisks(&types.ArrayOfVirtualDevice{VirtualDevice: []types.BaseVirtualDevice{
+		&types.VirtualDisk{
+			VirtualDevice: types.VirtualDevice{
+				Key:           2000,
+				ControllerKey: 1000,
+				UnitNumber:    &unit,
+				Backing: &types.VirtualDiskFlatVer2BackingInfo{
+					VirtualDeviceFileBackingInfo: types.VirtualDeviceFileBackingInfo{
+						FileName: "[ds] vm/disk.vmdk",
+					},
+				},
+			},
+			CapacityInBytes: 19327352832,
+		},
+	}})
+
+	if len(v.model.Disks) != 1 {
+		t.Fatalf("got %d disks, want 1", len(v.model.Disks))
+	}
+	if v.model.Disks[0].Capacity != 19327352832 {
+		t.Errorf("Capacity = %d, want updated capacity", v.model.Disks[0].Capacity)
+	}
+	if !v.model.Disks[0].ChangeTrackingEnabled {
+		t.Errorf("ChangeTrackingEnabled = false, want true preserved across device-only update")
+	}
+}
+
+func TestApply_deviceOnlyUpdatePreservesDiskCBT(t *testing.T) {
+	unit := int32(0)
+	v := &VmAdapter{
+		model: model.VM{
+			Controllers: []model.Controller{{Key: 1000, BusNumber: 0, Bus: SCSI}},
+		},
+	}
+
+	// Initial inventory sync: ExtraConfig enables CBT, then devices arrive.
+	v.Apply(types.ObjectUpdate{
+		ChangeSet: []types.PropertyChange{
+			{
+				Name: fExtraConfig,
+				Op:   Assign,
+				Val: types.ArrayOfOptionValue{
+					OptionValue: []types.BaseOptionValue{
+						&types.OptionValue{Key: "ctkEnabled", Value: "true"},
+						&types.OptionValue{Key: "scsi0:0.ctkEnabled", Value: "true"},
+					},
+				},
+			},
+			{
+				Name: fDevices,
+				Op:   Assign,
+				Val: types.ArrayOfVirtualDevice{
+					VirtualDevice: []types.BaseVirtualDevice{
+						&types.ParaVirtualSCSIController{
+							VirtualSCSIController: types.VirtualSCSIController{
+								VirtualController: types.VirtualController{
+									VirtualDevice: types.VirtualDevice{Key: 1000},
+									BusNumber:     0,
+									Device:        []int32{2000},
+								},
+							},
+						},
+						&types.VirtualDisk{
+							VirtualDevice: types.VirtualDevice{
+								Key:           2000,
+								ControllerKey: 1000,
+								UnitNumber:    &unit,
+								Backing: &types.VirtualDiskFlatVer2BackingInfo{
+									VirtualDeviceFileBackingInfo: types.VirtualDeviceFileBackingInfo{
+										FileName: "[ds] vm/disk.vmdk",
+									},
+								},
+							},
+							CapacityInBytes: 18253611008,
+						},
+					},
+				},
+			},
+		},
+	})
+
+	if !v.model.ChangeTrackingEnabled {
+		t.Fatalf("VM ChangeTrackingEnabled = false after ExtraConfig, want true")
+	}
+	if len(v.model.Disks) != 1 || !v.model.Disks[0].ChangeTrackingEnabled {
+		t.Fatalf("disk CBT = %#v, want enabled", v.model.Disks)
+	}
+
+	// Device-only modify (snapshot / disk extend): ExtraConfig is not resent.
+	v.Apply(types.ObjectUpdate{
+		ChangeSet: []types.PropertyChange{
+			{
+				Name: fDevices,
+				Op:   Assign,
+				Val: types.ArrayOfVirtualDevice{
+					VirtualDevice: []types.BaseVirtualDevice{
+						&types.ParaVirtualSCSIController{
+							VirtualSCSIController: types.VirtualSCSIController{
+								VirtualController: types.VirtualController{
+									VirtualDevice: types.VirtualDevice{Key: 1000},
+									BusNumber:     0,
+									Device:        []int32{2000},
+								},
+							},
+						},
+						&types.VirtualDisk{
+							VirtualDevice: types.VirtualDevice{
+								Key:           2000,
+								ControllerKey: 1000,
+								UnitNumber:    &unit,
+								Backing: &types.VirtualDiskFlatVer2BackingInfo{
+									VirtualDeviceFileBackingInfo: types.VirtualDeviceFileBackingInfo{
+										FileName: "[ds] vm/disk.vmdk",
+									},
+								},
+							},
+							CapacityInBytes: 19327352832,
+						},
+					},
+				},
+			},
+		},
+	})
+
+	if len(v.model.Disks) != 1 {
+		t.Fatalf("got %d disks after device-only update, want 1", len(v.model.Disks))
+	}
+	if v.model.Disks[0].Capacity != 19327352832 {
+		t.Errorf("Capacity = %d, want resized capacity", v.model.Disks[0].Capacity)
+	}
+	if !v.model.Disks[0].ChangeTrackingEnabled {
+		t.Errorf("disk ChangeTrackingEnabled cleared on device-only update (MTV-6825)")
+	}
+	if !v.model.ChangeTrackingEnabled {
+		t.Errorf("VM ChangeTrackingEnabled cleared unexpectedly")
+	}
+}
+
