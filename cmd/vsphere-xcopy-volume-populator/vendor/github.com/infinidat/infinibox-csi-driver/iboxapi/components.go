@@ -13,10 +13,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+
+	"github.com/infinidat/infinibox-csi-driver/common"
 )
 
 type FCPort struct {
@@ -40,43 +44,42 @@ type GetFCPortsResponse struct {
 	Metadata Metadata `json:"metadata"`
 }
 
-func (iboxClient *IboxClient) GetFCPorts() (nodes []FCNode, err error) {
-	const functionName = "GetFCPorts"
-	url := fmt.Sprintf("%s%s", iboxClient.Creds.URL, "api/rest/components/nodes")
-	iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "URL", url)
+func (client *IboxClient) GetFCPorts(ctx context.Context) (nodes []FCNode, err error) {
+	url := fmt.Sprintf("%s%s", client.Creds.URL, "api/rest/components/nodes")
+	slog.Log(ctx, common.LevelTrace, "info", "URL", url)
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nodes, fmt.Errorf("%s - NewRequest - error %w", functionName, err)
+		return nodes, common.Errorf("newRequest - error: %w url: %s", err, url)
 	}
 
 	values := req.URL.Query()
 	values.Add("fields", "fc_ports")
 	req.URL.RawQuery = values.Encode()
 
-	SetAuthHeader(req, iboxClient.Creds)
+	SetAuthHeader(req, client.Creds)
 
-	resp, err := iboxClient.HTTPClient.Do(req)
+	resp, err := client.HTTPClient.Do(req)
 	if err != nil {
-		return nodes, fmt.Errorf("%s - Do - error %w", functionName, err)
+		return nodes, common.Errorf("do - error: %w url: %s", err, url)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			iboxClient.Log.V(INFO_LEVEL).Error(err, functionName, "error in Close()", err.Error())
+			slog.Error("error in Close()", "error", err.Error())
 		}
 	}()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nodes, fmt.Errorf("%s - ReadAll - error %w", functionName, err)
+		return nodes, common.Errorf("readAll - error: %w url: %s", err, url)
 	}
 	var responseObject GetFCPortsResponse
 	err = json.Unmarshal(bodyBytes, &responseObject)
 	if err != nil {
-		return nodes, fmt.Errorf("%s - Unmarshal - error %w", functionName, err)
+		return nodes, common.Errorf("unmarshal - error: %w url: %s", err, url)
 	}
 	if responseObject.Error.Code != "" {
-		return nodes, fmt.Errorf("%s - ibox API - error code: %s message: %s", functionName, responseObject.Error.Code, responseObject.Error.Message)
+		return nodes, common.Errorf("ibox API - error: %v url: %s", responseObject.Error, url)
 	}
 
 	return responseObject.Result, nil

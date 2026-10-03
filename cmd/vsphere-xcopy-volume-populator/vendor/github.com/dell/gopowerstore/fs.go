@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2020-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2020-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,13 +22,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dell/csmlog"
 	"github.com/dell/gopowerstore/api"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
-	nasURL = "nas_server"
-	fsURL  = "file_system"
+	nasURL              = "nas_server"
+	fsURL               = "file_system"
+	jobsURL             = "job"
+	jobStatusInProgress = "IN_PROGRESS"
 )
 
 func getNASDefaultQueryParams(c Client) api.QueryParamsEncoder {
@@ -36,9 +38,26 @@ func getNASDefaultQueryParams(c Client) api.QueryParamsEncoder {
 	return c.APIClient().QueryParamsWithFields(&nas)
 }
 
-func getFSDefaultQueryParams(c Client) api.QueryParamsEncoder {
-	fs := FileSystem{}
-	return c.APIClient().QueryParamsWithFields(&fs)
+func getFSFieldsForClient(ctx context.Context, c Client) []string {
+	arrayVersion, err := c.GetSoftwareMajorMinorVersion(ctx)
+	if err != nil {
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "gopowerstore",
+			csmlog.FieldOperation: "getFSFieldsForClient",
+			csmlog.FieldProtocol:  "NFS",
+			csmlog.FieldError:     err.Error(),
+		}).Error("couldn't find the array version")
+	}
+	return GetFSFields(arrayVersion)
+}
+
+func getFSDefaultQueryParams(ctx context.Context, c Client) api.QueryParamsEncoder {
+	return c.APIClient().QueryParams().Select(getFSFieldsForClient(ctx, c)...)
+}
+
+func getJobDefaultQueryParams(c Client) api.QueryParamsEncoder {
+	job := Job{}
+	return c.APIClient().QueryParamsWithFields(&job)
 }
 
 func getNfsServerDefaultQueryParams(c Client) api.QueryParamsEncoder {
@@ -55,7 +74,12 @@ func (c *ClientIMPL) GetNASServers(ctx context.Context) ([]NAS, error) {
 		var page []NAS
 		arrayVerion, err := c.GetSoftwareMajorMinorVersion(ctx)
 		if err != nil {
-			log.Errorf("Couldn't find the array version %s", err.Error())
+			csmlog.WithFields(csmlog.Fields{
+				csmlog.FieldComponent: "gopowerstore",
+				csmlog.FieldOperation: "GetNASServers",
+				csmlog.FieldProtocol:  "NFS",
+				csmlog.FieldError:     err.Error(),
+			}).Error("couldn't find the array version")
 		}
 
 		fields = GetNASFields(arrayVerion)
@@ -86,7 +110,12 @@ func (c *ClientIMPL) GetNASByName(ctx context.Context, name string) (resp NAS, e
 	var fields []string
 	arrayVerion, err := c.GetSoftwareMajorMinorVersion(ctx)
 	if err != nil {
-		log.Errorf("Couldn't find the array version %s", err.Error())
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "gopowerstore",
+			csmlog.FieldOperation: "GetNASByName",
+			csmlog.FieldProtocol:  "NFS",
+			csmlog.FieldError:     err.Error(),
+		}).Error("couldn't find the array version")
 	}
 
 	fields = GetNASFields(arrayVerion)
@@ -117,7 +146,12 @@ func (c *ClientIMPL) GetNAS(ctx context.Context, id string) (resp NAS, err error
 	var fields []string
 	arrayVerion, err := c.GetSoftwareMajorMinorVersion(ctx)
 	if err != nil {
-		log.Errorf("Couldn't find the array version %s", err.Error())
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "gopowerstore",
+			csmlog.FieldOperation: "GetNAS",
+			csmlog.FieldProtocol:  "NFS",
+			csmlog.FieldError:     err.Error(),
+		}).Error("couldn't find the array version")
 	}
 
 	fields = GetNASFields(arrayVerion)
@@ -175,10 +209,81 @@ func (c *ClientIMPL) DeleteNAS(ctx context.Context, id string) (resp EmptyRespon
 	return resp, WrapErr(err)
 }
 
+// ModifyNAS modifies existing NAS
+func (c *ClientIMPL) ModifyNASByName(ctx context.Context, modifyParams *NASModify, name string) (err error) {
+	nas, err := c.GetNASByName(ctx, name)
+	if err != nil {
+		return fmt.Errorf("failed to get NAS by name: %v", err)
+	}
+	var resp EmptyResponse
+
+	_, err = c.APIClient().Query(
+		ctx,
+		RequestConfig{
+			Method:   "PATCH",
+			Endpoint: nasURL,
+			ID:       nas.ID,
+			Body:     modifyParams,
+		},
+		&resp)
+	if err != nil {
+		return WrapErr(fmt.Errorf("failed to modify NAS parameters in array: %v", err))
+	}
+	return nil
+}
+
+// ListFS returns a list of Filesystems
+func (c *ClientIMPL) ListFS(ctx context.Context) (resp []FileSystem, err error) {
+	fields := getFSFieldsForClient(ctx, c)
+	err = c.readPaginatedData(func(offset int) (api.RespMeta, error) {
+		var page []FileSystem
+		qp := c.APIClient().QueryParams().Select(fields...)
+		qp.RawArg("filesystem_type", fmt.Sprintf("not.eq.%s", FileSystemTypeEnumSnapshot))
+		qp.Order("name")
+		qp.Offset(offset).Limit(paginationDefaultPageSize)
+		meta, err := c.APIClient().Query(
+			ctx,
+			RequestConfig{
+				Method:      "GET",
+				Endpoint:    fsURL,
+				QueryParams: qp,
+			},
+			&page)
+		err = WrapErr(err)
+		if err == nil {
+			resp = append(resp, page...)
+		}
+		return meta, err
+	})
+	return resp, err
+}
+
+// GetInProgressJobsByFsName query and return all jobs that are in progress by name of the filesystem involved
+func (c *ClientIMPL) GetInProgressJobsByFsName(ctx context.Context, name string) (resp []Job, err error) {
+	var jobList []Job
+	qp := getJobDefaultQueryParams(c)
+	qp.RawArg("resource_name", fmt.Sprintf("eq.%s", name))
+	qp.RawArg("state", fmt.Sprintf("eq.%s", jobStatusInProgress))
+	qp.RawArg("resource_type", "eq.file_system")
+	_, err = c.APIClient().Query(
+		ctx,
+		RequestConfig{
+			Method:      "GET",
+			Endpoint:    jobsURL,
+			QueryParams: qp,
+		},
+		&jobList)
+	err = WrapErr(err)
+	if err != nil {
+		return resp, err
+	}
+	return jobList, err
+}
+
 // GetFSByName query and return specific FS by name
 func (c *ClientIMPL) GetFSByName(ctx context.Context, name string) (resp FileSystem, err error) {
 	var fsList []FileSystem
-	qp := getFSDefaultQueryParams(c)
+	qp := getFSDefaultQueryParams(ctx, c)
 	qp.RawArg("name", fmt.Sprintf("eq.%s", name))
 	_, err = c.APIClient().Query(
 		ctx,
@@ -206,7 +311,7 @@ func (c *ClientIMPL) GetFS(ctx context.Context, id string) (resp FileSystem, err
 			Method:      "GET",
 			Endpoint:    fsURL,
 			ID:          id,
-			QueryParams: getFSDefaultQueryParams(c),
+			QueryParams: getFSDefaultQueryParams(ctx, c),
 		},
 		&resp)
 	return resp, WrapErr(err)
@@ -262,7 +367,7 @@ func (c *ClientIMPL) DeleteFsSnapshot(ctx context.Context, id string) (resp Empt
 
 // GetFsSnapshot query and return specific fs snapshot by it's id
 func (c *ClientIMPL) GetFsSnapshot(ctx context.Context, snapID string) (resVol FileSystem, err error) {
-	qp := getFSDefaultQueryParams(c)
+	qp := getFSDefaultQueryParams(ctx, c)
 	qp.RawArg("filesystem_type", fmt.Sprintf("eq.%s", FileSystemTypeEnumSnapshot))
 	_, err = c.APIClient().Query(
 		ctx,
@@ -279,9 +384,10 @@ func (c *ClientIMPL) GetFsSnapshot(ctx context.Context, snapID string) (resVol F
 // GetFsSnapshots returns all fs snapshots
 func (c *ClientIMPL) GetFsSnapshots(ctx context.Context) ([]FileSystem, error) {
 	var result []FileSystem
+	fields := getFSFieldsForClient(ctx, c)
 	err := c.readPaginatedData(func(offset int) (api.RespMeta, error) {
 		var page []FileSystem
-		qp := getFSDefaultQueryParams(c)
+		qp := c.APIClient().QueryParams().Select(fields...)
 		qp.RawArg("filesystem_type", fmt.Sprintf("eq.%s", FileSystemTypeEnumSnapshot))
 		qp.Order("name")
 		qp.Offset(offset).Limit(paginationDefaultPageSize)
@@ -305,9 +411,10 @@ func (c *ClientIMPL) GetFsSnapshots(ctx context.Context) ([]FileSystem, error) {
 // GetFsSnapshotsByVolumeID returns a list of fs snapshots for specific volume
 func (c *ClientIMPL) GetFsSnapshotsByVolumeID(ctx context.Context, volID string) ([]FileSystem, error) {
 	var result []FileSystem
+	fields := getFSFieldsForClient(ctx, c)
 	err := c.readPaginatedData(func(offset int) (api.RespMeta, error) {
 		var page []FileSystem
-		qp := getFSDefaultQueryParams(c)
+		qp := c.APIClient().QueryParams().Select(fields...)
 		qp.RawArg("parent_id", fmt.Sprintf("eq.%s", volID))
 		qp.RawArg("filesystem_type", fmt.Sprintf("eq.%s", FileSystemTypeEnumSnapshot))
 		qp.Order("name")
@@ -380,9 +487,10 @@ func (c *ClientIMPL) CloneFS(ctx context.Context,
 
 func (c *ClientIMPL) GetFsByFilter(ctx context.Context, filter map[string]string) ([]FileSystem, error) {
 	var result []FileSystem
+	fields := getFSFieldsForClient(ctx, c)
 	err := c.readPaginatedData(func(offset int) (api.RespMeta, error) {
 		var page []FileSystem
-		qp := getFSDefaultQueryParams(c)
+		qp := c.APIClient().QueryParams().Select(fields...)
 		for k, v := range filter {
 			qp.RawArg(k, v)
 		}
@@ -404,9 +512,21 @@ func (c *ClientIMPL) GetFsByFilter(ctx context.Context, filter map[string]string
 	return result, err
 }
 
+// GetFSFields returns the list of fields to request for a file_system object.
+// The performance_policy_id field is included only when the PowerStore array version is 4.1 or later.
+func GetFSFields(arrayVersion float32) []string {
+	fields := (&FileSystem{}).Fields()
+
+	if arrayVersion >= 4.1 {
+		fields = append(fields, "performance_policy_id")
+	}
+
+	return fields
+}
+
 func GetNASFields(arrayVerion float32) []string {
 	var fields []string
-	fields = []string{"id", "description", "name", "current_node_id", "operational_status", "current_preferred_IPv4_interface_id", "current_preferred_IPv6_interface_id", "nfs_servers", "file_systems", "health_details", "preferred_node_id", "default_unix_user", "default_windows_user", "current_unix_directory_service", "is_username_translation_enabled", "is_auto_user_mapping_enabled", "production_IPv4_interface_id", "production_IPv6_interface_id", "backup_IPv4_interface_id", "backup_IPv6_interface_id", "protection_policy_id", "file_events_publishing_mode", "is_replication_destination", "is_production_mode_enabled", "operational_status_l10n", "current_unix_directory_service_l10n", "file_events_publishing_mode_l10n"}
+	fields = []string{"id", "description", "name", "current_node_id", "operational_status", "current_preferred_IPv4_interface_id", "current_preferred_IPv6_interface_id", "nfs_servers(id,is_nfsv3_enabled,is_nfsv4_enabled)", "file_systems", "preferred_node_id", "default_unix_user", "default_windows_user", "current_unix_directory_service", "is_username_translation_enabled", "is_auto_user_mapping_enabled", "production_IPv4_interface_id", "production_IPv6_interface_id", "backup_IPv4_interface_id", "backup_IPv6_interface_id", "protection_policy_id", "file_events_publishing_mode", "is_replication_destination", "is_production_mode_enabled", "operational_status_l10n", "current_unix_directory_service_l10n", "file_events_publishing_mode_l10n"}
 
 	if arrayVerion > 3.6 {
 		fields = append(fields, "is_dr_test")

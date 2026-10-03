@@ -1,4 +1,4 @@
-// Copyright © 2019 - 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2019 - 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"net/http/httputil"
 	"strings"
 
-	"github.com/dell/goscaleio/log"
+	"github.com/dell/csmlog"
 )
 
 func isBinOctetBody(h http.Header) bool {
@@ -32,7 +32,6 @@ func isBinOctetBody(h http.Header) bool {
 func logRequest(
 	_ context.Context,
 	req *http.Request,
-	lf func(func(msg string, args ...any), string),
 ) {
 	w := &bytes.Buffer{}
 
@@ -47,17 +46,14 @@ func logRequest(
 	}
 
 	if err := WriteIndented(w, buf); err != nil {
-		fmt.Printf("WriteIndented returned error: %s", err.Error())
+		csmlog.Errorf("failed to indent request: %v", err)
 	}
-	if lf != nil {
-		lf(log.Log.Debug, w.String())
-	}
+	csmlog.Debug(w.String())
 }
 
 func logResponse(
 	_ context.Context,
 	res *http.Response,
-	lf func(func(msg string, args ...any), string),
 ) {
 	w := &bytes.Buffer{}
 
@@ -74,7 +70,7 @@ func logResponse(
 	bw := &bytes.Buffer{}
 
 	if err := WriteIndented(w, buf); err != nil {
-		fmt.Printf("WriteIndented returned error: %s", err.Error())
+		csmlog.Errorf("failed to indent response: %v", err)
 	}
 
 	scanner := bufio.NewScanner(bw)
@@ -84,9 +80,7 @@ func logResponse(
 		}
 		fmt.Fprintln(w, scanner.Text())
 	}
-	if lf != nil {
-		lf(log.Log.Debug, w.String())
-	}
+	csmlog.Debug(w.String())
 }
 
 // WriteIndentedN indents all lines n spaces.
@@ -200,7 +194,7 @@ func dumpRequest(req *http.Request, body bool) ([]byte, error) {
 	}
 
 	if _, err := io.WriteString(&b, "\r\n"); err != nil {
-		fmt.Printf("io.WriteString returned error: %s", err.Error())
+		csmlog.Errorf("failed to write request terminator: %v", err)
 	}
 
 	if req.Body != nil {
@@ -211,11 +205,11 @@ func dumpRequest(req *http.Request, body bool) ([]byte, error) {
 		_, err = io.Copy(dest, req.Body)
 		if chunked {
 			if err := dest.(io.Closer).Close(); err != nil {
-				fmt.Printf("io.Closer.Close() returned error: %s", err.Error())
+				csmlog.Errorf("failed to close chunked writer: %v", err)
 			}
 
 			if _, err := io.WriteString(&b, "\r\n"); err != nil {
-				fmt.Printf("io.WriteString returned error: %s", err.Error())
+				csmlog.Errorf("failed to write chunk terminator: %v", err)
 			}
 
 		}

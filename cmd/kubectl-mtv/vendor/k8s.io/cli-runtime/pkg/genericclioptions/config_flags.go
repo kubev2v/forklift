@@ -35,29 +35,31 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
-	flagClusterName        = "cluster"
-	flagAuthInfoName       = "user"
-	flagContext            = "context"
-	flagNamespace          = "namespace"
-	flagAPIServer          = "server"
-	flagTLSServerName      = "tls-server-name"
-	flagInsecure           = "insecure-skip-tls-verify"
-	flagCertFile           = "client-certificate"
-	flagKeyFile            = "client-key"
-	flagCAFile             = "certificate-authority"
-	flagBearerToken        = "token"
-	flagImpersonate        = "as"
-	flagImpersonateUID     = "as-uid"
-	flagImpersonateGroup   = "as-group"
-	flagUsername           = "username"
-	flagPassword           = "password"
-	flagTimeout            = "request-timeout"
-	flagCacheDir           = "cache-dir"
-	flagDisableCompression = "disable-compression"
+	flagClusterName          = "cluster"
+	flagAuthInfoName         = "user"
+	flagContext              = "context"
+	flagNamespace            = "namespace"
+	flagAPIServer            = "server"
+	flagTLSServerName        = "tls-server-name"
+	flagInsecure             = "insecure-skip-tls-verify"
+	flagCertFile             = "client-certificate"
+	flagKeyFile              = "client-key"
+	flagCAFile               = "certificate-authority"
+	flagBearerToken          = "token"
+	flagImpersonate          = "as"
+	flagImpersonateUID       = "as-uid"
+	flagImpersonateGroup     = "as-group"
+	flagImpersonateUserExtra = "as-user-extra"
+	flagUsername             = "username"
+	flagPassword             = "password"
+	flagTimeout              = "request-timeout"
+	flagCacheDir             = "cache-dir"
+	flagDisableCompression   = "disable-compression"
+	flagProxyURL             = "proxy-url"
 )
 
 // RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
@@ -83,24 +85,26 @@ type ConfigFlags struct {
 	KubeConfig *string
 
 	// config flags
-	ClusterName        *string
-	AuthInfoName       *string
-	Context            *string
-	Namespace          *string
-	APIServer          *string
-	TLSServerName      *string
-	Insecure           *bool
-	CertFile           *string
-	KeyFile            *string
-	CAFile             *string
-	BearerToken        *string
-	Impersonate        *string
-	ImpersonateUID     *string
-	ImpersonateGroup   *[]string
-	Username           *string
-	Password           *string
-	Timeout            *string
-	DisableCompression *bool
+	ClusterName          *string
+	AuthInfoName         *string
+	Context              *string
+	Namespace            *string
+	APIServer            *string
+	TLSServerName        *string
+	Insecure             *bool
+	CertFile             *string
+	KeyFile              *string
+	CAFile               *string
+	BearerToken          *string
+	Impersonate          *string
+	ImpersonateUID       *string
+	ImpersonateGroup     *[]string
+	ImpersonateUserExtra *[]string
+	Username             *string
+	Password             *string
+	Timeout              *string
+	DisableCompression   *bool
+	ProxyURL             *string
 	// If non-nil, wrap config function can transform the Config
 	// before it is returned in ToRESTConfig function.
 	WrapConfigFn func(*rest.Config) *rest.Config
@@ -170,15 +174,31 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	// bind auth info flag values to overrides
 	if f.CertFile != nil {
 		overrides.AuthInfo.ClientCertificate = *f.CertFile
+		overrides.AuthInfo.ClientCertificateData = nil
 	}
 	if f.KeyFile != nil {
 		overrides.AuthInfo.ClientKey = *f.KeyFile
+		overrides.AuthInfo.ClientKeyData = nil
 	}
 	if f.BearerToken != nil {
 		overrides.AuthInfo.Token = *f.BearerToken
+		overrides.AuthInfo.TokenFile = ""
 	}
 	if f.Impersonate != nil {
 		overrides.AuthInfo.Impersonate = *f.Impersonate
+	}
+	if f.ImpersonateUserExtra != nil && len(*f.ImpersonateUserExtra) > 0 {
+		userExtras := make(map[string][]string)
+		for _, extra := range *f.ImpersonateUserExtra {
+			parts := strings.SplitN(extra, "=", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			key := parts[0]
+			value := parts[1]
+			userExtras[key] = append(userExtras[key], value)
+		}
+		overrides.AuthInfo.ImpersonateUserExtra = userExtras
 	}
 	if f.ImpersonateUID != nil {
 		overrides.AuthInfo.ImpersonateUID = *f.ImpersonateUID
@@ -208,6 +228,9 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	}
 	if f.DisableCompression != nil {
 		overrides.ClusterInfo.DisableCompression = *f.DisableCompression
+	}
+	if f.ProxyURL != nil {
+		overrides.ClusterInfo.ProxyURL = *f.ProxyURL
 	}
 
 	// bind context flags
@@ -373,6 +396,9 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.ImpersonateGroup != nil {
 		flags.StringArrayVar(f.ImpersonateGroup, flagImpersonateGroup, *f.ImpersonateGroup, "Group to impersonate for the operation, this flag can be repeated to specify multiple groups.")
 	}
+	if f.ImpersonateUserExtra != nil {
+		flags.StringArrayVar(f.ImpersonateUserExtra, flagImpersonateUserExtra, *f.ImpersonateUserExtra, "User extras to impersonate for the operation, this flag can be repeated to specify multiple values for the same key.")
+	}
 	if f.Username != nil {
 		flags.StringVar(f.Username, flagUsername, *f.Username, "Username for basic authentication to the API server")
 	}
@@ -410,12 +436,15 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.DisableCompression != nil {
 		flags.BoolVar(f.DisableCompression, flagDisableCompression, *f.DisableCompression, "If true, opt-out of response compression for all requests to the server")
 	}
+	if f.ProxyURL != nil {
+		flags.StringVar(f.ProxyURL, flagProxyURL, *f.ProxyURL, "Proxy URL to use for requests to the API server")
+	}
 }
 
 // WithDeprecatedPasswordFlag enables the username and password config flags
 func (f *ConfigFlags) WithDeprecatedPasswordFlag() *ConfigFlags {
-	f.Username = utilpointer.String("")
-	f.Password = utilpointer.String("")
+	f.Username = ptr.To("")
+	f.Password = ptr.To("")
 	return f
 }
 
@@ -446,29 +475,32 @@ func (f *ConfigFlags) WithWarningPrinter(ioStreams genericiooptions.IOStreams) *
 // NewConfigFlags returns ConfigFlags with default values set
 func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 	impersonateGroup := []string{}
+	impersonateUserExtra := []string{}
 	insecure := false
 	disableCompression := false
 
 	return &ConfigFlags{
 		Insecure:   &insecure,
-		Timeout:    utilpointer.String("0"),
-		KubeConfig: utilpointer.String(""),
+		Timeout:    ptr.To("0"),
+		KubeConfig: ptr.To(""),
 
-		CacheDir:           utilpointer.String(getDefaultCacheDir()),
-		ClusterName:        utilpointer.String(""),
-		AuthInfoName:       utilpointer.String(""),
-		Context:            utilpointer.String(""),
-		Namespace:          utilpointer.String(""),
-		APIServer:          utilpointer.String(""),
-		TLSServerName:      utilpointer.String(""),
-		CertFile:           utilpointer.String(""),
-		KeyFile:            utilpointer.String(""),
-		CAFile:             utilpointer.String(""),
-		BearerToken:        utilpointer.String(""),
-		Impersonate:        utilpointer.String(""),
-		ImpersonateUID:     utilpointer.String(""),
-		ImpersonateGroup:   &impersonateGroup,
-		DisableCompression: &disableCompression,
+		CacheDir:             ptr.To(getDefaultCacheDir()),
+		ClusterName:          ptr.To(""),
+		AuthInfoName:         ptr.To(""),
+		Context:              ptr.To(""),
+		Namespace:            ptr.To(""),
+		APIServer:            ptr.To(""),
+		TLSServerName:        ptr.To(""),
+		CertFile:             ptr.To(""),
+		KeyFile:              ptr.To(""),
+		CAFile:               ptr.To(""),
+		BearerToken:          ptr.To(""),
+		Impersonate:          ptr.To(""),
+		ImpersonateUID:       ptr.To(""),
+		ImpersonateGroup:     &impersonateGroup,
+		ImpersonateUserExtra: &impersonateUserExtra,
+		DisableCompression:   &disableCompression,
+		ProxyURL:             ptr.To(""),
 
 		usePersistentConfig: usePersistentConfig,
 		// The more groups you have, the more discovery requests you need to make.

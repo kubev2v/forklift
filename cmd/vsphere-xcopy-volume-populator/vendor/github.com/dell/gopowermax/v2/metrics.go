@@ -1,5 +1,5 @@
 /*
- Copyright © 2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2023-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -20,19 +20,22 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dell/csmlog"
 	types "github.com/dell/gopowermax/v2/types/v100"
 )
 
 // The following constants are for the query of performance metrics for pmax
 const (
-	Average      = "Average"
-	Performance  = "performance"
-	StorageGroup = "/StorageGroup"
-	Volume       = "/Volume"
-	FileSystem   = "/file/filesystem"
-	Metrics      = "/metrics"
-	Keys         = "/keys"
-	Array        = "/Array"
+	Average               = "Average"
+	Performance           = "performance"
+	StorageGroup          = "/StorageGroup"
+	Volume                = "/Volume"
+	FileSystem            = "/file/filesystem"
+	Metrics               = "/metrics"
+	Keys                  = "/keys"
+	Array                 = "/Array"
+	PerformanceCategories = "/performance-categories"
+	SRDF                  = "/SRDF"
 )
 
 // GetStorageGroupPerfKeys returns the available timestamp for the storage group performance
@@ -48,16 +51,17 @@ func (c *Client) GetStorageGroupPerfKeys(ctx context.Context, symID string) (*ty
 		SymmetrixID: symID,
 	}
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodPost, URL, c.getDefaultHeaders(), params)
+	if err != nil {
+		csmlog.Error("GetStorageGroupPerfKeys failed: " + err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close() // #nosec G104 G307
 	if err = c.checkResponse(resp); err != nil {
 		return nil, err
 	}
 	storageGroupInfo := &types.StorageGroupKeysResult{}
 	decoder := json.NewDecoder(resp.Body)
 	if err = decoder.Decode(storageGroupInfo); err != nil {
-		return nil, err
-	}
-	err = resp.Body.Close()
-	if err != nil {
 		return nil, err
 	}
 	return storageGroupInfo, nil
@@ -70,16 +74,17 @@ func (c *Client) GetArrayPerfKeys(ctx context.Context) (*types.ArrayKeysResult, 
 	ctx, cancel := c.GetTimeoutContext(ctx)
 	defer cancel()
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
+	if err != nil {
+		csmlog.Error("GetArrayPerfKeys failed: " + err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close() // #nosec G104 G307
 	if err = c.checkResponse(resp); err != nil {
 		return nil, err
 	}
 	ArrayInfo := &types.ArrayKeysResult{}
 	decoder := json.NewDecoder(resp.Body)
 	if err = decoder.Decode(ArrayInfo); err != nil {
-		return nil, err
-	}
-	err = resp.Body.Close()
-	if err != nil {
 		return nil, err
 	}
 	return ArrayInfo, nil
@@ -103,6 +108,11 @@ func (c *Client) GetStorageGroupMetrics(ctx context.Context, symID string, stora
 		Metrics:        metricsQuery,
 	}
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodPost, URL, c.getDefaultHeaders(), params)
+	if err != nil {
+		csmlog.Error("GetStorageGroupMetrics failed: " + err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close() // #nosec G104 G307
 	if err = c.checkResponse(resp); err != nil {
 		return nil, err
 	}
@@ -111,11 +121,34 @@ func (c *Client) GetStorageGroupMetrics(ctx context.Context, symID string, stora
 	if err = decoder.Decode(metricsList); err != nil {
 		return nil, err
 	}
-	err = resp.Body.Close()
-	if err != nil {
+	return metricsList, nil
+}
+
+// GetStorageGroupMetricsBulk returns all Storage Group performance metrics
+// in a single GET call using the performance-categories endpoint.
+func (c *Client) GetStorageGroupMetricsBulk(ctx context.Context, symID string) (*types.StorageGroupPerfCategoryResult, error) {
+	defer c.TimeSpent("GetStorageGroupMetricsBulk", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
 		return nil, err
 	}
-	return metricsList, nil
+	URL := c.urlPrefixV1() + symID + PerformanceCategories + StorageGroup
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
+	if err != nil {
+		csmlog.Error("GetStorageGroupMetricsBulk failed: " + err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close() // #nosec G104 G307
+	if err = c.checkResponse(resp); err != nil {
+		return nil, err
+	}
+	result := &types.StorageGroupPerfCategoryResult{}
+	decoder := json.NewDecoder(resp.Body)
+	if err = decoder.Decode(result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // GetVolumesMetrics returns a list of Volume performance metrics
@@ -136,16 +169,17 @@ func (c *Client) GetVolumesMetrics(ctx context.Context, symID string, storageGro
 		Metrics:                        metricsQuery,
 	}
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodPost, URL, c.getDefaultHeaders(), params)
+	if err != nil {
+		csmlog.Error("GetVolumesMetrics failed: " + err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close() // #nosec G104 G307
 	if err = c.checkResponse(resp); err != nil {
 		return nil, err
 	}
 	metricsList := &types.VolumeMetricsIterator{}
 	decoder := json.NewDecoder(resp.Body)
 	if err = decoder.Decode(metricsList); err != nil {
-		return nil, err
-	}
-	err = resp.Body.Close()
-	if err != nil {
 		return nil, err
 	}
 	return metricsList, nil
@@ -170,6 +204,11 @@ func (c *Client) GetVolumesMetricsByID(ctx context.Context, symID string, volID 
 		Metrics:          metricsQuery,
 	}
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodPost, URL, c.getDefaultHeaders(), params)
+	if err != nil {
+		csmlog.Error("GetVolumesMetricsByID failed: " + err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close() // #nosec G104 G307
 	if err = c.checkResponse(resp); err != nil {
 		return nil, err
 	}
@@ -178,8 +217,39 @@ func (c *Client) GetVolumesMetricsByID(ctx context.Context, symID string, volID 
 	if err = decoder.Decode(metricsList); err != nil {
 		return nil, err
 	}
-	err = resp.Body.Close()
+	return metricsList, nil
+}
+
+// GetRDFGroupMetrics returns performance metrics for a given SRDF (RDF) group.
+// Metrics of interest: "AvgCycleTime" (ms, lag for ASYNC) and "WriteMBs" (bandwidth).
+func (c *Client) GetRDFGroupMetrics(ctx context.Context, symID string, rdfGroupID int, metricsQuery []string, firstAvailableTime, lastAvailableTime int64) (*types.RDFGroupMetricsIterator, error) {
+	defer c.TimeSpent("GetRDFGroupMetrics", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+	URL := RESTPrefix + Performance + SRDF + Metrics
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	params := types.RDFGroupMetricsParam{
+		SymmetrixID: symID,
+		StartDate:   firstAvailableTime,
+		EndDate:     lastAvailableTime,
+		DataFormat:  Average,
+		RDFGroupID:  rdfGroupID,
+		Metrics:     metricsQuery,
+	}
+	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodPost, URL, c.getDefaultHeaders(), params)
 	if err != nil {
+		csmlog.Error("GetRDFGroupMetrics failed: " + err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close() // #nosec G104 G307
+	if err = c.checkResponse(resp); err != nil {
+		return nil, err
+	}
+	metricsList := &types.RDFGroupMetricsIterator{}
+	decoder := json.NewDecoder(resp.Body)
+	if err = decoder.Decode(metricsList); err != nil {
 		return nil, err
 	}
 	return metricsList, nil
@@ -203,16 +273,17 @@ func (c *Client) GetFileSystemMetricsByID(ctx context.Context, symID string, fsI
 		Metrics:      metricsQuery,
 	}
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodPost, URL, c.getDefaultHeaders(), params)
+	if err != nil {
+		csmlog.Error("GetFileSystemMetricsByID failed: " + err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close() // #nosec G104 G307
 	if err = c.checkResponse(resp); err != nil {
 		return nil, err
 	}
 	metricsList := &types.FileSystemMetricsIterator{}
 	decoder := json.NewDecoder(resp.Body)
 	if err = decoder.Decode(metricsList); err != nil {
-		return nil, err
-	}
-	err = resp.Body.Close()
-	if err != nil {
 		return nil, err
 	}
 	return metricsList, nil

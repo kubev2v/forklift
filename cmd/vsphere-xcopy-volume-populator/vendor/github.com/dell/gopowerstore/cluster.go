@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/dell/csmlog"
 )
 
 const (
@@ -36,7 +36,11 @@ func (c *ClientIMPL) GetCluster(ctx context.Context) (resp Cluster, err error) {
 
 	majorMinorVersion, err := c.GetSoftwareMajorMinorVersion(ctx)
 	if err != nil {
-		log.Errorf("Couldn't find the array version %s", err.Error())
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "gopowerstore",
+			csmlog.FieldOperation: "GetCluster",
+			csmlog.FieldError:     err.Error(),
+		}).Error("couldn't find the array version")
 	} else {
 		if majorMinorVersion >= 3.0 {
 			qp.Select("nvm_subsystem_nqn")

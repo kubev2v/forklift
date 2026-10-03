@@ -19,13 +19,15 @@
 package gopowerstore
 
 import (
+	"time"
+
 	"github.com/dell/gopowerstore/api"
 )
 
 // ClientOptions defaults
 const (
 	clientOptionsDefaultInsecure     = false
-	clientOptionsDefaultTimeout      = 120
+	clientOptionsDefaultTimeout      = 120 * time.Second
 	clientOptionsDefaultRateLimit    = 60
 	clientOptionsDefaultRequestIDKey = "csi.requestid"
 )
@@ -38,10 +40,21 @@ func NewClientOptions() *ClientOptions {
 // ClientOptions struct provide additional options for api client configuration
 type ClientOptions struct {
 	insecure       *bool // skip https cert check
-	defaultTimeout *int64
+	defaultTimeout *time.Duration
 	rateLimit      *int
 	// define field name in context which will be used for tracing
-	requestIDKey *api.ContextKey
+	requestIDKey    *api.ContextKey
+	caFilePath      *string
+	requestObserver api.RequestObserver
+	debugHTTPDump   *bool
+}
+
+// CAFilePath adds the certificate authority to the http client
+func (co *ClientOptions) CAFilePath() string {
+	if co.caFilePath == nil {
+		return ""
+	}
+	return *co.caFilePath
 }
 
 // Insecure returns insecure client option
@@ -53,7 +66,7 @@ func (co *ClientOptions) Insecure() bool {
 }
 
 // DefaultTimeout returns http client default timeout
-func (co *ClientOptions) DefaultTimeout() int64 {
+func (co *ClientOptions) DefaultTimeout() time.Duration {
 	if co.defaultTimeout == nil {
 		return clientOptionsDefaultTimeout
 	}
@@ -82,8 +95,14 @@ func (co *ClientOptions) SetInsecure(value bool) *ClientOptions {
 	return co
 }
 
+// SetCAFilePath sets certificate authority file path value
+func (co *ClientOptions) SetCAFilePath(path string) *ClientOptions {
+	co.caFilePath = &path
+	return co
+}
+
 // SetDefaultTimeout sets default http client timeout value
-func (co *ClientOptions) SetDefaultTimeout(value int64) *ClientOptions {
+func (co *ClientOptions) SetDefaultTimeout(value time.Duration) *ClientOptions {
 	co.defaultTimeout = &value
 	return co
 }
@@ -97,5 +116,17 @@ func (co *ClientOptions) SetRateLimit(value int) *ClientOptions {
 // SetRequestIDKey sets requestIdKey value
 func (co *ClientOptions) SetRequestIDKey(value api.ContextKey) *ClientOptions {
 	co.requestIDKey = &value
+	return co
+}
+
+// SetRequestObserver sets the request observer for API calls
+func (co *ClientOptions) SetRequestObserver(observer api.RequestObserver) *ClientOptions {
+	co.requestObserver = observer
+	return co
+}
+
+// SetDebugHTTPDump enables request and response HTTP dumps in debug logs
+func (co *ClientOptions) SetDebugHTTPDump(value bool) *ClientOptions {
+	co.debugHTTPDump = &value
 	return co
 }

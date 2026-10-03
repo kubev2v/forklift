@@ -23,9 +23,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dell/csmlog"
 	"github.com/dell/gopowerstore/api"
-
-	log "github.com/sirupsen/logrus"
 )
 
 const apiSoftwareInstalledURL = "software_installed"
@@ -67,7 +66,11 @@ func (c *ClientIMPL) GetSoftwareMajorMinorVersion(
 ) (majorMinorVersion float32, err error) {
 	resp, err := c.GetSoftwareInstalled(ctx)
 	if err != nil {
-		log.Errorf("couldn't find the softwares installed on the Powerstore array %s", err.Error())
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "gopowerstore",
+			csmlog.FieldOperation: "GetSoftwareMajorMinorVersion",
+			csmlog.FieldError:     err.Error(),
+		}).Error("couldn't find the softwares installed on the PowerStore array")
 		return 0.0, err
 	}
 
@@ -80,12 +83,20 @@ func (c *ClientIMPL) GetSoftwareMajorMinorVersion(
 				var majorVersion, minorVersion int
 
 				if majorVersion, err = strconv.Atoi(versions[0]); err != nil {
-					log.Errorf("couldn't get the software major version installed on the PowerStore array: %s", err.Error())
+					csmlog.WithFields(csmlog.Fields{
+						csmlog.FieldComponent: "gopowerstore",
+						csmlog.FieldOperation: "GetSoftwareMajorMinorVersion",
+						csmlog.FieldError:     err.Error(),
+					}).Error("couldn't get the software major version installed on the PowerStore array")
 					return 0.0, err
 				}
 
 				if minorVersion, err = strconv.Atoi(versions[1]); err != nil {
-					log.Errorf("couldn't get the software minor version installed on the PowerStore array: %s", err.Error())
+					csmlog.WithFields(csmlog.Fields{
+						csmlog.FieldComponent: "gopowerstore",
+						csmlog.FieldOperation: "GetSoftwareMajorMinorVersion",
+						csmlog.FieldError:     err.Error(),
+					}).Error("couldn't get the software minor version installed on the PowerStore array")
 					return 0.0, err
 				}
 

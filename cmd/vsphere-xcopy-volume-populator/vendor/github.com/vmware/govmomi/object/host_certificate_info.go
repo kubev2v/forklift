@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package object
@@ -145,7 +145,7 @@ func (info *HostCertificateInfo) fromName(name *pkix.Name) string {
 func (info *HostCertificateInfo) toName(s string) *pkix.Name {
 	var name pkix.Name
 
-	for _, pair := range strings.Split(s, ",") {
+	for pair := range strings.SplitSeq(s, ",") {
 		attr := strings.SplitN(pair, "=", 2)
 		if len(attr) != 2 {
 			continue

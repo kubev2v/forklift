@@ -22,6 +22,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/dell/csmlog"
 )
 
 const apiPoolAddressURL = "ip_pool_address"
@@ -30,6 +32,11 @@ const apiPoolAddressURL = "ip_pool_address"
 func (c *ClientIMPL) GetStorageISCSITargetAddresses(
 	ctx context.Context,
 ) (resp []IPPoolAddress, err error) {
+	csmlog.WithFields(csmlog.Fields{
+		csmlog.FieldComponent: "gopowerstore",
+		csmlog.FieldOperation: "GetStorageISCSITargetAddresses",
+		csmlog.FieldProtocol:  "iSCSI",
+	}).Info("retrieving iSCSI target addresses")
 	var ipPoolAddress IPPoolAddress
 	qp := c.APIClient().QueryParamsWithFields(&ipPoolAddress)
 	qp.RawArg("purposes", fmt.Sprintf("cs.{%s}", IPPurposeTypeEnumStorageIscsiTarget))
@@ -47,6 +54,12 @@ func (c *ClientIMPL) GetStorageISCSITargetAddresses(
 		return resp, err
 	}
 	if len(resp) == 0 {
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "gopowerstore",
+			csmlog.FieldOperation: "GetStorageISCSITargetAddresses",
+			csmlog.FieldProtocol:  "iSCSI",
+			csmlog.FieldError:     "can't get iscsi target address",
+		}).Error("no iSCSI target addresses found")
 		return resp, errors.New("can't get iscsi target address")
 	}
 	return resp, nil
@@ -56,6 +69,11 @@ func (c *ClientIMPL) GetStorageISCSITargetAddresses(
 func (c *ClientIMPL) GetStorageNVMETCPTargetAddresses(
 	ctx context.Context,
 ) (resp []IPPoolAddress, err error) {
+	csmlog.WithFields(csmlog.Fields{
+		csmlog.FieldComponent: "gopowerstore",
+		csmlog.FieldOperation: "GetStorageNVMETCPTargetAddresses",
+		csmlog.FieldProtocol:  "NVMeTCP",
+	}).Info("retrieving NVMe/TCP target addresses")
 	var ipPoolAddress IPPoolAddress
 	qp := c.APIClient().QueryParamsWithFields(&ipPoolAddress)
 	qp.RawArg("purposes", fmt.Sprintf("cs.{%s}", IPPurposeTypeEnumStorageNVMETCPPort))
@@ -73,6 +91,12 @@ func (c *ClientIMPL) GetStorageNVMETCPTargetAddresses(
 		return resp, err
 	}
 	if len(resp) == 0 {
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "gopowerstore",
+			csmlog.FieldOperation: "GetStorageNVMETCPTargetAddresses",
+			csmlog.FieldProtocol:  "NVMeTCP",
+			csmlog.FieldError:     "can't get NVMeTCP target address",
+		}).Error("no NVMe/TCP target addresses found")
 		return resp, errors.New("can't get NVMeTCP target address")
 	}
 	return resp, nil

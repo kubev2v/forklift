@@ -23,9 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dell/csmlog"
 	types "github.com/dell/gopowermax/v2/types/v100"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // The following constants are for internal use within the pmax library.
@@ -65,7 +64,7 @@ func (c *Client) GetSnapVolumeList(ctx context.Context, symID string, queryParam
 	defer cancel()
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetSnapVolumeList failed: " + err.Error())
+		csmlog.Error("GetSnapVolumeList failed: " + err.Error())
 		return nil, err
 	}
 
@@ -96,7 +95,7 @@ func (c *Client) GetVolumeSnapInfo(ctx context.Context, symID string, volumeID s
 	defer cancel()
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetVolumeSnapInfo failed: " + err.Error())
+		csmlog.Error("GetVolumeSnapInfo failed: " + err.Error())
 		return nil, err
 	}
 
@@ -126,7 +125,7 @@ func (c *Client) GetSnapshotInfo(ctx context.Context, symID, volumeID, snapID st
 	defer cancel()
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetSnapshotInfo failed: " + err.Error())
+		csmlog.Error("GetSnapshotInfo failed: " + err.Error())
 		return nil, err
 	}
 	if err = c.checkResponse(resp); err != nil {
@@ -168,7 +167,7 @@ func (c *Client) CreateSnapshot(ctx context.Context, symID string, snapID string
 	defer cancel()
 	err := c.api.Post(ctx, URL, c.getDefaultHeaders(), snapParam, nil)
 	if err != nil {
-		log.Error("CreateSnapshot failed: " + err.Error())
+		csmlog.Error("CreateSnapshot failed: " + err.Error())
 	}
 	return err
 }
@@ -212,7 +211,7 @@ func (c *Client) DeleteSnapshot(ctx context.Context, symID, snapID string, sourc
 	if job.Status == types.JobStatusFailed || job.Status == types.JobStatusRunning {
 		return fmt.Errorf("Job status not successful for snapshot delete. Job status = %s and Job result = %s", job.Status, job.Result)
 	}
-	log.Info(fmt.Sprintf("Snapshot (%s) deleted successfully", snapID))
+	csmlog.Info(fmt.Sprintf("Snapshot (%s) deleted successfully", snapID))
 	return nil
 }
 
@@ -241,10 +240,10 @@ func (c *Client) DeleteSnapshotS(ctx context.Context, symID, snapID string, sour
 	defer cancel()
 	err := c.api.DoWithHeaders(ctx, http.MethodDelete, URL, c.getDefaultHeaders(), deleteSnapshot, nil)
 	if err != nil {
-		log.WithFields(fields).Errorf("Delete Snapshot (%s:%s) failed with error: %s", symID, snapID, err.Error())
+		csmlog.WithFields(fields).Errorf("Delete Snapshot (%s:%s) failed with error: %s", symID, snapID, err.Error())
 		return err
 	}
-	log.Info(fmt.Sprintf("Snapshot (%s) deleted successfully", snapID))
+	csmlog.Info(fmt.Sprintf("Snapshot (%s) deleted successfully", snapID))
 	return nil
 }
 
@@ -320,7 +319,7 @@ func (c *Client) ModifySnapshot(ctx context.Context, symID string, sourceVol []t
 	err := c.api.Put(
 		ctx, URL, c.getDefaultHeaders(), snapParam, job)
 	if err != nil {
-		log.WithFields(fields).Error("Error in ModifySnapshot: " + err.Error())
+		csmlog.WithFields(fields).Error("Error in ModifySnapshot: " + err.Error())
 		return err
 	}
 	job, err = c.WaitOnJobCompletion(ctx, symID, job.JobID)
@@ -330,7 +329,7 @@ func (c *Client) ModifySnapshot(ctx context.Context, symID string, sourceVol []t
 	if job.Status == types.JobStatusFailed || job.Status == types.JobStatusRunning {
 		return fmt.Errorf("Job status not successful for snapshot %s. Job status = %s and Job result = %s", action, job.Status, job.Result)
 	}
-	log.Info(fmt.Sprintf("Action (%s) on Snapshot (%s) is successful", action, snapID))
+	csmlog.Info(fmt.Sprintf("Action (%s) on Snapshot (%s) is successful", action, snapID))
 	return nil
 }
 
@@ -340,7 +339,6 @@ func (c *Client) ModifySnapshotS(ctx context.Context, symID string, sourceVol []
 	newSnapID string, generation int64, isCopy bool,
 ) error {
 	defer c.TimeSpent("ModifySnapshotS", time.Now())
-
 	if _, err := c.IsAllowedArray(symID); err != nil {
 		return err
 	}
@@ -392,10 +390,10 @@ func (c *Client) ModifySnapshotS(ctx context.Context, symID string, sourceVol []
 	defer cancel()
 	err := c.api.Put(ctx, URL, c.getDefaultHeaders(), snapParam, nil)
 	if err != nil {
-		log.WithFields(fields).Error("Error in ModifySnapshotS: " + err.Error())
+		csmlog.WithFields(fields).Error("Error in ModifySnapshotS: " + err.Error())
 		return err
 	}
-	log.Info(fmt.Sprintf("Action (%s) on Snapshot (%s) is successful", action, snapID))
+	csmlog.Info(fmt.Sprintf("Action (%s) on Snapshot (%s) is successful", action, snapID))
 	return nil
 }
 
@@ -407,7 +405,7 @@ func (c *Client) GetPrivVolumeByID(ctx context.Context, symID string, volumeID s
 	}
 	vol, err := c.GetVolumeByID(ctx, symID, volumeID)
 	if err != nil {
-		log.Error("GetVolumeByID failed: " + err.Error())
+		csmlog.Error("GetVolumeByID failed: " + err.Error())
 		return nil, err
 	}
 
@@ -421,7 +419,7 @@ func (c *Client) GetPrivVolumeByID(ctx context.Context, symID string, volumeID s
 	resp, err := c.api.DoAndGetResponseBody(
 		ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetPrivVolumeByID failed: " + err.Error())
+		csmlog.Error("GetPrivVolumeByID failed: " + err.Error())
 		return nil, err
 	}
 	if err = c.checkResponse(resp); err != nil {

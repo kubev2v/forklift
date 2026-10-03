@@ -16,11 +16,12 @@
  *
  */
 
-package api
+package api // revive:disable:var-naming
 
 import (
 	"context"
-	"log"
+
+	"github.com/dell/csmlog"
 )
 
 // Logger interface for gopowerstore custom logger
@@ -33,15 +34,13 @@ type Logger interface {
 type defaultLogger struct{}
 
 func (dl *defaultLogger) Info(_ context.Context, format string, args ...interface{}) {
-	log.Printf(format, args...)
+	csmlog.Infof(format, args...)
 }
 
 func (dl *defaultLogger) Debug(_ context.Context, format string, args ...interface{}) {
-	if debug {
-		log.Printf(format, args...)
-	}
+	csmlog.Debugf(format, args...)
 }
 
 func (dl *defaultLogger) Error(_ context.Context, format string, args ...interface{}) {
-	log.Printf(format, args...)
+	csmlog.Errorf(format, args...)
 }

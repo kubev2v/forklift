@@ -7,6 +7,8 @@ The *Goscaleio* project represents API bindings that can be used to provide Scal
 - [Licensing](#licensing)
 - [Support](#support)
 
+
+
 ## Use Cases
 Any application written in Go can take advantage of these bindings.  Specifically, things that are involved in monitoring, management, and more specifically infrastructrue as code would find these bindings relevant.
 
@@ -68,17 +70,9 @@ Once you have a ```System``` struct you can then get other things like ```Protec
       log.Fatalf("error getting protection domains: %v", err)
     }
 
-## Debugging
+## Logging
 
-Two environment variables can be set to aid in debugging
-
-Env Var | Default Value |
--- | -- |
-`GOSCALEIO_DEBUG` | `false`
-`GOSCALEIO_SHOWHTTP` | `false`
-
-Setting `GOSCALEIO_DEBUG` well enable logging to `stdout`.
-Setting `GOSCALEIO_SHOWHTTP` will log all HTTP requests and responses to `stdout`.
+This library uses [csmlog](https://github.com/dell/csmlog) for structured logging. Log level is controlled via `csmlog` configuration. HTTP request/response logging is emitted at `DEBUG` level.
 
 
 <a id="licensing">Licensing</a>
@@ -91,3 +85,4 @@ Unless required by applicable law or agreed to in writing, software distributed 
 -------
 
 For any issues, questions or feedback, please follow our [support process](https://github.com/dell/csm/blob/main/docs/SUPPORT.md)
+

@@ -79,7 +79,7 @@ func (y *YAMLPrinter) Print() error {
 	encoder := yaml.NewEncoder(y.writer)
 	encoder.SetIndent(2)
 
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 
 	err := encoder.Encode(y.items)
 	if err != nil {
@@ -94,7 +94,7 @@ func (y *YAMLPrinter) PrintEmpty(message string) error {
 	encoder := yaml.NewEncoder(y.writer)
 	encoder.SetIndent(2)
 
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 
 	var data interface{}
 

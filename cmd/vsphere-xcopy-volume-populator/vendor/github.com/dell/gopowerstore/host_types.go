@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2020-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2020-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -252,6 +252,8 @@ type HostVolumeMapping struct {
 	HostGroupID string `json:"host_group_id,omitempty"`
 	// Unique identifier of a host attached to a volume. The host_id and host_group_id cannot both be set.
 	HostID string `json:"host_id,omitempty"`
+	// Host details of the host attached to a volume.
+	Host Host `json:"host,omitempty"`
 	// Unique identifier of a mapping between a host and a volume.
 	ID string `json:"id,omitempty"`
 	// Logical unit number for the host volume access.
@@ -264,7 +266,7 @@ type HostVolumeMapping struct {
 func (h *HostVolumeMapping) Fields() []string {
 	return []string{
 		"volume(appliance_id)", "host_group_id", "host_id",
-		"id", "logical_unit_number", "volume_id",
+		"host(id,name,host_initiators)", "id", "logical_unit_number", "volume_id",
 	}
 }
 

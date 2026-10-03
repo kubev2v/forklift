@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -252,8 +252,8 @@ func NewIpPool(config *types.IpPool) (*IpPool, error) {
 func (p *IpPool) init() error {
 	// IPv4 range
 	if p.config.Ipv4Config != nil {
-		ranges := strings.Split(p.config.Ipv4Config.Range, ",")
-		for _, r := range ranges {
+		ranges := strings.SplitSeq(p.config.Ipv4Config.Range, ",")
+		for r := range ranges {
 			sp := strings.Split(r, "#")
 			if len(sp) != 2 {
 				return fmt.Errorf("format of range should be ip#number; got %q", r)
@@ -269,7 +269,7 @@ func (p *IpPool) init() error {
 				return err
 			}
 
-			for i := 0; i < length; i++ {
+			for i := range length {
 				p.ipv4Pool = append(p.ipv4Pool, net.IPv4(ip[0], ip[1], ip[2], ip[3]+byte(i)).String())
 			}
 		}
@@ -277,8 +277,8 @@ func (p *IpPool) init() error {
 
 	// IPv6 range
 	if p.config.Ipv6Config != nil {
-		ranges := strings.Split(p.config.Ipv6Config.Range, ",")
-		for _, r := range ranges {
+		ranges := strings.SplitSeq(p.config.Ipv6Config.Range, ",")
+		for r := range ranges {
 			sp := strings.Split(r, "#")
 			if len(sp) != 2 {
 				return fmt.Errorf("format of range should be ip#number; got %q", r)
@@ -294,7 +294,7 @@ func (p *IpPool) init() error {
 				return err
 			}
 
-			for i := 0; i < length; i++ {
+			for i := range length {
 				var ipv6 [16]byte
 				copy(ipv6[:], ip)
 				ipv6[15] += byte(i)

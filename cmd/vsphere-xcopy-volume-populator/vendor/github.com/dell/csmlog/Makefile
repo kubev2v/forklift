@@ -1,0 +1,3 @@
+.PHONY: actions action-help
+unit-test:
+	go test -v -cover -race ./...

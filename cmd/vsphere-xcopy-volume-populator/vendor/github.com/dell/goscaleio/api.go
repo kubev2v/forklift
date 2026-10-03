@@ -1,4 +1,4 @@
-// Copyright © 2019 - 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright (c) 2019-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,23 +15,26 @@ package goscaleio
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/dell/csmlog"
 	"github.com/dell/goscaleio/api"
-	"github.com/dell/goscaleio/log"
 	types "github.com/dell/goscaleio/types/v1"
+	"github.com/zitadel/oidc/v3/pkg/client/rp"
+	"golang.org/x/oauth2"
 )
 
 var (
@@ -39,12 +42,9 @@ var (
 	accHeader string
 	conHeader string
 
-	errNilReponse = errors.New("nil response from API")
-	errBodyRead   = errors.New("error reading body")
-	errNoLink     = errors.New("Error: problem finding link")
-
-	debug, _    = strconv.ParseBool(os.Getenv("GOSCALEIO_DEBUG"))
-	showHTTP, _ = strconv.ParseBool(os.Getenv("GOSCALEIO_SHOWHTTP"))
+	errNilResponse = errors.New("nil response from API")
+	errBodyRead    = errors.New("error reading body")
+	errNoLink      = errors.New("Error: problem finding link")
 )
 
 // Client defines struct for Client
@@ -58,12 +58,33 @@ type Client struct {
 type Cluster struct{}
 
 // ConfigConnect defines struct for ConfigConnect
+
 type ConfigConnect struct {
-	Endpoint string
-	Version  string
-	Username string
-	Password string
-	Insecure bool
+	Endpoint         string
+	Version          string
+	Username         string
+	Password         string
+	Insecure         bool
+	AuthType         string // "Basic" or "OIDC"
+	PfmpIP           string
+	CiamClientID     string
+	CiamClientSecret string
+	OidcClientID     string
+	OidcClientSecret string
+	Issuer           string
+	Scopes           []string
+}
+
+func (c *Client) SetCustomHTTPHeaders(headers http.Header) {
+	c.api.SetCustomHTTPHeaders(headers)
+}
+
+// SetRequestObserver wires an API request observer into the underlying HTTP client.
+func (c *Client) SetRequestObserver(observer api.RequestObserver) {
+	if c == nil || c.api == nil {
+		return
+	}
+	c.api.SetRequestObserver(observer)
 }
 
 // GetVersion returns version
@@ -72,26 +93,31 @@ func (c *Client) GetVersion() (string, error) {
 	defer c.ResetContext()
 
 	resp, err := c.api.DoAndGetResponseBody(
-		ctx, http.MethodGet, "/api/version", nil, nil, c.configConnect.Version)
+		ctx, http.MethodGet, "/api/version", nil, nil, c.configConnect.Version,
+	)
 	if err != nil {
 		return "", err
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			log.DoLog(log.Log.Error, err.Error())
+			csmlog.WithFields(csmlog.Fields{
+				csmlog.FieldComponent: "goscaleio",
+				csmlog.FieldOperation: "GetVersion",
+			}).Errorf("Failed to close response body while getting version: %v", err)
 		}
 	}()
 	// parse the response
 	switch {
 	case resp == nil:
-		return "", errNilReponse
+		return "", errNilResponse
 	case resp.StatusCode == http.StatusUnauthorized:
 		// Authenticate then try again
 		if _, err = c.Authenticate(c.configConnect); err != nil {
 			return "", err
 		}
 		resp, err = c.api.DoAndGetResponseBody(
-			ctx, http.MethodGet, "/api/version", nil, nil, c.configConnect.Version)
+			ctx, http.MethodGet, "/api/version", nil, nil, c.configConnect.Version,
+		)
 		if err != nil {
 			return "", err
 		}
@@ -138,40 +164,31 @@ func (c *Client) Authenticate(configConnect *ConfigConnect) (Cluster, error) {
 	c.configConnect = configConnect
 
 	c.api.SetToken("")
-
-	headers := make(map[string]string, 1)
-	headers["Authorization"] = "Basic " + basicAuth(
-		configConnect.Username, configConnect.Password)
-
 	ctx := c.Context()
 	defer c.ResetContext()
 
-	resp, err := c.api.DoAndGetResponseBody(
-		ctx, http.MethodGet, "api/login", headers, nil, c.configConnect.Version)
-	if err != nil {
-		log.DoLog(log.Log.Error, err.Error())
-		return Cluster{}, err
-	}
+	var token string
+	var err error
 
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.DoLog(log.Log.Error, err.Error())
+	if configConnect.AuthType == "OIDC" {
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "Authenticate",
+		}).Info("authenticating with OIDC")
+		token, err = c.oidcAuthenticate(configConnect)
+		if err != nil {
+			return Cluster{}, err
 		}
-	}()
-
-	// parse the response
-	switch {
-	case resp == nil:
-		return Cluster{}, errNilReponse
-	case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
-		return Cluster{}, c.api.ParseJSONError(resp)
+	} else {
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "Authenticate",
+		}).Info("basic authentication")
+		token, err = c.basicAuthenticate(ctx, configConnect)
+		if err != nil {
+			return Cluster{}, err
+		}
 	}
-
-	token, err := extractString(resp)
-	if err != nil {
-		return Cluster{}, nil
-	}
-
 	c.api.SetToken(token)
 
 	if c.configConnect.Version == "" {
@@ -184,6 +201,251 @@ func (c *Client) Authenticate(configConnect *ConfigConnect) (Cluster, error) {
 	return Cluster{}, nil
 }
 
+func (c *Client) basicAuthenticate(ctx context.Context, configConnect *ConfigConnect) (string, error) {
+	// Prepare headers for Basic Auth
+	headers := map[string]string{
+		"Authorization": "Basic " + basicAuth(configConnect.Username, configConnect.Password),
+	}
+
+	// Call the login API
+	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, "api/login", headers, nil, c.configConnect.Version)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			csmlog.WithContext(ctx).WithFields(csmlog.Fields{
+				csmlog.FieldComponent: "goscaleio",
+				csmlog.FieldOperation: "basicAuthenticate",
+			}).Errorf("Failed to close response body during basic authentication: %v", err)
+		}
+	}()
+
+	// parse the response
+	switch {
+	case resp == nil:
+		return "", errNilResponse
+	case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
+		return "", c.api.ParseJSONError(resp)
+	}
+
+	// Extract token from response body
+	token, err := extractString(resp)
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+func (p *OIDCTokenProvider) GetToken(ctx context.Context) (*oauth2.Token, error) {
+	// rp library expects issuer base URL; discovery uses /.well-known/openid-configuration
+	rpClient, err := rp.NewRelyingPartyOIDC(
+		ctx,
+		p.cfg.Issuer,
+		p.cfg.ClientID,
+		p.cfg.ClientSecret,
+		"",
+		p.cfg.Scopes,
+		rp.WithHTTPClient(p.httpClient),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating OIDC relying party client: %w", err)
+	}
+
+	token, err := rp.ClientCredentials(ctx, rpClient, nil)
+	if err != nil {
+		return nil, fmt.Errorf("client credentials: %w", err)
+	}
+
+	return token, nil
+}
+
+type TokenProvider interface {
+	GetToken(ctx context.Context) (*oauth2.Token, error)
+}
+
+func WithHTTPClient(c *http.Client) OIDCOption {
+	return func(o *oidcOpts) { o.httpClient = c }
+}
+
+func WithTimeout(d time.Duration) OIDCOption {
+	return func(o *oidcOpts) { o.timeout = d }
+}
+
+func WithInsecureSkipVerify(skip bool) OIDCOption {
+	return func(o *oidcOpts) { o.insecureSkipVerify = skip }
+}
+
+func NewTokenProvider(config *ConfigConnect, opts ...OIDCOption) (TokenProvider, error) {
+	// Validate essentials
+	if config == nil {
+		return nil, fmt.Errorf("array connection data is nil")
+	}
+	if strings.TrimSpace(config.Issuer) == "" {
+		return nil, fmt.Errorf("issuer must not be empty")
+	}
+	if strings.TrimSpace(config.OidcClientID) == "" || strings.TrimSpace(config.OidcClientSecret) == "" {
+		return nil, fmt.Errorf("oidc client credentials must not be empty (OidcClientID/OidcClientSecret)")
+	}
+
+	if config.Scopes == nil {
+		config.Scopes = mergedScopes(config)
+	}
+	cfg := OIDCConfig{
+		Issuer:       config.Issuer,
+		ClientID:     config.OidcClientID,
+		ClientSecret: config.OidcClientSecret,
+		Scopes:       config.Scopes,
+	}
+
+	return NewOIDCTokenProvider(cfg, opts...)
+}
+
+func mergedScopes(config *ConfigConnect) []string {
+	iss := strings.ToLower(strings.TrimSpace(config.Issuer))
+	switch {
+	case strings.Contains(iss, "login.microsoftonline.com") || strings.HasSuffix(iss, "/v2.0"):
+		// Azure Scope: {"api://{resource-app-id}/.default"}
+		// If you have a dedicated Resource App ID, use that instead of OidcClientID.
+		return []string{fmt.Sprintf("api://%s/.default", config.OidcClientID)}
+
+	case strings.Contains(iss, "/realms/"):
+		// Keycloak Scope: {"openid"}
+		return []string{"openid"}
+	default:
+		// Unknown provider: keep empty unless caller specifies explicitly via options/fields
+		return nil
+	}
+}
+
+type OIDCOption func(*oidcOpts)
+
+type oidcOpts struct {
+	httpClient         *http.Client
+	timeout            time.Duration
+	insecureSkipVerify bool
+}
+
+type OIDCConfig struct {
+	// Base issuer URL (realm base for Keycloak, tenant base for Azure)
+	Issuer       string
+	ClientID     string
+	ClientSecret string
+	Scopes       []string
+}
+
+type OIDCTokenProvider struct {
+	cfg        OIDCConfig
+	httpClient *http.Client
+}
+
+func NewOIDCTokenProvider(cfg OIDCConfig, opts ...OIDCOption) (*OIDCTokenProvider, error) {
+	opt := &oidcOpts{}
+	for _, f := range opts {
+		f(opt)
+	}
+	httpClient, err := buildHTTPClient(opt)
+	if err != nil {
+		return nil, err
+	}
+	return &OIDCTokenProvider{cfg: cfg, httpClient: httpClient}, nil
+}
+
+func buildHTTPClient(o *oidcOpts) (*http.Client, error) {
+	if o.httpClient != nil {
+		return o.httpClient, nil
+	}
+	tlsCfg := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+	if o.insecureSkipVerify {
+		tlsCfg.InsecureSkipVerify = true
+	}
+	transport := &http.Transport{TLSClientConfig: tlsCfg}
+	client := &http.Client{Transport: transport}
+	if o.timeout > 0 {
+		client.Timeout = o.timeout
+	}
+	return client, nil
+}
+
+const tokenExchangeTimeout = 20 * time.Second
+
+func buildTokenExchangeHTTPClient(insecure bool) *http.Client {
+	return buildTokenExchangeHTTPClientWithTimeout(insecure, tokenExchangeTimeout)
+}
+
+func buildTokenExchangeHTTPClientWithTimeout(insecure bool, timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			// #nosec G402
+			TLSClientConfig: &tls.Config{
+				MinVersion:         tls.VersionTLS12,
+				InsecureSkipVerify: insecure, // same as curl -k
+			},
+		},
+	}
+}
+
+func (c *Client) oidcAuthenticate(configConnect *ConfigConnect) (string, error) {
+	ctx := c.Context()
+
+	form := url.Values{}
+	form.Set("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange")
+	form.Set("subject_token_type", "urn:ietf:params:oauth:token-type:jwt")
+	idpProvider, err := NewTokenProvider(
+		configConnect,
+		WithInsecureSkipVerify(configConnect.Insecure),
+		WithTimeout(20*time.Second),
+	)
+
+	idpToken, err := idpProvider.GetToken(ctx)
+	if err != nil {
+		return "", fmt.Errorf("Failed to get IDP token %s", err.Error())
+	}
+
+	form.Set("subject_token", idpToken.AccessToken)
+
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("https://%s/rest/v1/token", configConnect.PfmpIP), strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("creating token request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("ClientId", configConnect.CiamClientID)
+	req.Header.Set("ClientSecret", configConnect.CiamClientSecret)
+
+	client := buildTokenExchangeHTTPClient(configConnect.Insecure)
+
+	resp, err := client.Do(req) // #nosec G704 - Request to user-provided OIDC authentication endpoint (PfmpIP). This is intended SDK behavior where users configure their own auth server
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	switch {
+	case resp == nil:
+		return "", errNilResponse
+	case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
+		return "", c.api.ParseJSONError(resp)
+	}
+	return extractOauth2Token(resp), nil
+}
+
+func extractOauth2Token(response *http.Response) string {
+	token := &oauth2.Token{}
+	err := json.NewDecoder(response.Body).Decode(token)
+	if err != nil {
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "extractOauth2Token",
+		}).Errorf("Failed to decode OAuth2 token response: %v", err)
+	}
+	return token.AccessToken
+}
+
 func basicAuth(username, password string) string {
 	auth := username + ":" + password
 	return base64.StdEncoding.EncodeToString([]byte(auth))
@@ -192,7 +454,12 @@ func basicAuth(username, password string) string {
 func (c *Client) xmlRequest(method, uri string, body, resp interface{}) (*http.Response, error) {
 	response, err := c.api.DoXMLRequest(context.Background(), method, uri, c.configConnect.Version, body, resp)
 	if err != nil {
-		log.DoLog(log.Log.Error, err.Error())
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "xmlRequest",
+			"http_method":         method,
+			"request_uri":         uri,
+		}).Errorf("XML request failed: %v", err)
 	}
 	return response, err
 }
@@ -214,25 +481,42 @@ var getJSONWithRetryFunc = func(c *Client, method, uri string, body, resp interf
 	defer c.ResetContext()
 
 	err := c.api.DoWithHeaders(
-		ctx, method, uri, headers, body, resp, c.configConnect.Version)
+		ctx, method, uri, headers, body, resp, c.configConnect.Version,
+	)
 	if err == nil {
 		return nil
 	}
 
 	// check if we need to authenticate
 	if e, ok := err.(*types.Error); ok {
-		log.DoLog(log.Log.Debug, err.Error())
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "getJSONWithRetry",
+			"http_method":         method,
+			"request_uri":         uri,
+		}).Debugf("Request returned error before retry: %v", err)
 		if e.HTTPStatusCode == 401 {
-			log.DoLog(log.Log.Info, "Need to re-auth")
+			csmlog.WithFields(csmlog.Fields{
+				csmlog.FieldComponent: "goscaleio",
+				csmlog.FieldOperation: "getJSONWithRetry",
+				"http_method":         method,
+				"request_uri":         uri,
+			}).Info("need to re-auth")
 			// Authenticate then try again
 			if _, err := c.Authenticate(c.configConnect); err != nil {
 				return fmt.Errorf("Error Authenticating: %s", err)
 			}
 			return c.api.DoWithHeaders(
-				ctx, method, uri, headers, body, resp, c.configConnect.Version)
+				ctx, method, uri, headers, body, resp, c.configConnect.Version,
+			)
 		}
 	}
-	log.DoLog(log.Log.Error, err.Error())
+	csmlog.WithFields(csmlog.Fields{
+		csmlog.FieldComponent: "goscaleio",
+		csmlog.FieldOperation: "getJSONWithRetry",
+		"http_method":         method,
+		"request_uri":         uri,
+	}).Errorf("Request failed: %v", err)
 
 	return err
 }
@@ -272,14 +556,17 @@ func (c *Client) getStringWithRetry(
 	checkResponse := func(resp *http.Response) (string, bool, error) {
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
-				log.DoLog(log.Log.Error, err.Error())
+				csmlog.WithFields(csmlog.Fields{
+					csmlog.FieldComponent: "goscaleio",
+					csmlog.FieldOperation: "getStringWithRetry",
+				}).Errorf("Failed to close response body while getting string response: %v", err)
 			}
 		}()
 
 		// parse the response
 		switch {
 		case resp == nil:
-			return "", false, errNilReponse
+			return "", false, errNilResponse
 		case resp.StatusCode == 401:
 			return "", true, c.api.ParseJSONError(resp)
 		case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
@@ -295,20 +582,25 @@ func (c *Client) getStringWithRetry(
 	}
 
 	resp, err := c.api.DoAndGetResponseBody(
-		ctx, method, uri, headers, body, c.configConnect.Version)
+		ctx, method, uri, headers, body, c.configConnect.Version,
+	)
 	if err != nil {
 		return "", err
 	}
 	s, retry, httpErr := checkResponse(resp)
 	if httpErr != nil {
 		if retry {
-			log.DoLog(log.Log.Info, "need to re-auth")
+			csmlog.WithFields(csmlog.Fields{
+				csmlog.FieldComponent: "goscaleio",
+				csmlog.FieldOperation: "getStringWithRetry",
+			}).Info("need to re-auth")
 			// Authenticate then try again
 			if _, err = c.Authenticate(c.configConnect); err != nil {
 				return "", fmt.Errorf("Error Authenticating: %s", err)
 			}
 			resp, err = c.api.DoAndGetResponseBody(
-				ctx, method, uri, headers, body, c.configConnect.Version)
+				ctx, method, uri, headers, body, c.configConnect.Version,
+			)
 			if err != nil {
 				return "", err
 			}
@@ -360,7 +652,9 @@ func NewClient() (client *Client, err error) {
 		os.Getenv("GOSCALEIO_VERSION"),
 		math.MaxInt64,
 		os.Getenv("GOSCALEIO_INSECURE") == "true",
-		os.Getenv("GOSCALEIO_USECERTS") == "true")
+		os.Getenv("GOSCALEIO_USECERTS") == "true",
+		os.Getenv("GOSCALEIO_CAFILEPATH"),
+	)
 }
 
 // ClientConnectTimeout is used for unit testing to set the connection timeout much lower
@@ -373,45 +667,44 @@ func NewClientWithArgs(
 	timeout int64,
 	insecure,
 	useCerts bool,
+	caFilePath string,
 ) (client *Client, err error) {
-	if showHTTP {
-		debug = true
-	}
-	if debug {
-		log.SetLogLevel(slog.LevelDebug)
-		log.DoLog(log.Log.Info, "Setting log level to debug in GoScaleIO")
-	}
-
-	fields := map[string]interface{}{
-		"endpoint": endpoint,
-		"insecure": insecure,
-		"useCerts": useCerts,
-		"version":  version,
-		"debug":    debug,
-		"showHTTP": showHTTP,
-	}
-	log.DoLog(log.Log.Debug, fmt.Sprintf("goscaleio client init, Fields: %+v", fields))
+	csmlog.WithFields(csmlog.Fields{
+		csmlog.FieldComponent: "goscaleio",
+		csmlog.FieldOperation: "NewClientWithArgs",
+		"endpoint":            endpoint,
+		"insecure":            insecure,
+		"use_certs":           useCerts,
+	}).Debug("Initializing PowerFlex client")
 
 	if endpoint == "" {
-		log.DoLog(log.Log.Error, fmt.Sprintf("endpoint is required, Fields: %+v", fields))
-		return nil,
-			withFields(fields, "endpoint is required")
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "NewClientWithArgs",
+		}).Error("PowerFlex client endpoint is required")
+		return nil, fmt.Errorf("endpoint is required")
 	}
 
 	opts := api.ClientOptions{
-		Insecure: insecure,
-		UseCerts: useCerts,
-		ShowHTTP: showHTTP,
-		Timeout:  time.Duration(timeout) * time.Second,
+		Insecure:   insecure,
+		UseCerts:   useCerts,
+		CAFilePath: caFilePath,
+		Timeout:    time.Duration(timeout) * time.Second,
 	}
 
 	if ClientConnectTimeout != 0 {
 		opts.Timeout = ClientConnectTimeout
 	}
 
-	ac, err := api.New(context.Background(), endpoint, opts, debug)
+	ac, err := api.New(context.Background(), endpoint, opts)
 	if err != nil {
-		log.DoLog(log.Log.Error, fmt.Sprintf("Unable to create HTTP client: %s", err.Error()))
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "NewClientWithArgs",
+			"endpoint":            endpoint,
+			"insecure":            insecure,
+			"use_certs":           useCerts,
+		}).Errorf("Unable to create HTTP client: %v", err)
 		return nil, err
 	}
 

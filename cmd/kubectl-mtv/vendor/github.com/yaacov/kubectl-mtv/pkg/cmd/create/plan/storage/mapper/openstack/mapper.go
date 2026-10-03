@@ -41,6 +41,9 @@ func (m *OpenStackStorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, ta
 	}
 
 	klog.V(4).Infof("DEBUG: Created %d storage pairs", len(storagePairs))
+
+	storagePairs = mapper.ApplyOffloadToPairs(storagePairs, opts)
+
 	return storagePairs, nil
 }
 

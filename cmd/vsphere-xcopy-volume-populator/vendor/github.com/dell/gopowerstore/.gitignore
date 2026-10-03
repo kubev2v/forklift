@@ -26,3 +26,5 @@ GOPOWERSTORE_TEST.env
 # gosec
 gosec.log
 gosecresults.csv
+
+vendor/
