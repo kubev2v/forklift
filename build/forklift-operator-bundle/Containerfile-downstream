@@ -15,7 +15,7 @@ ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:40473f0f758
 
 ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:12d8e40dbce17b1d4e606826a0bdf6eec981826a0615feff83aefd63c9ef2a43"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:9f8e4bb8a3120920aef5526b74f1cade5a5a0cdd40f65404a3840672f951204f"
+ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:fad0b2c5b7ee7f89bd986d51c06172bdc781f0ba55646ae5e7eb2b47bfb46e48"
 
 ARG DEEP_INSPECTION_IMAGE="registry.redhat.io/mtv-candidate/mtv-deep-inspection-rhel10@sha256:f524d203e7120d5872c37924978c576058c9b861ad1cc2b08857f00341c9d9d9"
 
