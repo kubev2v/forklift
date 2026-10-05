@@ -221,69 +221,69 @@ arches:
     name: libtpms
     evr: 0.9.6-11.el10_0
     sourcerpm: libtpms-0.9.6-11.el10_0.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-client-11.10.0-12.4.el10_2.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-client-11.10.0-12.9.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 481344
-    checksum: sha256:c18f3282ce4e842229d74bb3ec0cafe6e0dd32ab4323066b7fd2382deb167c52
+    size: 484342
+    checksum: sha256:e724a05f8362bcc5dcaba20cc640f57d7fdd455b4f838c884ecf4925cf4ae8f3
     name: libvirt-client
-    evr: 11.10.0-12.4.el10_2
-    sourcerpm: libvirt-11.10.0-12.4.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-common-11.10.0-12.4.el10_2.x86_64.rpm
+    evr: 11.10.0-12.9.el10_2
+    sourcerpm: libvirt-11.10.0-12.9.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-common-11.10.0-12.9.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 173264
-    checksum: sha256:b2f8a8e652628fc572e0310f5ad3e28f12a7d4e8c9c8089b1fdc3c61b8f18af6
+    size: 175977
+    checksum: sha256:45cb219d23b8f5648ab105f82ff5e0d97129ebd3f3afb0c1b70d090277b1a2ac
     name: libvirt-daemon-common
-    evr: 11.10.0-12.4.el10_2
-    sourcerpm: libvirt-11.10.0-12.4.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-config-network-11.10.0-12.4.el10_2.x86_64.rpm
+    evr: 11.10.0-12.9.el10_2
+    sourcerpm: libvirt-11.10.0-12.9.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-config-network-11.10.0-12.9.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 43910
-    checksum: sha256:a39e9555dc1830a77b3226989366f6dc9d7a9b9c18caa4403f67ff57cf13892b
+    size: 46691
+    checksum: sha256:b8970ec08af012bc39238fa71602837ad21cec123c069d85ffcadefd8b9a401e
     name: libvirt-daemon-config-network
-    evr: 11.10.0-12.4.el10_2
-    sourcerpm: libvirt-11.10.0-12.4.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-driver-network-11.10.0-12.4.el10_2.x86_64.rpm
+    evr: 11.10.0-12.9.el10_2
+    sourcerpm: libvirt-11.10.0-12.9.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-driver-network-11.10.0-12.9.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 294393
-    checksum: sha256:52708b6e8cec26676b6c134ff40bf3363fe73a512f05a6b0aaef9f5b2a34102a
+    size: 296678
+    checksum: sha256:de9018711473f7138c3f49ff61a480b540c45959012a2ffe1bdc02a396c4cffc
     name: libvirt-daemon-driver-network
-    evr: 11.10.0-12.4.el10_2
-    sourcerpm: libvirt-11.10.0-12.4.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-driver-qemu-11.10.0-12.4.el10_2.x86_64.rpm
+    evr: 11.10.0-12.9.el10_2
+    sourcerpm: libvirt-11.10.0-12.9.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-driver-qemu-11.10.0-12.9.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 1081206
-    checksum: sha256:97f2867c8074fa981e15166a505278530815e67e6b04fea1594ff39b68d3f3e4
+    size: 1084140
+    checksum: sha256:3d016e597f15bc40a44a789d216c463d4e76a4e77436d6af1fac20b24596dc17
     name: libvirt-daemon-driver-qemu
-    evr: 11.10.0-12.4.el10_2
-    sourcerpm: libvirt-11.10.0-12.4.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-driver-secret-11.10.0-12.4.el10_2.x86_64.rpm
+    evr: 11.10.0-12.9.el10_2
+    sourcerpm: libvirt-11.10.0-12.9.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-driver-secret-11.10.0-12.9.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 236494
-    checksum: sha256:d6b7b2820802d9670f3fbd8734332541cc7689e219dc9d186f28db0b8b6bc7e2
+    size: 238992
+    checksum: sha256:bbd558fcdfd7aad76b95609ddff88c52c053c23fecf1ceeb173cb3b5378f4b46
     name: libvirt-daemon-driver-secret
-    evr: 11.10.0-12.4.el10_2
-    sourcerpm: libvirt-11.10.0-12.4.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-driver-storage-core-11.10.0-12.4.el10_2.x86_64.rpm
+    evr: 11.10.0-12.9.el10_2
+    sourcerpm: libvirt-11.10.0-12.9.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-driver-storage-core-11.10.0-12.9.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 293778
-    checksum: sha256:9e0c17f96d68c824e6593b6322cd598ae847816e348c6b8329c92ff259c95af7
+    size: 296885
+    checksum: sha256:429348a242799fff9a8e93242ddd5db8b0f492c04bd427a054e257d8f0aa3c58
     name: libvirt-daemon-driver-storage-core
-    evr: 11.10.0-12.4.el10_2
-    sourcerpm: libvirt-11.10.0-12.4.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-log-11.10.0-12.4.el10_2.x86_64.rpm
+    evr: 11.10.0-12.9.el10_2
+    sourcerpm: libvirt-11.10.0-12.9.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-log-11.10.0-12.9.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 84930
-    checksum: sha256:a2ed888debe8582464d59955b68d8ae0ddd577e97b033c012ea80a69b4299140
+    size: 87717
+    checksum: sha256:11bb89fe28f163c047d67cfd4b3e92566ffeb2980c4227513e7cf434898d61b6
     name: libvirt-daemon-log
-    evr: 11.10.0-12.4.el10_2
-    sourcerpm: libvirt-11.10.0-12.4.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-libs-11.10.0-12.4.el10_2.x86_64.rpm
+    evr: 11.10.0-12.9.el10_2
+    sourcerpm: libvirt-11.10.0-12.9.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-libs-11.10.0-12.9.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 5774282
-    checksum: sha256:a87baf20011cc1e58d3d291ee8adec5ffb35590257593a044712112bd5e1e5bb
+    size: 5773561
+    checksum: sha256:bf88c4828be5d4bc48d8ecd7cc08bfb5a1877827d7e84a07b61a4bb7d4b0e1da
     name: libvirt-libs
-    evr: 11.10.0-12.4.el10_2
-    sourcerpm: libvirt-11.10.0-12.4.el10_2.src.rpm
+    evr: 11.10.0-12.9.el10_2
+    sourcerpm: libvirt-11.10.0-12.9.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libxcrypt-compat-4.4.36-10.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
     size: 95333
@@ -550,27 +550,27 @@ arches:
     name: swtpm-tools
     evr: 0.9.0-5.el10
     sourcerpm: swtpm-0.9.0-5.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/u/unbound-anchor-1.24.2-7.el10_2.5.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/u/unbound-anchor-1.24.2-7.el10_2.6.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 43911
-    checksum: sha256:6f45dcd95f85fea368c92e61f5a2d2ea39a02b537c7c270bd0c1a8793bb21905
+    size: 44330
+    checksum: sha256:2729b6a7c01675b9375a919b4f0b7b358e282d9db34c3fc7d8ef846268649f77
     name: unbound-anchor
-    evr: 1.24.2-7.el10_2.5
-    sourcerpm: unbound-1.24.2-7.el10_2.5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/u/unbound-libs-1.24.2-7.el10_2.5.x86_64.rpm
+    evr: 1.24.2-7.el10_2.6
+    sourcerpm: unbound-1.24.2-7.el10_2.6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/u/unbound-libs-1.24.2-7.el10_2.6.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 578080
-    checksum: sha256:95c969d2d37e71b9c88f27b2451e55ea123430a90fad8453846ee2e7b4e3d6c3
+    size: 578631
+    checksum: sha256:14f5cbb8adb0ebcc7e114e6c2306079eda775d7435806d75077ae70797d3a56c
     name: unbound-libs
-    evr: 1.24.2-7.el10_2.5
-    sourcerpm: unbound-1.24.2-7.el10_2.5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/v/virt-v2v-2.10.0-21.el10_2.x86_64.rpm
+    evr: 1.24.2-7.el10_2.6
+    sourcerpm: unbound-1.24.2-7.el10_2.6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/v/virt-v2v-2.10.0-23.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 3816231
-    checksum: sha256:ae9c097a1f3ad538c91ecdfd849e307ab368ffd431911ce372c7a89b440ad190
+    size: 3800979
+    checksum: sha256:35caf09e5ae67d670ee9c1f29cd98983bdf558faf37d51e2928f2b71ef168d88
     name: virt-v2v
-    evr: 1:2.10.0-21.el10_2
-    sourcerpm: virt-v2v-2.10.0-21.el10_2.src.rpm
+    evr: 1:2.10.0-23.el10_2
+    sourcerpm: virt-v2v-2.10.0-23.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/v/virtio-win-1.9.58-0.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
     size: 287940012
@@ -1390,20 +1390,20 @@ arches:
     name: openldap
     evr: 2.6.10-1.el10
     sourcerpm: openldap-2.6.10-1.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/o/openssh-9.9p1-27.el10_2.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/o/openssh-9.9p1-28.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 368352
-    checksum: sha256:de1f34299c7cf64294263a2c10ebe9e9cc6d06dd9e4bf9720e3c935382597b31
+    size: 368139
+    checksum: sha256:58558ebf888650bc800be1896991782d656498894ab8d786e55847e8960d7d67
     name: openssh
-    evr: 9.9p1-27.el10_2
-    sourcerpm: openssh-9.9p1-27.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/o/openssh-clients-9.9p1-27.el10_2.x86_64.rpm
+    evr: 9.9p1-28.el10_2
+    sourcerpm: openssh-9.9p1-28.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/o/openssh-clients-9.9p1-28.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 792859
-    checksum: sha256:c09d9574a9604eade01e9c4c0cb2407594e1d12bc6dfa7f9a081fa74951c3b03
+    size: 792667
+    checksum: sha256:c0f39b7148d1bf822767916cfd86cc53a9010316d379b59cfbcd921cd7c0801e
     name: openssh-clients
-    evr: 9.9p1-27.el10_2
-    sourcerpm: openssh-9.9p1-27.el10_2.src.rpm
+    evr: 9.9p1-28.el10_2
+    sourcerpm: openssh-9.9p1-28.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/o/openssl-3.5.5-6.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 1332328
@@ -1740,12 +1740,12 @@ arches:
     checksum: sha256:7c8ec33e4e179bd7c3f3595d19d4b5b935dd2531f4bb1687a8acb35a2d7263ab
     name: libtpms
     evr: 0.9.6-11.el10_0
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libvirt-11.10.0-12.4.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libvirt-11.10.0-12.9.el10_2.src.rpm
     repoid: rhel-10-for-x86_64-appstream-source-rpms
-    size: 10938723
-    checksum: sha256:68625c36795b802977758fb665ec99d40290dc806b71f39a6c5e22b93304c048
+    size: 11048477
+    checksum: sha256:f11404a06c42ef680ef94ee9e9e52280a99048d298170870af3e86e5d3f09445
     name: libvirt
-    evr: 11.10.0-12.4.el10_2
+    evr: 11.10.0-12.9.el10_2
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libxslt-1.1.39-8.el10_2.1.src.rpm
     repoid: rhel-10-for-x86_64-appstream-source-rpms
     size: 1635350
@@ -1836,18 +1836,18 @@ arches:
     checksum: sha256:831771414ecdb203deedc3ca941abcd7225b1cc0c52a8b5fd546d8fa846243b2
     name: swtpm
     evr: 0.9.0-5.el10
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/u/unbound-1.24.2-7.el10_2.5.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/u/unbound-1.24.2-7.el10_2.6.src.rpm
     repoid: rhel-10-for-x86_64-appstream-source-rpms
-    size: 7079366
-    checksum: sha256:395bc259681b3a34539e160bad9e0fa8c5749b321ae10374b3d45d7745651389
+    size: 7088829
+    checksum: sha256:248a822c13280302e7f081df70f5efaeb10b1aedfd1e54d1ae7240e1ab6c6b7b
     name: unbound
-    evr: 1.24.2-7.el10_2.5
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/v/virt-v2v-2.10.0-21.el10_2.src.rpm
+    evr: 1.24.2-7.el10_2.6
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/v/virt-v2v-2.10.0-23.el10_2.src.rpm
     repoid: rhel-10-for-x86_64-appstream-source-rpms
-    size: 7505765
-    checksum: sha256:7194c22640d188fef99137929f4e3216b97355c82a208d29756c1b54ee57ee82
+    size: 7509853
+    checksum: sha256:9839eea20f2aa75ecfc4a25d8f9b7922fc0e51bcb36906d19443705c5402c52d
     name: virt-v2v
-    evr: 1:2.10.0-21.el10_2
+    evr: 1:2.10.0-23.el10_2
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/v/virtio-win-1.9.58-0.el10_2.src.rpm
     repoid: rhel-10-for-x86_64-appstream-source-rpms
     size: 261947531
@@ -2352,12 +2352,12 @@ arches:
     checksum: sha256:14808cf2224c23002ecb0d3df48a474916d37230ba9b14dcc9d20f434eb351a9
     name: openldap
     evr: 2.6.10-1.el10
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/o/openssh-9.9p1-27.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/o/openssh-9.9p1-28.el10_2.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
-    size: 2404763
-    checksum: sha256:96c890cf0d8ee5ac1b8510bbef0d02441f75818909308afbf095976c50b16866
+    size: 2406476
+    checksum: sha256:339f80b64499014ec151dd123b82bca39c4cced6ba5f9ff0c833e5cd7b900308
     name: openssh
-    evr: 9.9p1-27.el10_2
+    evr: 9.9p1-28.el10_2
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/o/openssl-3.5.5-6.el10_2.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
     size: 53416833
