@@ -7,10 +7,12 @@ import (
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/base"
+	calico "github.com/kubev2v/forklift/pkg/lib/client/calico"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	cnv "kubevirt.io/api/core/v1"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
@@ -225,4 +227,28 @@ type NetworkConfig struct {
 func (m *NetworkConfig) IsUnsupportedUdn() bool {
 	return m.Type == OvnOverlayType &&
 		(m.Role == RolePrimary || m.Topology == TopologyLayer3)
+}
+
+// CalicoNetwork is a projectcalico.org/v3 Network served by the cluster,
+// parsed to the fields migration validation reads.
+type CalicoNetwork struct {
+	Base
+	Object calico.Network `sql:""`
+}
+
+func (m *CalicoNetwork) With(u *unstructured.Unstructured, network calico.Network) {
+	m.Base.With(u)
+	m.Object = network
+}
+
+// CalicoIPPool is a projectcalico.org/v3 IPPool served by the cluster,
+// parsed to the fields migration validation reads.
+type CalicoIPPool struct {
+	Base
+	Object calico.IPPool `sql:""`
+}
+
+func (m *CalicoIPPool) With(u *unstructured.Unstructured, pool calico.IPPool) {
+	m.Base.With(u)
+	m.Object = pool
 }
