@@ -35,7 +35,7 @@ ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-
 
 ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:be057c014f23d0ebaa3d21c3d99e1558cdd6efccb9063f6c7c4dd98897fcac81"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:be7584ee81d76fed8f8ce395b3f633802f9fe404a910848bf1067cbfcc7b626d"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:351e90c22f58891bbed3deb2effbacf3765e62ab2aae3a704583bb1fdc8fb99e"
 
 ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:688d769214d9de0458152de609d1d57e89eedb1c56d75bbc8c02b1652e04767a"
 
