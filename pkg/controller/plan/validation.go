@@ -68,7 +68,7 @@ const (
 	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
 	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
 	CopyApplianceNotReady           = "CopyApplianceNotReady"
-	ToeholdTemplateNotReady         = "ToeholdTemplateNotReady"
+	CopyApplianceTemplateNotReady         = "CopyApplianceTemplateNotReady"
 	VMHasSnapshots                  = "VMHasSnapshots"
 	VMConsolidationNeeded           = "VMConsolidationNeeded"
 	HostNotReady                    = "HostNotReady"
@@ -466,27 +466,27 @@ func (r *Reconciler) validateCopyAppliance(ctx *plancontext.Context) error {
 	if provider == nil {
 		return nil
 	}
-	toehold, err := toeholdTemplateForProvider(r.Client, provider)
+	toehold, err := copyApplianceTemplateForProvider(r.Client, provider)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			plan.Status.SetCondition(libcnd.Condition{
-				Type:     ToeholdTemplateNotReady,
+				Type:     CopyApplianceTemplateNotReady,
 				Status:   True,
 				Category: api.CategoryCritical,
 				Reason:   NotFound,
-				Message:  fmt.Sprintf("No toehold template was found for provider %q.", provider.Name),
+				Message:  fmt.Sprintf("No copy appliance template was found for provider %q.", provider.Name),
 			})
 			return nil
 		}
 		return err
 	}
-	if toehold.Status.Phase != api.ToeholdTemplatePhaseSucceeded {
+	if toehold.Status.Phase != api.CopyApplianceTemplatePhaseSucceeded {
 		plan.Status.SetCondition(libcnd.Condition{
-			Type:     ToeholdTemplateNotReady,
+			Type:     CopyApplianceTemplateNotReady,
 			Status:   True,
 			Category: api.CategoryCritical,
 			Reason:   NotValid,
-			Message:  fmt.Sprintf("Toehold template %q is not ready (phase=%s).", toehold.Name, toehold.Status.Phase),
+			Message:  fmt.Sprintf("Copy appliance template %q is not ready (phase=%s).", toehold.Name, toehold.Status.Phase),
 		})
 	}
 

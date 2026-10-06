@@ -36,7 +36,7 @@ type fakeInventory struct {
 	hosts       map[string]model.Host
 	clusters    map[string]model.Cluster
 	// There is deliberately no network or datastore map. Placement resolves
-	// neither — the network and the datastore are the toehold template's spec
+	// neither — the network and the datastore are the copy appliance template's spec
 	// — and Get rejects the attempt, so a regression to taking either from the
 	// inventory fails rather than passes.
 }
@@ -88,7 +88,7 @@ var testRef = ref.Ref{ID: "vm-101", Name: "web-01"}
 
 const testMigrationUID = types.UID("6f1e2a3b-4c5d-6e7f-8091-a2b3c4d5e6f7")
 
-// testInventory is a source VM and the provider's toehold template, each on a
+// testInventory is a source VM and the provider's copy appliance template, each on a
 // clustered host with one disk and in a folder of its own. Keeping the two
 // apart is what makes it visible that the datacenter and the resource pool are
 // the template's and only the attached disks are the source VM's. Every path
@@ -214,7 +214,7 @@ func TestPlacementFollowsTheTemplate(t *testing.T) {
 	}
 }
 
-// Where the appliance is cloned from and to is the toehold template's spec,
+// Where the appliance is cloned from and to is the copy appliance template's spec,
 // not where the inventory has the template. The two agree unless the template
 // was moved or renamed after the import, and the spec is what the import was
 // told to do.
@@ -320,12 +320,12 @@ func TestPlacementErrors(t *testing.T) {
 	tests := []struct {
 		name    string
 		setup   func(*fakeInventory)
-		toehold func(*api.ToeholdTemplate)
+		toehold func(*api.CopyApplianceTemplate)
 		want    string
 	}{
 		{
 			name:    "template not imported yet",
-			toehold: func(x *api.ToeholdTemplate) { x.Status.Template.Moref = "" },
+			toehold: func(x *api.CopyApplianceTemplate) { x.Status.Template.Moref = "" },
 			want:    "moref",
 		},
 		{
@@ -411,19 +411,19 @@ func TestBuildRejectsAnUnknownSourceVM(t *testing.T) {
 	}
 }
 
-// testToehold is the provider's toehold template, imported and placed. The
+// testToehold is the provider's copy appliance template, imported and placed. The
 // spec is where the import put it; the moref resolves to that same template VM
 // in the fixture inventory.
-func testToehold() *api.ToeholdTemplate {
-	return &api.ToeholdTemplate{
+func testToehold() *api.CopyApplianceTemplate {
+	return &api.CopyApplianceTemplate{
 		ObjectMeta: meta.ObjectMeta{Namespace: "forklift", Name: "vcenter-toehold"},
-		Spec: api.ToeholdTemplateSpec{
+		Spec: api.CopyApplianceTemplateSpec{
 			TemplateName: "vcenter-toehold",
 			Folder:       "/DC0/vm/templates",
 			Datastore:    "templates",
 		},
-		Status: api.ToeholdTemplateStatus{
-			Phase:    api.ToeholdTemplatePhaseSucceeded,
+		Status: api.CopyApplianceTemplateStatus{
+			Phase:    api.CopyApplianceTemplatePhaseSucceeded,
 			Template: api.TemplateStatus{Moref: "vm-900"},
 		},
 	}
@@ -499,7 +499,7 @@ func TestBuild(t *testing.T) {
 	if spec.ContainerImage != testSettings().ContainerImage {
 		t.Errorf("ContainerImage = %q, want it from settings", spec.ContainerImage)
 	}
-	// The toehold template build injects the matching public key; the private
+	// The copy appliance template build injects the matching public key; the private
 	// half and the certificates live with the provider.
 	if spec.Secret.Namespace != "forklift" || spec.Secret.Name != "toehold-ssh-keys-vcenter-private" {
 		t.Errorf("Secret = %v, want the toehold private secret in the provider namespace", spec.Secret)
@@ -515,7 +515,7 @@ func TestBuild(t *testing.T) {
 	}
 	// Placement is the template's; only the disks above are the source VM's.
 	if spec.Template != "/DC0/vm/templates/vcenter-toehold" {
-		t.Errorf("Template = %q, want the toehold template's inventory path", spec.Template)
+		t.Errorf("Template = %q, want the copy appliance template's inventory path", spec.Template)
 	}
 	if spec.Folder != "/DC0/vm/templates" || spec.Datastore != "templates" {
 		t.Errorf("placement = (%q, %q), want the template's", spec.Folder, spec.Datastore)

@@ -23,7 +23,7 @@ func TestBuildCheck(t *testing.T) {
 		t.Errorf("AttachDisks = %+v, want none", appliance.Spec.AttachDisks)
 	}
 	if appliance.Spec.Template != "/DC0/vm/templates/vcenter-toehold" {
-		t.Errorf("Template = %q, want the toehold template's inventory path", appliance.Spec.Template)
+		t.Errorf("Template = %q, want the copy appliance template's inventory path", appliance.Spec.Template)
 	}
 	// The same placement a migration appliance gets, which is the point: the
 	// check proves that placement works.

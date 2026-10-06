@@ -7,7 +7,7 @@ import (
 )
 
 func TestDiskHashStable(t *testing.T) {
-	spec := api.ToeholdTemplateSpec{
+	spec := api.CopyApplianceTemplateSpec{
 		BaseDisk: api.ToeholdBaseDisk{
 			ContainerImage: "registry.example/rhel-guest-image:9.8",
 		},
@@ -31,7 +31,7 @@ func TestDiskHashStable(t *testing.T) {
 }
 
 func TestConfigHashStable(t *testing.T) {
-	spec := api.ToeholdTemplateSpec{
+	spec := api.CopyApplianceTemplateSpec{
 		Network:   "VM Network",
 		Resources: api.ToeholdResources{CPU: 2, MemoryMiB: 4096},
 	}

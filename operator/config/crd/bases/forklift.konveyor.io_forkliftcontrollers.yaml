@@ -341,6 +341,14 @@ spec:
                 description: SSH user the controller logs in to copy appliances as.
                   Defaults to root.
                 type: string
+              copy_appliance_template_cpu:
+                default: "2"
+                description: Default OVF CPU count for copy appliance templates.
+                type: string
+              copy_appliance_template_memory_mib:
+                default: "4096"
+                description: Default OVF memory in MiB for copy appliance templates.
+                type: string
               deep_inspection_image_fqin:
                 description: Deep inspection image. Optional. If left empty, the operator
                   automatically sets this from the release payload.
@@ -395,7 +403,7 @@ spec:
                 type: string
               feature_toehold:
                 default: "false"
-                description: Provision toehold templates for vSphere providers.
+                description: Provision copy appliance templates for vSphere providers.
                 enum:
                 - "true"
                 - "false"
@@ -728,20 +736,12 @@ spec:
                 type: string
               toehold_base_disk_container_image_fqin:
                 description: |-
-                  Fully-qualified base containerdisk image for toehold templates
+                  Fully-qualified base containerdisk image for copy appliance templates
                   (e.g. "registry.redhat.io/rhel9/rhel-guest-image:latest").
                 type: string
               toehold_builder_image_fqin:
                 description: Toehold builder image. Optional. If left empty, the operator
                   automatically sets this from the release payload.
-                type: string
-              toehold_template_cpu:
-                default: "2"
-                description: Default OVF CPU count for toehold templates.
-                type: string
-              toehold_template_memory_mib:
-                default: "4096"
-                description: Default OVF memory in MiB for toehold templates.
                 type: string
               ui_plugin_container_limits_cpu:
                 default: 100m

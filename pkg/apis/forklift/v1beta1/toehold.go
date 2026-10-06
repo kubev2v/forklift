@@ -6,36 +6,36 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const ToeholdTemplateFinalizer = "forklift/toehold-template"
+const CopyApplianceTemplateFinalizer = "forklift/copy-appliance-template"
 
-// LabelToehold marks build pods owned by a ToeholdTemplate (value is the
+// LabelToehold marks build pods owned by a CopyApplianceTemplate (value is the
 // template name).
 const LabelToehold = "forklift.konveyor.io/toehold"
 
-// ToeholdTemplatePhase is the high-level lifecycle state of a ToeholdTemplate resource.
-type ToeholdTemplatePhase string
+// CopyApplianceTemplatePhase is the high-level lifecycle state of a CopyApplianceTemplate resource.
+type CopyApplianceTemplatePhase string
 
 const (
-	ToeholdTemplatePhasePending   ToeholdTemplatePhase = "Pending"
-	ToeholdTemplatePhaseRunning   ToeholdTemplatePhase = "Running"
-	ToeholdTemplatePhaseSucceeded ToeholdTemplatePhase = "Succeeded"
-	ToeholdTemplatePhaseFailed    ToeholdTemplatePhase = "Failed"
+	CopyApplianceTemplatePhasePending   CopyApplianceTemplatePhase = "Pending"
+	CopyApplianceTemplatePhaseRunning   CopyApplianceTemplatePhase = "Running"
+	CopyApplianceTemplatePhaseSucceeded CopyApplianceTemplatePhase = "Succeeded"
+	CopyApplianceTemplatePhaseFailed    CopyApplianceTemplatePhase = "Failed"
 )
 
-// ToeholdTemplateStage is the fine-grained pipeline position within the Running phase.
-type ToeholdTemplateStage string
+// CopyApplianceTemplateStage is the fine-grained pipeline position within the Running phase.
+type CopyApplianceTemplateStage string
 
 const (
-	StageEnsurePrerequisites ToeholdTemplateStage = "EnsurePrerequisites"
-	StageEnsureTemplate      ToeholdTemplateStage = "EnsureTemplate"
-	StageBuildAndUpload      ToeholdTemplateStage = "BuildAndUpload"
-	StageToeholdFinished     ToeholdTemplateStage = "Finished"
+	StageEnsurePrerequisites CopyApplianceTemplateStage = "EnsurePrerequisites"
+	StageEnsureTemplate      CopyApplianceTemplateStage = "EnsureTemplate"
+	StageBuildAndUpload      CopyApplianceTemplateStage = "BuildAndUpload"
+	StageToeholdFinished     CopyApplianceTemplateStage = "Finished"
 )
 
-// Condition types set on ToeholdTemplate status.
+// Condition types set on CopyApplianceTemplate status.
 const (
-	ToeholdTemplateFailed   = "ToeholdTemplateFailed"
-	ToeholdTemplateUpToDate = "TemplateUpToDate"
+	CopyApplianceTemplateFailed   = "CopyApplianceTemplateFailed"
+	CopyApplianceTemplateUpToDate = "TemplateUpToDate"
 )
 
 // ToeholdResources defines CPU and memory for the OVF descriptor.
@@ -61,8 +61,8 @@ type ToeholdBaseDisk struct {
 	WorkGiB int64 `json:"workGiB,omitempty"`
 }
 
-// ToeholdTemplateSpec defines the desired state of ToeholdTemplate.
-type ToeholdTemplateSpec struct {
+// CopyApplianceTemplateSpec defines the desired state of CopyApplianceTemplate.
+type CopyApplianceTemplateSpec struct {
 	// Reference to a vSphere Provider.
 	Provider core.ObjectReference `json:"provider"`
 	// Base containerdisk image for overlay customization.
@@ -108,16 +108,16 @@ type TemplateStatus struct {
 	Moref string `json:"moref,omitempty"`
 }
 
-// ToeholdTemplateStatus defines the observed state of ToeholdTemplate.
-type ToeholdTemplateStatus struct {
+// CopyApplianceTemplateStatus defines the observed state of CopyApplianceTemplate.
+type CopyApplianceTemplateStatus struct {
 	libcnd.Conditions `json:",inline"`
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 	// +optional
 	// +kubebuilder:validation:Enum=Pending;Running;Succeeded;Failed
-	Phase ToeholdTemplatePhase `json:"phase,omitempty"`
+	Phase CopyApplianceTemplatePhase `json:"phase,omitempty"`
 	// +optional
-	Stage ToeholdTemplateStage `json:"stage,omitempty"`
+	Stage CopyApplianceTemplateStage `json:"stage,omitempty"`
 	// +optional
 	Message string `json:"message,omitempty"`
 	// Reference to the build pod when a template was successfully created.
@@ -133,26 +133,26 @@ type ToeholdTemplateStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // +k8s:openapi-gen=true
-// +kubebuilder:resource:shortName=ttpl
+// +kubebuilder:resource:shortName=catpl
 // +kubebuilder:printcolumn:name="PHASE",type=string,JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="STAGE",type=string,JSONPath=".status.stage"
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:subresource:status
-type ToeholdTemplate struct {
+type CopyApplianceTemplate struct {
 	meta.TypeMeta   `json:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty"`
-	Spec            ToeholdTemplateSpec   `json:"spec,omitempty"`
-	Status          ToeholdTemplateStatus `json:"status,omitempty"`
+	Spec            CopyApplianceTemplateSpec   `json:"spec,omitempty"`
+	Status          CopyApplianceTemplateStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type ToeholdTemplateList struct {
+type CopyApplianceTemplateList struct {
 	meta.TypeMeta `json:",inline"`
 	meta.ListMeta `json:"metadata,omitempty"`
-	Items         []ToeholdTemplate `json:"items"`
+	Items         []CopyApplianceTemplate `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ToeholdTemplate{}, &ToeholdTemplateList{})
+	SchemeBuilder.Register(&CopyApplianceTemplate{}, &CopyApplianceTemplateList{})
 }

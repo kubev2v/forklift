@@ -44,7 +44,7 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.ToeholdTemplate{}, &handler.TypedEnqueueRequestForObject[*api.ToeholdTemplate]{}, &ToeholdPredicate{}))
+		source.Kind(mgr.GetCache(), &api.CopyApplianceTemplate{}, &handler.TypedEnqueueRequestForObject[*api.CopyApplianceTemplate]{}, &ToeholdPredicate{}))
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		err = nil
 	}()
 
-	toehold := &api.ToeholdTemplate{}
+	toehold := &api.CopyApplianceTemplate{}
 	err = r.Get(ctx, request.NamespacedName, toehold)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
@@ -82,27 +82,27 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return r.finalize(ctx, toehold)
 	}
 
-	if toehold.Status.Phase == api.ToeholdTemplatePhaseSucceeded {
+	if toehold.Status.Phase == api.CopyApplianceTemplatePhaseSucceeded {
 		if toehold.Status.ObservedGeneration >= toehold.Generation {
 			return
 		}
-		toehold.Status.Phase = api.ToeholdTemplatePhaseRunning
+		toehold.Status.Phase = api.CopyApplianceTemplatePhaseRunning
 		toehold.Status.Stage = api.StageEnsureTemplate
 	}
-	if toehold.Status.Phase == api.ToeholdTemplatePhaseFailed {
+	if toehold.Status.Phase == api.CopyApplianceTemplatePhaseFailed {
 		if toehold.Status.ObservedGeneration >= toehold.Generation {
 			return
 		}
-		toehold.Status.Phase = api.ToeholdTemplatePhaseRunning
+		toehold.Status.Phase = api.CopyApplianceTemplatePhaseRunning
 		toehold.Status.Stage = api.StageEnsureTemplate
-		log.Info("retrying failed toehold template after spec change",
+		log.Info("retrying failed copy appliance template after spec change",
 			"toeholdTemplate", toehold.Name,
 			"generation", toehold.Generation,
 		)
 	}
 
-	if !controllerutil.ContainsFinalizer(toehold, api.ToeholdTemplateFinalizer) {
-		controllerutil.AddFinalizer(toehold, api.ToeholdTemplateFinalizer)
+	if !controllerutil.ContainsFinalizer(toehold, api.CopyApplianceTemplateFinalizer) {
+		controllerutil.AddFinalizer(toehold, api.CopyApplianceTemplateFinalizer)
 		if err = r.Update(ctx, toehold); err != nil {
 			return
 		}
@@ -123,12 +123,12 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	if pipeErr != nil {
 		r.fail(toehold, pipeErr)
 	} else if done {
-		toehold.Status.Phase = api.ToeholdTemplatePhaseSucceeded
+		toehold.Status.Phase = api.CopyApplianceTemplatePhaseSucceeded
 		toehold.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   libcnd.True,
 			Category: libcnd.Required,
-			Message:  "Toehold template is ready.",
+			Message:  "Copy appliance template is ready.",
 		})
 	} else {
 		result.RequeueAfter = base.SlowReQ
@@ -141,9 +141,9 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		case api.StageBuildAndUpload:
 			toehold.Status.Message = "Building and uploading template."
 		case api.StageToeholdFinished:
-			toehold.Status.Message = "Toehold template is ready."
+			toehold.Status.Message = "Copy appliance template is ready."
 		default:
-			toehold.Status.Message = "Reconciling toehold template."
+			toehold.Status.Message = "Reconciling copy appliance template."
 		}
 	}
 	toehold.Status.EndStagingConditions()
@@ -153,25 +153,25 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	return
 }
 
-func (r Reconciler) fail(toehold *api.ToeholdTemplate, cause error) {
-	toehold.Status.Phase = api.ToeholdTemplatePhaseFailed
+func (r Reconciler) fail(toehold *api.CopyApplianceTemplate, cause error) {
+	toehold.Status.Phase = api.CopyApplianceTemplatePhaseFailed
 	now := meta.Now()
 	toehold.Status.CompletionTime = &now
-	msg := "The toehold template has failed."
+	msg := "The copy appliance template has failed."
 	if cause != nil {
 		msg = fmt.Sprintf("%s %s", msg, cause.Error())
 	}
 	toehold.Status.Message = msg
 	toehold.Status.SetCondition(libcnd.Condition{
-		Type:     api.ToeholdTemplateFailed,
+		Type:     api.CopyApplianceTemplateFailed,
 		Status:   libcnd.True,
 		Category: libcnd.Critical,
 		Message:  msg,
 	})
 }
 
-func (r Reconciler) finalize(ctx context.Context, toehold *api.ToeholdTemplate) (reconcile.Result, error) {
-	if !controllerutil.ContainsFinalizer(toehold, api.ToeholdTemplateFinalizer) {
+func (r Reconciler) finalize(ctx context.Context, toehold *api.CopyApplianceTemplate) (reconcile.Result, error) {
+	if !controllerutil.ContainsFinalizer(toehold, api.CopyApplianceTemplateFinalizer) {
 		return reconcile.Result{}, nil
 	}
 	tc := &ToeholdContext{Client: r.Client, Scheme: r.Scheme, Toehold: toehold}
@@ -184,7 +184,7 @@ func (r Reconciler) finalize(ctx context.Context, toehold *api.ToeholdTemplate) 
 	if err := tc.deleteBuildPod(ctx); err != nil {
 		return reconcile.Result{}, err
 	}
-	controllerutil.RemoveFinalizer(toehold, api.ToeholdTemplateFinalizer)
+	controllerutil.RemoveFinalizer(toehold, api.CopyApplianceTemplateFinalizer)
 	if err := r.Update(ctx, toehold); err != nil {
 		return reconcile.Result{}, err
 	}
@@ -192,15 +192,15 @@ func (r Reconciler) finalize(ctx context.Context, toehold *api.ToeholdTemplate) 
 }
 
 type ToeholdPredicate struct {
-	predicate.TypedFuncs[*api.ToeholdTemplate]
+	predicate.TypedFuncs[*api.CopyApplianceTemplate]
 }
 
-func (r ToeholdPredicate) Create(e event.TypedCreateEvent[*api.ToeholdTemplate]) bool {
+func (r ToeholdPredicate) Create(e event.TypedCreateEvent[*api.CopyApplianceTemplate]) bool {
 	libref.Mapper.Create(event.CreateEvent{Object: e.Object})
 	return true
 }
 
-func (r ToeholdPredicate) Update(e event.TypedUpdateEvent[*api.ToeholdTemplate]) bool {
+func (r ToeholdPredicate) Update(e event.TypedUpdateEvent[*api.CopyApplianceTemplate]) bool {
 	object := e.ObjectNew
 	changed := object.Status.ObservedGeneration < object.Generation
 	if changed {
@@ -209,10 +209,10 @@ func (r ToeholdPredicate) Update(e event.TypedUpdateEvent[*api.ToeholdTemplate])
 			ObjectNew: e.ObjectNew,
 		})
 	}
-	return changed || object.Status.Phase == api.ToeholdTemplatePhaseRunning
+	return changed || object.Status.Phase == api.CopyApplianceTemplatePhaseRunning
 }
 
-func (r ToeholdPredicate) Delete(e event.TypedDeleteEvent[*api.ToeholdTemplate]) bool {
+func (r ToeholdPredicate) Delete(e event.TypedDeleteEvent[*api.CopyApplianceTemplate]) bool {
 	libref.Mapper.Delete(event.DeleteEvent{Object: e.Object})
 	return true
 }
@@ -232,7 +232,7 @@ func toeholdForBuildPodMapper() handler.TypedEventHandler[*core.Pod, reconcile.R
 	})
 }
 
-func (r Reconciler) validate(ctx context.Context, toehold *api.ToeholdTemplate) error {
+func (r Reconciler) validate(ctx context.Context, toehold *api.CopyApplianceTemplate) error {
 	if toehold.Spec.Provider.Name == "" {
 		return liberr.New("spec.provider.name is required")
 	}

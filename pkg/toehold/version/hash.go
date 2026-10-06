@@ -29,7 +29,7 @@ type configHashInput struct {
 // DiskHash fingerprints the base containerdisk image and guest customization
 // that produces the disk artifact. sshPublicKey is the authorized_keys entry
 // virt-customize installs; an empty value means no key is injected.
-func DiskHash(spec api.ToeholdTemplateSpec, sshPublicKey string) string {
+func DiskHash(spec api.CopyApplianceTemplateSpec, sshPublicKey string) string {
 	return hash(diskHashInput{
 		ContainerImage: spec.BaseDisk.ContainerImage,
 		SSHPublicKey:   sshPublicKey,
@@ -37,7 +37,7 @@ func DiskHash(spec api.ToeholdTemplateSpec, sshPublicKey string) string {
 }
 
 // ConfigHash fingerprints OVF hardware and network configuration.
-func ConfigHash(spec api.ToeholdTemplateSpec) string {
+func ConfigHash(spec api.CopyApplianceTemplateSpec) string {
 	cpu := spec.Resources.CPU
 	if cpu == 0 {
 		cpu = DefaultCPU

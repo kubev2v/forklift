@@ -226,10 +226,10 @@ spec:
           value: "{{ feature_toehold|bool|lower }}"
         - name: TOEHOLD_BASE_DISK_CONTAINER_IMAGE
           value: "{{ toehold_base_disk_container_image_fqin | default('', true) }}"
-        - name: TOEHOLD_TEMPLATE_CPU
-          value: "{{ toehold_template_cpu | default('2', true) }}"
-        - name: TOEHOLD_TEMPLATE_MEMORY_MIB
-          value: "{{ toehold_template_memory_mib | default('4096', true) }}"
+        - name: COPY_APPLIANCE_TEMPLATE_CPU
+          value: "{{ copy_appliance_template_cpu | default('2', true) }}"
+        - name: COPY_APPLIANCE_TEMPLATE_MEMORY_MIB
+          value: "{{ copy_appliance_template_memory_mib | default('4096', true) }}"
         - name: COPY_APPLIANCE_CONTAINER_IMAGE
           value: "{{ copy_appliance_container_image_fqin | default('', true) }}"
         - name: COPY_APPLIANCE_SETUP_IMAGE
@@ -420,10 +420,10 @@ spec:
           value: "{{ toehold_builder_image_fqin or lookup('env', 'TOEHOLD_BUILDER_IMAGE') or lookup('env', 'RELATED_IMAGE_TOEHOLD_BUILDER') }}"
         - name: TOEHOLD_BASE_DISK_CONTAINER_IMAGE
           value: "{{ toehold_base_disk_container_image_fqin | default('', true) }}"
-        - name: TOEHOLD_TEMPLATE_CPU
-          value: "{{ toehold_template_cpu | default('2', true) }}"
-        - name: TOEHOLD_TEMPLATE_MEMORY_MIB
-          value: "{{ toehold_template_memory_mib | default('4096', true) }}"
+        - name: COPY_APPLIANCE_TEMPLATE_CPU
+          value: "{{ copy_appliance_template_cpu | default('2', true) }}"
+        - name: COPY_APPLIANCE_TEMPLATE_MEMORY_MIB
+          value: "{{ copy_appliance_template_memory_mib | default('4096', true) }}"
         - name: COPY_APPLIANCE_CONTAINER_IMAGE
           value: "{{ copy_appliance_container_image_fqin | default('', true) }}"
         - name: COPY_APPLIANCE_SETUP_IMAGE

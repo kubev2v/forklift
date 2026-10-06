@@ -80,7 +80,7 @@ func TestToeholdTLSHandshakes(t *testing.T) {
 
 // A secret predating the merge of the appliance's two secrets holds only the
 // SSH key, and the key is the half that cannot be regenerated: its public half
-// is already built into the toehold template.
+// is already built into the copy appliance template.
 func TestEnsureToeholdTLS(t *testing.T) {
 	complete, err := toeholdTLS()
 	if err != nil {

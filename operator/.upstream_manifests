@@ -5188,6 +5188,352 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.3
+  name: copyappliancetemplates.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: CopyApplianceTemplate
+    listKind: CopyApplianceTemplateList
+    plural: copyappliancetemplates
+    shortNames:
+    - catpl
+    singular: copyappliancetemplate
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .status.stage
+      name: STAGE
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CopyApplianceTemplateSpec defines the desired state of CopyApplianceTemplate.
+            properties:
+              baseDisk:
+                description: Base containerdisk image for overlay customization.
+                properties:
+                  containerImage:
+                    description: OCI image embedding the base qcow2 (KubeVirt containerdisk
+                      layout under /disk).
+                    type: string
+                  imagePullSecret:
+                    description: Optional dockerconfigjson secret for pulling containerImage.
+                    properties:
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  workGiB:
+                    description: emptyDir size limit for the qcow2 overlay workspace.
+                      Unset means no limit.
+                    format: int64
+                    type: integer
+                type: object
+              builderImage:
+                description: |-
+                  Override for the toehold builder container image.
+                  Defaults to the controller TOEHOLD_BUILDER_IMAGE setting when empty.
+                type: string
+              datastore:
+                description: Target vCenter datastore.
+                type: string
+              folder:
+                description: vCenter folder path (e.g. /Datacenter/vm).
+                type: string
+              network:
+                description: Port group for OVF network mapping.
+                type: string
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: Optional node selector for the build pod.
+                type: object
+              provider:
+                description: Reference to a vSphere Provider.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              resources:
+                description: OVF hardware descriptor overrides.
+                properties:
+                  cpu:
+                    default: 2
+                    format: int32
+                    type: integer
+                  memoryMiB:
+                    default: 4096
+                    format: int32
+                    type: integer
+                type: object
+              templateName:
+                description: vCenter template name after OVF import.
+                type: string
+              transferNetwork:
+                description: Multus NAD for the OVA build pod (same as Plan.spec.transferNetwork).
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            required:
+            - baseDisk
+            - datastore
+            - folder
+            - network
+            - provider
+            - templateName
+            type: object
+          status:
+            description: CopyApplianceTemplateStatus defines the observed state of
+              CopyApplianceTemplate.
+            properties:
+              buildPod:
+                description: Reference to the build pod when a template was successfully
+                  created.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              completionTime:
+                format: date-time
+                type: string
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              message:
+                type: string
+              observedGeneration:
+                format: int64
+                type: integer
+              phase:
+                description: CopyApplianceTemplatePhase is the high-level lifecycle
+                  state of a CopyApplianceTemplate resource.
+                enum:
+                - Pending
+                - Running
+                - Succeeded
+                - Failed
+                type: string
+              stage:
+                description: CopyApplianceTemplateStage is the fine-grained pipeline
+                  position within the Running phase.
+                type: string
+              template:
+                description: TemplateStatus tracks the vCenter template artifact.
+                properties:
+                  baseContainerImage:
+                    description: containerImage used for the base disk at build time.
+                    type: string
+                  configHash:
+                    description: Hash of CPU/memory/network configuration.
+                    type: string
+                  diskHash:
+                    description: Hash of the base containerdisk image.
+                    type: string
+                  importedAt:
+                    format: date-time
+                    type: string
+                  moref:
+                    description: vSphere managed object reference.
+                    type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: forkliftcontrollers.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -5525,6 +5871,14 @@ spec:
                 description: SSH user the controller logs in to copy appliances as.
                   Defaults to root.
                 type: string
+              copy_appliance_template_cpu:
+                default: "2"
+                description: Default OVF CPU count for copy appliance templates.
+                type: string
+              copy_appliance_template_memory_mib:
+                default: "4096"
+                description: Default OVF memory in MiB for copy appliance templates.
+                type: string
               deep_inspection_image_fqin:
                 description: Deep inspection image. Optional. If left empty, the operator
                   automatically sets this from the release payload.
@@ -5579,7 +5933,7 @@ spec:
                 type: string
               feature_toehold:
                 default: "false"
-                description: Provision toehold templates for vSphere providers.
+                description: Provision copy appliance templates for vSphere providers.
                 enum:
                 - "true"
                 - "false"
@@ -5912,20 +6266,12 @@ spec:
                 type: string
               toehold_base_disk_container_image_fqin:
                 description: |-
-                  Fully-qualified base containerdisk image for toehold templates
+                  Fully-qualified base containerdisk image for copy appliance templates
                   (e.g. "registry.redhat.io/rhel9/rhel-guest-image:latest").
                 type: string
               toehold_builder_image_fqin:
                 description: Toehold builder image. Optional. If left empty, the operator
                   automatically sets this from the release payload.
-                type: string
-              toehold_template_cpu:
-                default: "2"
-                description: Default OVF CPU count for toehold templates.
-                type: string
-              toehold_template_memory_mib:
-                default: "4096"
-                description: Default OVF memory in MiB for toehold templates.
                 type: string
               ui_plugin_container_limits_cpu:
                 default: 100m
@@ -12577,351 +12923,6 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.3
-  name: toeholdtemplates.forklift.konveyor.io
-spec:
-  group: forklift.konveyor.io
-  names:
-    kind: ToeholdTemplate
-    listKind: ToeholdTemplateList
-    plural: toeholdtemplates
-    shortNames:
-    - ttpl
-    singular: toeholdtemplate
-  scope: Namespaced
-  versions:
-  - additionalPrinterColumns:
-    - jsonPath: .status.phase
-      name: PHASE
-      type: string
-    - jsonPath: .status.stage
-      name: STAGE
-      type: string
-    - jsonPath: .status.conditions[?(@.type=='Ready')].status
-      name: READY
-      type: string
-    - jsonPath: .metadata.creationTimestamp
-      name: AGE
-      type: date
-    name: v1beta1
-    schema:
-      openAPIV3Schema:
-        properties:
-          apiVersion:
-            description: |-
-              APIVersion defines the versioned schema of this representation of an object.
-              Servers should convert recognized schemas to the latest internal value, and
-              may reject unrecognized values.
-              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-            type: string
-          kind:
-            description: |-
-              Kind is a string value representing the REST resource this object represents.
-              Servers may infer this from the endpoint the client submits requests to.
-              Cannot be updated.
-              In CamelCase.
-              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-            type: string
-          metadata:
-            type: object
-          spec:
-            description: ToeholdTemplateSpec defines the desired state of ToeholdTemplate.
-            properties:
-              baseDisk:
-                description: Base containerdisk image for overlay customization.
-                properties:
-                  containerImage:
-                    description: OCI image embedding the base qcow2 (KubeVirt containerdisk
-                      layout under /disk).
-                    type: string
-                  imagePullSecret:
-                    description: Optional dockerconfigjson secret for pulling containerImage.
-                    properties:
-                      name:
-                        default: ""
-                        description: |-
-                          Name of the referent.
-                          This field is effectively required, but due to backwards compatibility is
-                          allowed to be empty. Instances of this type with an empty value here are
-                          almost certainly wrong.
-                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                        type: string
-                    type: object
-                    x-kubernetes-map-type: atomic
-                  workGiB:
-                    description: emptyDir size limit for the qcow2 overlay workspace.
-                      Unset means no limit.
-                    format: int64
-                    type: integer
-                type: object
-              builderImage:
-                description: |-
-                  Override for the toehold builder container image.
-                  Defaults to the controller TOEHOLD_BUILDER_IMAGE setting when empty.
-                type: string
-              datastore:
-                description: Target vCenter datastore.
-                type: string
-              folder:
-                description: vCenter folder path (e.g. /Datacenter/vm).
-                type: string
-              network:
-                description: Port group for OVF network mapping.
-                type: string
-              nodeSelector:
-                additionalProperties:
-                  type: string
-                description: Optional node selector for the build pod.
-                type: object
-              provider:
-                description: Reference to a vSphere Provider.
-                properties:
-                  apiVersion:
-                    description: API version of the referent.
-                    type: string
-                  fieldPath:
-                    description: |-
-                      If referring to a piece of an object instead of an entire object, this string
-                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within a pod, this would take on a value like:
-                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]" (container with
-                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-                      referencing a part of an object.
-                    type: string
-                  kind:
-                    description: |-
-                      Kind of the referent.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-                    type: string
-                  name:
-                    description: |-
-                      Name of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                  namespace:
-                    description: |-
-                      Namespace of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-                    type: string
-                  resourceVersion:
-                    description: |-
-                      Specific resourceVersion to which this reference is made, if any.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
-                    type: string
-                  uid:
-                    description: |-
-                      UID of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              resources:
-                description: OVF hardware descriptor overrides.
-                properties:
-                  cpu:
-                    default: 2
-                    format: int32
-                    type: integer
-                  memoryMiB:
-                    default: 4096
-                    format: int32
-                    type: integer
-                type: object
-              templateName:
-                description: vCenter template name after OVF import.
-                type: string
-              transferNetwork:
-                description: Multus NAD for the OVA build pod (same as Plan.spec.transferNetwork).
-                properties:
-                  apiVersion:
-                    description: API version of the referent.
-                    type: string
-                  fieldPath:
-                    description: |-
-                      If referring to a piece of an object instead of an entire object, this string
-                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within a pod, this would take on a value like:
-                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]" (container with
-                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-                      referencing a part of an object.
-                    type: string
-                  kind:
-                    description: |-
-                      Kind of the referent.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-                    type: string
-                  name:
-                    description: |-
-                      Name of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                  namespace:
-                    description: |-
-                      Namespace of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-                    type: string
-                  resourceVersion:
-                    description: |-
-                      Specific resourceVersion to which this reference is made, if any.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
-                    type: string
-                  uid:
-                    description: |-
-                      UID of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-            required:
-            - baseDisk
-            - datastore
-            - folder
-            - network
-            - provider
-            - templateName
-            type: object
-          status:
-            description: ToeholdTemplateStatus defines the observed state of ToeholdTemplate.
-            properties:
-              buildPod:
-                description: Reference to the build pod when a template was successfully
-                  created.
-                properties:
-                  apiVersion:
-                    description: API version of the referent.
-                    type: string
-                  fieldPath:
-                    description: |-
-                      If referring to a piece of an object instead of an entire object, this string
-                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within a pod, this would take on a value like:
-                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]" (container with
-                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-                      referencing a part of an object.
-                    type: string
-                  kind:
-                    description: |-
-                      Kind of the referent.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-                    type: string
-                  name:
-                    description: |-
-                      Name of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                  namespace:
-                    description: |-
-                      Namespace of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-                    type: string
-                  resourceVersion:
-                    description: |-
-                      Specific resourceVersion to which this reference is made, if any.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
-                    type: string
-                  uid:
-                    description: |-
-                      UID of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              completionTime:
-                format: date-time
-                type: string
-              conditions:
-                description: List of conditions.
-                items:
-                  description: Condition
-                  properties:
-                    category:
-                      description: The condition category.
-                      type: string
-                    durable:
-                      description: The condition is durable - never un-staged.
-                      type: boolean
-                    items:
-                      description: A list of items referenced in the `Message`.
-                      items:
-                        type: string
-                      type: array
-                    lastTransitionTime:
-                      description: When the last status transition occurred.
-                      format: date-time
-                      type: string
-                    message:
-                      description: The human readable description of the condition.
-                      type: string
-                    reason:
-                      description: The reason for the condition or transition.
-                      type: string
-                    status:
-                      description: The condition status [true,false].
-                      type: string
-                    suggestion:
-                      description: A suggested action or resolution for the condition.
-                      type: string
-                    type:
-                      description: The condition type.
-                      type: string
-                  required:
-                  - category
-                  - lastTransitionTime
-                  - status
-                  - type
-                  type: object
-                type: array
-              message:
-                type: string
-              observedGeneration:
-                format: int64
-                type: integer
-              phase:
-                description: ToeholdTemplatePhase is the high-level lifecycle state
-                  of a ToeholdTemplate resource.
-                enum:
-                - Pending
-                - Running
-                - Succeeded
-                - Failed
-                type: string
-              stage:
-                description: ToeholdTemplateStage is the fine-grained pipeline position
-                  within the Running phase.
-                type: string
-              template:
-                description: TemplateStatus tracks the vCenter template artifact.
-                properties:
-                  baseContainerImage:
-                    description: containerImage used for the base disk at build time.
-                    type: string
-                  configHash:
-                    description: Hash of CPU/memory/network configuration.
-                    type: string
-                  diskHash:
-                    description: Hash of the base containerdisk image.
-                    type: string
-                  importedAt:
-                    format: date-time
-                    type: string
-                  moref:
-                    description: vSphere managed object reference.
-                    type: string
-                type: object
-            type: object
-        type: object
-    served: true
-    storage: true
-    subresources:
-      status: {}
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  annotations:
-    controller-gen.kubebuilder.io/version: v0.17.3
   name: vspherexcopyvolumepopulators.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -14895,10 +14896,10 @@ spec:
       kind: Conversion
       name: conversions.forklift.konveyor.io
       version: v1beta1
-    - description: vSphere toehold template builder
+    - description: vSphere copy appliance template builder
       displayName: Toehold Template
-      kind: ToeholdTemplate
-      name: toeholdtemplates.forklift.konveyor.io
+      kind: CopyApplianceTemplate
+      name: copyappliancetemplates.forklift.konveyor.io
       version: v1beta1
     - description: Copy appliance VM for vSphere disk export over NBD
       displayName: Copy Appliance
