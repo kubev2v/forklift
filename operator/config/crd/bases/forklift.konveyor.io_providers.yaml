@@ -225,6 +225,13 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              toeholdSSHPrivateSecret:
+                description: Name of the secret with the toehold SSH private key and
+                  TLS material.
+                type: string
+              toeholdSSHPublicSecret:
+                description: Name of the secret with the toehold SSH public key.
+                type: string
             type: object
         type: object
     served: true
