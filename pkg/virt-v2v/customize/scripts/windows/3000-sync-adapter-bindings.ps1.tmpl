@@ -1,0 +1,123 @@
+# Staged in C:\Program Files\Guestfs\Firstboot\scripts\3000-sync-adapter-bindings.ps1
+# Runs after VirtIO driver load and before later first-boot cleanup scripts.
+
+$logDir = Join-Path -Path $env:SystemDrive -ChildPath "Program Files\Guestfs\Firstboot\scripts"
+if (-not (Test-Path -Path $logDir)) {
+    New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+}
+$LogPath = Join-Path -Path $logDir -ChildPath "3000-sync-bindings.log"
+
+$transcriptStarted = $false
+$networkIPv6Modes = @{
+{{- range . }}
+    '{{ .MAC }}' = '{{ .Mode }}'
+{{- end }}
+}
+
+try {
+    Start-Transcript -Path $LogPath -Append -ErrorAction Stop
+    $transcriptStarted = $true
+
+    Write-Host "[1/5] Waiting for VirtIO Network Adapters to initialize..."
+
+    $virtioAdapters = @()
+    for ($i = 0; $i -lt 15 -and $virtioAdapters.Count -eq 0; $i++) {
+        $virtioAdapters = @(Get-NetAdapter -ErrorAction SilentlyContinue |
+            Where-Object { $_.InterfaceDescription -like "*Red Hat VirtIO Ethernet Adapter*" })
+        if ($virtioAdapters.Count -eq 0) {
+            Start-Sleep -Seconds 1
+        }
+    }
+    if ($virtioAdapters.Count -eq 0) {
+        throw "Timed out waiting for Red Hat VirtIO Ethernet Adapters to become active."
+    }
+    
+    $syncErrors = @()
+    foreach ($virtio in $virtioAdapters) {
+        Write-Host "Target VirtIO Adapter found: Name='$($virtio.Name)', InterfaceDescription='$($virtio.InterfaceDescription)'"
+        $virtioMac = $virtio.MacAddress.ToLower().Replace(":", "-")
+        $networkIPv6Mode = $networkIPv6Modes[$virtioMac]
+        if (-not $networkIPv6Mode) {
+            $networkIPv6Mode = "preserve"
+        }
+
+        Write-Host "[2/5] Locating source adapter for MAC $virtioMac..."
+        $isIpv6Bound = $false
+        if ($networkIPv6Mode -ne "none") {
+            $sourceAdapter = Get-NetAdapter -IncludeHidden -ErrorAction SilentlyContinue |
+                Where-Object {
+                    $_.MacAddress -and
+                    $_.MacAddress.ToLower().Replace(":", "-") -eq $virtioMac -and
+                    $_.InterfaceDescription -notlike "*Red Hat VirtIO Ethernet Adapter*"
+                } |
+                Select-Object -First 1
+            if (-not $sourceAdapter) {
+                $message = "Unable to find a source adapter for MAC $virtioMac."
+                Write-Warning $message
+                $syncErrors += $message
+                continue
+            }
+
+            $sourceBinding = @(Get-NetAdapterBinding -Name $sourceAdapter.Name -ComponentID ms_tcpip6 -ErrorAction Stop)
+            if ($sourceBinding.Count -ne 1) {
+                throw "Expected exactly one ms_tcpip6 binding on source adapter '$($sourceAdapter.Name)', found $($sourceBinding.Count)."
+            }
+
+            $isIpv6Bound = [bool]$sourceBinding[0].Enabled
+            Write-Host "Source IPv6 binding for $virtioMac is $isIpv6Bound."
+        }
+
+        Write-Host "[3/5] IPv6 binding target for '$($virtio.Name)': $networkIPv6Mode"
+
+        Write-Host "[4/5] Inspecting current VirtIO adapter binding state..."
+
+        $targetBinding = @(Get-NetAdapterBinding -Name $virtio.Name -ComponentID ms_tcpip6 -ErrorAction Stop)
+
+        if ($targetBinding.Count -ne 1) {
+            throw "Expected exactly one ms_tcpip6 binding on VirtIO adapter '$($virtio.Name)', found $($targetBinding.Count)."
+        }
+
+        Write-Host "Current VirtIO ms_tcpip6 state: Enabled=$($targetBinding[0].Enabled)"
+
+        $desiredIpv6Bound = [bool]$isIpv6Bound
+        if ($networkIPv6Mode -eq "none") {
+            $desiredIpv6Bound = $false
+        }
+
+        if ([bool]$targetBinding[0].Enabled -ne $desiredIpv6Bound) {
+            Write-Host "Applying target state (Enabled=$desiredIpv6Bound, mode=$networkIPv6Mode) to '$($virtio.Name)'..."
+            if ($desiredIpv6Bound) {
+                Enable-NetAdapterBinding -Name $virtio.Name -ComponentID ms_tcpip6 -ErrorAction Stop
+            } else {
+                Disable-NetAdapterBinding -Name $virtio.Name -ComponentID ms_tcpip6 -Confirm:$false -ErrorAction Stop
+            }
+        } else {
+            Write-Host "VirtIO ms_tcpip6 binding is already in the desired state ($desiredIpv6Bound). No changes needed."
+        }
+
+        Write-Host "[5/5] Verifying applied binding state..."
+        $finalBinding = @(Get-NetAdapterBinding -Name $virtio.Name -ComponentID ms_tcpip6 -ErrorAction Stop)
+
+        if ($finalBinding.Count -ne 1) {
+            throw "Expected exactly one ms_tcpip6 binding during verification on VirtIO adapter '$($virtio.Name)', found $($finalBinding.Count)."
+        }
+
+        if ([bool]$finalBinding[0].Enabled -eq $desiredIpv6Bound) {
+            Write-Host "SUCCESS: ms_tcpip6 binding on '$($virtio.Name)' successfully verified as $($finalBinding[0].Enabled)." -ForegroundColor Green
+        } else {
+            throw "Verification failed: Expected ms_tcpip6 state '$desiredIpv6Bound', but cmdlet reports '$($finalBinding[0].Enabled)'."
+        }
+
+    }
+
+    if ($syncErrors.Count -gt 0) {
+        throw "One or more adapter binding sync operations failed: $($syncErrors -join '; ')"
+    }
+} catch {
+    Write-Error "CRITICAL SYNC FAILURE: $_"
+    exit 1
+} finally {
+    if ($transcriptStarted) {
+        Stop-Transcript
+    }
+}

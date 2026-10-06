@@ -7193,6 +7193,13 @@ spec:
                       - dhcp
                       - none
                       type: string
+                    networkIPv6Mode:
+                      description: 'Optional IPv6 binding mode: preserve the source
+                        binding state or disable the binding.'
+                      enum:
+                      - preserve
+                      - none
+                      type: string
                     source:
                       description: Source network.
                       properties:

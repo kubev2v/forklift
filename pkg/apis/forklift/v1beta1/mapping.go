@@ -68,6 +68,17 @@ const (
 	NetworkIPModeNone NetworkIPMode = "none"
 )
 
+// NetworkIPv6Mode defines the IPv6 protocol binding behavior for a mapped network.
+// +kubebuilder:validation:Enum=preserve;none
+type NetworkIPv6Mode string
+
+const (
+	// NetworkIPv6ModePreserve preserves the source IPv6 binding state.
+	NetworkIPv6ModePreserve NetworkIPv6Mode = "preserve"
+	// NetworkIPv6ModeNone disables the IPv6 protocol binding.
+	NetworkIPv6ModeNone NetworkIPv6Mode = "none"
+)
+
 // Mapped network.
 type NetworkPair struct {
 	// Source network.
@@ -77,6 +88,9 @@ type NetworkPair struct {
 	// Network IP mode for this network, overrides plan-level preserveStaticIPs.
 	// +optional
 	NetworkIPMode NetworkIPMode `json:"networkIPMode,omitempty"`
+	// Optional IPv6 binding mode: preserve the source binding state or disable the binding.
+	// +optional
+	NetworkIPv6Mode NetworkIPv6Mode `json:"networkIPv6Mode,omitempty"`
 }
 
 // OffloadPlugin is a storage plugin that acts on the storage allocation and copying
