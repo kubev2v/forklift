@@ -177,6 +177,7 @@ type Datastore struct {
 	Type                        string                  `json:"type"`
 	Capacity                    int64                   `json:"capacity"`
 	Free                        int64                   `json:"free"`
+	Accessible                  bool                    `json:"accessible"`
 	MaintenanceMode             string                  `json:"maintenance"`
 	BackingDevicesNames         []string                `json:"backingDevicesNames"`
 	NasRemoteHost               string                  `json:"nasRemoteHost,omitempty"`
@@ -195,6 +196,7 @@ func (r *Datastore) With(m *model.Datastore) {
 	r.Type = m.Type
 	r.Capacity = m.Capacity
 	r.Free = m.Free
+	r.Accessible = m.Accessible
 	r.MaintenanceMode = m.MaintenanceMode
 	r.BackingDevicesNames = m.BackingDevicesNames
 	r.NasRemoteHost = m.NasRemoteHost
