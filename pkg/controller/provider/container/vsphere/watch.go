@@ -526,6 +526,9 @@ func (r *VMEventHandler) workload(vmID string) (object interface{}, err error) {
 func buildFileCount(allVMs []model.VM) map[string]int {
 	m := map[string]int{}
 	for i := range allVMs {
+		if allVMs[i].Annotation == api.CopyApplianceAnnotation {
+			continue
+		}
 		for _, disk := range allVMs[i].Disks {
 			m[disk.File]++
 		}

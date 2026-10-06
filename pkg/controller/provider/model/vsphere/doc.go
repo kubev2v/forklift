@@ -14,6 +14,7 @@ func All() []interface{} {
 		&Cluster{},
 		&Network{},
 		&Datastore{},
+		&ResourcePool{},
 		&Host{},
 		&CustomFieldDef{},
 		&VM{},
