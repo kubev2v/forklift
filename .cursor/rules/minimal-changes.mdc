@@ -1,8 +1,6 @@
 ---
-name: minimal-changes
-description: >-
-  Keep code changes and commits small, simple, and focused. Use when implementing
-  features, fixing bugs, refactoring, or reviewing diffs in this repo.
+description: Keep code changes and commits small, simple, and focused.
+alwaysApply: true
 ---
 
 # Minimal Changes
@@ -15,6 +13,14 @@ Apply these principles to every change in this repository.
 - as simple as possible, don't create many unnecessary functions
 - keep all code changes and commits short and straight forward
 
+## Size and shape
+
+- Smallest correct diff: change only what the task needs.
+- Keep it simple: no extra helpers, wrappers, or layers unless reuse or clarity clearly needs them.
+- Prefer inline over a named helper.
+- No drive-by refactors, renames, or formatting outside the lines you touch.
+- Short, focused commits; one logical change each.
+
 ## Code
 
 1. **Smallest correct diff** — Change only what the task requires. No drive-by refactors, renames, or formatting outside touched lines.
@@ -24,7 +30,7 @@ Apply these principles to every change in this repository.
 
 ## Commits
 
-Keep each commit focused on one logical change with a short, direct message. For commit format and Jira linking, use the [git-commit](git-commit/SKILL.md) skill.
+Keep each commit focused on one logical change with a short, direct message. For commit format and Jira linking, use the git-commit skill.
 
 ## Before finishing
 
