@@ -1,0 +1,11 @@
+[Unit]
+Description=Retry toehold guest network publish until vCenter can read it
+ConditionPathExists=!/var/lib/toehold/guestinfo-published
+
+[Timer]
+OnBootSec=15
+OnUnitActiveSec=30
+AccuracySec=1
+
+[Install]
+WantedBy=timers.target

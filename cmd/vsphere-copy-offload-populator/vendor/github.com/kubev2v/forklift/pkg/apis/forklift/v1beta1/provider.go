@@ -91,6 +91,12 @@ const (
 	AzureSnapshotRG    = "snapshotResourceGroup"
 	AzureTargetRegion  = "targetRegion"
 	AzureSnapshotClass = "volumeSnapshotClassName"
+	// vSphere toehold / copy-appliance placement (per provider).
+	ToeholdDatastore          = "toeholdDatastore"
+	ToeholdFolder             = "toeholdFolder"
+	ToeholdNetwork            = "toeholdNetwork"
+	ToeholdNbdSsl             = "toeholdNbdSsl"
+	CopyApplianceResourcePool = "copyApplianceResourcePool"
 )
 
 // Nutanix Prism endpoint types.
@@ -114,6 +120,7 @@ const (
 
 const OvaProviderFinalizer = "forklift/ova-provider"
 const HyperVProviderFinalizer = "forklift/hyperv-provider"
+const VSphereProviderFinalizer = "forklift/vsphere-provider"
 
 // Defines the desired state of Provider.
 type ProviderSpec struct {
@@ -149,6 +156,12 @@ type ProviderStatus struct {
 	// Used to detect when credentials have been rotated.
 	// +optional
 	SecretResourceVersion string `json:"secretResourceVersion,omitempty"`
+	// Name of the secret with the toehold SSH private key and TLS material.
+	// +optional
+	ToeholdSSHPrivateSecret string `json:"toeholdSSHPrivateSecret,omitempty"`
+	// Name of the secret with the toehold SSH public key.
+	// +optional
+	ToeholdSSHPublicSecret string `json:"toeholdSSHPublicSecret,omitempty"`
 }
 
 // +genclient
@@ -230,4 +243,25 @@ func (p *Provider) UseVddkAioOptimization() bool {
 // Whether this Hyper-V provider is configured for Failover Cluster mode.
 func (p *Provider) IsHyperVCluster() bool {
 	return p.Type() == HyperV && p.Spec.Settings[ManagementType] == HyperVCluster
+}
+
+// Setting returns a provider settings value, or empty if unset.
+func (p *Provider) Setting(key string) string {
+	if p == nil || p.Spec.Settings == nil {
+		return ""
+	}
+	return p.Spec.Settings[key]
+}
+
+// ToeholdNbdSsl reports whether mutual TLS is required for copy-appliance NBD exports.
+// Enabled by default; set provider setting toeholdNbdSsl to "false" to disable.
+func (p *Provider) ToeholdNbdSsl() bool {
+	return p.Setting(ToeholdNbdSsl) != "false"
+}
+
+// ToeholdTemplateName is the name of this provider's toehold template. The
+// provider controller, the appliance check, the plan and the console create all
+// have to agree on it.
+func (p *Provider) ToeholdTemplateName() string {
+	return p.Name + "-toehold"
 }

@@ -228,6 +228,9 @@ func (c *Conversion) addVirtV2vArgs(cmd utils.CommandBuilder) (err error) {
 }
 
 func (c *Conversion) addVirtV2vVsphereArgs(cmd utils.CommandBuilder) (err error) {
+	if len(c.NbdDisks) > 0 {
+		return c.addVirtV2vNbdLibvirtArgs(cmd)
+	}
 	cmd.AddArg("-i", "libvirt").
 		AddArg("-ic", c.LibvirtUrl).
 		AddArg("-ip", c.SecretKey).
@@ -245,6 +248,34 @@ func (c *Conversion) addVirtV2vVsphereArgs(cmd utils.CommandBuilder) (err error)
 	}
 	cmd.AddPositional("--")
 	cmd.AddPositional(c.VmName)
+	return nil
+}
+
+// addVirtV2vNbdLibvirtArgs fetches the source domain XML and rewrites disk
+// sources to the copy-appliance NBD exports (nbd:// or nbds://).
+func (c *Conversion) addVirtV2vNbdLibvirtArgs(cmd utils.CommandBuilder) error {
+	domainXML, err := c.fetchDomainXML()
+	if err != nil {
+		return err
+	}
+	domainXML, err = c.updateDiskSourcesToNbd(domainXML)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(c.LibvirtDomainFile, []byte(domainXML), 0644); err != nil {
+		return fmt.Errorf("write nbd domain XML: %w", err)
+	}
+	cmd.AddArg("-i", "libvirtxml")
+	for _, u := range c.NbdDisks {
+		if strings.HasPrefix(u, "nbds://") {
+			cmd.AddArg("-io", "nbd-tls-certificates=/etc/secret")
+			break
+		}
+	}
+	if err := c.addCommonArgs(cmd); err != nil {
+		return err
+	}
+	cmd.AddPositional(c.LibvirtDomainFile)
 	return nil
 }
 
@@ -424,10 +455,23 @@ func (c *Conversion) addVirtV2vRemoteInspectionArgs(cmd utils.CommandBuilder) (e
 	return
 }
 
-// retrieve and modify the domain XML from libvirt
+// GetDomainXML retrieves the domain XML from libvirt and rewrites disk sources
+// to local paths for in-place conversion.
 func (c *Conversion) GetDomainXML() (string, error) {
-	libvirtURL, err := url.Parse(c.LibvirtUrl)
+	domainXML, err := c.fetchDomainXML()
+	if err != nil {
+		return "", err
+	}
+	modifiedXML, err := c.UpdateDiskPaths(domainXML)
+	if err != nil {
+		return "", fmt.Errorf("failed to update disk paths in domain XML: %w", err)
+	}
+	return modifiedXML, nil
+}
 
+// fetchDomainXML retrieves the source VM domain XML from libvirt (vSphere).
+func (c *Conversion) fetchDomainXML() (string, error) {
+	libvirtURL, err := url.Parse(c.LibvirtUrl)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse libvirt URL: %w", err)
 	}
@@ -483,13 +527,7 @@ func (c *Conversion) GetDomainXML() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get domain XML: %w", err)
 	}
-
-	modifiedXML, err := c.UpdateDiskPaths(domainXML)
-	if err != nil {
-		return "", fmt.Errorf("failed to update disk paths in domain XML: %w", err)
-	}
-
-	return modifiedXML, nil
+	return domainXML, nil
 }
 
 func updateDiskSource(disk *libvirtxml.DomainDisk, path string) bool {
@@ -542,6 +580,57 @@ func (c *Conversion) UpdateDiskPaths(domainXML string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal modified domain XML: %w", err)
 	}
+	return modifiedXML, nil
+}
 
+// updateDiskSourcesToNbd rewrites domain disks to NBD exports.
+func (c *Conversion) updateDiskSourcesToNbd(domainXML string) (string, error) {
+	if len(c.NbdDisks) == 0 {
+		return "", fmt.Errorf("no NBD disks configured")
+	}
+	domain := &libvirtxml.Domain{}
+	if err := domain.Unmarshal(domainXML); err != nil {
+		return "", fmt.Errorf("failed to parse domain XML: %w", err)
+	}
+	if domain.Devices == nil {
+		return "", fmt.Errorf("domain XML has no devices")
+	}
+	updatedDisks := []libvirtxml.DomainDisk{}
+	diskIdx := 0
+	for _, disk := range domain.Devices.Disks {
+		if disk.Device == "cdrom" {
+			continue
+		}
+		if diskIdx >= len(c.NbdDisks) {
+			return "", fmt.Errorf("domain has more disks than NBD exports (%d)", len(c.NbdDisks))
+		}
+		u, err := url.Parse(c.NbdDisks[diskIdx])
+		if err != nil {
+			return "", fmt.Errorf("parse nbd URI %q: %w", c.NbdDisks[diskIdx], err)
+		}
+		if (u.Scheme != "nbd" && u.Scheme != "nbds") || u.Hostname() == "" || u.Port() == "" {
+			return "", fmt.Errorf("nbd URI %q must be nbd[s]://host:port", c.NbdDisks[diskIdx])
+		}
+		disk.Source = &libvirtxml.DomainDiskSource{
+			Network: &libvirtxml.DomainDiskSourceNetwork{
+				Protocol: "nbd",
+				Hosts: []libvirtxml.DomainDiskSourceHost{{
+					Name: u.Hostname(),
+					Port: u.Port(),
+				}},
+			},
+		}
+		disk.Driver = &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"}
+		updatedDisks = append(updatedDisks, disk)
+		diskIdx++
+	}
+	if diskIdx != len(c.NbdDisks) {
+		return "", fmt.Errorf("NBD exports (%d) do not match domain disks (%d)", len(c.NbdDisks), diskIdx)
+	}
+	domain.Devices.Disks = updatedDisks
+	modifiedXML, err := domain.Marshal()
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal modified domain XML: %w", err)
+	}
 	return modifiedXML, nil
 }

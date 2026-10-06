@@ -109,6 +109,12 @@ type ForkliftControllerSpec struct {
 	// +kubebuilder:validation:Enum="true";"false"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:radio:true","urn:alm:descriptor:com.tectonic.ui:radio:false"}
 	FeatureUseConversionCR string `json:"feature_use_conversion_cr,omitempty"`
+	// Provision toehold templates for vSphere providers.
+	// +optional
+	// +kubebuilder:default="false"
+	// +kubebuilder:validation:Enum="true";"false"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:radio:true","urn:alm:descriptor:com.tectonic.ui:radio:false"}
+	FeatureToehold string `json:"feature_toehold,omitempty"`
 
 	// Container Images
 
@@ -184,6 +190,42 @@ type ForkliftControllerSpec struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	OVAProxyFQIN string `json:"ova_proxy_fqin,omitempty"`
+	// Toehold builder image. Optional. If left empty, the operator automatically sets this from the release payload.
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	ToeholdBuilderImageFQIN string `json:"toehold_builder_image_fqin,omitempty"`
+
+	// Toehold template defaults
+
+	// Fully-qualified base containerdisk image for toehold templates
+	// (e.g. "registry.redhat.io/rhel9/rhel-guest-image:latest").
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	ToeholdBaseDiskContainerImageFQIN string `json:"toehold_base_disk_container_image_fqin,omitempty"`
+	// Default OVF CPU count for toehold templates.
+	// +optional
+	// +kubebuilder:default="2"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	ToeholdTemplateCPU string `json:"toehold_template_cpu,omitempty"`
+	// Default OVF memory in MiB for toehold templates.
+	// +optional
+	// +kubebuilder:default="4096"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	ToeholdTemplateMemoryMiB string `json:"toehold_template_memory_mib,omitempty"`
+
+	// Copy appliance defaults
+
+	// Fully-qualified nbd-container image loaded onto copy appliances
+	// (e.g. "quay.io/kubev2v/nbd-container:latest"), or an ImageStreamTag in the
+	// controller namespace (e.g. "copy-appliance:latest").
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	CopyApplianceContainerImageFQIN string `json:"copy_appliance_container_image_fqin,omitempty"`
+	// SSH user the controller logs in to copy appliances as. Defaults to root.
+	// +optional
+	// +kubebuilder:default="root"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	CopyApplianceSSHUser string `json:"copy_appliance_ssh_user,omitempty"`
 
 	// Controller Resource Configuration
 
