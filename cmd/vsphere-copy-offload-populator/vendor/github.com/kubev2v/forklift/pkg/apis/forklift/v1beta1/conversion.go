@@ -12,6 +12,9 @@ import (
 // snapshot creation/removal and does not take ownership of the snapshot.
 const SpecSettingsSnapshotMorefKey = "SNAPSHOT_MOREF"
 
+// SpecSettingsNbdDisksKey holds comma-separated copy-appliance NBD URIs.
+const SpecSettingsNbdDisksKey = "V2V_nbdDisks"
+
 // ConversionType defines the type of conversion to perform.
 type ConversionType string
 

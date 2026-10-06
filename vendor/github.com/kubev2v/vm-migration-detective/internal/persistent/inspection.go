@@ -2,10 +2,12 @@ package persistent
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/kubev2v/vm-migration-detective/internal/inspection"
+	"github.com/kubev2v/vm-migration-detective/internal/tlsconfig"
 	"github.com/kubev2v/vm-migration-detective/internal/vddk"
 	"github.com/kubev2v/vm-migration-detective/pkg/types"
 	"github.com/sirupsen/logrus"
@@ -22,6 +24,7 @@ type InspectorInterface interface {
 	InspectWithVirt(ctx context.Context, vmMoref string, snapshotMoref string, diskInfo *types.SnapshotDiskInfo) (*types.VirtInspectorXML, error)
 
 	// InspectWithVirtV2v performs inspection using VirtV2vInspector with memory and DB caching
+	// NOTE: sslVerify parameter is deprecated and ignored - TLS config is taken from Credentials instead
 	InspectWithVirtV2v(ctx context.Context, vmMoref string, snapshotMoref string, diskInfo *types.SnapshotDiskInfo, sslVerify string) (*types.VirtV2VInspectorXML, error)
 
 	// InspectLocal performs inspection on locally-mounted disk files (no VDDK/vSphere)
@@ -37,6 +40,7 @@ type Inspector struct {
 	virtV2vInspector   *inspection.VirtV2vInspector
 	db                 DB
 	credentials        Credentials
+	tlsConfig          *tlsconfig.Config
 	virtMemoryCache    *virtInspectorMemoryCache
 	virtV2vMemoryCache *virtV2vInspectorMemoryCache
 	virtInflight       *inflightTracker[*types.VirtInspectorXML]
@@ -52,22 +56,29 @@ type Inspector struct {
 // logger: logger instance for logging (can be nil)
 // db: database implementation provided by caller (can be nil for memory-only caching)
 // vddkLibDir: path to VDDK library directory (required, cannot be empty)
-func NewInspector(virtInspectorPath string, virtV2vInspectorPath string, timeout time.Duration, credentials Credentials, logger *logrus.Logger, db DB, vddkLibDir string) *Inspector {
+func NewInspector(virtInspectorPath string, virtV2vInspectorPath string, timeout time.Duration, credentials Credentials, logger *logrus.Logger, db DB, vddkLibDir string) (*Inspector, error) {
 	// Set VDDK library directory for internal use
 	// Caller must provide vddkLibDir - no fallback to default locations
 	vddk.SetLibDir(vddkLibDir)
+
+	// Validate and build TLS config from credentials
+	tlsConfig, err := tlsconfig.FromCredentials(credentials, logger)
+	if err != nil {
+		return nil, fmt.Errorf("invalid TLS configuration: %w", err)
+	}
 
 	return &Inspector{
 		virtInspector:      inspection.NewVirtInspector(virtInspectorPath, timeout, logger),
 		virtV2vInspector:   inspection.NewVirtV2vInspector(virtV2vInspectorPath, timeout, logger),
 		db:                 db,
 		credentials:        credentials,
+		tlsConfig:          tlsConfig,
 		virtMemoryCache:    newVirtInspectorMemoryCache(),
 		virtV2vMemoryCache: newVirtV2vInspectorMemoryCache(),
 		virtInflight:       newInflightTracker[*types.VirtInspectorXML](),
 		virtV2vInflight:    newInflightTracker[*types.VirtV2VInspectorXML](),
 		logger:             logger,
-	}
+	}, nil
 }
 
 // InspectWithVirt performs inspection using VirtInspector with memory and DB caching
@@ -136,7 +147,7 @@ func (p *Inspector) InspectWithVirt(
 			}).Info("Performing new inspection (not found in cache)")
 		}
 
-		result, err := p.virtInspector.Inspect(ctx, vmMoref, snapshotMoref, p.credentials.VCenterURL, p.credentials.Username, p.credentials.Password, diskInfo)
+		result, err := p.virtInspector.Inspect(ctx, vmMoref, snapshotMoref, p.credentials.VCenterURL, p.credentials.Username, p.credentials.Password, p.tlsConfig, diskInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -234,7 +245,7 @@ func (p *Inspector) InspectWithVirtV2v(
 			}).Info("Performing new inspection (not found in cache)")
 		}
 
-		result, err := p.virtV2vInspector.Inspect(ctx, vmMoref, snapshotMoref, p.credentials.VCenterURL, p.credentials.Username, p.credentials.Password, diskInfo, sslVerify)
+		result, err := p.virtV2vInspector.Inspect(ctx, vmMoref, snapshotMoref, p.credentials.VCenterURL, p.credentials.Username, p.credentials.Password, p.tlsConfig, diskInfo)
 		if err != nil {
 			return nil, err
 		}

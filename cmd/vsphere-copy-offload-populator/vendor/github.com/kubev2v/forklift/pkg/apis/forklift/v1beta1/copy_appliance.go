@@ -27,6 +27,10 @@ const (
 	SubappCheck     = "copy-appliance-check"
 )
 
+// LabelCopyApplianceSetup marks setup pods owned by a CopyAppliance (value is
+// the CopyAppliance name, which is in the pod's own namespace).
+const LabelCopyApplianceSetup = "forklift.konveyor.io/copy-appliance-setup"
+
 // Phases of the CopyAppliance deploy, export, and teardown itineraries.
 // Written to Status.Phase; terminal values are DeployCompleted, DeployFailed,
 // Released, TeardownCompleted, and TeardownFailed.
@@ -38,8 +42,7 @@ const (
 	PhaseCloneVM             = "CloneVM"
 	PhaseWaitForClone        = "WaitForClone"
 	PhaseWaitForNetwork      = "WaitForNetwork"
-	PhaseConfigure           = "Configure"
-	PhaseLoadImage           = "LoadImage"
+	PhaseSetupAppliance      = "SetupAppliance"
 	PhaseWaitForExports      = "WaitForExports"
 	PhaseReleased            = "Released"
 	PhaseReleaseDisks        = "ReleaseDisks"
@@ -55,6 +58,15 @@ const (
 	PhaseDeployCompleted     = "DeployCompleted"
 	PhaseTeardownCompleted   = "TeardownCompleted"
 	PhaseTeardownFailed      = "TeardownFailed"
+)
+
+// Phases an older controller could have left in Status.Phase. Loading the image
+// and installing the supervisor ran here, one phase each; both now run in a
+// setup pod under PhaseSetupAppliance. The deploy itinerary no longer contains
+// these, and an appliance found on either is sent to PhaseSetupAppliance.
+const (
+	PhaseConfigure = "Configure"
+	PhaseLoadImage = "LoadImage"
 )
 
 // CopyAppliance specification.
@@ -82,11 +94,11 @@ type CopyApplianceSpec struct {
 	// address is not known when the certificate is issued, so the client
 	// verifies the name instead of where it reached it.
 	Secret core.ObjectReference `json:"secret" ref:"Secret"`
-	// ImageStreamTag naming the container image loaded into the appliance's
-	// podman store, resolved in the controller's own namespace. The controller
-	// reads the image from the cluster's internal registry and streams it to
+	// Fully qualified pull spec for the container image loaded into the
+	// appliance's podman store. A setup pod reads the image and streams it to
 	// the appliance over SSH, so the appliance needs no registry access of its
-	// own.
+	// own. The pod carries no credential, so the image has to be readable
+	// without one.
 	// +kubebuilder:validation:MinLength=1
 	ContainerImage string `json:"containerImage"`
 	// Datacenter in which the appliance VM is created.
