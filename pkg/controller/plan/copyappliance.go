@@ -15,14 +15,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func toeholdTemplateForProvider(c client.Client, provider *api.Provider) (*api.ToeholdTemplate, error) {
-	toehold := &api.ToeholdTemplate{}
+func copyApplianceTemplateForProvider(c client.Client, provider *api.Provider) (*api.CopyApplianceTemplate, error) {
+	toehold := &api.CopyApplianceTemplate{}
 	err := c.Get(context.TODO(), client.ObjectKey{
 		Namespace: provider.Namespace,
-		Name:      provider.ToeholdTemplateName(),
+		Name:      provider.CopyApplianceTemplateName(),
 	}, toehold)
 	if err != nil {
-		return nil, liberr.Wrap(err, "toehold template", provider.ToeholdTemplateName())
+		return nil, liberr.Wrap(err, "copy appliance template", provider.CopyApplianceTemplateName())
 	}
 	return toehold, nil
 }
@@ -37,7 +37,7 @@ func (r *Migration) ensureCopyAppliance(vm *plan.VMStatus) error {
 		return err
 	}
 
-	toehold, err := toeholdTemplateForProvider(r.Client, provider)
+	toehold, err := copyApplianceTemplateForProvider(r.Client, provider)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func (r *Migration) buildCopyApplianceAttachDisks(vm *plan.VMStatus) ([]api.Atta
 	if provider == nil {
 		return nil, liberr.New("source provider is not available")
 	}
-	toehold, err := toeholdTemplateForProvider(r.Client, provider)
+	toehold, err := copyApplianceTemplateForProvider(r.Client, provider)
 	if err != nil {
 		return nil, err
 	}

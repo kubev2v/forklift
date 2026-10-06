@@ -54,13 +54,13 @@ func checkProvider() *api.Provider {
 	}
 }
 
-// checkTemplate is the provider's toehold template, built and imported.
-func checkTemplate() *api.ToeholdTemplate {
-	return &api.ToeholdTemplate{
+// checkTemplate is the provider's copy appliance template, built and imported.
+func checkTemplate() *api.CopyApplianceTemplate {
+	return &api.CopyApplianceTemplate{
 		ObjectMeta: meta.ObjectMeta{Namespace: "forklift", Name: "vcenter-toehold"},
-		Spec:       api.ToeholdTemplateSpec{TemplateName: "vcenter-toehold", Folder: "/DC0/vm"},
-		Status: api.ToeholdTemplateStatus{
-			Phase: api.ToeholdTemplatePhaseSucceeded,
+		Spec:       api.CopyApplianceTemplateSpec{TemplateName: "vcenter-toehold", Folder: "/DC0/vm"},
+		Status: api.CopyApplianceTemplateStatus{
+			Phase: api.CopyApplianceTemplatePhaseSucceeded,
 			Template: api.TemplateStatus{
 				Moref:      "vm-900",
 				DiskHash:   "disk-1",
@@ -118,7 +118,7 @@ func testCheckOn(t *testing.T, cl client.Client, provider *api.Provider) *applia
 	check := newApplianceCheck(cl, provider)
 	// Stands in for the real builder, which reads the inventory service. Only
 	// the appliance's identity matters to the check.
-	check.build = func(provider *api.Provider, _ *api.ToeholdTemplate) (*api.CopyAppliance, error) {
+	check.build = func(provider *api.Provider, _ *api.CopyApplianceTemplate) (*api.CopyAppliance, error) {
 		labeler := copyappliance.Labeler{}
 		return &api.CopyAppliance{
 			ObjectMeta: meta.ObjectMeta{
@@ -138,7 +138,7 @@ func testCheck(t *testing.T, provider *api.Provider, objs ...client.Object) *app
 	cl := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(objs...).
-		WithStatusSubresource(&api.Provider{}, &api.CopyAppliance{}, &api.ToeholdTemplate{}).
+		WithStatusSubresource(&api.Provider{}, &api.CopyAppliance{}, &api.CopyApplianceTemplate{}).
 		Build()
 	return testCheckOn(t, cl, provider)
 }
@@ -227,8 +227,8 @@ func TestToeholdApplianceCheck(t *testing.T) {
 		// objects beyond the provider and its template.
 		objects []client.Object
 		// template replaces the built and imported one.
-		template *api.ToeholdTemplate
-		// noTemplate skips creating a ToeholdTemplate in the fake client.
+		template *api.CopyApplianceTemplate
+		// noTemplate skips creating a CopyApplianceTemplate in the fake client.
 		noTemplate bool
 
 		wantBlockedBy string // reason of ToeholdApplianceNotReady, "" for ready
@@ -321,9 +321,9 @@ func TestToeholdApplianceCheck(t *testing.T) {
 		},
 		{
 			name:          "a template that has not been built yet is waited on",
-			template:      &api.ToeholdTemplate{ObjectMeta: meta.ObjectMeta{Namespace: "forklift", Name: "vcenter-toehold"}},
+			template:      &api.CopyApplianceTemplate{ObjectMeta: meta.ObjectMeta{Namespace: "forklift", Name: "vcenter-toehold"}},
 			wantBlockedBy: ToeholdCheckPending,
-			wantMessage:   "Waiting for the toehold template",
+			wantMessage:   "Waiting for the copy appliance template",
 			wantAppliance: "gone",
 		},
 		{
@@ -480,7 +480,7 @@ func TestToeholdCheckDoesNotDeleteWhatIsNotThere(t *testing.T) {
 	cl := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(provider, checkTemplate()).
-		WithStatusSubresource(&api.Provider{}, &api.CopyAppliance{}, &api.ToeholdTemplate{}).
+		WithStatusSubresource(&api.Provider{}, &api.CopyAppliance{}, &api.CopyApplianceTemplate{}).
 		WithInterceptorFuncs(interceptor.Funcs{
 			Delete: func(ctx context.Context, cl client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
 				deletes++
@@ -510,10 +510,10 @@ func TestToeholdCheckReportsATemplateReadFailure(t *testing.T) {
 	cl := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(provider, checkTemplate()).
-		WithStatusSubresource(&api.Provider{}, &api.CopyAppliance{}, &api.ToeholdTemplate{}).
+		WithStatusSubresource(&api.Provider{}, &api.CopyAppliance{}, &api.CopyApplianceTemplate{}).
 		WithInterceptorFuncs(interceptor.Funcs{
 			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-				if _, isTemplate := obj.(*api.ToeholdTemplate); isTemplate {
+				if _, isTemplate := obj.(*api.CopyApplianceTemplate); isTemplate {
 					return errors.New("etcd is unavailable")
 				}
 				return cl.Get(ctx, key, obj, opts...)
@@ -534,7 +534,7 @@ func TestToeholdCheckReportsATemplateReadFailure(t *testing.T) {
 	if !strings.Contains(blocker.Message, "etcd is unavailable") {
 		t.Errorf("message = %q, want it to name the real failure", blocker.Message)
 	}
-	if strings.Contains(blocker.Message, "Waiting for the toehold template") {
+	if strings.Contains(blocker.Message, "Waiting for the copy appliance template") {
 		t.Errorf("message = %q, want it not to claim the template is still building", blocker.Message)
 	}
 }
@@ -546,7 +546,7 @@ func TestToeholdCheckReportsAnApplianceReadFailure(t *testing.T) {
 	cl := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(provider, checkTemplate()).
-		WithStatusSubresource(&api.Provider{}, &api.CopyAppliance{}, &api.ToeholdTemplate{}).
+		WithStatusSubresource(&api.Provider{}, &api.CopyAppliance{}, &api.CopyApplianceTemplate{}).
 		WithInterceptorFuncs(interceptor.Funcs{
 			List: func(ctx context.Context, cl client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
 				if _, isAppliance := list.(*api.CopyApplianceList); isAppliance {
@@ -573,7 +573,7 @@ func TestToeholdCheckReportsAnApplianceReadFailure(t *testing.T) {
 }
 
 // Neither condition may block at the top of a pass. updateContainer and the
-// toehold template sync both bail on HasBlockerCondition and both run before
+// copy appliance template sync both bail on HasBlockerCondition and both run before
 // the check does, so a recorded failure that blocked would stop the inventory
 // from updating and stop the template from ever being rebuilt to fix the very
 // failure that was recorded. The record stays out of the way by being

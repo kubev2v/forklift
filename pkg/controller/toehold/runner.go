@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Runner drives a ToeholdTemplate to a ready vCenter template. It holds no
+// Runner drives a CopyApplianceTemplate to a ready vCenter template. It holds no
 // state of its own: every pass reads where it got to from the status and
 // leaves the next stage behind — same shape as the copy-appliance runners.
 // ToeholdContext is the template's cluster client and CR. Runners read and
@@ -27,7 +27,7 @@ import (
 type ToeholdContext struct {
 	Client  client.Client
 	Scheme  *runtime.Scheme
-	Toehold *api.ToeholdTemplate
+	Toehold *api.CopyApplianceTemplate
 }
 
 type Runner struct {
@@ -49,9 +49,9 @@ func (run *Runner) Run(ctx context.Context) (done bool, err error) {
 	if toehold.Status.Stage == "" || toehold.Status.Stage == api.StageEnsurePrerequisites {
 		toehold.Status.Stage = api.StageEnsureTemplate
 	}
-	toehold.Status.Phase = api.ToeholdTemplatePhaseRunning
+	toehold.Status.Phase = api.CopyApplianceTemplatePhaseRunning
 
-	log.Info("toehold template stage",
+	log.Info("copy appliance template stage",
 		"toeholdTemplate", toehold.Name,
 		"namespace", toehold.Namespace,
 		"stage", toehold.Status.Stage,
@@ -60,7 +60,7 @@ func (run *Runner) Run(ctx context.Context) (done bool, err error) {
 
 	switch toehold.Status.Stage {
 	case api.StageToeholdFinished:
-		toehold.Status.Phase = api.ToeholdTemplatePhaseSucceeded
+		toehold.Status.Phase = api.CopyApplianceTemplatePhaseSucceeded
 		now := meta.Now()
 		toehold.Status.CompletionTime = &now
 		return true, nil
@@ -84,7 +84,7 @@ func (run *Runner) Run(ctx context.Context) (done bool, err error) {
 	return false, nil
 }
 
-func (run *Runner) ensureTemplate(ctx context.Context, sshSecretName, sshPublicKey, sshProviderNS string) (next api.ToeholdTemplateStage, err error) {
+func (run *Runner) ensureTemplate(ctx context.Context, sshSecretName, sshPublicKey, sshProviderNS string) (next api.CopyApplianceTemplateStage, err error) {
 	pctx, err := run.context.providerContext(ctx)
 	if err != nil {
 		return
@@ -146,7 +146,7 @@ func (run *Runner) ensureTemplate(ctx context.Context, sshSecretName, sshPublicK
 		}
 	}
 	run.context.Toehold.Status.SetCondition(libcnd.Condition{
-		Type:     api.ToeholdTemplateUpToDate,
+		Type:     api.CopyApplianceTemplateUpToDate,
 		Status:   libcnd.True,
 		Category: libcnd.Advisory,
 		Message:  "Reusing existing vCenter template.",
@@ -154,7 +154,7 @@ func (run *Runner) ensureTemplate(ctx context.Context, sshSecretName, sshPublicK
 	return api.StageToeholdFinished, nil
 }
 
-func (run *Runner) requireBuild(ctx context.Context, pctx *providerContext) (api.ToeholdTemplateStage, error) {
+func (run *Runner) requireBuild(ctx context.Context, pctx *providerContext) (api.CopyApplianceTemplateStage, error) {
 	if err := run.context.deleteBuildPod(ctx); err != nil {
 		return "", err
 	}

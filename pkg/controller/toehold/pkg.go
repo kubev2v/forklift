@@ -1,5 +1,5 @@
 // Package toehold builds and uploads a vCenter VM template from a base
-// containerdisk image. The ToeholdTemplate CR is its lifecycle.
+// containerdisk image. The CopyApplianceTemplate CR is its lifecycle.
 package toehold
 
 import (

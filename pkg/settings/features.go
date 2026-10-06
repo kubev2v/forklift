@@ -78,7 +78,7 @@ type Features struct {
 	RetainPopulatorPods bool
 	// Whether to ignore xfs_repair exit status during conversion.
 	XfsRepairIgnore bool
-	// Whether to provision toehold templates for vSphere providers.
+	// Whether to provision copy appliance templates for vSphere providers.
 	Toehold bool
 }
 

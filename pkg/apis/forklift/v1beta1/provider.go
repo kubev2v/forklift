@@ -259,9 +259,9 @@ func (p *Provider) ToeholdNbdSsl() bool {
 	return p.Setting(ToeholdNbdSsl) != "false"
 }
 
-// ToeholdTemplateName is the name of this provider's toehold template. The
+// CopyApplianceTemplateName is the name of this provider's copy appliance template. The
 // provider controller, the appliance check, the plan and the console create all
 // have to agree on it.
-func (p *Provider) ToeholdTemplateName() string {
+func (p *Provider) CopyApplianceTemplateName() string {
 	return p.Name + "-toehold"
 }
