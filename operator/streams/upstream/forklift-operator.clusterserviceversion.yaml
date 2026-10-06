@@ -809,6 +809,16 @@ spec:
         kind: Conversion
         name: conversions.forklift.konveyor.io
         version: v1beta1
+      - description: vSphere toehold template builder
+        displayName: Toehold Template
+        kind: ToeholdTemplate
+        name: toeholdtemplates.forklift.konveyor.io
+        version: v1beta1
+      - description: Copy appliance VM for vSphere disk export over NBD
+        displayName: Copy Appliance
+        kind: CopyAppliance
+        name: copyappliances.forklift.konveyor.io
+        version: v1beta1
   relatedImages:
     - name: forklift-operator
       image: "${OPERATOR_IMAGE}"
@@ -842,3 +852,5 @@ spec:
       image: "${CLI_DOWNLOAD_IMAGE}"
     - name: virt_v2v_rhel9
       image: "${VIRT_V2V_IMAGE_RHEL9}"
+    - name: toehold_builder
+      image: "${TOEHOLD_BUILDER_IMAGE}"

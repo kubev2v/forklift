@@ -22,6 +22,8 @@ deep_inspection_image_xfs_fqin: "{{ lookup( 'env', 'DEEP_INSPECTION_IMAGE_XFS') 
 ova_provider_server_fqin: "{{ lookup( 'env', 'OVA_PROVIDER_SERVER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROVIDER_SERVER') }}"
 hyperv_provider_server_fqin: "{{ lookup( 'env', 'HYPERV_PROVIDER_SERVER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_HYPERV_PROVIDER_SERVER') }}"
 ova_proxy_fqin: "{{ lookup( 'env', 'OVA_PROXY_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROXY') }}"
+toehold_builder_image_fqin: "{{ lookup( 'env', 'TOEHOLD_BUILDER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_TOEHOLD_BUILDER') or 'quay.io/kubev2v/toehold-builder:latest' }}"
+feature_toehold: false
 
 # Computed names derived from app_name (internal to Ansible, not CRD fields).
 controller_configmap_name: "{{ controller_service_name }}-config"

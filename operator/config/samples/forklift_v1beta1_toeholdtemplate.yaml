@@ -1,0 +1,15 @@
+apiVersion: forklift.konveyor.io/v1beta1
+kind: ToeholdTemplate
+metadata:
+  name: nbdkit-toehold
+  namespace: toehold-e2e
+spec:
+  provider:
+    name: vcenter
+    namespace: openshift-mtv
+  baseDisk:
+    containerImage: registry.redhat.io/rhel9/rhel-guest-image:latest
+  templateName: nbdkit-toehold
+  datastore: datastore1
+  folder: /Datacenter/vm
+  network: "VM Network"
