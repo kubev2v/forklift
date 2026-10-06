@@ -19,7 +19,9 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
@@ -2386,14 +2388,35 @@ var _ = Describe("excludeDisks", func() {
 	})
 })
 
-//nolint:errcheck
+func ipv4ClusterNetwork() *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "config.openshift.io/v1",
+		"kind":       "Network",
+		"metadata":   map[string]interface{}{"name": "cluster"},
+		"status": map[string]interface{}{
+			"clusterNetwork": []interface{}{
+				map[string]interface{}{"cidr": "10.128.0.0/14"},
+			},
+		},
+	}}
+}
+
+func addOpenShiftNetworkToScheme(scheme *runtime.Scheme) {
+	gv := schema.GroupVersion{Group: "config.openshift.io", Version: "v1"}
+	meta.AddToGroupVersion(scheme, gv)
+	scheme.AddKnownTypeWithName(gv.WithKind("Network"), &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(gv.WithKind("NetworkList"), &unstructured.UnstructuredList{})
+}
+
 func createBuilder(objs ...runtime.Object) *Builder {
 	scheme := runtime.NewScheme()
 	_ = v1.AddToScheme(scheme)
 	_ = core.AddToScheme(scheme)
 	_ = rbacv1.AddToScheme(scheme)
 	_ = storagev1.AddToScheme(scheme)
-	v1beta1.SchemeBuilder.AddToScheme(scheme)
+	_ = v1beta1.SchemeBuilder.AddToScheme(scheme)
+	addOpenShiftNetworkToScheme(scheme)
+	objs = append([]runtime.Object{ipv4ClusterNetwork()}, objs...)
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithRuntimeObjects(objs...).
