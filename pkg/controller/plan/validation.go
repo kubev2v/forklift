@@ -67,6 +67,8 @@ const (
 	VMMissingGuestIPs               = "VMMissingGuestIPs"
 	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
 	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
+	CopyApplianceNotReady           = "CopyApplianceNotReady"
+	ToeholdTemplateNotReady         = "ToeholdTemplateNotReady"
 	VMHasSnapshots                  = "VMHasSnapshots"
 	VMConsolidationNeeded           = "VMConsolidationNeeded"
 	HostNotReady                    = "HostNotReady"
@@ -220,6 +222,10 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 
 	if err = r.validateWarmMigration(ctx); err != nil {
+		return err
+	}
+
+	if err = r.validateCopyAppliance(ctx); err != nil {
 		return err
 	}
 
@@ -437,6 +443,56 @@ func hasShiftDiskMissingNAS(vm *vsphere.VM, storageMap *api.StorageMap, inventor
 }
 
 // Validate that warm migration is supported from the source provider.
+func planUsesCopyAppliance(plan *api.Plan) bool {
+	return settings.Settings.EnabledForPlan(plan)
+}
+
+func (r *Reconciler) validateCopyAppliance(ctx *plancontext.Context) error {
+	plan := ctx.Plan
+	if !planUsesCopyAppliance(plan) {
+		return nil
+	}
+
+	if settings.Settings.ContainerImage == "" {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     CopyApplianceNotReady,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Reason:   NotSet,
+			Message:  "Copy appliance container image is not configured on the ForkliftController.",
+		})
+	}
+	provider := plan.Provider.Source
+	if provider == nil {
+		return nil
+	}
+	toehold, err := toeholdTemplateForProvider(r.Client, provider)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     ToeholdTemplateNotReady,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Reason:   NotFound,
+				Message:  fmt.Sprintf("No toehold template was found for provider %q.", provider.Name),
+			})
+			return nil
+		}
+		return err
+	}
+	if toehold.Status.Phase != api.ToeholdTemplatePhaseSucceeded {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     ToeholdTemplateNotReady,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Reason:   NotValid,
+			Message:  fmt.Sprintf("Toehold template %q is not ready (phase=%s).", toehold.Name, toehold.Status.Phase),
+		})
+	}
+
+	return nil
+}
+
 func (r *Reconciler) validateWarmMigration(ctx *plancontext.Context) (err error) {
 	if !ctx.Plan.IsWarm() {
 		return
@@ -1832,7 +1888,7 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		}
 		err = r.validateVddkImageJob(job, plan)
 	}
-	if plan.IsWarm() && vddkImage == "" {
+	if plan.IsWarm() && vddkImage == "" && !planUsesCopyAppliance(plan) {
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     VDDKInitImageUnavailable,
 			Status:   True,

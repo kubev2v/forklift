@@ -11,6 +11,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libvsphere "github.com/kubev2v/forklift/pkg/lib/vsphere"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -305,7 +306,7 @@ func (p *ConversionPipeline) runStageCreatingSnapshot() (stageDone bool, err err
 		return stageDone, err
 	}
 
-	gClient, err := GovmomiClientFromSecret(p.ctx, secret)
+	gClient, err := libvsphere.ConnectFromSecret(p.ctx, secret)
 	if err != nil {
 		return stageDone, err
 	}
@@ -337,7 +338,7 @@ func (p *ConversionPipeline) runStageWaitingForSnapshot() (stageDone bool, err e
 		return stageDone, err
 	}
 
-	gClient, err := GovmomiClientFromSecret(p.ctx, secret)
+	gClient, err := libvsphere.ConnectFromSecret(p.ctx, secret)
 	if err != nil {
 		return stageDone, err
 	}

@@ -59,6 +59,14 @@ const (
 	SMBMountFailed          = "SMBMountFailed"
 	WaitingForService       = "WaitingForService"
 	ForkliftNotInstalled    = "ForkliftNotInstalled"
+	// ToeholdApplianceChecked records the outcome of the last toehold
+	// appliance check, and what it was a check of. It is durable: it is the
+	// only reason a check that has already run is not run again.
+	ToeholdApplianceChecked = "ToeholdApplianceChecked"
+	// ToeholdApplianceNotReady blocks the provider while the appliance has
+	// not been shown to work. It is deliberately not durable; see
+	// ensureToeholdApplianceCheck.
+	ToeholdApplianceNotReady = "ToeholdApplianceNotReady"
 )
 
 // Forklift operator is installed on a remote cluster.
@@ -89,6 +97,9 @@ const (
 	Tested              = "Tested"
 	Started             = "Started"
 	SkipTLSVerification = "SkipTLSVerification"
+	ToeholdCheckPassed  = "ToeholdCheckPassed"
+	ToeholdCheckFailed  = "ToeholdCheckFailed"
+	ToeholdCheckPending = "ToeholdCheckPending"
 )
 
 // Phases
