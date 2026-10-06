@@ -128,6 +128,10 @@ spec:
         - name: MAX_PARENT_BACKING_RETRIES
           value: "{{ controller_max_parent_backing_retries }}"
 {% endif %}
+{% if controller_multus_network_name_always_qualified is defined and controller_multus_network_name_always_qualified|length > 0 %}
+        - name: MULTUS_NETWORK_NAME_ALWAYS_QUALIFIED
+          value: "{{ controller_multus_network_name_always_qualified }}"
+{% endif %}
 {% if controller_migration_service_account is defined and controller_migration_service_account|length > 0 %}
         - name: MIGRATION_SERVICE_ACCOUNT
           value: "{{ controller_migration_service_account }}"

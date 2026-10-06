@@ -5,6 +5,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/settings"
 )
 
 func TestValidatePodNetworkDuplicates_NilNetworkMap(t *testing.T) {
@@ -503,6 +504,34 @@ func TestHasPreserveMode_Empty(t *testing.T) {
 func TestHasPreserveMode_Nil(t *testing.T) {
 	if HasPreserveMode(nil) {
 		t.Error("expected false for nil map")
+	}
+}
+
+func TestQualifiedMultusNetworkName(t *testing.T) {
+	orig := settings.Settings.MultusNetworkNameAlwaysQualified
+	defer func() { settings.Settings.MultusNetworkNameAlwaysQualified = orig }()
+
+	tests := []struct {
+		name            string
+		alwaysQualified bool
+		nadNamespace    string
+		nadName         string
+		targetNamespace string
+		want            string
+	}{
+		{"same namespace, unqualified", false, "app", "nad-a", "app", "nad-a"},
+		{"different namespace, qualified", false, "other", "nad-a", "app", "other/nad-a"},
+		{"always-qualified forces qualified in same namespace", true, "app", "nad-a", "app", "app/nad-a"},
+		{"empty NAD namespace yields bare name", false, "", "nad-a", "", "nad-a"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			settings.Settings.MultusNetworkNameAlwaysQualified = tt.alwaysQualified
+			got := QualifiedMultusNetworkName(tt.nadNamespace, tt.nadName, tt.targetNamespace)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

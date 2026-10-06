@@ -2,7 +2,6 @@ package builder
 
 import (
 	"fmt"
-	"path"
 	"strings"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -356,8 +355,9 @@ func (r *Builder) mapNetworks(awsInstance *model.InstanceDetails, object *cnv.Vi
 				}
 			} else if mapped.Destination.Type == Multus {
 				// Multus network
+				networkName := planbase.QualifiedMultusNetworkName(mapped.Destination.Namespace, mapped.Destination.Name, r.Plan.Spec.TargetNamespace)
 				kNetwork.Multus = &cnv.MultusNetwork{
-					NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+					NetworkName: networkName,
 				}
 				kInterface.InterfaceBindingMethod = cnv.InterfaceBindingMethod{
 					Bridge: &cnv.InterfaceBridge{},

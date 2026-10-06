@@ -12,7 +12,6 @@ import (
 	"math/rand"
 	"net"
 	liburl "net/url"
-	"path"
 	"regexp"
 	"slices"
 	"strconv"
@@ -1007,8 +1006,9 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 				kInterface.Masquerade = &cnv.InterfaceMasquerade{}
 			}
 		case Multus:
+			networkName := planbase.QualifiedMultusNetworkName(mapped.Destination.Namespace, mapped.Destination.Name, r.Plan.Spec.TargetNamespace)
 			kNetwork.Multus = &cnv.MultusNetwork{
-				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+				NetworkName: networkName,
 			}
 			kInterface.Bridge = &cnv.InterfaceBridge{}
 		}

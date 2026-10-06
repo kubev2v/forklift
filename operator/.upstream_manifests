@@ -5025,6 +5025,15 @@ spec:
                   Global default ServiceAccount for migration pods in the target namespace.
                   Overridden by Plan-level serviceAccount.
                 type: string
+              controller_multus_network_name_always_qualified:
+                default: "false"
+                description: |-
+                  Always use qualified namespace/nad-name format for Multus networks.
+                  When false, uses unqualified nad-name when NAD is in same namespace as target VM.
+                enum:
+                - "true"
+                - "false"
+                type: string
               controller_ocp_pvc_name_template:
                 description: |-
                   Global default Go template for generating PVC names during OpenShift (OCP) migrations.

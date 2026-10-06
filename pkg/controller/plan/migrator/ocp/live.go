@@ -11,6 +11,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/ensurer"
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
@@ -1351,7 +1352,7 @@ func (r *Builder) mapNetworks(srcNS string, target *cnv.VirtualMachine) {
 				sourceNetwork = path.Join(srcNS, sourceNetwork)
 			}
 			destination := networkMap[sourceNetwork]
-			network.Multus.NetworkName = path.Join(destination.Namespace, destination.Name)
+			network.Multus.NetworkName = planbase.QualifiedMultusNetworkName(destination.Namespace, destination.Name, r.Plan.Spec.TargetNamespace)
 		case network.Pod != nil:
 		}
 	}

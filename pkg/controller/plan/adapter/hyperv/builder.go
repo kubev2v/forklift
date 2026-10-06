@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"path"
 	"strconv"
 	"strings"
 
@@ -254,8 +253,9 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) {
 
 		switch mapped.Destination.Type {
 		case Multus:
+			networkName := planbase.QualifiedMultusNetworkName(mapped.Destination.Namespace, mapped.Destination.Name, r.Plan.Spec.TargetNamespace)
 			kNetwork.Multus = &cnv.MultusNetwork{
-				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+				NetworkName: networkName,
 			}
 			kInterface.Bridge = &cnv.InterfaceBridge{}
 		case Pod:
