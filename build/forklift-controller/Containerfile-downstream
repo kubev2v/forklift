@@ -8,6 +8,17 @@ ENV GOEXPERIMENT=strictfipsruntime
 ENV GOCACHE=/go-build/cache
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o manager github.com/kubev2v/forklift/cmd/forklift-controller
 
+# The orchestrator runs on the copy appliance VM, not here. The controller image only
+# carries it so the deploy can ship it over, so it is built unlike everything else here:
+#
+#   CGO_ENABLED=0  a cgo binary links against this builder's glibc, not the appliance's.
+#   GOEXPERIMENT   strictfipsruntime routes crypto through OpenSSL and so needs cgo. It
+#     / GOFLAGS    has to go, and "none" rather than empty because empty falls back to
+#                  the toolchain's baked-in default, which is the OpenSSL backend.
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOEXPERIMENT=none GOFLAGS="-mod=vendor" \
+    go build -buildvcs=false -trimpath -ldflags="-w -s" -o nbd-orchestrator github.com/kubev2v/forklift/cmd/nbd-orchestrator
+
 FROM registry.redhat.io/ubi9-minimal:9.7-1778562320
 
 # RUN microdnf -y update && microdnf -y clean all
@@ -15,6 +26,7 @@ FROM registry.redhat.io/ubi9-minimal:9.7-1778562320
 RUN microdnf -y install tar && microdnf clean all
 
 COPY --from=builder /app/manager /usr/local/bin/forklift-controller
+COPY --from=builder /app/nbd-orchestrator /usr/local/bin/nbd-orchestrator
 ENTRYPOINT ["/usr/local/bin/forklift-controller"]
 
 ARG MTV_VERSION

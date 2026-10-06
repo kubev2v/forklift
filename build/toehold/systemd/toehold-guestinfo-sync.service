@@ -1,0 +1,13 @@
+[Unit]
+Description=Publish toehold guest network info to vCenter
+After=network-online.target toehold-vmtoolsd.service
+Wants=network-online.target
+Requires=toehold-vmtoolsd.service
+ConditionPathExists=!/var/lib/toehold/guestinfo-published
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/toehold-publish-guestinfo.sh
+
+[Install]
+WantedBy=multi-user.target

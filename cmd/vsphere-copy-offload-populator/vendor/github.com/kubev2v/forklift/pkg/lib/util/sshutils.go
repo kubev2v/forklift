@@ -13,8 +13,11 @@ import (
 )
 
 const (
-	// SSHKeysSecretPrefix is the prefix used for SSH key secrets
+	// SSHKeysSecretPrefix is the prefix used for ESXi offload SSH key secrets.
 	SSHKeysSecretPrefix = "offload-ssh-keys"
+
+	// ToeholdSSHKeysSecretPrefix is the prefix used for toehold appliance SSH key secrets.
+	ToeholdSSHKeysSecretPrefix = "toehold-ssh-keys"
 
 	// RestrictedSSHCommandTemplate is the inline shell command used in SSH authorized_keys
 	// to restrict SSH access and route commands to the shell wrapper based on datastore.
@@ -64,6 +67,26 @@ func GenerateSSHPublicSecretName(providerName string) (string, error) {
 		return "", fmt.Errorf("failed to generate SSH public secret name: %w", err)
 	}
 	return fmt.Sprintf("%s-%s-public", SSHKeysSecretPrefix, sanitized), nil
+}
+
+// GenerateToeholdSSHPrivateSecretName generates a secret name for the toehold
+// appliance SSH private key.
+func GenerateToeholdSSHPrivateSecretName(providerName string) (string, error) {
+	sanitized, err := SanitizeProviderName(providerName)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate toehold SSH private secret name: %w", err)
+	}
+	return fmt.Sprintf("%s-%s-private", ToeholdSSHKeysSecretPrefix, sanitized), nil
+}
+
+// GenerateToeholdSSHPublicSecretName generates a secret name for the toehold
+// appliance SSH public key.
+func GenerateToeholdSSHPublicSecretName(providerName string) (string, error) {
+	sanitized, err := SanitizeProviderName(providerName)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate toehold SSH public secret name: %w", err)
+	}
+	return fmt.Sprintf("%s-%s-public", ToeholdSSHKeysSecretPrefix, sanitized), nil
 }
 
 // TestSSHConnectivity tests if we can connect via SSH and execute a restricted command.

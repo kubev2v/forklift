@@ -1,0 +1,14 @@
+FROM quay.io/centos/centos:stream9
+
+# nbdkit is in the CentOS Stream 9 AppStream repo. The `nbdkit` metapackage pulls
+# in the server plus a useful subset of plugins, including the `file` plugin used
+# here to export a block device.
+RUN dnf install -y nbdkit && dnf clean all
+
+# Default NBD port.
+EXPOSE 10809
+
+COPY build/nbd-container/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
