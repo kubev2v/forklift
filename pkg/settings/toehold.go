@@ -6,14 +6,14 @@ const (
 	ToeholdBuilderImage           = "TOEHOLD_BUILDER_IMAGE"
 	ToeholdBaseDiskContainerImage = "TOEHOLD_BASE_DISK_CONTAINER_IMAGE"
 	ToeholdBaseContainerImage     = "TOEHOLD_BASE_CONTAINER_IMAGE"
-	ToeholdTemplateCPU            = "TOEHOLD_TEMPLATE_CPU"
-	ToeholdTemplateMemoryMiB      = "TOEHOLD_TEMPLATE_MEMORY_MIB"
+	CopyApplianceTemplateCPU            = "COPY_APPLIANCE_TEMPLATE_CPU"
+	CopyApplianceTemplateMemoryMiB      = "COPY_APPLIANCE_TEMPLATE_MEMORY_MIB"
 	ToeholdBuildPodCPUs           = "TOEHOLD_CPUS"
 	ToeholdBuildPodMemoryMiB      = "TOEHOLD_MEMORY_MIB"
-	ToeholdTemplateName           = "TOEHOLD_TEMPLATE_NAME"
+	CopyApplianceTemplateName           = "COPY_APPLIANCE_TEMPLATE_NAME"
 	ToeholdVMDKPath               = "TOEHOLD_VMDK_PATH"
-	ToeholdTemplateContentHash    = "TOEHOLD_TEMPLATE_CONTENT_HASH"
-	ToeholdTemplateConfigHash     = "TOEHOLD_TEMPLATE_CONFIG_HASH"
+	CopyApplianceTemplateContentHash    = "COPY_APPLIANCE_TEMPLATE_CONTENT_HASH"
+	CopyApplianceTemplateConfigHash     = "COPY_APPLIANCE_TEMPLATE_CONFIG_HASH"
 	ToeholdDatastore              = "TOEHOLD_DATASTORE"
 	ToeholdFolder                 = "TOEHOLD_FOLDER"
 	ToeholdNetwork                = "TOEHOLD_NETWORK"
@@ -27,7 +27,7 @@ const (
 	DefaultBaseDiskContainerImage = "registry.redhat.io/rhel9/rhel-guest-image:latest"
 )
 
-// Toehold settings for the toehold template controller and build pod.
+// Toehold settings for the copy appliance template controller and build pod.
 type Toehold struct {
 	BuilderImage           string
 	BaseDiskContainerImage string
@@ -44,7 +44,7 @@ func (r *Toehold) Load() error {
 	if r.BaseDiskContainerImage == "" {
 		r.BaseDiskContainerImage = DefaultBaseDiskContainerImage
 	}
-	r.TemplateCPU = int32(LookupInt(ToeholdTemplateCPU, 2))
-	r.TemplateMemoryMiB = int32(LookupInt(ToeholdTemplateMemoryMiB, 4096))
+	r.TemplateCPU = int32(LookupInt(CopyApplianceTemplateCPU, 2))
+	r.TemplateMemoryMiB = int32(LookupInt(CopyApplianceTemplateMemoryMiB, 4096))
 	return nil
 }

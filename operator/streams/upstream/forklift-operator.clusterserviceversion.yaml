@@ -809,10 +809,10 @@ spec:
         kind: Conversion
         name: conversions.forklift.konveyor.io
         version: v1beta1
-      - description: vSphere toehold template builder
+      - description: vSphere copy appliance template builder
         displayName: Toehold Template
-        kind: ToeholdTemplate
-        name: toeholdtemplates.forklift.konveyor.io
+        kind: CopyApplianceTemplate
+        name: copyappliancetemplates.forklift.konveyor.io
         version: v1beta1
       - description: Copy appliance VM for vSphere disk export over NBD
         displayName: Copy Appliance

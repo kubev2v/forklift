@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// Builder builds an uncreated CopyAppliance from aPowerOn:  !encrypted toehold template.
+// Builder builds an uncreated CopyAppliance from aPowerOn:  !encrypted copy appliance template.
 type Builder struct {
 	Provider  *api.Provider
 	Inventory web.Client
@@ -32,7 +32,7 @@ func NewBuilder(provider *api.Provider) (*Builder, error) {
 }
 
 // Appliance builds a CopyAppliance that attaches the source VM's disks.
-func (r *Builder) Appliance(toehold *api.ToeholdTemplate, vmRef ref.Ref, migrationUID types.UID) (*api.CopyAppliance, error) {
+func (r *Builder) Appliance(toehold *api.CopyApplianceTemplate, vmRef ref.Ref, migrationUID types.UID) (*api.CopyAppliance, error) {
 	appliance, err := r.build(toehold)
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (r *Builder) Appliance(toehold *api.ToeholdTemplate, vmRef ref.Ref, migrati
 }
 
 // Check builds a CopyAppliance with no attached disks (provider readiness probe).
-func (r *Builder) Check(toehold *api.ToeholdTemplate) (*api.CopyAppliance, error) {
+func (r *Builder) Check(toehold *api.CopyApplianceTemplate) (*api.CopyAppliance, error) {
 	appliance, err := r.build(toehold)
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (r *Builder) Check(toehold *api.ToeholdTemplate) (*api.CopyAppliance, error
 	return appliance, nil
 }
 
-func (r *Builder) build(toehold *api.ToeholdTemplate) (*api.CopyAppliance, error) {
+func (r *Builder) build(toehold *api.CopyApplianceTemplate) (*api.CopyAppliance, error) {
 	provider := r.Provider
 	if provider.Type() != api.VSphere {
 		return nil, liberr.New(fmt.Sprintf(
@@ -106,7 +106,7 @@ func (r *Builder) build(toehold *api.ToeholdTemplate) (*api.CopyAppliance, error
 // placement copies folder/datastore/template from the toehold and resolves
 // datacenter + resource pool from inventory (by template moref; templates are
 // not listed by path).
-func (r *Builder) placement(toehold *api.ToeholdTemplate, spec *api.CopyApplianceSpec) error {
+func (r *Builder) placement(toehold *api.CopyApplianceTemplate, spec *api.CopyApplianceSpec) error {
 	spec.Folder = toehold.Spec.Folder
 	spec.Datastore = toehold.Spec.Datastore
 	spec.Template = path.Join(toehold.Spec.Folder, toehold.Spec.TemplateName)
@@ -114,7 +114,7 @@ func (r *Builder) placement(toehold *api.ToeholdTemplate, spec *api.CopyApplianc
 	moRef := toehold.Status.Template.Moref
 	if moRef == "" {
 		return liberr.New(fmt.Sprintf(
-			"toehold template %s has no moref to place the appliance from",
+			"copy appliance template %s has no moref to place the appliance from",
 			toehold.Name))
 	}
 	vm := &model.VM{}

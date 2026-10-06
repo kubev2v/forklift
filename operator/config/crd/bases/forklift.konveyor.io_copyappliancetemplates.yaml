@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.3
-  name: toeholdtemplates.forklift.konveyor.io
+  name: copyappliancetemplates.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
   names:
-    kind: ToeholdTemplate
-    listKind: ToeholdTemplateList
-    plural: toeholdtemplates
+    kind: CopyApplianceTemplate
+    listKind: CopyApplianceTemplateList
+    plural: copyappliancetemplates
     shortNames:
-    - ttpl
-    singular: toeholdtemplate
+    - catpl
+    singular: copyappliancetemplate
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -51,7 +51,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ToeholdTemplateSpec defines the desired state of ToeholdTemplate.
+            description: CopyApplianceTemplateSpec defines the desired state of CopyApplianceTemplate.
             properties:
               baseDisk:
                 description: Base containerdisk image for overlay customization.
@@ -209,7 +209,8 @@ spec:
             - templateName
             type: object
           status:
-            description: ToeholdTemplateStatus defines the observed state of ToeholdTemplate.
+            description: CopyApplianceTemplateStatus defines the observed state of
+              CopyApplianceTemplate.
             properties:
               buildPod:
                 description: Reference to the build pod when a template was successfully
@@ -306,8 +307,8 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: ToeholdTemplatePhase is the high-level lifecycle state
-                  of a ToeholdTemplate resource.
+                description: CopyApplianceTemplatePhase is the high-level lifecycle
+                  state of a CopyApplianceTemplate resource.
                 enum:
                 - Pending
                 - Running
@@ -315,8 +316,8 @@ spec:
                 - Failed
                 type: string
               stage:
-                description: ToeholdTemplateStage is the fine-grained pipeline position
-                  within the Running phase.
+                description: CopyApplianceTemplateStage is the fine-grained pipeline
+                  position within the Running phase.
                 type: string
               template:
                 description: TemplateStatus tracks the vCenter template artifact.
