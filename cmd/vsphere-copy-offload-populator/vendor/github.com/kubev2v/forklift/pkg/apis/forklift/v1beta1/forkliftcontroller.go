@@ -216,8 +216,8 @@ type ForkliftControllerSpec struct {
 	// Copy appliance defaults
 
 	// Fully-qualified nbd-container image loaded onto copy appliances
-	// (e.g. "quay.io/kubev2v/nbd-container:latest"), or an ImageStreamTag in the
-	// controller namespace (e.g. "copy-appliance:latest").
+	// (e.g. "quay.io/kubev2v/nbd-container:latest"). The setup pod that reads
+	// it carries no registry credential, so it has to be readable without one.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	CopyApplianceContainerImageFQIN string `json:"copy_appliance_container_image_fqin,omitempty"`

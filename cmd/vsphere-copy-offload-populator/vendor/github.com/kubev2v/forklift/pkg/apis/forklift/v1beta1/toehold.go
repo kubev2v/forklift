@@ -92,9 +92,6 @@ type ToeholdTemplateSpec struct {
 
 // TemplateStatus tracks the vCenter template artifact.
 type TemplateStatus struct {
-	// True when an existing vCenter template was reused.
-	// +optional
-	Reused bool `json:"reused,omitempty"`
 	// Hash of the base containerdisk image.
 	// +optional
 	DiskHash string `json:"diskHash,omitempty"`
