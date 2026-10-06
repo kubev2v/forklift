@@ -31,7 +31,7 @@ import (
 const toeholdCheckDeadline = 30 * time.Minute
 
 // applianceCheck proves, once per provider, that a copy appliance can be
-// deployed from the provider's toehold template — the clone, the boot, the
+// deployed from the provider's copy appliance template — the clone, the boot, the
 // guest network, the login, the orchestrator install and the export endpoint —
 // so that a migration is not the first thing to find out that it cannot.
 //
@@ -45,7 +45,7 @@ type applianceCheck struct {
 	// build returns the appliance to deploy. A field because the real one reads
 	// the provider's inventory service over the network, which a unit test
 	// cannot do.
-	build func(*api.Provider, *api.ToeholdTemplate) (*api.CopyAppliance, error)
+	build func(*api.Provider, *api.CopyApplianceTemplate) (*api.CopyAppliance, error)
 }
 
 func newApplianceCheck(client client.Client, provider *api.Provider) *applianceCheck {
@@ -56,7 +56,7 @@ func newApplianceCheck(client client.Client, provider *api.Provider) *applianceC
 			Log:    logging.WithName("provider|appliance-check"),
 		},
 		provider: provider,
-		build: func(provider *api.Provider, toehold *api.ToeholdTemplate) (*api.CopyAppliance, error) {
+		build: func(provider *api.Provider, toehold *api.CopyApplianceTemplate) (*api.CopyAppliance, error) {
 			builder, err := copyappliance.NewBuilder(provider)
 			if err != nil {
 				return nil, liberr.Wrap(err)
@@ -74,10 +74,10 @@ func (c *applianceCheck) Run(ctx context.Context) (err error) {
 		return
 	}
 
-	toehold := &api.ToeholdTemplate{}
+	toehold := &api.CopyApplianceTemplate{}
 	key := client.ObjectKey{
 		Namespace: c.provider.Namespace,
-		Name:      c.provider.ToeholdTemplateName(),
+		Name:      c.provider.CopyApplianceTemplateName(),
 	}
 	err = c.client.Get(ctx, key, toehold)
 	if k8serr.IsNotFound(err) {
@@ -88,13 +88,13 @@ func (c *applianceCheck) Run(ctx context.Context) (err error) {
 	}
 	if err != nil {
 		c.block(ToeholdCheckPending,
-			fmt.Sprintf("Could not read the toehold template: %s.", err))
+			fmt.Sprintf("Could not read the copy appliance template: %s.", err))
 		err = liberr.Wrap(err, "template", key.Name)
 		return
 	}
-	if toehold.Status.Phase != api.ToeholdTemplatePhaseSucceeded ||
+	if toehold.Status.Phase != api.CopyApplianceTemplatePhaseSucceeded ||
 		toehold.Status.Template.Moref == "" {
-		c.block(ToeholdCheckPending, "Waiting for the toehold template.")
+		c.block(ToeholdCheckPending, "Waiting for the copy appliance template.")
 		return
 	}
 
@@ -154,7 +154,7 @@ func (c *applianceCheck) Run(ctx context.Context) (err error) {
 
 // deploy creates the check appliance the same way a migration does (via the
 // ensurer) and blocks the provider while it comes up.
-func (c *applianceCheck) deploy(ctx context.Context, toehold *api.ToeholdTemplate) (err error) {
+func (c *applianceCheck) deploy(ctx context.Context, toehold *api.CopyApplianceTemplate) (err error) {
 	defer func() {
 		if err != nil {
 			c.block(ToeholdCheckFailed,
@@ -246,7 +246,7 @@ func (c *applianceCheck) fail(items []string, describe, reason string) {
 		})
 }
 
-// toeholdSync keeps a provider's toehold template in step with the provider's
+// toeholdSync keeps a provider's copy appliance template in step with the provider's
 // settings and the controller's own image settings. The template itself is
 // created by the console or the API; this only maintains one that is already
 // there. Built for a single reconcile pass and discarded.
@@ -259,7 +259,7 @@ func newToeholdSync(client client.Client, provider *api.Provider) *toeholdSync {
 	return &toeholdSync{client: client, provider: provider}
 }
 
-// Run applies the provider's settings to its toehold template.
+// Run applies the provider's settings to its copy appliance template.
 func (s *toeholdSync) Run(ctx context.Context) error {
 	if !inventoryReady(s.provider) {
 		return nil
@@ -272,10 +272,10 @@ func (s *toeholdSync) Run(ctx context.Context) error {
 		return nil
 	}
 
-	template := &api.ToeholdTemplate{}
+	template := &api.CopyApplianceTemplate{}
 	key := client.ObjectKey{
 		Namespace: s.provider.Namespace,
-		Name:      s.provider.ToeholdTemplateName(),
+		Name:      s.provider.CopyApplianceTemplateName(),
 	}
 	err := s.client.Get(ctx, key, template)
 	if k8serr.IsNotFound(err) {
@@ -294,7 +294,7 @@ func (s *toeholdSync) Run(ctx context.Context) error {
 		Name:      s.provider.Name,
 		Namespace: s.provider.Namespace,
 	}
-	template.Spec.TemplateName = s.provider.ToeholdTemplateName()
+	template.Spec.TemplateName = s.provider.CopyApplianceTemplateName()
 	template.Spec.BaseDisk = api.ToeholdBaseDisk{
 		ContainerImage: Settings.BaseDiskContainerImage,
 	}

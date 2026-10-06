@@ -251,7 +251,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		}
 	}
 
-	// Hold the provider until owned CopyAppliances / ToeholdTemplates finish
+	// Hold the provider until owned CopyAppliances / CopyApplianceTemplates finish
 	// teardown — they need the provider (and its secret) to destroy the VMs.
 	if provider.Type() == api.VSphere {
 		if provider.DeletionTimestamp != nil {
@@ -294,7 +294,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 			}
 			err = newToeholdSync(r.Client, provider).Run(ctx)
 			if err != nil {
-				r.Log.Error(err, "failed to reconcile toehold template for vSphere provider")
+				r.Log.Error(err, "failed to reconcile copy appliance template for vSphere provider")
 				return
 			}
 		}
@@ -307,7 +307,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	}
 
 	// Prove the copy appliance works, before a migration finds out that it does
-	// not. This runs after updateContainer and the toehold template sync
+	// not. This runs after updateContainer and the copy appliance template sync
 	// because it sets a blocking condition, and both of those bail on one. The
 	// error is logged rather than returned: returning it would skip
 	// updateProviderStatus, discarding the verdict the check just recorded.
@@ -615,7 +615,7 @@ func (r *Reconciler) ensureToeholdSSHKeys(provider *api.Provider) error {
 		r.Log.V(1).Info("Toehold SSH keys already exist for provider", "provider", provider.Name)
 		// A secret predating the merge of the two appliance secrets holds only
 		// the SSH key. Fill in the TLS material rather than regenerating the key
-		// pair, whose public half is already built into the toehold template.
+		// pair, whose public half is already built into the copy appliance template.
 		if err := r.ensureToeholdTLS(existing); err != nil {
 			return err
 		}
@@ -738,7 +738,7 @@ func (r *Reconciler) deleteProviderServer(ctx context.Context, provider *api.Pro
 	return nil
 }
 
-// cleanupVSphereProvider deletes owned CopyAppliances and ToeholdTemplates and
+// cleanupVSphereProvider deletes owned CopyAppliances and CopyApplianceTemplates and
 // waits for them to go away before releasing the provider finalizer.
 func (r *Reconciler) cleanupVSphereProvider(ctx context.Context, provider *api.Provider) (done bool, err error) {
 	if !k8sutil.ContainsFinalizer(provider, api.VSphereProviderFinalizer) {
@@ -761,7 +761,7 @@ func (r *Reconciler) cleanupVSphereProvider(ctx context.Context, provider *api.P
 			}
 		}
 	}
-	templates := &api.ToeholdTemplateList{}
+	templates := &api.CopyApplianceTemplateList{}
 	if err = r.List(ctx, templates, client.InNamespace(provider.Namespace)); err != nil {
 		return false, liberr.Wrap(err)
 	}

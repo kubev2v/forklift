@@ -32,12 +32,12 @@ func syncProvider() *api.Provider {
 	return provider
 }
 
-// syncTemplate is a toehold template as someone else created it: the fields the
+// syncTemplate is a copy appliance template as someone else created it: the fields the
 // provider dictates are empty or wrong, and the ones it does not are set.
-func syncTemplate() *api.ToeholdTemplate {
-	return &api.ToeholdTemplate{
+func syncTemplate() *api.CopyApplianceTemplate {
+	return &api.CopyApplianceTemplate{
 		ObjectMeta: meta.ObjectMeta{Namespace: "forklift", Name: "vcenter-toehold"},
-		Spec: api.ToeholdTemplateSpec{
+		Spec: api.CopyApplianceTemplateSpec{
 			Datastore:       "the-old-datastore",
 			TransferNetwork: &core.ObjectReference{Name: "migration-net", Namespace: "openshift-mtv"},
 			NodeSelector:    map[string]string{"kubernetes.io/arch": "amd64"},
@@ -50,14 +50,14 @@ func testToeholdSync(t *testing.T, provider *api.Provider, objs ...client.Object
 	cl := fake.NewClientBuilder().
 		WithScheme(testCheckScheme(t)).
 		WithObjects(objs...).
-		WithStatusSubresource(&api.Provider{}, &api.CopyAppliance{}, &api.ToeholdTemplate{}).
+		WithStatusSubresource(&api.Provider{}, &api.CopyAppliance{}, &api.CopyApplianceTemplate{}).
 		Build()
 	return newToeholdSync(cl, provider)
 }
 
-func getTemplate(t *testing.T, s *toeholdSync) *api.ToeholdTemplate {
+func getTemplate(t *testing.T, s *toeholdSync) *api.CopyApplianceTemplate {
 	t.Helper()
-	found := &api.ToeholdTemplate{}
+	found := &api.CopyApplianceTemplate{}
 	key := client.ObjectKey{Namespace: "forklift", Name: "vcenter-toehold"}
 	if err := s.client.Get(context.TODO(), key, found); err != nil {
 		t.Fatalf("get template: %v", err)
@@ -117,7 +117,7 @@ func TestToeholdSyncDoesNotCreate(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	list := &api.ToeholdTemplateList{}
+	list := &api.CopyApplianceTemplateList{}
 	if err := s.client.List(context.TODO(), list); err != nil {
 		t.Fatalf("list templates: %v", err)
 	}
