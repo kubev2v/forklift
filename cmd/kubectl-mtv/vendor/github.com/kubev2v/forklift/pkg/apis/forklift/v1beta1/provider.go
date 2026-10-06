@@ -86,6 +86,13 @@ const (
 	ESXiCloneMethodSSH = "ssh"
 )
 
+// Hyper-V management type setting key and values.
+const (
+	ManagementType   = "managementType"
+	HyperVStandalone = "standalone"
+	HyperVCluster    = "cluster"
+)
+
 const OvaProviderFinalizer = "forklift/ova-provider"
 const HyperVProviderFinalizer = "forklift/hyperv-provider"
 
@@ -199,4 +206,9 @@ func (p *Provider) UseVddkAioOptimization() bool {
 		return false
 	}
 	return parseBool
+}
+
+// Whether this Hyper-V provider is configured for Failover Cluster mode.
+func (p *Provider) IsHyperVCluster() bool {
+	return p.Type() == HyperV && p.Spec.Settings[ManagementType] == HyperVCluster
 }

@@ -37,21 +37,6 @@ const (
 	Unknown  NASServerOperationalStatusEnum = "Unknown"
 )
 
-// NASHealthStateTypeEnum NAS health state
-type NASHealthStateTypeEnum string
-
-const (
-	None     NASHealthStateTypeEnum = "None"
-	Info     NASHealthStateTypeEnum = "Info"
-	Major    NASHealthStateTypeEnum = "Major"
-	Minor    NASHealthStateTypeEnum = "Minor"
-	Critical NASHealthStateTypeEnum = "Critical"
-)
-
-type HealthDetails struct {
-	State NASHealthStateTypeEnum `json:"state,omitempty"`
-}
-
 type FileSystemTypeEnum string
 
 const (
@@ -78,6 +63,7 @@ type FsCreate struct {
 	FolderRenamePolicy         string      `json:"folder_rename_policy,omitempty"`
 	IsAsyncMTimeEnabled        bool        `json:"is_async_MTime_enabled,omitempty"`
 	ProtectionPolicyID         string      `json:"protection_policy_id,omitempty"`
+	PerformancePolicyID        string      `json:"performance_policy_id,omitempty"`
 	FileEventsPublishingMode   string      `json:"file_events_publishing_mode,omitempty"`
 	HostIOSize                 string      `json:"host_io_size,omitempty"`
 	FlrCreate                  interface{} `json:"flr_attributes,omitempty"`
@@ -138,9 +124,17 @@ type FSModify struct {
 	IsSmbNoNotifyEnabled       *bool         `json:"is_smb_no_notify_enabled,omitempty"`
 	IsAsyncMtimeEnabled        *bool         `json:"is_async_MTime_enabled,omitempty"`
 	ProtectionPolicyID         string        `json:"protection_policy_id"` // empty to unassign
+	PerformancePolicyID        string        `json:"performance_policy_id,omitempty"`
 	FileEventsPublishingMode   string        `json:"file_events_publishing_mode,omitempty"`
 	FlrCreate                  FlrAttributes `json:"flr_attributes,omitempty"`
 	ExpirationTimestamp        string        `json:"expiration_timestamp,omitempty"`
+}
+
+// ModifyNAS params for modifying 'modify nas' request
+type NASModify struct {
+	Description        string `json:"description,omitempty"`
+	Name               string `json:"name,omitempty"`
+	ProtectionPolicyID string `json:"protection_policy_id,omitempty"`
 }
 
 // NASCreate params for creating 'create nas' request
@@ -177,6 +171,14 @@ func (fc *FsClone) MetaData() http.Header {
 	return fc.metadata
 }
 
+type Job struct {
+	ID           string `json:"id,omitempty"`
+	Action       string `json:"resource_action,omitempty"`
+	Type         string `json:"resource_type,omitempty"`
+	ResourceName string `json:"resource_name,omitempty"`
+	State        string `json:"state,omitempty"`
+}
+
 // Details about the FileSystem
 type FileSystem struct {
 	// File system id
@@ -207,6 +209,8 @@ type FileSystem struct {
 	IsAsyncMTimeEnabled bool `json:"is_async_MTime_enabled,omitempty"`
 	// Unique identifier of the protection policy
 	ProtectionPolicyID string `json:"protection_policy_id,omitempty"`
+	// Unique identifier of the performance policy
+	PerformancePolicyID string `json:"performance_policy_id,omitempty"`
 	// State of the event notification services for all file systems
 	FileEventsPublishingMode string `json:"file_events_publishing_mode,omitempty"`
 	// Typical size of writes
@@ -253,6 +257,8 @@ type FileSystem struct {
 type NFSServerInstance struct {
 	// Unique identifier for NFS server
 	ID string `json:"id"`
+	// IsNFSv3Enabled is set to true if nfsv3 is enabled on NAS server
+	IsNFSv3Enabled bool `json:"is_nfsv3_enabled,omitempty"`
 	// IsNFSv4Enabled is set to true if nfsv4 is enabled on NAS server
 	IsNFSv4Enabled bool `json:"is_nfsv4_enabled,omitempty"`
 }
@@ -277,8 +283,6 @@ type NAS struct {
 	NfsServers []NFSServerInstance `json:"nfs_servers"`
 	// FileSystems define file system instance that are present on the NAS server
 	FileSystems []FileSystem `json:"file_systems"`
-	// HealthDetails represent health details of the NAS server
-	HealthDetails HealthDetails `json:"health_details,omitempty"`
 	// PreferredNodeID represents the preferred node ID for the NAS server.
 	PreferredNodeID string `json:"preferred_node_id,omitempty"`
 	// DefaultUnixUser represents the default Unix user of the NAS server.
@@ -319,14 +323,19 @@ type NAS struct {
 
 // Fields returns fields which must be requested to fill struct
 func (n *NAS) Fields() []string {
-	return []string{"id", "description", "name", "current_node_id", "operational_status", "current_preferred_IPv4_interface_id", "current_preferred_IPv6_interface_id", "nfs_servers", "file_systems", "health_details", "preferred_node_id", "default_unix_user", "default_windows_user", "current_unix_directory_service", "is_username_translation_enabled", "is_auto_user_mapping_enabled", "production_IPv4_interface_id", "production_IPv6_interface_id", "backup_IPv4_interface_id", "backup_IPv6_interface_id", "protection_policy_id", "file_events_publishing_mode", "is_replication_destination", "is_production_mode_enabled", "is_dr_test", "operational_status_l10n", "current_unix_directory_service_l10n", "file_events_publishing_mode_l10n"}
+	return []string{"id", "description", "name", "current_node_id", "operational_status", "current_preferred_IPv4_interface_id", "current_preferred_IPv6_interface_id", "nfs_servers", "file_systems", "preferred_node_id", "default_unix_user", "default_windows_user", "current_unix_directory_service", "is_username_translation_enabled", "is_auto_user_mapping_enabled", "production_IPv4_interface_id", "production_IPv6_interface_id", "backup_IPv4_interface_id", "backup_IPv6_interface_id", "protection_policy_id", "file_events_publishing_mode", "is_replication_destination", "is_production_mode_enabled", "is_dr_test", "operational_status_l10n", "current_unix_directory_service_l10n", "file_events_publishing_mode_l10n"}
 }
 
 // Fields returns fields which must be requested to fill struct
 func (n *FileSystem) Fields() []string {
-	return []string{"description", "id", "name", "nas_server_id", "filesystem_type", "size_total", "size_used", "parent_id", "expiration_timestamp", "access_type", "config_type", "access_policy", "locking_policy", "folder_rename_policy", "is_async_MTime_enabled", "protection_policy_id", "file_events_publishing_mode", "host_io_size", "flr_attributes", "is_smb_sync_writes_enabled", "is_smb_no_notify_enabled", "is_smb_op_locks_enabled", "is_smb_notify_on_access_enabled", "is_smb_notify_on_write_enabled", "smb_notify_on_change_dir_depth", "is_quota_enabled", "grace_period", "default_hard_limit", "default_soft_limit", "creation_timestamp", "last_refresh_timestamp", "last_writable_timestamp", "is_modified", "creator_type"}
+	return []string{"description", "id", "name", "nas_server_id", "filesystem_type", "size_total", "size_used", "parent_id", "expiration_timestamp", "access_type", "config_type", "access_policy", "locking_policy", "folder_rename_policy", "is_async_MTime_enabled", "protection_policy_id", "performance_policy_id", "file_events_publishing_mode", "host_io_size", "flr_attributes", "is_smb_sync_writes_enabled", "is_smb_no_notify_enabled", "is_smb_op_locks_enabled", "is_smb_notify_on_access_enabled", "is_smb_notify_on_write_enabled", "smb_notify_on_change_dir_depth", "is_quota_enabled", "grace_period", "default_hard_limit", "default_soft_limit", "creation_timestamp", "last_refresh_timestamp", "last_writable_timestamp", "is_modified", "creator_type"}
 }
 
 func (n *NFSServerInstance) Fields() []string {
-	return []string{"id", "is_nfsv4_enabled"}
+	return []string{"id", "is_nfsv3_enabled", "is_nfsv4_enabled"}
+}
+
+// Fields returns fields which must be requested to fill struct
+func (j *Job) Fields() []string {
+	return []string{"id", "resource_action", "resource_type", "resource_name", "state"}
 }

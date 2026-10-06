@@ -58,10 +58,10 @@ type VolumeMetricsParam struct {
 	SystemID                       string   `json:"systemId"`
 	StartDate                      int64    `json:"startDate"`
 	EndDate                        int64    `json:"endDate"`
-	VolumeStartRange               string   `json:"volumeStartRange"`
-	VolumeEndRange                 string   `json:"volumeEndRange"`
+	VolumeStartRange               string   `json:"volumeStartRange,omitempty"`
+	VolumeEndRange                 string   `json:"volumeEndRange,omitempty"`
 	DataFormat                     string   `json:"dataFormat"`
-	CommaSeparatedStorageGroupList string   `json:"commaSeparatedStorageGroupList"`
+	CommaSeparatedStorageGroupList string   `json:"commaSeparatedStorageGroupList,omitempty"`
 	Metrics                        []string `json:"metrics"`
 }
 
@@ -127,6 +127,22 @@ type ArrayInfo struct {
 	SymmetrixID        string `json:"symmetrixId"`
 	FirstAvailableDate int64  `json:"firstAvailableDate"`
 	LastAvailableDate  int64  `json:"lastAvailableDate"`
+}
+
+// StorageGroupPerfCategoryResult represents the response from the
+// GET /performance-categories/StorageGroup bulk endpoint.
+type StorageGroupPerfCategoryResult struct {
+	ID              string                       `json:"id"`
+	ResourceType    string                       `json:"resource_type"`
+	System          string                       `json:"system"`
+	MetricInstances []StorageGroupMetricInstance `json:"metric_instances"`
+}
+
+// StorageGroupMetricInstance represents a single storage group's metrics
+// returned by the bulk performance-categories endpoint.
+type StorageGroupMetricInstance struct {
+	ID      string               `json:"id"`
+	Metrics []StorageGroupMetric `json:"metrics"`
 }
 
 // FileSystemMetricsParam contains req param for filesystem metric

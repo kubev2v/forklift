@@ -62,7 +62,7 @@ func newEC2InventoryCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalCo
 	cmd.Flags().StringVarP(&provider, "provider", "p", "", "Provider name")
 	_ = cmd.MarkFlagRequired("provider")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
+	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 
@@ -121,5 +121,16 @@ func NewInventoryEC2NetworkCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
 		long:       `Get EC2 networks (VPCs and Subnets) from an AWS provider's inventory.`,
 		logMessage: "Getting EC2 networks from provider",
 		listFunc:   inventory.ListEC2NetworksWithInsecure,
+	})
+}
+
+// NewInventoryEC2SnapshotCmd creates the get inventory snapshot command for EC2 EBS snapshots
+func NewInventoryEC2SnapshotCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
+	return newEC2InventoryCmd(kubeConfigFlags, globalConfig, ec2CommandConfig{
+		use:        "ec2-snapshot",
+		short:      "Get EC2 EBS snapshots from a provider",
+		long:       `Get EC2 EBS snapshots from an AWS provider's inventory.`,
+		logMessage: "Getting EC2 EBS snapshots from provider",
+		listFunc:   inventory.ListEC2SnapshotsWithInsecure,
 	})
 }

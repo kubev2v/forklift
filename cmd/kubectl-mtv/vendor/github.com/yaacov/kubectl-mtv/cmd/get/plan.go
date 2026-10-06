@@ -154,7 +154,7 @@ Use --query without --vms-table to filter the plans list using TSL syntax.`,
 	cmd.Flags().BoolVar(&vms, "vms", false, "Get VMs status in the migration plan (requires plan NAME)")
 	cmd.Flags().BoolVar(&disk, "disk", false, "Get disk transfer status in the migration plan (requires plan NAME)")
 	cmd.Flags().BoolVar(&vmsTable, "vms-table", false, "Show all VMs across plans in a flat table with source/target inventory details")
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax")
+	cmd.Flags().StringVarP(&query, "query", "q", "", flags.QueryHelp)
 	help.MarkMCPHidden(cmd, "watch", "vms-table")
 
 	// Add completion for name and output format flags

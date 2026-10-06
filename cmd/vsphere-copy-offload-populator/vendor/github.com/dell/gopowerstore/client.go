@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2020-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2020-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/dell/gopowerstore/api"
 )
@@ -47,6 +48,7 @@ type Client interface {
 	GetVolume(ctx context.Context, id string) (Volume, error)
 	GetVolumeByName(ctx context.Context, name string) (Volume, error)
 	GetVolumes(ctx context.Context) ([]Volume, error)
+	GetVolumesWithFilter(ctx context.Context, filters map[string]string) ([]Volume, error)
 	CreateVolume(ctx context.Context, createParams *VolumeCreate) (CreateResponse, error)
 	DeleteVolume(ctx context.Context, deleteParams *VolumeDelete, id string) (EmptyResponse, error)
 	GetSnapshotRules(ctx context.Context) ([]SnapshotRule, error)
@@ -69,6 +71,7 @@ type Client interface {
 	GetHostVolumeMappings(ctx context.Context) ([]HostVolumeMapping, error)
 	GetHostVolumeMapping(ctx context.Context, id string) (HostVolumeMapping, error)
 	GetHostVolumeMappingByVolumeID(ctx context.Context, volumeID string) ([]HostVolumeMapping, error)
+	GetHostVolumeMappingByHostID(ctx context.Context, hostID string) ([]HostVolumeMapping, error)
 	AttachVolumeToHost(ctx context.Context, hostID string, attachParams *HostVolumeAttach) (EmptyResponse, error)
 	AttachVolumeToHostGroup(ctx context.Context, hostGroupID string, attachParams *HostVolumeAttach) (EmptyResponse, error)
 	DetachVolumeFromHost(ctx context.Context, hostID string, detachParams *HostVolumeDetach) (EmptyResponse, error)
@@ -78,6 +81,10 @@ type Client interface {
 	GetCapacity(ctx context.Context) (int64, error)
 	GetFCPorts(ctx context.Context) (resp []FcPort, err error)
 	GetFCPort(ctx context.Context, id string) (resp FcPort, err error)
+	GetEthPorts(ctx context.Context) ([]EthPort, error)
+	GetEthPort(ctx context.Context, id string) (EthPort, error)
+	GetEthPortByName(ctx context.Context, name string) (EthPort, error)
+	ModifyEthPort(ctx context.Context, modifyParams *EthPortModify, id string) (EmptyResponse, error)
 	GetSoftwareInstalled(ctx context.Context) (resp []SoftwareInstalled, err error)
 	GetSoftwareMajorMinorVersion(ctx context.Context) (majorVersion float32, err error)
 	SetLogger(logger Logger)
@@ -93,6 +100,9 @@ type Client interface {
 	GetNAS(ctx context.Context, id string) (NAS, error)
 	GetNASByName(ctx context.Context, name string) (NAS, error)
 	GetNfsServer(ctx context.Context, id string) (NFSServerInstance, error)
+	ModifyNASByName(ctx context.Context, modifyParams *NASModify, name string) (err error)
+	ListFS(ctx context.Context) ([]FileSystem, error)
+	GetInProgressJobsByFsName(ctx context.Context, name string) ([]Job, error)
 	GetFSByName(ctx context.Context, name string) (FileSystem, error)
 	GetFS(ctx context.Context, id string) (FileSystem, error)
 	GetFileInterface(ctx context.Context, id string) (FileInterface, error)
@@ -150,6 +160,7 @@ type Client interface {
 	PerformanceMetricsByNode(ctx context.Context, entityID string, interval MetricsIntervalEnum) ([]PerformanceMetricsByNodeResponse, error)
 	PerformanceMetricsByVolume(ctx context.Context, entityID string, interval MetricsIntervalEnum) ([]PerformanceMetricsByVolumeResponse, error)
 	VolumeMirrorTransferRate(ctx context.Context, entityID string) ([]VolumeMirrorTransferRateResponse, error)
+	FileSystemMirrorTransferRate(ctx context.Context, entityID string) ([]VolumeMirrorTransferRateResponse, error)
 	PerformanceMetricsByCluster(ctx context.Context, entityID string, interval MetricsIntervalEnum) ([]PerformanceMetricsByClusterResponse, error)
 	PerformanceMetricsByVM(ctx context.Context, entityID string, interval MetricsIntervalEnum) ([]PerformanceMetricsByVMResponse, error)
 	PerformanceMetricsByVg(ctx context.Context, entityID string, interval MetricsIntervalEnum) ([]PerformanceMetricsByVgResponse, error)
@@ -182,6 +193,7 @@ type Client interface {
 	PerformanceMetricsNfsv3ByNode(ctx context.Context, entityID string, interval MetricsIntervalEnum) ([]PerformanceMetricsByNfsv3Response, error)
 	PerformanceMetricsNfsv4ByNode(ctx context.Context, entityID string, interval MetricsIntervalEnum) ([]PerformanceMetricsByNfsv4Response, error)
 	ExecuteActionOnReplicationSession(ctx context.Context, id string, actionType ActionType, params *FailoverParams) (resp EmptyResponse, err error)
+	ModifyReplicationSession(ctx context.Context, id string, params *ReplicationSessionParams) (resp EmptyResponse, err error)
 	GetReplicationSessionByID(ctx context.Context, id string) (resp ReplicationSession, err error)
 	CreateStorageContainer(ctx context.Context, createParams *StorageContainer) (CreateResponse, error)
 	DeleteStorageContainer(ctx context.Context, id string) (EmptyResponse, error)
@@ -208,6 +220,8 @@ type Client interface {
 	GetSMBShares(ctx context.Context, args map[string]string) (resp []SMBShare, err error)
 	SetSMBShareACL(ctx context.Context, id string, acl *ModifySMBShareACL) (resp EmptyResponse, err error)
 	GetSMBShareACL(ctx context.Context, id string) (resp SMBShareACL, err error)
+	AlertsClient
+	EventsClient
 }
 
 // ClientIMPL provides basic API client implementation
@@ -283,7 +297,7 @@ func NewClient() (Client, error) {
 	httpTimeout, err := strconv.ParseInt(os.Getenv(HTTPTimeoutEnv), 10, 64)
 
 	if err == nil {
-		options.SetDefaultTimeout(httpTimeout)
+		options.SetDefaultTimeout(time.Duration(httpTimeout) * time.Second)
 	}
 	return NewClientWithArgs(
 		os.Getenv(APIURLEnv),
@@ -298,10 +312,16 @@ func NewClientWithArgs(
 	username, password string, options *ClientOptions,
 ) (Client, error) {
 	client, err := api.New(apiURL, username, password,
-		options.Insecure(), options.DefaultTimeout(), options.RateLimit(), options.RequestIDKey())
+		options.Insecure(), options.CAFilePath(), options.DefaultTimeout(), options.RateLimit(), options.RequestIDKey())
 	if err != nil {
 		return nil, err
 	}
 
 	return &ClientIMPL{client}, nil
+}
+
+func NewMockClient(options *ClientOptions) Client {
+	client := api.MockClient(options.DefaultTimeout(), options.RateLimit(), options.RequestIDKey())
+
+	return &ClientIMPL{client}
 }

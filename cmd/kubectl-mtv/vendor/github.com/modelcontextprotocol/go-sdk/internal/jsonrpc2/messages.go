@@ -11,8 +11,6 @@ import (
 	"fmt"
 
 	internaljson "github.com/modelcontextprotocol/go-sdk/internal/json"
-
-	"github.com/modelcontextprotocol/go-sdk/internal/mcpgodebug"
 )
 
 // ID is a Request identifier, which is defined by the spec to be a string, integer, or null.
@@ -173,8 +171,20 @@ func EncodeIndent(msg Message, prefix, indent string) ([]byte, error) {
 	return bytes.TrimRight(buf.Bytes(), "\n"), nil
 }
 
+// wireDecode is the decode form of [wireCombined]. Method is a [json.RawMessage]
+// so we can tell whether the "method" key was present on the wire, including
+// when its value is the empty string (see go-sdk#976).
+type wireDecode struct {
+	VersionTag string          `json:"jsonrpc"`
+	ID         any             `json:"id,omitempty"`
+	Method     json.RawMessage `json:"method"`
+	Params     json.RawMessage `json:"params,omitempty"`
+	Result     json.RawMessage `json:"result,omitempty"`
+	Error      *WireError      `json:"error,omitempty"`
+}
+
 func DecodeMessage(data []byte) (Message, error) {
-	msg := wireCombined{}
+	msg := wireDecode{}
 	if err := internaljson.Unmarshal(data, &msg); err != nil {
 		return nil, fmt.Errorf("unmarshaling jsonrpc message: %w", err)
 	}
@@ -185,15 +195,19 @@ func DecodeMessage(data []byte) (Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	if msg.Method != "" {
-		// has a method, must be a call
+	if len(msg.Method) > 0 {
+		// The "method" key was present. Decode its value (including "").
+		var method string
+		if err := internaljson.Unmarshal(msg.Method, &method); err != nil {
+			return nil, fmt.Errorf("unmarshaling jsonrpc message: %w", err)
+		}
 		return &Request{
-			Method: msg.Method,
+			Method: method,
 			ID:     id,
 			Params: msg.Params,
 		}, nil
 	}
-	// no method, should be a response
+	// no method key, should be a response
 	if !id.IsValid() {
 		return nil, ErrInvalidRequest
 	}
@@ -219,18 +233,8 @@ func marshalToRaw(obj any) (json.RawMessage, error) {
 	return json.RawMessage(data), nil
 }
 
-// jsonescaping is a compatibility parameter that allows to restore
-// JSON escaping in the JSON marshaling, which stopped being the default
-// in the 1.4.0 version of the SDK. See the documentation for the
-// mcpgodebug package for instructions how to enable it.
-// The option will be removed in the 1.6.0 version of the SDK.
-var jsonescaping = mcpgodebug.Value("jsonescaping")
-
 // jsonMarshal marshals obj to JSON like json.Marshal but without HTML escaping.
 func jsonMarshal(obj any) ([]byte, error) {
-	if jsonescaping == "1" {
-		return json.Marshal(obj)
-	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
