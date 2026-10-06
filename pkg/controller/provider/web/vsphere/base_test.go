@@ -234,6 +234,55 @@ func TestHostPathNestedDatacenterTwoLevels(t *testing.T) {
 	g.Expect(pb.Path(&host)).To(Equal("/myfolder/myfolder2/mydc/mycluster/myhost"))
 }
 
+func TestFolderDatacenter(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	pb := PathBuilder{
+		cache: make(map[model.Ref]*model.Base),
+	}
+
+	root := model.Folder{
+		Base: model.Base{
+			Name: "Datacenters",
+			ID:   "1",
+		},
+	}
+	rootRef := model.Ref{Kind: model.FolderKind, ID: "1"}
+	pb.cache[rootRef] = &root.Base
+
+	dc := model.Datacenter{
+		Base: model.Base{
+			Name:   "mydc",
+			Parent: rootRef,
+			ID:     "2",
+		},
+	}
+	dcRef := model.Ref{Kind: model.DatacenterKind, ID: "2"}
+	pb.cache[dcRef] = &dc.Base
+
+	vmFolder := model.Folder{
+		Base: model.Base{
+			Name:   "vm",
+			Parent: dcRef,
+			ID:     "3",
+		},
+		Datacenter: "2",
+	}
+	vmFolderRef := model.Ref{Kind: model.FolderKind, ID: "3"}
+	pb.cache[vmFolderRef] = &vmFolder.Base
+
+	nested := model.Folder{
+		Base: model.Base{
+			Name:   "apps",
+			Parent: vmFolderRef,
+			ID:     "4",
+		},
+	}
+
+	g.Expect(pb.Datacenter(&vmFolder)).To(Equal("2"))
+	g.Expect(pb.Datacenter(&nested)).To(Equal("2"))
+}
+
 func TestVMWithCopiesToolsFields(t *testing.T) {
 	m := &model.VM{
 		ToolsStatus:        "toolsOk",

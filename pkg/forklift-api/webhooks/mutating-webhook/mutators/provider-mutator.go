@@ -87,6 +87,8 @@ func (mutator *ProviderMutator) setFinalizers() bool {
 		changed = k8sutil.AddFinalizer(&(mutator.provider), api.OvaProviderFinalizer)
 	case api.HyperV:
 		changed = k8sutil.AddFinalizer(&(mutator.provider), api.HyperVProviderFinalizer)
+	case api.VSphere:
+		changed = k8sutil.AddFinalizer(&(mutator.provider), api.VSphereProviderFinalizer)
 	}
 	return changed
 }
