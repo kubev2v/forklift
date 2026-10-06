@@ -50,6 +50,31 @@ func TestGet(t *testing.T) {
 	g.Expect(current.Name).To(gomega.Equal("TWO"))
 }
 
+func TestNext_DuplicateNamesReturnsFirstMatch(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	itinerary := Itinerary{
+		Name: "Duplicate",
+		Pipeline: Pipeline{
+			Step{Name: "WAIT"},
+			Step{Name: "COPY"},
+			Step{Name: "REFRESH"},
+			Step{Name: "WAIT"},
+			Step{Name: "DONE"},
+		},
+	}
+
+	next, done, err := itinerary.Next("WAIT")
+	g.Expect(err).ToNot(gomega.HaveOccurred())
+	g.Expect(done).To(gomega.BeFalse())
+	g.Expect(next.Name).To(gomega.Equal("COPY"))
+
+	next, done, err = itinerary.Next("REFRESH")
+	g.Expect(err).ToNot(gomega.HaveOccurred())
+	g.Expect(done).To(gomega.BeFalse())
+	g.Expect(next.Name).To(gomega.Equal("WAIT"))
+}
+
 func TestNext(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 

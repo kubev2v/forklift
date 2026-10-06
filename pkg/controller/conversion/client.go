@@ -7,6 +7,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	libvsphere "github.com/kubev2v/forklift/pkg/lib/vsphere"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
@@ -224,7 +225,7 @@ func (r *Client) Close() {
 // newSnapshotClientFromSecret creates a govmomi session from the secret and
 // returns a SnapshotClient. The caller must defer snapClient.Close().
 func newSnapshotClientFromSecret(ctx context.Context, log logging.LevelLogger, secret *core.Secret, vmRef ref.Ref) (*Client, error) {
-	gClient, err := GovmomiClientFromSecret(ctx, secret)
+	gClient, err := libvsphere.ConnectFromSecret(ctx, secret)
 	if err != nil {
 		return nil, err
 	}

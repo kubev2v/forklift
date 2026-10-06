@@ -40,6 +40,7 @@ var (
 	RunInspection                     libitr.Flag = 0x80
 	WindowsWaitForGuestReboot         libitr.Flag = 0x100
 	WaitForFinalSnapshotConsolidation libitr.Flag = 0x200
+	CopyAppliance                     libitr.Flag = 0x400
 )
 
 // Steps.
@@ -53,6 +54,8 @@ const (
 	VMCreation                   = "VirtualMachineCreation"
 	PreflightInspection          = "PreflightInspection"
 	WaitForSnapshotConsolidation = "WaitForFinalSnapshotConsolidation"
+	ApplianceDeployment          = "ApplianceDeployment"
+	ApplianceTeardown            = "ApplianceTeardown"
 	Unknown                      = "Unknown"
 )
 

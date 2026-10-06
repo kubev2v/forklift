@@ -24,6 +24,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	basecontroller "github.com/kubev2v/forklift/pkg/controller/base"
+	appliancectrl "github.com/kubev2v/forklift/pkg/controller/copyappliance"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
@@ -35,6 +36,7 @@ import (
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/kubev2v/forklift/pkg/lib/util"
+	"github.com/kubev2v/forklift/pkg/nbd-container/announce"
 	"github.com/kubev2v/forklift/pkg/settings"
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"github.com/kubev2v/forklift/pkg/templateutil"
@@ -321,23 +323,84 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			err = liberr.Wrap(detectErr, "podNetworkHasIPv6")
 			return
 		}
-		if !hasIPv6 {
-			return
-		}
-		if nicKeys, pairsBySource, resolverErr := r.buildNICResolver(vm.NICs); resolverErr == nil {
-			podMacs := planbase.CollectPodNetworkMACs(nicKeys, pairsBySource, vm.NICs, func(nic vsphere.NIC) string {
-				return nic.MAC
-			})
-			if len(podMacs) > 0 {
-				env = append(env, core.EnvVar{
-					Name:  "V2V_podNetworkIPv6MACs",
-					Value: strings.Join(podMacs, ","),
+		if hasIPv6 {
+			if nicKeys, pairsBySource, resolverErr := r.buildNICResolver(vm.NICs); resolverErr == nil {
+				podMacs := planbase.CollectPodNetworkMACs(nicKeys, pairsBySource, vm.NICs, func(nic vsphere.NIC) string {
+					return nic.MAC
 				})
+				if len(podMacs) > 0 {
+					env = append(env, core.EnvVar{
+						Name:  "V2V_podNetworkIPv6MACs",
+						Value: strings.Join(podMacs, ","),
+					})
+				}
 			}
 		}
 	}
 
+	nbdURIs, nbdErr := r.nbdDiskURIsForVM(vmRef, vm)
+	if nbdErr != nil {
+		err = nbdErr
+		return
+	}
+	if len(nbdURIs) > 0 {
+		env = append(env, core.EnvVar{
+			Name:  "V2V_nbdDisks",
+			Value: strings.Join(nbdURIs, ","),
+		})
+	}
 	return
+}
+
+// nbdDiskURIsForVM returns ordered nbd:// URIs for virt-v2v when a copy appliance
+// is exporting the VM's disks. Empty when CDI already transferred (!useV2vForTransfer),
+// when the plan uses VDDK instead of a copy appliance, or when there is no appliance —
+// conversion must not require NBD after release.
+func (r *Builder) nbdDiskURIsForVM(vmRef ref.Ref, vm *model.VM) ([]string, error) {
+	if r.Migration == nil || r.Migration.UID == "" {
+		return nil, nil
+	}
+	if !settings.Settings.EnabledForPlan(r.Plan) {
+		return nil, nil
+	}
+	useV2vForTransfer, err := r.Plan.ShouldUseV2vForTransfer(vmRef)
+	if err != nil {
+		return nil, err
+	}
+	if !useV2vForTransfer {
+		return nil, nil
+	}
+	connections, err := r.nbdConnectionsForVM(vmRef)
+	if err != nil {
+		notFound := k8serr.IsNotFound(err) || k8serr.IsNotFound(liberr.Unwrap(err))
+		if notFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	// Shared disks are already dropped by RemoveSharedDisks when they should
+	// not be migrated; do not skip Shared here or migrateSharedDisks plans
+	// produce empty NBD input.
+	var uris []string
+	for _, disk := range vm.SortedDisksAsVmware() {
+		if disk.RDM || disk.File == "" {
+			continue
+		}
+		uri, ok := connections[disk.File]
+		if !ok {
+			uri, ok = connections[baseVolume(disk.File, r.Plan.IsWarm())]
+		}
+		if !ok {
+			return nil, liberr.New("no NBD export for disk", "backing", disk.File)
+		}
+		uris = append(uris, uri)
+	}
+	if len(uris) == 0 {
+		return nil, liberr.New(
+			"copy appliance has exports but no migratable disks mapped for NBD input",
+			"vm", vmRef.String())
+	}
+	return uris, nil
 }
 
 // isNonGlobalIPv6 returns true for link-local (fe80::/10) and ULA (fc00::/7) IPv6 addresses.
@@ -600,6 +663,25 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	if cacert, ok := util.GetCACert(in); ok {
 		object.Data["cacert"] = cacert
 	}
+	if r.Source.Provider.ToeholdNbdSsl() {
+		name := r.Source.Provider.Status.ToeholdSSHPrivateSecret
+		if name == "" {
+			return fmt.Errorf("provider has no toehold SSH private secret for NBD TLS")
+		}
+		toeholdSecret := &core.Secret{}
+		if err = r.Get(context.Background(), client.ObjectKey{
+			Name: name, Namespace: r.Source.Provider.Namespace,
+		}, toeholdSecret); err != nil {
+			return fmt.Errorf("failed to get toehold secret %s for NBD TLS: %w", name, err)
+		}
+		for _, key := range []string{announce.CACert, announce.ClientCert, announce.ClientKey} {
+			data, found := toeholdSecret.Data[key]
+			if !found || len(data) == 0 {
+				return fmt.Errorf("toehold secret %s missing %s for NBD TLS", name, key)
+			}
+			object.Data[key] = data
+		}
+	}
 	return
 }
 
@@ -719,6 +801,16 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	// Important: need to match order in mapDisks method
 	disks := vm.SortedDisksAsVmware()
 
+	var nbdConnections map[string]string
+	if settings.Settings.EnabledForPlan(r.Plan) {
+		// Copy-appliance itineraries create the appliance before DataVolumes so
+		// NBD URIs are present at DV creation (no direct-VDDK interim window).
+		nbdConnections, err = r.nbdConnectionsForVM(vmRef)
+		if err != nil {
+			return
+		}
+	}
+
 	for diskIndex, disk := range disks {
 		mapped, found := dsMap[disk.Datastore.ID]
 		if !found {
@@ -815,10 +907,35 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		if !useV2vForTransfer && vddkConfigMap != nil {
 			dv.Annotations[planbase.AnnVddkExtraArgs] = vddkConfigMap.Name
 		}
+		if nbdConnections != nil && !useV2vForTransfer {
+			backing := baseVolume(disk.File, r.Plan.IsWarm())
+			uri, present := nbdConnections[backing]
+			if !present {
+				err = liberr.New("no NBD export for disk", "backing", backing)
+				return
+			}
+			dv.Annotations[planbase.AnnVddkNbdConnection] = uri
+		}
 		dvs = append(dvs, *dv)
 	}
 
 	return
+}
+
+func (r *Builder) nbdConnectionsForVM(vmRef ref.Ref) (map[string]string, error) {
+	provider := r.Source.Provider
+	ensure := appliancectrl.Ensurer{Client: r.Client, Log: r.Log}
+	appliance, err := ensure.Find(context.TODO(),
+		provider.Namespace,
+		ensure.Labeler.ApplianceLabels(provider, r.Migration.UID, vmRef.ID),
+		true)
+	if err != nil {
+		return nil, err
+	}
+	if appliance == nil {
+		return nil, liberr.New("copy appliance is gone", "vm", vmRef.ID)
+	}
+	return appliancectrl.ExportNbdConnections(appliance, provider.ToeholdNbdSsl())
 }
 
 func (r *Builder) applyHostsConfig(vmRef ref.Ref, url, thumbprint string) (string, string, error) {

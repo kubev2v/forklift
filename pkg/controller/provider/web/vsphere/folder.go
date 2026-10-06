@@ -64,6 +64,9 @@ func (h FolderHandler) List(ctx *gin.Context) {
 		r.With(&m)
 		r.Link(h.Provider)
 		r.Path = pb.Path(&m)
+		if r.Datacenter == "" {
+			r.Datacenter = pb.Datacenter(&m)
+		}
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -102,6 +105,9 @@ func (h FolderHandler) Get(ctx *gin.Context) {
 	r.With(m)
 	r.Link(h.Provider)
 	r.Path = pb.Path(m)
+	if r.Datacenter == "" {
+		r.Datacenter = pb.Datacenter(m)
+	}
 	content := r.Content(model.MaxDetail)
 
 	ctx.JSON(http.StatusOK, content)
@@ -121,6 +127,9 @@ func (h *FolderHandler) watch(ctx *gin.Context) {
 			folder.With(m)
 			folder.Link(h.Provider)
 			folder.Path = pb.Path(m)
+			if folder.Datacenter == "" {
+				folder.Datacenter = pb.Datacenter(m)
+			}
 			r = folder
 			return
 		})
