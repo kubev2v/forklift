@@ -2,11 +2,24 @@ package base
 
 import (
 	"net"
+	"path"
 	"sort"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/settings"
 )
+
+// QualifiedMultusNetworkName returns the Multus NetworkName for a NAD. It is
+// qualified as "namespace/name" when the global setting forces qualified names
+// or the NAD and target VM are in different namespaces, and the bare name when
+// they share a namespace.
+func QualifiedMultusNetworkName(nadNamespace, nadName, targetVMNamespace string) string {
+	if settings.Settings.MultusNetworkNameAlwaysQualified || nadNamespace != targetVMNamespace {
+		return path.Join(nadNamespace, nadName)
+	}
+	return nadName
+}
 
 // SortedIPv4First returns a copy of items with IPv4 addresses before IPv6.
 // ipOf extracts the IP string from each element.

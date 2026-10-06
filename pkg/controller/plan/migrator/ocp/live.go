@@ -11,6 +11,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/ensurer"
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
@@ -19,7 +20,6 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
-	"github.com/kubev2v/forklift/pkg/settings"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -1338,23 +1338,6 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus) (object *cnv.VirtualMachi
 	return
 }
 
-// shouldUseQualifiedNetworkName determines whether to use namespace/nad-name format
-// for Multus networks based on ForkliftController settings and namespace comparison.
-func (r *Builder) shouldUseQualifiedNetworkName(nadNamespace, targetVMNamespace string) bool {
-	// If global setting forces qualified names, always use qualified format
-	if settings.Settings.MultusNetworkNameAlwaysQualified {
-		return true
-	}
-
-	// If NAD and target VM are in different namespaces, use qualified format for safety
-	if nadNamespace != targetVMNamespace {
-		return true
-	}
-
-	// NAD and VM are in same namespace, use unqualified format
-	return false
-}
-
 func (r *Builder) mapNetworks(srcNS string, target *cnv.VirtualMachine) {
 	networkMap := make(map[string]api.DestinationNetwork)
 	for _, network := range r.Map.Network.Spec.Map {
@@ -1369,11 +1352,7 @@ func (r *Builder) mapNetworks(srcNS string, target *cnv.VirtualMachine) {
 				sourceNetwork = path.Join(srcNS, sourceNetwork)
 			}
 			destination := networkMap[sourceNetwork]
-			if r.shouldUseQualifiedNetworkName(destination.Namespace, r.Plan.Spec.TargetNamespace) {
-				network.Multus.NetworkName = path.Join(destination.Namespace, destination.Name)
-			} else {
-				network.Multus.NetworkName = destination.Name
-			}
+			network.Multus.NetworkName = planbase.QualifiedMultusNetworkName(destination.Namespace, destination.Name, r.Plan.Spec.TargetNamespace)
 		case network.Pod != nil:
 		}
 	}
