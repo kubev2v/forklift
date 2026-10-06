@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/kubev2v/vm-migration-detective/internal/tlsconfig"
 	"github.com/kubev2v/vm-migration-detective/internal/vddk"
 )
 
@@ -22,6 +23,7 @@ func OpenWithVirtV2V(
 	vcenterURL string,
 	username string,
 	password string,
+	tlsConfig *tlsconfig.Config,
 ) (*V2VSession, error) {
 
 	parsedURL, err := url.Parse(vcenterURL)
@@ -31,14 +33,23 @@ func OpenWithVirtV2V(
 
 	vcenterHost := parsedURL.Hostname()
 
+	// Validate TLS config
+	if tlsConfig == nil {
+		return nil, fmt.Errorf("TLS configuration is required")
+	}
+
+	// Build sslVerify parameter from TLS config
+	sslVerify := tlsConfig.ForVirtV2V(tlsConfig.RootCAPath)
+
 	// Build vpx source URL using VMMoref
-	// Format: vpx://user@host/?moref=vm-123&snapshot=snapshot-456&no_verify=1&password=...
+	// Format: vpx://user@host/?moref=vm-123&snapshot=snapshot-456&sslVerify&password=...
 	vpxURL := fmt.Sprintf(
-		"vpx://%s@%s/?moref=%s&snapshot=%s&no_verify=1&password=%s",
+		"vpx://%s@%s/?moref=%s&snapshot=%s&%s&password=%s",
 		username,
 		bracketIPv6(vcenterHost),
 		vmMoref,
 		snapshotMoref,
+		sslVerify,
 		password,
 	)
 

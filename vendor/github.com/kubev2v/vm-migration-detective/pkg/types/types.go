@@ -23,6 +23,26 @@ type Credentials struct {
 	VCenterURL string
 	Username   string
 	Password   string
+
+	// TLS Configuration (at least one required for secure connections in v1.0.0)
+	// If all are empty, connections use deprecated insecure mode with warnings
+
+	// TLSCACert is the path to a PEM-encoded CA certificate bundle
+	// for verifying the vCenter TLS certificate.
+	// If provided, full certificate chain verification is performed.
+	TLSCACert string
+
+	// TLSThumbprint is a SHA-1 thumbprint of the vCenter certificate
+	// in VMware format (colon-separated hex, e.g., "AA:BB:CC:...").
+	// If provided, certificate pinning is used instead of CA verification.
+	// This takes precedence over TLSCACert if both are set.
+	TLSThumbprint string
+
+	// TLSInsecure explicitly allows insecure connections (skip TLS verification).
+	// WARNING: This should only be used for testing/development.
+	// When true, both TLSCACert and TLSThumbprint are ignored.
+	// Default is false (secure mode preferred).
+	TLSInsecure bool
 }
 
 // CacheKey represents a unique identifier for a VM+snapshot pair
