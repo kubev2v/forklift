@@ -1490,9 +1490,13 @@ func (r *Builder) targetPvc(source *model.PersistentVolumeClaim, storage api.Des
 	}
 	if storage.AccessMode != "" {
 		pvc.Spec.AccessModes = []core.PersistentVolumeAccessMode{storage.AccessMode}
+	} else {
+		pvc.Spec.AccessModes = source.Object.Spec.AccessModes
 	}
 	if storage.VolumeMode != "" {
 		pvc.Spec.VolumeMode = &storage.VolumeMode
+	} else {
+		pvc.Spec.VolumeMode = source.Object.Spec.VolumeMode
 	}
 	return
 }

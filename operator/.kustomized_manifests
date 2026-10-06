@@ -496,7 +496,7 @@ spec:
                 type: string
               virt_v2v_image_xfs_fqin:
                 description: Virt-v2v XFS conversion image used by migration pods
-                example: quay.io/kubev2v/forklift-virt-v2v-xfs:latest
+                example: quay.io/kubev2v/forklift-virt-v2v:latest
                 type: string
               virt_v2v_inspector_extra_args:
                 description: Additional arguments for virt-v2v-inspector

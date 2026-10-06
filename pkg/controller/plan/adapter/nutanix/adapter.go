@@ -1,4 +1,6 @@
-// Package nutanix provides the Nutanix AHV plan adapter.
+// Package nutanix provides the Nutanix Prism plan adapter.
+// Nutanix uses the Prism API for inventory; virt-v2v in-place mode
+// with a generated libvirt domain XML for VM conversion.
 package nutanix
 
 import (

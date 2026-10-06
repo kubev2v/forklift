@@ -1,8 +1,10 @@
 package nutanix
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path"
@@ -201,33 +203,28 @@ func vmEntityPtr(uuid, powerState string) *libclient.VM {
 }
 
 // newPowerTestServer serves the connectivity probe plus GET/PUT for a
-// single VM entity, tracking PUT bodies and set_power_state transitions
-// for assertions. PUT ON/OFF updates the entity in place; ACPI_SHUTDOWN
-// leaves the VM running until an OFF transition is posted.
+// single VM entity, tracking PUT bodies and ACPI shutdown requests for
+// assertions. Defaults to Prism Central (200 on prism_central): PowerOff
+// posts .../acpi_shutdown. PUT ON/OFF updates power_state (PowerOn).
 func newPowerTestServer(
 	t *testing.T,
 	entity *libclient.VM,
-) (server *httptest.Server, puts *[]libclient.VMUpdateRequest, transitions *[]string) {
+) (server *httptest.Server, puts *[]libclient.VMUpdateRequest, acpiShutdowns *int) {
 	t.Helper()
 	var putBodies []libclient.VMUpdateRequest
-	var transitionBodies []string
+	var acpiCount int
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list"):
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"entities":[]}`))
-		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/set_power_state"):
-			var body struct {
-				Transition string `json:"transition"`
-			}
-			_ = json.NewDecoder(r.Body).Decode(&body)
-			transitionBodies = append(transitionBodies, body.Transition)
-			if body.Transition == powerStateTransitionOff {
-				entity.Spec.Resources.PowerState = powerStateOff
-				entity.Status.Resources.PowerState = powerStateOff
-			}
+		case r.Method == http.MethodGet && r.URL.Path == prismCentralPath:
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{}`))
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/acpi_shutdown"):
+			acpiCount++
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte(`{"task_uuid":"test-task"}`))
 		case r.Method == http.MethodGet:
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(entity)
@@ -243,7 +240,7 @@ func newPowerTestServer(
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	}))
-	return server, &putBodies, &transitionBodies
+	return server, &putBodies, &acpiCount
 }
 
 // newConnectedTestClient builds a plan adapter Client and connects it
@@ -259,11 +256,7 @@ func newConnectedTestClient(t *testing.T, url string) *Client {
 
 func powerTestVMID(t *testing.T, name string) string {
 	t.Helper()
-	vmID := "vm-power-" + name
-	t.Cleanup(func() {
-		clearPowerOffTracking(testMigrationUID, vmID)
-	})
-	return vmID
+	return "vm-power-" + name
 }
 
 func TestPowerState(t *testing.T) {
@@ -313,7 +306,7 @@ func TestPoweredOff(t *testing.T) {
 // VM is already off.
 func TestPowerOff_SkipsAcpiWhenAlreadyOff(t *testing.T) {
 	vmID := powerTestVMID(t, "skip-acpi")
-	server, puts, transitions := newPowerTestServer(t, vmEntityPtr(vmID, powerStateOff))
+	server, puts, acpi := newPowerTestServer(t, vmEntityPtr(vmID, powerStateOff))
 	defer server.Close()
 
 	client := newConnectedTestClient(t, server.URL)
@@ -323,17 +316,16 @@ func TestPowerOff_SkipsAcpiWhenAlreadyOff(t *testing.T) {
 	if len(*puts) != 0 {
 		t.Fatalf("expected no PUT requests, got %d", len(*puts))
 	}
-	if len(*transitions) != 0 {
-		t.Fatalf("expected no set_power_state requests, got %d", len(*transitions))
+	if *acpi != 0 {
+		t.Fatalf("expected no acpi_shutdown requests, got %d", *acpi)
 	}
 }
 
-// TestPowerOff_SubmitsAcpiShutdown verifies PowerOff requests ACPI_SHUTDOWN
-// and leaves the VM running until PoweredOff forces OFF after the grace
-// period.
+// TestPowerOff_SubmitsAcpiShutdown verifies PowerOff posts PC v3
+// acpi_shutdown and does not hard-off while the guest is still on.
 func TestPowerOff_SubmitsAcpiShutdown(t *testing.T) {
 	vmID := powerTestVMID(t, "acpi-shutdown")
-	server, puts, transitions := newPowerTestServer(t, vmEntityPtr(vmID, powerStateOn))
+	server, puts, acpi := newPowerTestServer(t, vmEntityPtr(vmID, powerStateOn))
 	defer server.Close()
 
 	client := newConnectedTestClient(t, server.URL)
@@ -343,15 +335,8 @@ func TestPowerOff_SubmitsAcpiShutdown(t *testing.T) {
 	if len(*puts) != 0 {
 		t.Fatalf("expected no PUT requests, got %d", len(*puts))
 	}
-	if len(*transitions) != 1 {
-		t.Fatalf("expected exactly one set_power_state request, got %d", len(*transitions))
-	}
-	if (*transitions)[0] != powerStateTransitionAcpiShutdown {
-		t.Fatalf(
-			"expected transition %q, got %q",
-			powerStateTransitionAcpiShutdown,
-			(*transitions)[0],
-		)
+	if *acpi != 1 {
+		t.Fatalf("expected exactly one acpi_shutdown request, got %d", *acpi)
 	}
 
 	off, err := client.PoweredOff(ref.Ref{ID: vmID})
@@ -363,43 +348,89 @@ func TestPowerOff_SubmitsAcpiShutdown(t *testing.T) {
 	}
 }
 
-func TestPoweredOff_ForcesHardOffAfterGracePeriod(t *testing.T) {
-	oldGrace := powerOffGracePeriod
-	powerOffGracePeriod = 0
-	t.Cleanup(func() { powerOffGracePeriod = oldGrace })
-
-	vmID := powerTestVMID(t, "hard-off")
-	server, puts, transitions := newPowerTestServer(t, vmEntityPtr(vmID, powerStateOn))
+// TestPowerOff_PrismElementUsesV2SetPowerState verifies PE PowerOff uses
+// REST v2.0 set_power_state with ACPI_SHUTDOWN (PE has no v3 acpi_shutdown).
+func TestPowerOff_PrismElementUsesV2SetPowerState(t *testing.T) {
+	vmID := powerTestVMID(t, "pe-acpi")
+	entity := vmEntityPtr(vmID, powerStateOn)
+	var transitions []string
+	var puts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == prismCentralPath:
+			w.WriteHeader(http.StatusNotFound)
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/set_power_state"):
+			var body struct {
+				Transition string `json:"transition"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			transitions = append(transitions, body.Transition)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"task_uuid":"pe-task"}`))
+		case r.Method == http.MethodGet:
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(entity)
+		case r.Method == http.MethodPut:
+			puts++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
 	defer server.Close()
 
 	client := newConnectedTestClient(t, server.URL)
 	if err := client.PowerOff(ref.Ref{ID: vmID}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if puts != 0 {
+		t.Fatalf("expected no PUT requests, got %d", puts)
+	}
+	if len(transitions) != 1 || transitions[0] != powerStateTransitionAcpiShutdown {
+		t.Fatalf("expected one ACPI_SHUTDOWN v2 transition, got %v", transitions)
+	}
+}
 
-	off, err := client.PoweredOff(ref.Ref{ID: vmID})
-	if err != nil {
-		t.Fatalf("unexpected error on first PoweredOff: %v", err)
-	}
-	if off {
-		t.Fatal("expected PoweredOff to be false before hard off completes")
-	}
-	if len(*transitions) != 2 {
-		t.Fatalf("expected ACPI then OFF transitions, got %v", *transitions)
-	}
-	if (*transitions)[1] != powerStateTransitionOff {
-		t.Fatalf("expected hard-off transition %q, got %q", powerStateTransitionOff, (*transitions)[1])
-	}
-	if len(*puts) != 0 {
-		t.Fatalf("expected no PUT requests, got %d", len(*puts))
-	}
+// TestPowerOff_FailsWhenAcpiUnavailable verifies a failed ACPI POST fails
+// PowerOff with no hard-off PUT (same as vSphere/oVirt: no force power-off).
+func TestPowerOff_FailsWhenAcpiUnavailable(t *testing.T) {
+	vmID := powerTestVMID(t, "acpi-404")
+	entity := vmEntityPtr(vmID, powerStateOn)
+	var puts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == prismCentralPath:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/acpi_shutdown"):
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{}`))
+		case r.Method == http.MethodGet:
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(entity)
+		case r.Method == http.MethodPut:
+			puts++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
 
-	off, err = client.PoweredOff(ref.Ref{ID: vmID})
-	if err != nil {
-		t.Fatalf("unexpected error on second PoweredOff: %v", err)
+	client := newConnectedTestClient(t, server.URL)
+	if err := client.PowerOff(ref.Ref{ID: vmID}); err == nil {
+		t.Fatal("expected PowerOff to fail when acpi_shutdown returns 404")
 	}
-	if !off {
-		t.Fatal("expected PoweredOff to be true after hard off")
+	if puts != 0 {
+		t.Fatalf("expected no hard-off PUT, got %d", puts)
 	}
 }
 
@@ -415,6 +446,53 @@ func TestPowerOn_SkipsPutWhenAlreadyOn(t *testing.T) {
 	}
 	if len(*puts) != 0 {
 		t.Fatalf("expected no PUT requests, got %d", len(*puts))
+	}
+}
+
+// TestPowerOn_PrismElementUsesV2SetPowerState verifies PE PowerOn uses
+// REST v2.0 set_power_state with ON (PE rejects v3 VM PUT).
+func TestPowerOn_PrismElementUsesV2SetPowerState(t *testing.T) {
+	vmID := powerTestVMID(t, "pe-on")
+	entity := vmEntityPtr(vmID, powerStateOff)
+	var transitions []string
+	var puts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == prismCentralPath:
+			w.WriteHeader(http.StatusNotFound)
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/set_power_state"):
+			var body struct {
+				Transition string `json:"transition"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			transitions = append(transitions, body.Transition)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"task_uuid":"pe-task"}`))
+		case r.Method == http.MethodGet:
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(entity)
+		case r.Method == http.MethodPut:
+			puts++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	client := newConnectedTestClient(t, server.URL)
+	if err := client.PowerOn(ref.Ref{ID: vmID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if puts != 0 {
+		t.Fatalf("expected no PUT requests, got %d", puts)
+	}
+	if len(transitions) != 1 || transitions[0] != powerStateOn {
+		t.Fatalf("expected one ON v2 transition, got %v", transitions)
 	}
 }
 
@@ -554,23 +632,84 @@ func TestIsPrismElement_ErrorsOnUnexpectedProbeStatus(t *testing.T) {
 	}
 }
 
-// TestSetPowerState_PreservesSpecVersion verifies GET-to-PUT round-trips
-// retain metadata.spec_version required by Nutanix v3 updates.
-func TestSetPowerState_PreservesSpecVersion(t *testing.T) {
-	entity := vmEntityPtr("uuid-1", powerStateOn)
-	entity.Metadata.SpecVersion = 42
-	server, puts, _ := newPowerTestServer(t, entity)
+// TestSetPowerState_PreservesRawJSON verifies setPowerState round-trips the
+// GET body as JSON, changing only power_state and omitting status, while
+// keeping integer fields exact (UseNumber) and dropping empty host_reference.
+func TestSetPowerState_PreservesRawJSON(t *testing.T) {
+	const getBody = `{
+		"api_version": "3.1",
+		"metadata": {"uuid": "uuid-1", "kind": "vm", "spec_version": 42},
+		"spec": {
+			"name": "test-vm",
+			"cluster_reference": {"kind": "cluster", "uuid": "cluster-1", "name": "Unnamed"},
+			"resources": {
+				"power_state": "ON",
+				"host_reference": {},
+				"vtpm_config": {"enabled": true},
+				"disk_list": [{"disk_size_bytes": 42949672960}],
+				"nic_list": [{"uuid": "nic-1", "subnet_reference": {"kind": "subnet", "uuid": "subnet-1"}}]
+			}
+		},
+		"status": {"resources": {"power_state": "ON"}}
+	}`
+	var putRaw []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case r.Method == http.MethodGet:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(getBody))
+		case r.Method == http.MethodPut:
+			putRaw, _ = io.ReadAll(r.Body)
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
 	defer server.Close()
 
 	client := newConnectedTestClient(t, server.URL)
 	if err := client.setPowerState(ref.Ref{ID: "uuid-1"}, powerStateOff); err != nil {
 		t.Fatalf("setPowerState failed: %v", err)
 	}
-	if len(*puts) != 1 {
-		t.Fatalf("expected 1 PUT, got %d", len(*puts))
+	if len(putRaw) == 0 {
+		t.Fatal("expected a PUT body")
 	}
-	if (*puts)[0].Metadata.SpecVersion != 42 {
-		t.Fatalf("expected spec_version 42 in PUT body, got %d", (*puts)[0].Metadata.SpecVersion)
+	var put map[string]any
+	dec := json.NewDecoder(bytes.NewReader(putRaw))
+	dec.UseNumber()
+	if err := dec.Decode(&put); err != nil {
+		t.Fatalf("unmarshal PUT body: %v", err)
+	}
+	if _, ok := put["status"]; ok {
+		t.Fatalf("expected status to be omitted from PUT body, got %s", putRaw)
+	}
+	spec := put["spec"].(map[string]any)
+	resources := spec["resources"].(map[string]any)
+	if resources["power_state"] != powerStateOff {
+		t.Fatalf("expected power_state %q, got %#v", powerStateOff, resources["power_state"])
+	}
+	if _, ok := resources["host_reference"]; ok {
+		t.Fatalf("expected empty host_reference to be omitted, got %s", putRaw)
+	}
+	if _, ok := resources["vtpm_config"]; !ok {
+		t.Fatalf("expected unknown fields like vtpm_config to be preserved, got %s", putRaw)
+	}
+	disks := resources["disk_list"].([]any)
+	disk0 := disks[0].(map[string]any)
+	if disk0["disk_size_bytes"] != json.Number("42949672960") {
+		t.Fatalf("expected disk_size_bytes to stay an exact integer, got %#v", disk0["disk_size_bytes"])
+	}
+	md := put["metadata"].(map[string]any)
+	if md["kind"] != "vm" || md["spec_version"] != json.Number("42") {
+		t.Fatalf("expected metadata kind/spec_version preserved, got %#v", md)
+	}
+	cluster := spec["cluster_reference"].(map[string]any)
+	if cluster["kind"] != "cluster" {
+		t.Fatalf("expected cluster_reference.kind preserved, got %#v", cluster)
 	}
 }
 

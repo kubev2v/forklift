@@ -2,6 +2,8 @@
 
 # Global variables with default values
 V2V_MAP_FILE="${V2V_MAP_FILE:-/tmp/macToIP}"
+V2V_POD_NETWORK_IPV6_MACS_FILE="${V2V_POD_NETWORK_IPV6_MACS_FILE:-/tmp/podNetworkIPv6MACs}"
+KVIRT_POD_IPV6_GW="fd10:0:2::1"
 NETWORK_SCRIPTS_DIR="${NETWORK_SCRIPTS_DIR:-/etc/sysconfig/network-scripts}"
 NETWORK_SCRIPTS_DIR_SUSE="${NETWORK_SCRIPTS_DIR_SUSE:-/etc/sysconfig/network}"
 NETWORK_CONNECTIONS_DIR="${NETWORK_CONNECTIONS_DIR:-/etc/NetworkManager/system-connections}"
@@ -21,17 +23,307 @@ log() {
     echo "$@" >&3
 }
 
+normalize_mac() {
+    echo "$1" | tr 'A-F' 'a-f' | tr -d '[:space:]'
+}
+
+mac_in_pod_list() {
+    local want
+    want=$(normalize_mac "$1")
+    [ -z "$want" ] && return 1
+    while read -r line; do
+        line=$(normalize_mac "$line")
+        [ -z "$line" ] && continue
+        [ "$line" = "$want" ] && return 0
+    done < "$V2V_POD_NETWORK_IPV6_MACS_FILE"
+    return 1
+}
+
+nmconnection_mac() {
+    local f="$1" mac
+    mac=$(sed -n '/^\[ethernet\]/,/^\[/{ /^\(mac-address\|cloned-mac-address\)=/p; }' "$f" | head -1 | cut -d= -f2-)
+    if [ -z "$mac" ]; then
+        mac=$(grep -m1 -iE '^(mac-address|cloned-mac-address)=' "$f" | cut -d= -f2-)
+    fi
+    normalize_mac "$mac"
+}
+
+ifcfg_mac() {
+    local f="$1" mac
+    mac=$(grep -m1 -iE '^HWADDR=' "$f" | cut -d= -f2-)
+    # Strip surrounding quotes (e.g. HWADDR="00:50:56:97:33:D8").
+    mac=$(echo "$mac" | tr -d '"'"'")
+    normalize_mac "$mac"
+}
+
+set_nm_keyfile_kv() {
+    local f="$1" key="$2" val="$3"
+    if sed -n "/^\[ipv6\]/,/^\[/{ /^${key}=/p; }" "$f" | grep -q .; then
+        sed -i "/^\[ipv6\]/,/^\[/ s|^${key}=.*|${key}=${val}|" "$f"
+    else
+        sed -i "/^\[ipv6\]/a ${key}=${val}" "$f"
+    fi
+}
+
+set_connection_keyfile_kv() {
+    local f="$1" key="$2" val="$3"
+    if sed -n "/^\[connection\]/,/^\[/{ /^${key}=/p; }" "$f" | grep -q .; then
+        sed -i "/^\[connection\]/,/^\[/ s/^${key}=.*/${key}=${val}/" "$f"
+    else
+        sed -i "/^\[connection\]/a ${key}=${val}" "$f"
+    fi
+}
+
+set_ipv4_keyfile_kv() {
+    local f="$1" key="$2" val="$3"
+    if sed -n "/^\[ipv4\]/,/^\[/{ /^${key}=/p; }" "$f" | grep -q .; then
+        sed -i "/^\[ipv4\]/,/^\[/ s/^${key}=.*/${key}=${val}/" "$f"
+    else
+        sed -i "/^\[ipv4\]/a ${key}=${val}" "$f"
+    fi
+}
+
+udev_iface_name_for_mac() {
+    local want="$1" line mac name
+    [ ! -f "$UDEV_RULES_FILE" ] && return 1
+    while read -r line; do
+        mac=$(echo "$line" | sed -n 's/.*ATTR{address}=="\([^"]*\)".*/\1/p')
+        name=$(echo "$line" | sed -n 's/.*NAME="\([^"]*\)".*/\1/p')
+        [ -z "$mac" ] || [ -z "$name" ] && continue
+        [ "$(normalize_mac "$mac")" = "$(normalize_mac "$want")" ] && { echo "$name"; return 0; }
+    done < "$UDEV_RULES_FILE"
+    return 1
+}
+
+patch_nm_keyfile_pod() {
+    local NM_FILE="$1" mac="$2" udev_name=""
+    log "Fixing Pod network profile $NM_FILE"
+
+    if udev_name=$(udev_iface_name_for_mac "$mac"); then
+        set_connection_keyfile_kv "$NM_FILE" interface-name "$udev_name"
+        log "Pod profile $NM_FILE: interface-name=$udev_name (from udev)"
+    else
+        # Stale source names (e.g. ens192) prevent binding after udev renames to eth0.
+        sed -i '/^\[connection\]/,/^\[/{ /^interface-name=/d; }' "$NM_FILE"
+    fi
+    set_connection_keyfile_kv "$NM_FILE" autoconnect true
+    # Source VMs often bridge the NIC (e.g. to virbr0), Pod network needs a plain ethernet profile.
+    sed -i '/^\[connection\]/,/^\[/{ /^\(master\|slave-type\|port-type\)=/d; }' "$NM_FILE"
+
+    if ! grep -q '^\[ipv4\]' "$NM_FILE"; then
+        printf '\n[ipv4]\nmethod=auto\nmay-fail=true\n' >> "$NM_FILE"
+    else
+        sed -i '/^\[ipv4\]/,/^\[/ s/^method=.*/method=auto/' "$NM_FILE"
+        set_ipv4_keyfile_kv "$NM_FILE" may-fail true
+    fi
+
+    if ! grep -q '^\[ipv6\]' "$NM_FILE"; then
+        printf '\n[ipv6]\nmethod=auto\nmay-fail=true\ngateway=%s\nroute1=::/0,%s\n' "$KVIRT_POD_IPV6_GW" "$KVIRT_POD_IPV6_GW" >> "$NM_FILE"
+    else
+        sed -i '/^\[ipv6\]/,/^\[/ s/^method=.*/method=auto/' "$NM_FILE"
+        set_nm_keyfile_kv "$NM_FILE" may-fail true
+        set_nm_keyfile_kv "$NM_FILE" gateway "$KVIRT_POD_IPV6_GW"
+        set_nm_keyfile_kv "$NM_FILE" route1 "::/0,${KVIRT_POD_IPV6_GW}"
+    fi
+    chmod 600 "$NM_FILE" 2>/dev/null || true
+}
+
+patch_ifcfg_pod() {
+    local IFCFG="$1" mac="$2" udev_name=""
+    log "Fixing Pod network ifcfg $IFCFG"
+    if udev_name=$(udev_iface_name_for_mac "$mac"); then
+        if grep -q '^DEVICE=' "$IFCFG"; then
+            sed -i "s/^DEVICE=.*/DEVICE=${udev_name}/" "$IFCFG"
+        else
+            echo "DEVICE=${udev_name}" >> "$IFCFG"
+        fi
+    else
+        # Remove stale DEVICE that may not match the destination name.
+        # HWADDR is sufficient for NM to bind the profile to the right NIC.
+        sed -i '/^DEVICE=/d' "$IFCFG"
+    fi
+    sed -i '/^BRIDGE=/d; /^MASTER=/d; /^SLAVE=/d' "$IFCFG"
+
+    # Ensure IPv4 DHCP failure is non-fatal (IPv6-only clusters have no IPv4).
+    if grep -q '^IPV4_FAILURE_FATAL=' "$IFCFG"; then
+        sed -i 's/^IPV4_FAILURE_FATAL=.*/IPV4_FAILURE_FATAL=no/' "$IFCFG"
+    else
+        echo "IPV4_FAILURE_FATAL=no" >> "$IFCFG"
+    fi
+
+    # Enable IPv6 with autoconf and non-fatal.
+    grep -q '^IPV6INIT=' "$IFCFG" || echo "IPV6INIT=yes" >> "$IFCFG"
+    grep -q '^IPV6_AUTOCONF=' "$IFCFG" || echo "IPV6_AUTOCONF=yes" >> "$IFCFG"
+    if grep -q '^IPV6_FAILURE_FATAL=' "$IFCFG"; then
+        sed -i 's/^IPV6_FAILURE_FATAL=.*/IPV6_FAILURE_FATAL=no/' "$IFCFG"
+    else
+        echo "IPV6_FAILURE_FATAL=no" >> "$IFCFG"
+    fi
+    if grep -q '^IPV6_DEFAULTGW=' "$IFCFG"; then
+        sed -i "s/^IPV6_DEFAULTGW=.*/IPV6_DEFAULTGW=${KVIRT_POD_IPV6_GW}/" "$IFCFG"
+    else
+        echo "IPV6_DEFAULTGW=${KVIRT_POD_IPV6_GW}" >> "$IFCFG"
+    fi
+
+    # Pin HWADDR so the profile can be matched by MAC (not just device name).
+    if ! grep -qi '^HWADDR=' "$IFCFG"; then
+        echo "HWADDR=${mac}" >> "$IFCFG"
+    fi
+}
+
+# Match an ifcfg file to a Pod MAC. Checks HWADDR first, then falls back to
+# DEVICE name matching the udev name for that MAC (covers ifcfg-NIC-1 style
+# files that have DEVICE=eth0 but no HWADDR).
+ifcfg_matches_pod_mac() {
+    local IFCFG="$1" want_mac="$2"
+    local file_mac
+    file_mac=$(ifcfg_mac "$IFCFG")
+    if [ -n "$file_mac" ]; then
+        [ "$file_mac" = "$want_mac" ] && return 0
+        return 1
+    fi
+    # No HWADDR — check if DEVICE matches the udev name for this MAC.
+    local dev udev_name
+    dev=$(grep -m1 '^DEVICE=' "$IFCFG" | cut -d= -f2 | tr -d '"'"'" | tr -d '[:space:]')
+    [ -z "$dev" ] && return 1
+    udev_name=$(udev_iface_name_for_mac "$want_mac") || return 1
+    [ "$dev" = "$udev_name" ] && return 0
+    return 1
+}
+
+# Create a persistent NM config for a Pod MAC when no config file exists on disk.
+# On RHEL7/8 guests (ifcfg-rh plugin), create an ifcfg file.
+# On RHEL9+ and others (keyfile plugin), create an .nmconnection keyfile.
+create_pod_network_config() {
+    local mac="$1" udev_name=""
+
+    udev_name=$(udev_iface_name_for_mac "$mac") || true
+
+    # Derive a safe filename from the MAC (colons → dashes).
+    local safe_mac
+    safe_mac=$(echo "$mac" | tr ':' '-')
+
+    # Prefer ifcfg when the directory exists (RHEL7/8 with ifcfg-rh plugin).
+    if [ -d "$NETWORK_SCRIPTS_DIR" ]; then
+        local IFCFG="${NETWORK_SCRIPTS_DIR}/ifcfg-pod-${safe_mac}"
+        log "Creating Pod network ifcfg $IFCFG for MAC $mac"
+        cat > "$IFCFG" <<EOF
+TYPE=Ethernet
+BOOTPROTO=dhcp
+ONBOOT=yes
+HWADDR=${mac}
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_FAILURE_FATAL=no
+EOF
+        echo "IPV6_DEFAULTGW=${KVIRT_POD_IPV6_GW}" >> "$IFCFG"
+        # Only pin DEVICE when we know the correct name from udev.
+        # A wrong DEVICE (e.g. eth0 when the NIC is ens3) prevents activation.
+        if [ -n "$udev_name" ]; then
+            echo "DEVICE=${udev_name}" >> "$IFCFG"
+        fi
+        chmod 644 "$IFCFG"
+        return 0
+    fi
+
+    # Fall back to keyfile (.nmconnection) for RHEL9+ / systems without ifcfg.
+    mkdir -p "$NETWORK_CONNECTIONS_DIR"
+    local iface_clause=""
+    [ -n "$udev_name" ] && iface_clause="interface-name=${udev_name}"
+
+    local NM_FILE="${NETWORK_CONNECTIONS_DIR}/pod-${safe_mac}.nmconnection"
+    log "Creating Pod network keyfile $NM_FILE for MAC $mac"
+    cat > "$NM_FILE" <<EOF
+[connection]
+id=pod-${safe_mac}
+type=ethernet
+autoconnect=true
+${iface_clause}
+
+[ethernet]
+mac-address=${mac}
+
+[ipv4]
+method=auto
+may-fail=true
+
+[ipv6]
+method=auto
+may-fail=true
+EOF
+    echo "gateway=${KVIRT_POD_IPV6_GW}" >> "$NM_FILE"
+    echo "route1=::/0,${KVIRT_POD_IPV6_GW}" >> "$NM_FILE"
+    # Remove blank interface-name line when udev name was not available.
+    sed -i '/^$/d' "$NM_FILE"
+    chmod 600 "$NM_FILE"
+}
+
+# Pod masquerade: static IPv6 gateway + non-fatal IPv6 (keeps DHCP connections up).
+# Only runs when /tmp/podNetworkIPv6MACs exists (IPv6-enabled clusters only).
+fix_pod_network_ipv6() {
+    if [ ! -s "$V2V_POD_NETWORK_IPV6_MACS_FILE" ]; then
+        log "No $V2V_POD_NETWORK_IPV6_MACS_FILE; skipping Pod network IPv6 fix."
+        return 0
+    fi
+
+    # Track which Pod MACs we successfully patched so we know which ones need
+    # a new keyfile created from scratch.
+    local patched_macs=""
+
+    if [ -d "$NETWORK_CONNECTIONS_DIR" ]; then
+        for NM_FILE in "$NETWORK_CONNECTIONS_DIR"/*.nmconnection; do
+            [ -f "$NM_FILE" ] || continue
+            mac=$(nmconnection_mac "$NM_FILE")
+            mac_in_pod_list "$mac" || continue
+            patch_nm_keyfile_pod "$NM_FILE" "$mac"
+            patched_macs="${patched_macs} $(normalize_mac "$mac")"
+        done
+    fi
+
+    local SCRIPTS_DIR=""
+    [ -d "$NETWORK_SCRIPTS_DIR" ] && SCRIPTS_DIR="$NETWORK_SCRIPTS_DIR"
+    [ -d "$NETWORK_SCRIPTS_DIR_SUSE" ] && SCRIPTS_DIR="$NETWORK_SCRIPTS_DIR_SUSE"
+    if [ -n "$SCRIPTS_DIR" ]; then
+        while read -r pod_mac_line; do
+            local want_mac
+            want_mac=$(normalize_mac "$pod_mac_line")
+            [ -z "$want_mac" ] && continue
+            for IFCFG in "$SCRIPTS_DIR"/ifcfg-*; do
+                [ -f "$IFCFG" ] || continue
+                case "$(basename "$IFCFG")" in ifcfg-lo|*.bak|*.orig|*~) continue ;; esac
+                ifcfg_matches_pod_mac "$IFCFG" "$want_mac" || continue
+                patch_ifcfg_pod "$IFCFG" "$want_mac"
+                patched_macs="${patched_macs} ${want_mac}"
+                break
+            done
+        done < "$V2V_POD_NETWORK_IPV6_MACS_FILE"
+    fi
+
+    # For any Pod MAC that had no config file on disk, create a new keyfile.
+    while read -r line; do
+        line=$(normalize_mac "$line")
+        [ -z "$line" ] && continue
+        case "$patched_macs" in
+            *"$line"*) continue ;;
+        esac
+        create_pod_network_config "$line"
+    done < "$V2V_POD_NETWORK_IPV6_MACS_FILE"
+}
+
 # Sanity checks
 # -------------
 
 # Check if mapping file does not exist
 if [ ! -f "$V2V_MAP_FILE" ]; then
+    fix_pod_network_ipv6
     log "File $V2V_MAP_FILE does not exist. Exiting."
     exit 0
 fi
 
 # Check if udev rules file exists and is not empty
 if [ -f "$UDEV_RULES_FILE" ] && [ -s "$UDEV_RULES_FILE" ]; then
+    fix_pod_network_ipv6
     log "File $UDEV_RULES_FILE already exists and is not empty. Exiting."
     exit 0
 fi
@@ -623,3 +915,4 @@ main() {
 }
 
 main
+fix_pod_network_ipv6

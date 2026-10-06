@@ -1,13 +1,19 @@
 package base
 
 import (
+	"context"
 	"net"
 	"path"
 	"sort"
 
+	"fmt"
+
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/settings"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // QualifiedMultusNetworkName returns the Multus NetworkName for a NAD. It is
@@ -252,4 +258,85 @@ func ValidatePodNetworkDuplicates(nicRefs []ref.Ref, networkMap *api.NetworkMap)
 		}
 	}
 	return podCount > 1
+}
+
+// CollectPodNetworkMACs returns MAC addresses for all NICs mapped to Pod networks.
+// Callers should skip this when the destination namespace uses UDN (l2bridge binding)
+// because the masquerade-specific IPv6 config must not be applied to UDN interfaces.
+func CollectPodNetworkMACs[N any](nicKeys []string, pairsBySourceKey map[string][]api.NetworkPair, nics []N, nicToRef func(N) (mac string)) []string {
+	var podMacs []string
+	pool := NewNADPool()
+
+	for i, nic := range nics {
+		if i >= len(nicKeys) {
+			break
+		}
+		pairs := pairsBySourceKey[nicKeys[i]]
+		if len(pairs) == 0 {
+			continue
+		}
+		// Use the same allocation logic as mapNetworks
+		pair, ok := AllocateNetwork(pool, pairs)
+		if !ok {
+			continue
+		}
+		if pair.Destination.Type == Pod {
+			podMacs = append(podMacs, nicToRef(nic))
+		}
+	}
+	return podMacs
+}
+
+// PodNetworkHasIPv6 checks the active OpenShift cluster Pod-network CIDRs.
+func PodNetworkHasIPv6(
+	ctx context.Context,
+	client k8sclient.Client,
+) (bool, error) {
+	network := &unstructured.Unstructured{}
+	network.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "config.openshift.io",
+		Version: "v1",
+		Kind:    "Network",
+	})
+
+	if err := client.Get(
+		ctx, k8sclient.ObjectKey{Name: "cluster"}, network,
+	); err != nil {
+		return false, fmt.Errorf("get destination Network/cluster: %w", err)
+	}
+
+	entries, found, err := unstructured.NestedSlice(
+		network.Object, "status", "clusterNetwork",
+	)
+	if err != nil {
+		return false, fmt.Errorf("read status.clusterNetwork: %w", err)
+	}
+	if !found || len(entries) == 0 {
+		return false, fmt.Errorf("network/cluster has no active Pod-network CIDRs")
+	}
+
+	hasIPv6 := false
+	for i, entry := range entries {
+		pool, ok := entry.(map[string]interface{})
+		if !ok {
+			return false, fmt.Errorf(
+				"status.clusterNetwork[%d] is not an object", i,
+			)
+		}
+		cidr, ok := pool["cidr"].(string)
+		if !ok {
+			return false, fmt.Errorf(
+				"status.clusterNetwork[%d].cidr is missing or invalid", i,
+			)
+		}
+
+		ip, _, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return false, fmt.Errorf("parse Pod-network CIDR %q: %w", cidr, err)
+		}
+		if ip.To4() == nil {
+			hasIPv6 = true
+		}
+	}
+	return hasIPv6, nil
 }
