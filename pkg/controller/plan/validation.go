@@ -68,7 +68,7 @@ const (
 	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
 	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
 	CopyApplianceNotReady           = "CopyApplianceNotReady"
-	CopyApplianceTemplateNotReady         = "CopyApplianceTemplateNotReady"
+	CopyApplianceTemplateNotReady   = "CopyApplianceTemplateNotReady"
 	VMHasSnapshots                  = "VMHasSnapshots"
 	VMConsolidationNeeded           = "VMConsolidationNeeded"
 	HostNotReady                    = "HostNotReady"

@@ -71,13 +71,13 @@ func (c *ToeholdContext) ensureCredsSecret(ctx context.Context, pctx *providerCo
 	name := toehold.Name + credsSecretSuffix
 	ns := toehold.Namespace
 	data := map[string]string{
-		settings.VCenterURL:                 pctx.Provider.Spec.URL,
-		settings.VCenterUser:                string(pctx.Secret.Data["user"]),
-		settings.VCenterPassword:            string(pctx.Secret.Data["password"]),
-		settings.VCenterInsecure:            fmt.Sprint(base.GetInsecureSkipVerifyFlag(pctx.Secret)),
-		settings.VCenterThumbprint:          pctx.Provider.Status.Fingerprint,
+		settings.VCenterURL:                       pctx.Provider.Spec.URL,
+		settings.VCenterUser:                      string(pctx.Secret.Data["user"]),
+		settings.VCenterPassword:                  string(pctx.Secret.Data["password"]),
+		settings.VCenterInsecure:                  fmt.Sprint(base.GetInsecureSkipVerifyFlag(pctx.Secret)),
+		settings.VCenterThumbprint:                pctx.Provider.Status.Fingerprint,
 		settings.CopyApplianceTemplateContentHash: version.DiskHash(toehold.Spec, sshPublicKey),
-		settings.ToeholdBaseContainerImage:  toehold.Spec.BaseDisk.ContainerImage,
+		settings.ToeholdBaseContainerImage:        toehold.Spec.BaseDisk.ContainerImage,
 	}
 	secret := &core.Secret{}
 	err := c.Client.Get(ctx, client.ObjectKey{Namespace: ns, Name: name}, secret)
