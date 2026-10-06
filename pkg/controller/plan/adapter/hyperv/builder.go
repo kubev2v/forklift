@@ -603,7 +603,12 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	for i, nic := range vm.NICs {
 		macs[i] = nic.MAC
 	}
-	modeByMAC := planbase.ResolveNICModes(planbase.NICRefsFromKeys(macs, nicKeys), pairsBySource, r.Plan.Spec.PreserveStaticIPs)
+	nicRefs, err := planbase.NICRefsFromKeys(macs, nicKeys)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	modeByMAC := planbase.ResolveNICModes(nicRefs, pairsBySource, r.Plan.Spec.PreserveStaticIPs)
 	// Honor resolved preserve modes. Fall back to the plan-level flag only when
 	// matching produced no modes (empty map), so a dhcp/none override still wins.
 	// DHCP is also mapped on Linux so virt-v2v can write udev naming rules.

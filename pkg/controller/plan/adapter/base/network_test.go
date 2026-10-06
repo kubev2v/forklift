@@ -303,6 +303,16 @@ func TestValidateNetworkDuplicates_1toN_MixedNetworks(t *testing.T) {
 	}
 }
 
+func TestNICRefsFromKeys_MismatchedLengths(t *testing.T) {
+	refs, err := NICRefsFromKeys([]string{"aa:bb:cc:dd:ee:01"}, []string{"net-1", "net-2"})
+	if err == nil {
+		t.Fatal("expected error when keys is longer than macs")
+	}
+	if refs != nil {
+		t.Errorf("expected nil refs on mismatch, got %#v", refs)
+	}
+}
+
 // --- ResolveNICModes ---
 
 // pairsBySourceFromMap groups a NetworkMap's pairs by Source.ID, mimicking the

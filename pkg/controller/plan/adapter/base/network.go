@@ -2,11 +2,10 @@ package base
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"path"
 	"sort"
-
-	"fmt"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
@@ -62,13 +61,16 @@ type NICRef struct {
 }
 
 // NICRefsFromKeys pairs each MAC with its resolved lookup key. macs and keys
-// must be the same length and share NIC order.
-func NICRefsFromKeys(macs []string, keys []string) []NICRef {
+// must be the same length and share NIC order. Returns an error if they differ.
+func NICRefsFromKeys(macs []string, keys []string) ([]NICRef, error) {
+	if len(macs) != len(keys) {
+		return nil, fmt.Errorf("macs and keys length mismatch: %d != %d", len(macs), len(keys))
+	}
 	refs := make([]NICRef, len(macs))
 	for i := range macs {
 		refs[i] = NICRef{MAC: macs[i], NetworkID: keys[i]}
 	}
-	return refs
+	return refs, nil
 }
 
 // ResolveNICModes returns a MAC->mode map based on pre-resolved NetworkPairs and NADPool
