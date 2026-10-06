@@ -19,6 +19,7 @@ RUN microdnf install -y \
   qemu-kvm \
   nbdkit \
   nbdkit-vddk-plugin \
+  nbdkit-nbd-plugin \
   ca-certificates \
   sqlite-libs && microdnf clean all
 
