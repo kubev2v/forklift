@@ -49,12 +49,12 @@ func run(ctx context.Context) error {
 		FolderPath:         settings.Lookup(settings.ToeholdFolder, ""),
 		Datastore:          settings.Lookup(settings.ToeholdDatastore, ""),
 		Network:            settings.Lookup(settings.ToeholdNetwork, settings.DefaultToeholdNetwork),
-		Name:               os.Getenv(settings.ToeholdTemplateName),
+		Name:               os.Getenv(settings.CopyApplianceTemplateName),
 		VMDKPath:           settings.Lookup(settings.ToeholdVMDKPath, settings.DefaultBuildPodVMDKPath),
 		CPUs:               int32(settings.LookupInt(settings.ToeholdBuildPodCPUs, int(version.DefaultCPU))),
 		MemoryMiB:          int32(settings.LookupInt(settings.ToeholdBuildPodMemoryMiB, int(version.DefaultMemoryMiB))),
-		TemplateDiskHash:   os.Getenv(settings.ToeholdTemplateContentHash),
-		TemplateConfigHash: os.Getenv(settings.ToeholdTemplateConfigHash),
+		TemplateDiskHash:   os.Getenv(settings.CopyApplianceTemplateContentHash),
+		TemplateConfigHash: os.Getenv(settings.CopyApplianceTemplateConfigHash),
 		BaseContainerImage: os.Getenv(settings.ToeholdBaseContainerImage),
 	}
 	_ = client.DestroyIfExists(ctx, opts.FolderPath, opts.Name)

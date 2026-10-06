@@ -1,5 +1,5 @@
 apiVersion: forklift.konveyor.io/v1beta1
-kind: ToeholdTemplate
+kind: CopyApplianceTemplate
 metadata:
   name: nbdkit-toehold
   namespace: toehold-e2e

@@ -76,7 +76,7 @@ func (c *ToeholdContext) ensureCredsSecret(ctx context.Context, pctx *providerCo
 		settings.VCenterPassword:            string(pctx.Secret.Data["password"]),
 		settings.VCenterInsecure:            fmt.Sprint(base.GetInsecureSkipVerifyFlag(pctx.Secret)),
 		settings.VCenterThumbprint:          pctx.Provider.Status.Fingerprint,
-		settings.ToeholdTemplateContentHash: version.DiskHash(toehold.Spec, sshPublicKey),
+		settings.CopyApplianceTemplateContentHash: version.DiskHash(toehold.Spec, sshPublicKey),
 		settings.ToeholdBaseContainerImage:  toehold.Spec.BaseDisk.ContainerImage,
 	}
 	secret := &core.Secret{}
@@ -235,13 +235,13 @@ func (c *ToeholdContext) ensureBuildPod(ctx context.Context, sshSecretName, sshP
 						LocalObjectReference: core.LocalObjectReference{Name: toehold.Name + credsSecretSuffix},
 					}}},
 					Env: []core.EnvVar{
-						{Name: settings.ToeholdTemplateName, Value: toehold.Spec.TemplateName},
+						{Name: settings.CopyApplianceTemplateName, Value: toehold.Spec.TemplateName},
 						{Name: settings.ToeholdDatastore, Value: toehold.Spec.Datastore},
 						{Name: settings.ToeholdFolder, Value: toehold.Spec.Folder},
 						{Name: settings.ToeholdNetwork, Value: toehold.Spec.Network},
 						{Name: settings.ToeholdBuildPodCPUs, Value: fmt.Sprint(cpus)},
 						{Name: settings.ToeholdBuildPodMemoryMiB, Value: fmt.Sprint(memMiB)},
-						{Name: settings.ToeholdTemplateConfigHash, Value: version.ConfigHash(toehold.Spec)},
+						{Name: settings.CopyApplianceTemplateConfigHash, Value: version.ConfigHash(toehold.Spec)},
 						{Name: "TOEHOLD_SSH_PUBLIC_KEY_FILE", Value: "/etc/toehold/ssh/public-key"},
 					},
 					VolumeMounts: []core.VolumeMount{
@@ -358,14 +358,14 @@ func (c *ToeholdContext) ensureSSHPublicSecret(ctx context.Context, secretName, 
 	return secretName, liberr.Wrap(c.Client.Update(ctx, target))
 }
 
-func cpuCount(toehold *api.ToeholdTemplate) int32 {
+func cpuCount(toehold *api.CopyApplianceTemplate) int32 {
 	if toehold.Spec.Resources.CPU > 0 {
 		return toehold.Spec.Resources.CPU
 	}
 	return version.DefaultCPU
 }
 
-func memoryMiB(toehold *api.ToeholdTemplate) int32 {
+func memoryMiB(toehold *api.CopyApplianceTemplate) int32 {
 	if toehold.Spec.Resources.MemoryMiB > 0 {
 		return toehold.Spec.Resources.MemoryMiB
 	}

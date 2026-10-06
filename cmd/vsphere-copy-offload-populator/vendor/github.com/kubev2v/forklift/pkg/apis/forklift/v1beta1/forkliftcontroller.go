@@ -109,7 +109,7 @@ type ForkliftControllerSpec struct {
 	// +kubebuilder:validation:Enum="true";"false"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:radio:true","urn:alm:descriptor:com.tectonic.ui:radio:false"}
 	FeatureUseConversionCR string `json:"feature_use_conversion_cr,omitempty"`
-	// Provision toehold templates for vSphere providers.
+	// Provision copy appliance templates for vSphere providers.
 	// +optional
 	// +kubebuilder:default="false"
 	// +kubebuilder:validation:Enum="true";"false"
@@ -195,23 +195,23 @@ type ForkliftControllerSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	ToeholdBuilderImageFQIN string `json:"toehold_builder_image_fqin,omitempty"`
 
-	// Toehold template defaults
+	// Copy appliance template defaults
 
-	// Fully-qualified base containerdisk image for toehold templates
+	// Fully-qualified base containerdisk image for copy appliance templates
 	// (e.g. "registry.redhat.io/rhel9/rhel-guest-image:latest").
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	ToeholdBaseDiskContainerImageFQIN string `json:"toehold_base_disk_container_image_fqin,omitempty"`
-	// Default OVF CPU count for toehold templates.
+	// Default OVF CPU count for copy appliance templates.
 	// +optional
 	// +kubebuilder:default="2"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
-	ToeholdTemplateCPU string `json:"toehold_template_cpu,omitempty"`
-	// Default OVF memory in MiB for toehold templates.
+	CopyApplianceTemplateCPU string `json:"copy_appliance_template_cpu,omitempty"`
+	// Default OVF memory in MiB for copy appliance templates.
 	// +optional
 	// +kubebuilder:default="4096"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
-	ToeholdTemplateMemoryMiB string `json:"toehold_template_memory_mib,omitempty"`
+	CopyApplianceTemplateMemoryMiB string `json:"copy_appliance_template_memory_mib,omitempty"`
 
 	// Copy appliance defaults
 
