@@ -1,0 +1,19 @@
+---
+# Example vSphere Provider with toehold / copy-appliance placement settings.
+# Pair with forklift_v1beta1_forkliftcontroller_toehold.yaml for images + feature gate.
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: vsphere
+  namespace: openshift-mtv
+spec:
+  type: vsphere
+  url: https://vcenter.example.com/sdk
+  secret:
+    name: vsphere
+    namespace: openshift-mtv
+  settings:
+    toeholdDatastore: datastore1
+    toeholdFolder: /Datacenter/vm
+    toeholdNetwork: VM Network
+    copyApplianceResourcePool: /Datacenter/host/my-cluster/Resources
