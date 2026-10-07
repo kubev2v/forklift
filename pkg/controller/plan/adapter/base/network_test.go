@@ -410,29 +410,6 @@ func TestResolveNICModes_MixedModes(t *testing.T) {
 	}
 }
 
-func TestResolveNICIPv6Modes(t *testing.T) {
-	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Name: "nad-a"}, NetworkIPv6Mode: api.NetworkIPv6ModePreserve},
-		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-2"}}, Destination: api.DestinationNetwork{Type: Multus, Name: "nad-b"}, NetworkIPv6Mode: api.NetworkIPv6ModeNone},
-		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-3"}}, Destination: api.DestinationNetwork{Type: Multus, Name: "nad-c"}},
-	}}}
-	nics := []NICRef{
-		{MAC: "mac-1", NetworkID: "net-1"},
-		{MAC: "mac-2", NetworkID: "net-2"},
-		{MAC: "mac-3", NetworkID: "net-3"},
-	}
-	modes := ResolveNICIPv6Modes(nics, nm)
-	if modes["mac-1"] != "preserve" || modes["mac-2"] != "none" {
-		t.Errorf("unexpected IPv6 mode overrides: %#v", modes)
-	}
-	if _, ok := modes["mac-3"]; ok {
-		t.Errorf("unspecified mode should preserve source state by default, got %#v", modes["mac-3"])
-	}
-	if got := FormatNICIPv6Modes(modes); got != "mac-1=preserve,mac-2=none" {
-		t.Errorf("unexpected encoded IPv6 modes: %q", got)
-	}
-}
-
 // --- ResolveNICModes 1:N allocation ---
 
 func TestResolveNICModes_1toN_DifferentNetworkIPMode(t *testing.T) {

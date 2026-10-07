@@ -11,7 +11,6 @@ import (
 	"strings"
 	"text/template"
 
-	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	"github.com/kubev2v/forklift/pkg/virt-v2v/utils"
 )
@@ -29,7 +28,6 @@ const (
 
 const vsphereVmwareCleanupScript = "9100_cleanup_vmware.ps1"
 const vsphereVmwareVerifyScript = "verify_vmware_cleanup.ps1"
-const adapterBindingSyncTemplate = "3000-sync-adapter-bindings.ps1.tmpl"
 
 const qemuGAInstallScript = "5001_win_firstboot_qemu_ga_install.ps1"
 
@@ -49,11 +47,6 @@ type Customize struct {
 type IPConfig struct {
 	MAC string
 	IPs []IPEntry
-}
-
-type IPv6ModeConfig struct {
-	MAC  string
-	Mode string
 }
 
 type IPEntry struct {
@@ -106,37 +99,6 @@ func formatDNS(dns []string) string {
 	return b.String()
 }
 
-var macPattern = regexp.MustCompile(`^([0-9a-f]{2}-){5}[0-9a-f]{2}$`)
-
-func parseNetworkIPv6Modes(encoded string) ([]IPv6ModeConfig, error) {
-	if encoded == "" {
-		return nil, nil
-	}
-	modes := strings.Split(encoded, ",")
-	configs := make([]IPv6ModeConfig, 0, len(modes))
-	seen := make(map[string]struct{}, len(modes))
-	for _, mode := range modes {
-		parts := strings.SplitN(mode, "=", 2)
-		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
-			return nil, fmt.Errorf("invalid network IPv6 mode entry %q", mode)
-		}
-		value := strings.ToLower(strings.TrimSpace(parts[1]))
-		if value != string(api.NetworkIPv6ModePreserve) && value != string(api.NetworkIPv6ModeNone) {
-			return nil, fmt.Errorf("invalid network IPv6 mode %q", value)
-		}
-		mac := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(parts[0])), ":", "-")
-		if !macPattern.MatchString(mac) {
-			return nil, fmt.Errorf("invalid MAC %q in network IPv6 mode entry", mac)
-		}
-		if _, exists := seen[mac]; exists {
-			return nil, fmt.Errorf("duplicate MAC %q in network IPv6 modes", mac)
-		}
-		seen[mac] = struct{}{}
-		configs = append(configs, IPv6ModeConfig{MAC: mac, Mode: value})
-	}
-	return configs, nil
-}
-
 func NewCustomize(cfg *config.AppConfig, disks []string, operatingSystem utils.InspectionOS) *Customize {
 	return &Customize{
 		appConfig:          cfg,
@@ -150,7 +112,7 @@ func NewCustomize(cfg *config.AppConfig, disks []string, operatingSystem utils.I
 
 func (c *Customize) Run() (err error) {
 	fmt.Printf("Customizing disks '%s'\n", c.disks)
-	// Extract embedded customization scripts.
+	// Customization for vSphere source.
 	err = c.embeddedFileSystem.CreateFilesFromFS(c.appConfig.Workdir)
 	if err != nil {
 		return fmt.Errorf("failed to create files from filesystem: %w", err)
@@ -197,9 +159,6 @@ func (c *Customize) customizeWindows() (err error) {
 		if err != nil {
 			return err
 		}
-	}
-	if err = c.addAdapterBindingSync(cmdBuilder); err != nil {
-		return err
 	}
 
 	if c.appConfig.VsphereVmwareDriverRemoval && c.appConfig.IsVsphereMigration() {
@@ -366,28 +325,6 @@ func (c *Customize) runCmd(builder utils.CommandBuilder) error {
 	if err := customizeCmd.Run(); err != nil {
 		return fmt.Errorf("error executing virt-customize command: %w", err)
 	}
-	return nil
-}
-
-// addAdapterBindingSync renders and uploads the first-boot script when modes are configured.
-func (c *Customize) addAdapterBindingSync(cmdBuilder utils.CommandBuilder) error {
-	if c.appConfig.NetworkIPv6Modes == "" {
-		return nil
-	}
-	windowsScriptsPath := filepath.Join(c.appConfig.Workdir, "scripts", "windows")
-	modeConfigs, err := parseNetworkIPv6Modes(c.appConfig.NetworkIPv6Modes)
-	if err != nil {
-		return err
-	}
-	templatePath := filepath.Join(windowsScriptsPath, adapterBindingSyncTemplate)
-	scriptName := strings.TrimSuffix(adapterBindingSyncTemplate, ".tmpl")
-	scriptPath := filepath.Join(windowsScriptsPath, scriptName)
-	if err = renderTemplate(templatePath, scriptPath, "adapterBindingSync", modeConfigs); err != nil {
-		return fmt.Errorf("render adapter binding sync script: %w", err)
-	}
-	src := filepath.Join(windowsScriptsPath, scriptName)
-	dst := filepath.Join(WinFirstbootScriptsPath, scriptName)
-	cmdBuilder.AddArg(UploadCmd, c.formatUpload(src, dst))
 	return nil
 }
 

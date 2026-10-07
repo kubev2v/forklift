@@ -24,7 +24,6 @@ const (
 	EnvVmNameName                       = "V2V_vmName"
 	EnvRootDiskName                     = "V2V_RootDisk"
 	EnvStaticIPsName                    = "V2V_staticIPs"
-	EnvNetworkIPv6ModesName             = "V2V_networkIPv6Modes"
 	EnvSourceName                       = "V2V_source"
 	EnvDiskPathName                     = "V2V_diskPath"
 	EnvSecretKeyName                    = "V2V_secretKey"
@@ -99,8 +98,6 @@ type AppConfig struct {
 	RootDisk string
 	// V2V_staticIPs
 	StaticIPs string
-	// V2V_networkIPv6Modes
-	NetworkIPv6Modes string
 	// V2V_source
 	Source string
 	// V2V_diskPath
@@ -170,7 +167,6 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.VmName, "vm-name", os.Getenv(EnvVmNameName), "Original VM name")
 	flag.StringVar(&s.RootDisk, "root-disk", os.Getenv(EnvRootDiskName), "Specify which disk should be converted (default \"first\")")
 	flag.StringVar(&s.StaticIPs, "static-ips", os.Getenv(EnvStaticIPsName), "Preserve static IPs, format <mac:network|bridge|ip:out>_<mac:network|bridge|ip:out>")
-	flag.StringVar(&s.NetworkIPv6Modes, "network-ipv6-modes", os.Getenv(EnvNetworkIPv6ModesName), "Per-MAC IPv6 binding modes, format <mac=mode,mac=mode>")
 	flag.StringVar(&s.DiskPath, "disk-path", os.Getenv(EnvDiskPathName), "Path to disk(s) - single for OVA, comma-separated for HyperV")
 	flag.StringVar(&s.AccessKeyId, "access-key", AccessKeyId, "Path to the Username for the vSphere")
 	flag.StringVar(&s.SecretKey, "secret-key", SecretKey, "Path to the secret to the vSphere")
