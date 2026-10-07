@@ -112,7 +112,7 @@ var _ = Describe("Customize", func() {
 			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "run")).Return(runScripts, nil)
 			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "firstboot")).Return(firstBootScripts, nil)
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -139,9 +139,102 @@ var _ = Describe("Customize", func() {
 			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "run")).Return(runScripts, nil)
 			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "firstboot")).Return(firstBootScripts, nil)
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to execute domain customization"))
+		})
+
+		It("adds --selinux-relabel-at-boot when SelinuxRelabelAtBoot is enabled", func() {
+			customize.disks = disks
+			appConfig.SelinuxRelabelAtBoot = true
+			mockCommandBuilder.EXPECT().New("virt-customize").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--selinux-relabel-at-boot").Return(mockCommandBuilder)
+			for _, expectedScript := range expectedRunScripts {
+				mockCommandBuilder.EXPECT().AddArg("--run", expectedScript).Return(mockCommandBuilder)
+			}
+			for _, expectedScript := range expectedFirstBootScripts {
+				mockCommandBuilder.EXPECT().AddArg("--firstboot", expectedScript).Return(mockCommandBuilder)
+			}
+			for _, disk := range disks {
+				mockCommandBuilder.EXPECT().AddArg("--add", disk).Return(mockCommandBuilder)
+			}
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().Run().Return(nil)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+
+			mockFileSystem.EXPECT().Stat(gomock.Any()).Return(nil, os.ErrNotExist)
+			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "run")).Return(runScripts, nil)
+			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "firstboot")).Return(firstBootScripts, nil)
+
+			err := customize.runLinuxCustomize()
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("adds --selinux-relabel-exclude for each configured directory", func() {
+			customize.disks = disks
+			appConfig.SelinuxRelabelExclude = []string{"/var/lib/etcd", "/data", "/persistent"}
+			mockCommandBuilder.EXPECT().New("virt-customize").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
+			for _, dir := range appConfig.SelinuxRelabelExclude {
+				mockCommandBuilder.EXPECT().AddArg("--selinux-relabel-exclude", dir).Return(mockCommandBuilder)
+			}
+			for _, expectedScript := range expectedRunScripts {
+				mockCommandBuilder.EXPECT().AddArg("--run", expectedScript).Return(mockCommandBuilder)
+			}
+			for _, expectedScript := range expectedFirstBootScripts {
+				mockCommandBuilder.EXPECT().AddArg("--firstboot", expectedScript).Return(mockCommandBuilder)
+			}
+			for _, disk := range disks {
+				mockCommandBuilder.EXPECT().AddArg("--add", disk).Return(mockCommandBuilder)
+			}
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().Run().Return(nil)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+
+			mockFileSystem.EXPECT().Stat(gomock.Any()).Return(nil, os.ErrNotExist)
+			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "run")).Return(runScripts, nil)
+			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "firstboot")).Return(firstBootScripts, nil)
+
+			err := customize.runLinuxCustomize()
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("adds both selinux relabel flags when both are configured", func() {
+			customize.disks = disks
+			appConfig.SelinuxRelabelAtBoot = true
+			appConfig.SelinuxRelabelExclude = []string{"/var/lib/etcd", "/data"}
+			mockCommandBuilder.EXPECT().New("virt-customize").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--selinux-relabel-at-boot").Return(mockCommandBuilder)
+			for _, dir := range appConfig.SelinuxRelabelExclude {
+				mockCommandBuilder.EXPECT().AddArg("--selinux-relabel-exclude", dir).Return(mockCommandBuilder)
+			}
+			for _, expectedScript := range expectedRunScripts {
+				mockCommandBuilder.EXPECT().AddArg("--run", expectedScript).Return(mockCommandBuilder)
+			}
+			for _, expectedScript := range expectedFirstBootScripts {
+				mockCommandBuilder.EXPECT().AddArg("--firstboot", expectedScript).Return(mockCommandBuilder)
+			}
+			for _, disk := range disks {
+				mockCommandBuilder.EXPECT().AddArg("--add", disk).Return(mockCommandBuilder)
+			}
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().Run().Return(nil)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+
+			mockFileSystem.EXPECT().Stat(gomock.Any()).Return(nil, os.ErrNotExist)
+			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "run")).Return(runScripts, nil)
+			mockFileSystem.EXPECT().ReadDir(filepath.Join(config.V2vOutputDir, "scripts", "rhel", "firstboot")).Return(firstBootScripts, nil)
+
+			err := customize.runLinuxCustomize()
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
@@ -810,7 +903,7 @@ var _ = Describe("Customize", func() {
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 
-			err := customize.customizeWindows()
+			err := customize.runWindowsCustomize()
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -824,7 +917,7 @@ var _ = Describe("Customize", func() {
 			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
 
-			err := customize.customizeWindows()
+			err := customize.runWindowsCustomize()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to read scripts directory"))
 		})
@@ -860,7 +953,7 @@ var _ = Describe("Customize", func() {
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 
-			err = customize.customizeWindows()
+			err = customize.runWindowsCustomize()
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -964,7 +1057,7 @@ var _ = Describe("Customize", func() {
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -980,7 +1073,7 @@ var _ = Describe("Customize", func() {
 			expectedContent := "00:11:22:33:44:55:ip:192.168.1.100\n"
 			mockFileSystem.EXPECT().WriteFile(expectedPath, []byte(expectedContent), fs.FileMode(0755)).Return(errors.New("write error"))
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to write MAC to IP mapping file"))
 		})
@@ -1026,7 +1119,7 @@ var _ = Describe("Customize", func() {
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -1041,7 +1134,7 @@ var _ = Describe("Customize", func() {
 			mockFileSystem.EXPECT().Stat(appConfig.DynamicScriptsDir).Return(nil, nil)
 			mockFileSystem.EXPECT().ReadDir(appConfig.DynamicScriptsDir).Return(nil, errors.New("read error"))
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to read scripts directory"))
 		})
@@ -1087,7 +1180,7 @@ var _ = Describe("Customize", func() {
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 
-			err := customize.customizeLinux()
+			err := customize.runLinuxCustomize()
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
