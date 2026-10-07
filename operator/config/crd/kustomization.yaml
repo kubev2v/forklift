@@ -18,4 +18,5 @@ resources:
 - bases/forklift.konveyor.io_hypervproviderservers.yaml
 - bases/forklift.konveyor.io_copyappliances.yaml
 - bases/forklift.konveyor.io_copyappliancetemplates.yaml
+- bases/validation.kubevirt.io_virtualizationvalidations.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
