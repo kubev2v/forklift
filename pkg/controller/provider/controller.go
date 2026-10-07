@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/model"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/validation/policy"
+	validationcontroller "github.com/kubev2v/forklift/pkg/controller/virtualizationvalidation"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libfb "github.com/kubev2v/forklift/pkg/lib/filebacked"
@@ -48,6 +50,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -124,6 +127,23 @@ func Add(mgr manager.Manager) error {
 	if err != nil {
 		log.Trace(err)
 		return err
+	}
+	if Settings.OpenShift {
+		err = cnt.Watch(
+			source.Kind(
+				mgr.GetCache(),
+				validationcontroller.NewValidation(),
+				handler.TypedEnqueueRequestsFromMapFunc(func(_ context.Context, validation *unstructured.Unstructured) []reconcile.Request {
+					providerName := validation.GetLabels()[validationcontroller.ProviderNameLabel]
+					if providerName == "" || validation.GetNamespace() == "" {
+						return nil
+					}
+					return []reconcile.Request{{NamespacedName: client.ObjectKey{Namespace: validation.GetNamespace(), Name: providerName}}}
+				})))
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
 	}
 	err = cnt.Watch(
 		source.Kind(mgr.GetCache(), &api.OVAProviderServer{},
@@ -361,8 +381,38 @@ func (r *Reconciler) updateProviderStatus(provider *api.Provider) error {
 		r.Log.Error(err, "Failed to update provider status", "provider", provider)
 		return err
 	}
+	if Settings.OpenShift {
+		if err := r.patchVirtualizationValidationCondition(context.TODO(), client.ObjectKeyFromObject(provider)); err != nil {
+			return err
+		}
+	}
 
 	return nil
+}
+
+// patchVirtualizationValidationCondition performs a second, narrow status
+// write after the normal Provider lifecycle update. The fresh read and
+// optimistic lock ensure this Provider-owned condition never replaces a
+// concurrent status update.
+func (r *Reconciler) patchVirtualizationValidationCondition(ctx context.Context, key client.ObjectKey) error {
+	provider := &api.Provider{}
+	if err := r.Get(ctx, key, provider); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	original := provider.DeepCopy()
+	condition, err := validationcontroller.ProviderCondition(ctx, r.Client, provider)
+	if err != nil {
+		return err
+	}
+	if condition == nil {
+		provider.Status.DeleteCondition(api.ConditionTargetVirtualizationValid)
+	} else {
+		provider.Status.SetCondition(*condition)
+	}
+	if reflect.DeepEqual(original.Status, provider.Status) {
+		return nil
+	}
+	return base.PatchStatus(ctx, r.Status(), original, provider)
 }
 
 // Update the provider.

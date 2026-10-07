@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
+	validationcontroller "github.com/kubev2v/forklift/pkg/controller/virtualizationvalidation"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
@@ -39,6 +41,7 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/names"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -129,6 +132,19 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+	if Settings.OpenShift {
+		err = cnt.Watch(
+			source.Kind(
+				mgr.GetCache(),
+				validationcontroller.NewValidation(),
+				handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, validation *unstructured.Unstructured) []reconcile.Request {
+					return plansForValidation(ctx, mgr.GetClient(), validation)
+				})))
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+	}
 	// NetworkMap.
 	err = cnt.Watch(
 		source.Kind(mgr.GetCache(), &api.NetworkMap{},
@@ -218,12 +234,22 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	// Don't reconcile if the plan is archived.
 	if plan.Spec.Archived && plan.Status.HasCondition(Archived) {
+		if Settings.OpenShift {
+			if err = r.patchVirtualizationValidationCondition(ctx, client.ObjectKeyFromObject(plan)); err != nil {
+				return
+			}
+		}
 		r.Log.Info("Aborting reconcile of archived plan.")
 		return
 	}
 
 	// Don't reconcile succeeded plans unless they need archiving.
 	if plan.Status.HasCondition(Succeeded) && !plan.Spec.Archived {
+		if Settings.OpenShift {
+			if err = r.patchVirtualizationValidationCondition(ctx, client.ObjectKeyFromObject(plan)); err != nil {
+				return
+			}
+		}
 		r.Log.V(1).Info("Skipping reconcile of succeeded plan.", "plan", plan.Name)
 		result.RequeueAfter = 0
 		err = nil
@@ -292,6 +318,30 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	return
 }
 
+func plansForValidation(ctx context.Context, reader client.Reader, validation *unstructured.Unstructured) []reconcile.Request {
+	providerName := validation.GetLabels()[validationcontroller.ProviderNameLabel]
+	if providerName == "" || validation.GetNamespace() == "" {
+		return nil
+	}
+	plans := &api.PlanList{}
+	if err := reader.List(ctx, plans); err != nil {
+		log.Error(err, "Failed to list Plans for target virtualization validation", "validation", client.ObjectKeyFromObject(validation))
+		return nil
+	}
+	requests := make([]reconcile.Request, 0)
+	for i := range plans.Items {
+		plan := &plans.Items[i]
+		destination := plan.Spec.Provider.Destination
+		if destination.Namespace == "" {
+			destination.Namespace = plan.Namespace
+		}
+		if destination.Namespace == validation.GetNamespace() && destination.Name == providerName {
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(plan)})
+		}
+	}
+	return requests
+}
+
 func (r *Reconciler) isDanglingArchivedPlan(plan *api.Plan) bool {
 	return plan.Spec.Archived && plan.Provider.Source == nil
 }
@@ -311,8 +361,38 @@ func (r *Reconciler) updatePlanStatus(plan *api.Plan) error {
 		r.Log.Error(err, "Failed to update plan status", "plan", plan)
 		return err
 	}
+	if Settings.OpenShift {
+		if err := r.patchVirtualizationValidationCondition(context.TODO(), client.ObjectKeyFromObject(plan)); err != nil {
+			return err
+		}
+	}
 
 	return nil
+}
+
+// patchVirtualizationValidationCondition performs a second, narrow status
+// write after the normal Plan lifecycle update. The fresh read and optimistic
+// lock ensure this Plan-owned condition never replaces a concurrent status
+// update.
+func (r *Reconciler) patchVirtualizationValidationCondition(ctx context.Context, key client.ObjectKey) error {
+	plan := &api.Plan{}
+	if err := r.APIReader.Get(ctx, key, plan); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	original := plan.DeepCopy()
+	condition, err := validationcontroller.PlanCondition(ctx, r.APIReader, plan)
+	if err != nil {
+		return err
+	}
+	if condition == nil {
+		plan.Status.DeleteCondition(api.ConditionDestinationVirtualizationValid)
+	} else {
+		plan.Status.SetCondition(*condition)
+	}
+	if reflect.DeepEqual(original.Status, plan.Status) {
+		return nil
+	}
+	return base.PatchStatus(ctx, r.Status(), original, plan.DeepCopy())
 }
 
 func (r *Reconciler) setPopulatorDataSourceLabels(plan *api.Plan) {
