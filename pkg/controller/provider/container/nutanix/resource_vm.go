@@ -22,7 +22,7 @@ func (e vmEntity) mergedResources() libclient.VMResources {
 	if out.PowerState == "" {
 		out.PowerState = status.PowerState
 	}
-	if len(out.NICList) == 0 {
+	if len(status.NICList) > 0 {
 		out.NICList = status.NICList
 	}
 	if len(out.DiskList) == 0 {
