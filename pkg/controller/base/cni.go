@@ -9,7 +9,7 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
-// Multus / transfer-network annotation keys (Plan importer pods and Toehold build pods).
+// Multus / transfer-network annotation keys (Plan importer pods and CopyApplianceTemplate build pods).
 const (
 	// AnnLegacyTransferNetwork is the legacy Multus annotation (value=namespace/name).
 	// FIXME: phase out in favor of AnnTransferNetwork.

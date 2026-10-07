@@ -1,0 +1,14 @@
+---
+# Example ForkliftController with copyApplianceTemplate / copy-appliance images.
+# Placement (datastore, folder, network, resource pool) belongs on the
+# vSphere Provider.spec.settings — see forklift_v1beta1_provider_copyApplianceTemplate.yaml.
+apiVersion: forklift.konveyor.io/v1beta1
+kind: ForkliftController
+metadata:
+  name: forklift-controller
+  namespace: openshift-mtv
+spec:
+  feature_copy_appliance: "true"
+  copy_appliance_template_builder_image_fqin: quay.io/kubev2v/copy-appliance-template-builder:latest
+  copy_appliance_template_base_disk_container_image_fqin: registry.redhat.io/rhel9/rhel-guest-image:latest
+  copy_appliance_container_image_fqin: quay.io/kubev2v/nbd-container:latest

@@ -16,8 +16,8 @@ const (
 	// SSHKeysSecretPrefix is the prefix used for ESXi offload SSH key secrets.
 	SSHKeysSecretPrefix = "offload-ssh-keys"
 
-	// ToeholdSSHKeysSecretPrefix is the prefix used for toehold appliance SSH key secrets.
-	ToeholdSSHKeysSecretPrefix = "toehold-ssh-keys"
+	// CopyApplianceTemplateSSHKeysSecretPrefix is the prefix used for copy appliance SSH key secrets.
+	CopyApplianceTemplateSSHKeysSecretPrefix = "copy-appliance-ssh-keys"
 
 	// RestrictedSSHCommandTemplate is the inline shell command used in SSH authorized_keys
 	// to restrict SSH access and route commands to the shell wrapper based on datastore.
@@ -69,24 +69,24 @@ func GenerateSSHPublicSecretName(providerName string) (string, error) {
 	return fmt.Sprintf("%s-%s-public", SSHKeysSecretPrefix, sanitized), nil
 }
 
-// GenerateToeholdSSHPrivateSecretName generates a secret name for the toehold
+// GenerateCopyApplianceSSHPrivateSecretName generates a secret name for the copy appliance template
 // appliance SSH private key.
-func GenerateToeholdSSHPrivateSecretName(providerName string) (string, error) {
+func GenerateCopyApplianceSSHPrivateSecretName(providerName string) (string, error) {
 	sanitized, err := SanitizeProviderName(providerName)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate toehold SSH private secret name: %w", err)
+		return "", fmt.Errorf("failed to generate copy appliance SSH private secret name: %w", err)
 	}
-	return fmt.Sprintf("%s-%s-private", ToeholdSSHKeysSecretPrefix, sanitized), nil
+	return fmt.Sprintf("%s-%s-private", CopyApplianceTemplateSSHKeysSecretPrefix, sanitized), nil
 }
 
-// GenerateToeholdSSHPublicSecretName generates a secret name for the toehold
+// GenerateCopyApplianceSSHPublicSecretName generates a secret name for the copy appliance template
 // appliance SSH public key.
-func GenerateToeholdSSHPublicSecretName(providerName string) (string, error) {
+func GenerateCopyApplianceSSHPublicSecretName(providerName string) (string, error) {
 	sanitized, err := SanitizeProviderName(providerName)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate toehold SSH public secret name: %w", err)
+		return "", fmt.Errorf("failed to generate copy appliance SSH public secret name: %w", err)
 	}
-	return fmt.Sprintf("%s-%s-public", ToeholdSSHKeysSecretPrefix, sanitized), nil
+	return fmt.Sprintf("%s-%s-public", CopyApplianceTemplateSSHKeysSecretPrefix, sanitized), nil
 }
 
 // TestSSHConnectivity tests if we can connect via SSH and execute a restricted command.

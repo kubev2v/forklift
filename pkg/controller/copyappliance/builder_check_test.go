@@ -12,7 +12,7 @@ func TestBuildCheck(t *testing.T) {
 	provider := testProvider()
 	builder := &Builder{Provider: provider, Inventory: testInventory()}
 
-	appliance, err := builder.Check(testToehold())
+	appliance, err := builder.Check(testCopyApplianceTemplate())
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
@@ -22,7 +22,7 @@ func TestBuildCheck(t *testing.T) {
 	if len(appliance.Spec.AttachDisks) != 0 {
 		t.Errorf("AttachDisks = %+v, want none", appliance.Spec.AttachDisks)
 	}
-	if appliance.Spec.Template != "/DC0/vm/templates/vcenter-toehold" {
+	if appliance.Spec.Template != "/DC0/vm/templates/vcenter-copy-appliance-template" {
 		t.Errorf("Template = %q, want the copy appliance template's inventory path", appliance.Spec.Template)
 	}
 	// The same placement a migration appliance gets, which is the point: the
@@ -31,8 +31,8 @@ func TestBuildCheck(t *testing.T) {
 		t.Errorf("placement = (%q, %q), want the template's folder and datastore",
 			appliance.Spec.Folder, appliance.Spec.Datastore)
 	}
-	if appliance.Spec.Secret.Name != "toehold-ssh-keys-vcenter-private" {
-		t.Errorf("Secret = %v, want the toehold private secret", appliance.Spec.Secret)
+	if appliance.Spec.Secret.Name != "copy-appliance-ssh-keys-vcenter-private" {
+		t.Errorf("Secret = %v, want the copyApplianceTemplate private secret", appliance.Spec.Secret)
 	}
 
 	// Generated, and found again by its labels rather than by its name.
@@ -69,11 +69,11 @@ func TestCheckPrefixFitsAVMName(t *testing.T) {
 // blank one would send the finder looking for "the default" object.
 func TestBuildCheckRejectsAnUnimportedTemplate(t *testing.T) {
 	withSettings(t, testSettings())
-	toehold := testToehold()
-	toehold.Status.Template.Moref = ""
+	copyApplianceTemplate := testCopyApplianceTemplate()
+	copyApplianceTemplate.Status.Template.Moref = ""
 	builder := &Builder{Provider: testProvider(), Inventory: testInventory()}
 
-	_, err := builder.Check(toehold)
+	_, err := builder.Check(copyApplianceTemplate)
 	if err == nil {
 		t.Fatal("Check succeeded without a template moref")
 	}

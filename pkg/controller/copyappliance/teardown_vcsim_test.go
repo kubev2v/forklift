@@ -256,14 +256,8 @@ func TestTeardownAgainstSimulatedVCenter(t *testing.T) {
 			t.Errorf("a VM that is already off started task %q", status.TaskRef)
 		}
 
-		detach, err := applianceContext.DetachDisks(ctx, vm)
-		if err != nil {
-			t.Fatalf("DetachDisks: %v", err)
-		}
-		err = detach.Wait(ctx)
-		if err != nil {
-			t.Fatalf("detach the disks: %v", err)
-		}
+		// Spec.AttachDisks name source VMDKs that are not on this simulated
+		// VM, so DetachAttachedDisks has nothing to do and starts no task.
 		status.Phase = api.PhaseDetachDisks
 		_, err = runner.execute(ctx)
 		if err != nil {
@@ -273,7 +267,7 @@ func TestTeardownAgainstSimulatedVCenter(t *testing.T) {
 			t.Fatalf("phase = %q, want %q", status.Phase, api.PhaseWaitForDetachDisks)
 		}
 		if status.TaskRef != "" {
-			t.Errorf("a VM with no disks started task %q", status.TaskRef)
+			t.Errorf("a VM with no source disks to detach started task %q", status.TaskRef)
 		}
 	})
 
