@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"os"
@@ -18,6 +19,17 @@ type InspectionV2V struct {
 	OS InspectionOS `xml:"operatingsystem"`
 }
 
+// virtInspectorXML matches the root element produced by virt-inspector.
+type virtInspectorXML struct {
+	XMLName xml.Name     `xml:"operatingsystems"`
+	OS      InspectionOS `xml:"operatingsystem"`
+}
+
+type v2vInspectionXML struct {
+	XMLName xml.Name     `xml:"v2v"`
+	OS      InspectionOS `xml:"operatingsystem"`
+}
+
 func GetInspectionV2vFromFile(xmlFilePath string) (*InspectionV2V, error) {
 	xmlData, err := os.ReadFile(xmlFilePath)
 	if err != nil {
@@ -25,12 +37,50 @@ func GetInspectionV2vFromFile(xmlFilePath string) (*InspectionV2V, error) {
 		return nil, err
 	}
 
-	var xmlConf InspectionV2V
-	err = xml.Unmarshal(xmlData, &xmlConf)
+	root, err := xmlRootElement(xmlData)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling XML: %v", err)
+		return nil, fmt.Errorf("error reading XML root: %w", err)
 	}
-	return &xmlConf, nil
+
+	switch root {
+	case "operatingsystems":
+		var inspectorXML virtInspectorXML
+		if err := xml.Unmarshal(xmlData, &inspectorXML); err != nil {
+			return nil, fmt.Errorf("error unmarshalling XML: %w", err)
+		}
+		if !hasInspectionOS(inspectorXML.OS) {
+			return nil, fmt.Errorf("no operating system detected in inspection XML")
+		}
+		return &InspectionV2V{OS: inspectorXML.OS}, nil
+	case "v2v":
+		var v2vXML v2vInspectionXML
+		if err := xml.Unmarshal(xmlData, &v2vXML); err != nil {
+			return nil, fmt.Errorf("error unmarshalling XML: %w", err)
+		}
+		if !hasInspectionOS(v2vXML.OS) {
+			return nil, fmt.Errorf("no operating system detected in inspection XML")
+		}
+		return &InspectionV2V{OS: v2vXML.OS}, nil
+	default:
+		return nil, fmt.Errorf("unexpected inspection XML root element: %s", root)
+	}
+}
+
+func xmlRootElement(data []byte) (string, error) {
+	dec := xml.NewDecoder(bytes.NewReader(data))
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return "", err
+		}
+		if se, ok := tok.(xml.StartElement); ok {
+			return se.Name.Local, nil
+		}
+	}
+}
+
+func hasInspectionOS(os InspectionOS) bool {
+	return os.Name != "" || os.Distro != "" || os.Osinfo != "" || os.Arch != ""
 }
 
 func (os InspectionOS) IsWindows() bool {
