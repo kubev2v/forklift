@@ -506,6 +506,13 @@ func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) (
 				Value: "true",
 			})
 	}
+	if settings.Settings.SplitVirtCustomize {
+		env = append(env,
+			core.EnvVar{
+				Name:  "V2V_splitVirtCustomize",
+				Value: "true",
+			})
+	}
 
 	env = append(env, core.EnvVar{
 		Name:  "LOCAL_MIGRATION",
