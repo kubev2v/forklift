@@ -435,6 +435,11 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:radio:true
         - urn:alm:descriptor:com.tectonic.ui:radio:false
+      - description: Run virt-v2v and virt-customize as separate commands.
+        displayName: Feature Split Virt Customize
+        path: feature_split_virt_customize
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Enable validation service.
         displayName: Feature Validation
         path: feature_validation

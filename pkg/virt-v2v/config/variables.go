@@ -46,6 +46,7 @@ const (
 	EnvXfsCompatibilityName             = "V2V_xfsCompatibility"
 	EnvXfsRepairIgnoreName              = "V2V_xfsRepairIgnore"
 	EnvOverlayEnabledName               = "V2V_overlayEnabled"
+	EnvSplitVirtCustomizeName           = "V2V_splitVirtCustomize"
 )
 
 const (
@@ -139,6 +140,8 @@ type AppConfig struct {
 	SupportsNoFstrim bool
 	// V2V_overlayEnabled — use qcow2 overlay for in-place conversions (default true)
 	OverlayEnabled bool
+	// V2V_splitVirtCustomize — run virt-customize after virt-v2v instead of inlining it
+	SplitVirtCustomize bool
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
@@ -162,6 +165,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.BoolVar(&s.IsLocalMigration, "local-migration", s.getEnvBool(EnvLocalMigrationName, true), "Migration is in local or remote cluster")
 	flag.BoolVar(&s.IsInPlace, "in-place", s.getEnvBool(EnvInPlaceName, false), "Run virt-v2v-in-place on already populated disks")
 	flag.BoolVar(&s.OverlayEnabled, "overlay-enabled", s.getEnvBool(EnvOverlayEnabledName, true), "Use qcow2 overlay for in-place conversions")
+	flag.BoolVar(&s.SplitVirtCustomize, "split-virt-customize", s.getEnvBool(EnvSplitVirtCustomizeName, false), "Run virt-v2v and virt-customize as separate commands")
 	flag.BoolVar(&s.NbdeClevis, "nbde-clevis", s.getEnvBool(EnvNbdeClevis, false), "virt-v2v should unencrypt the disks via clevis client")
 	flag.StringVar(&s.Source, "source", os.Getenv(EnvSourceName), "Source of VM ['ova','vSphere']")
 	flag.StringVar(&s.LibvirtUrl, "libvirt-url", os.Getenv(EnvLibvirtUrlName), "Libvirt domain to the vSphere")

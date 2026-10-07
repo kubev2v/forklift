@@ -426,6 +426,13 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_split_virt_customize:
+                default: "true"
+                description: Run virt-v2v and virt-customize as separate commands.
+                enum:
+                - "true"
+                - "false"
+                type: string
               feature_ui_plugin:
                 default: "true"
                 description: Enable UI plugin.

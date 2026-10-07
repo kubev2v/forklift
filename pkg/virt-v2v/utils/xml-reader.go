@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"os"
@@ -25,12 +26,29 @@ func GetInspectionV2vFromFile(xmlFilePath string) (*InspectionV2V, error) {
 		return nil, err
 	}
 
-	var xmlConf InspectionV2V
-	err = xml.Unmarshal(xmlData, &xmlConf)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling XML: %v", err)
+	decoder := xml.NewDecoder(bytes.NewReader(xmlData))
+	var root string
+	for root == "" {
+		token, err := decoder.Token()
+		if err != nil {
+			return nil, fmt.Errorf("error reading XML root: %w", err)
+		}
+		if start, ok := token.(xml.StartElement); ok {
+			root = start.Name.Local
+		}
 	}
-	return &xmlConf, nil
+	if root != "operatingsystems" && root != "v2v" {
+		return nil, fmt.Errorf("unexpected inspection XML root element: %s", root)
+	}
+
+	var inspection InspectionV2V
+	if err := xml.Unmarshal(xmlData, &inspection); err != nil {
+		return nil, fmt.Errorf("error unmarshalling XML: %w", err)
+	}
+	if inspection.OS.Name == "" && inspection.OS.Distro == "" && inspection.OS.Osinfo == "" && inspection.OS.Arch == "" {
+		return nil, fmt.Errorf("no operating system detected in inspection XML")
+	}
+	return &inspection, nil
 }
 
 func (os InspectionOS) IsWindows() bool {
