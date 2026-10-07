@@ -5,7 +5,6 @@ import (
 	"net"
 	"path"
 	"sort"
-	"strings"
 
 	"fmt"
 
@@ -111,40 +110,6 @@ func ResolveNICModes(nics []NICRef, networkMap *api.NetworkMap, preserveStaticIP
 		modes[nic.MAC] = mode
 	}
 	return modes
-}
-
-// ResolveNICIPv6Modes returns explicit MAC->IPv6-mode overrides based on NetworkMap pairs.
-func ResolveNICIPv6Modes(nics []NICRef, networkMap *api.NetworkMap) map[string]string {
-	modes := map[string]string{}
-	if networkMap == nil {
-		return modes
-	}
-	pool := NewNADPool()
-	for _, nic := range nics {
-		pairs := networkMap.FindAllNetworks(nic.NetworkID)
-		if len(pairs) == 0 {
-			continue
-		}
-		pair, allocated := AllocateNetwork(pool, pairs)
-		if !allocated || pair.Destination.Type == Ignored || pair.NetworkIPv6Mode == "" {
-			continue
-		}
-		modes[nic.MAC] = string(pair.NetworkIPv6Mode)
-	}
-	return modes
-}
-
-func FormatNICIPv6Modes(modes map[string]string) string {
-	macs := make([]string, 0, len(modes))
-	for mac := range modes {
-		macs = append(macs, mac)
-	}
-	sort.Strings(macs)
-	entries := make([]string, 0, len(macs))
-	for _, mac := range macs {
-		entries = append(entries, mac+"="+modes[mac])
-	}
-	return strings.Join(entries, ",")
 }
 
 func HasPreserveMode(modes map[string]string) bool {

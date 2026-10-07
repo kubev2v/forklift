@@ -577,22 +577,6 @@ var _ = Describe("Customize", func() {
 		})
 	})
 
-	Describe("parseNetworkIPv6Modes", func() {
-		It("normalizes MACs and parses preserve and none modes", func() {
-			modes, err := parseNetworkIPv6Modes("AA:BB:CC:DD:EE:01=preserve,00:11:22:33:44:55=none")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(modes).To(Equal([]IPv6ModeConfig{
-				{MAC: "aa-bb-cc-dd-ee-01", Mode: "preserve"},
-				{MAC: "00-11-22-33-44-55", Mode: "none"},
-			}))
-		})
-
-		It("rejects unsupported modes", func() {
-			_, err := parseNetworkIPv6Modes("00:11:22:33:44:55=dhcp")
-			Expect(err).To(HaveOccurred())
-		})
-	})
-
 	Describe("injectStaticIPTemplate renders typed data", func() {
 		It("renders IPv4 and IPv6 entries grouped by MAC", func() {
 			tmpDir := GinkgoT().TempDir()
@@ -715,8 +699,8 @@ var _ = Describe("Customize", func() {
 		It("runs Windows customization for Windows OS", func() {
 			customize.disks = disks
 			customize.operatingSystem = utils.InspectionOS{Osinfo: "win10"}
-			appConfig.Workdir = GinkgoT().TempDir()
-			customize.embeddedFileSystem = &EmbedToolImpl{Filesystem: &scriptFS}
+
+			mockEmbedTool.EXPECT().CreateFilesFromFS(appConfig.Workdir).Return(nil)
 			mockCommandBuilder.EXPECT().New("virt-customize").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
@@ -724,7 +708,7 @@ var _ = Describe("Customize", func() {
 			// DynamicScriptsDir does not exist
 			mockFileSystem.EXPECT().Stat(appConfig.DynamicScriptsDir).Return(nil, os.ErrNotExist)
 
-			// QEMU GA upload; no binding override was supplied.
+			// addWinFirstbootScripts - QEMU GA upload + batch upload (IPv6 script only if PodNetworkMACs set)
 			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
 
@@ -744,8 +728,8 @@ var _ = Describe("Customize", func() {
 		It("returns error when Windows customization fails", func() {
 			customize.disks = disks
 			customize.operatingSystem = utils.InspectionOS{Osinfo: "win10"}
-			appConfig.Workdir = GinkgoT().TempDir()
-			customize.embeddedFileSystem = &EmbedToolImpl{Filesystem: &scriptFS}
+
+			mockEmbedTool.EXPECT().CreateFilesFromFS(appConfig.Workdir).Return(nil)
 			mockCommandBuilder.EXPECT().New("virt-customize").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
@@ -772,16 +756,6 @@ var _ = Describe("Customize", func() {
 	Describe("customizeWindows", func() {
 		It("customizes Windows with dynamic scripts", func() {
 			customize.disks = disks
-			appConfig.Source = config.HYPERV
-			appConfig.NetworkIPv6Modes = "00:11:22:33:44:55=none"
-			appConfig.Workdir = GinkgoT().TempDir()
-			windowsScriptsPath := filepath.Join(appConfig.Workdir, "scripts", "windows")
-			Expect(os.MkdirAll(windowsScriptsPath, 0755)).To(Succeed())
-			for _, name := range []string{adapterBindingSyncTemplate} {
-				content, err := scriptFS.ReadFile("scripts/windows/" + name)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(os.WriteFile(filepath.Join(windowsScriptsPath, name), content, 0644)).To(Succeed())
-			}
 
 			winScripts := utils.ConvertMockDirEntryToOs([]utils.MockDirEntry{
 				{FileName: "01_win_firstboot_setup.ps1", FileIsDir: false},
@@ -795,8 +769,8 @@ var _ = Describe("Customize", func() {
 			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
 
-			// Dynamic script, binding sync, and QEMU GA uploads.
-			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder).Times(3)
+			// Dynamic script upload + QEMU GA upload
+			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder).Times(2)
 
 			// addWinFirstbootScripts
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
@@ -833,12 +807,6 @@ var _ = Describe("Customize", func() {
 			customize.disks = disks
 			appConfig.VsphereVmwareDriverRemoval = true
 			appConfig.Source = config.VSPHERE
-			appConfig.Workdir = GinkgoT().TempDir()
-			windowsScriptsPath := filepath.Join(appConfig.Workdir, "scripts", "windows")
-			Expect(os.MkdirAll(windowsScriptsPath, 0755)).To(Succeed())
-			script, err := scriptFS.ReadFile("scripts/windows/" + adapterBindingSyncTemplate)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(os.WriteFile(filepath.Join(windowsScriptsPath, adapterBindingSyncTemplate), script, 0644)).To(Succeed())
 
 			mockFileSystem.EXPECT().Stat(appConfig.DynamicScriptsDir).Return(nil, os.ErrNotExist)
 
@@ -846,7 +814,7 @@ var _ = Describe("Customize", func() {
 			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
 
-			// QEMU GA and VMware driver removal uploads; no IPv6 mode was supplied.
+			// QEMU GA upload + VMware driver removal uploads
 			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder).Times(3)
 
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
@@ -860,7 +828,7 @@ var _ = Describe("Customize", func() {
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 
-			err = customize.customizeWindows()
+			err := customize.customizeWindows()
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -1229,48 +1197,6 @@ var _ = Describe("Customize", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("9999-network-config-registry.ps1.tmpl"))
 		})
-
-		It("uploads adapter binding sync scripts when modes are set", func() {
-			appConfig.Source = config.HYPERV
-			appConfig.NetworkIPv6Modes = "00:11:22:33:44:55=preserve"
-			appConfig.Workdir = GinkgoT().TempDir()
-			windowsScriptsPath := filepath.Join(appConfig.Workdir, "scripts", "windows")
-			Expect(os.MkdirAll(windowsScriptsPath, 0755)).To(Succeed())
-			for _, name := range []string{adapterBindingSyncTemplate} {
-				content, err := scriptFS.ReadFile("scripts/windows/" + name)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(os.WriteFile(filepath.Join(windowsScriptsPath, name), content, 0644)).To(Succeed())
-			}
-
-			mockCommandBuilder.EXPECT().AddArg(UploadCmd, filepath.Join(windowsScriptsPath, "3000-sync-adapter-bindings.ps1")+":"+filepath.Join(WinFirstbootScriptsPath, "3000-sync-adapter-bindings.ps1")).Return(mockCommandBuilder)
-
-			err := customize.addAdapterBindingSync(mockCommandBuilder)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("renders and uploads per-NIC IPv6 binding modes", func() {
-			appConfig.Source = config.VSPHERE
-			appConfig.NetworkIPv6Modes = "00:11:22:33:44:55=none"
-			workdir := GinkgoT().TempDir()
-			appConfig.Workdir = workdir
-			windowsScriptsPath := filepath.Join(workdir, "scripts", "windows")
-			Expect(os.MkdirAll(windowsScriptsPath, 0755)).To(Succeed())
-			for _, name := range []string{adapterBindingSyncTemplate} {
-				content, err := scriptFS.ReadFile("scripts/windows/" + name)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(os.WriteFile(filepath.Join(windowsScriptsPath, name), content, 0644)).To(Succeed())
-			}
-
-			mockCommandBuilder.EXPECT().AddArg(UploadCmd, filepath.Join(windowsScriptsPath, "3000-sync-adapter-bindings.ps1")+":"+filepath.Join(WinFirstbootScriptsPath, "3000-sync-adapter-bindings.ps1")).Return(mockCommandBuilder)
-
-			err := customize.addAdapterBindingSync(mockCommandBuilder)
-			Expect(err).NotTo(HaveOccurred())
-			content, err := os.ReadFile(filepath.Join(windowsScriptsPath, "3000-sync-adapter-bindings.ps1"))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(string(content)).To(ContainSubstring("'00-11-22-33-44-55' = 'none'"))
-			Expect(string(content)).To(ContainSubstring("Get-NetAdapterBinding -Name $sourceAdapter.Name"))
-			Expect(string(content)).NotTo(ContainSubstring("ms_tcpip6\\Linkage"))
-			Expect(string(content)).NotTo(ContainSubstring("vmwareRegInstances"))
-		})
 	})
+
 })

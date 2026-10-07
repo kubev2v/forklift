@@ -211,13 +211,6 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	r.removeExcludedDisks(vm)
 	macsToIps := ""
 	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
-	ipv6ModesByMAC := planbase.ResolveNICIPv6Modes(nicRefsFromVM(vm), r.Map.Network)
-	if len(ipv6ModesByMAC) > 0 {
-		env = append(env, core.EnvVar{
-			Name:  "V2V_networkIPv6Modes",
-			Value: planbase.FormatNICIPv6Modes(ipv6ModesByMAC),
-		})
-	}
 	if planbase.HasPreserveMode(modeByMAC) || planbase.HasDHCPMode(modeByMAC) {
 		macsToIps, err = r.mapMacStaticIps(vm, modeByMAC)
 		if err != nil {
