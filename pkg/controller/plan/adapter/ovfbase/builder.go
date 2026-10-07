@@ -412,7 +412,12 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		return
 	}
 	for _, disk := range vm.Disks {
-		mB := disk.Capacity / 0x100000
+		diskSizeBytes, capErr := getResourceCapacity(disk.Capacity, disk.CapacityAllocationUnits)
+		if capErr != nil {
+			err = liberr.Wrap(capErr, "disk", disk.Name)
+			return
+		}
+		mB := diskSizeBytes / 0x100000
 		list = append(
 			list,
 			&plan.Task{
