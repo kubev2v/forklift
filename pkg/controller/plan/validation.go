@@ -466,7 +466,7 @@ func (r *Reconciler) validateCopyAppliance(ctx *plancontext.Context) error {
 	if provider == nil {
 		return nil
 	}
-	toehold, err := copyApplianceTemplateForProvider(r.Client, provider)
+	copyApplianceTemplate, err := copyApplianceTemplateForProvider(r.Client, provider)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			plan.Status.SetCondition(libcnd.Condition{
@@ -480,13 +480,13 @@ func (r *Reconciler) validateCopyAppliance(ctx *plancontext.Context) error {
 		}
 		return err
 	}
-	if toehold.Status.Phase != api.CopyApplianceTemplatePhaseSucceeded {
+	if copyApplianceTemplate.Status.Phase != api.CopyApplianceTemplatePhaseSucceeded {
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     CopyApplianceTemplateNotReady,
 			Status:   True,
 			Category: api.CategoryCritical,
 			Reason:   NotValid,
-			Message:  fmt.Sprintf("Copy appliance template %q is not ready (phase=%s).", toehold.Name, toehold.Status.Phase),
+			Message:  fmt.Sprintf("Copy appliance template %q is not ready (phase=%s).", copyApplianceTemplate.Name, copyApplianceTemplate.Status.Phase),
 		})
 	}
 

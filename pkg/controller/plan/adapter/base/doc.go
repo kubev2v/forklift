@@ -66,6 +66,9 @@ const (
 	// TCP NBD URI for VDDK import via a copy appliance export.
 	AnnVddkNbdConnection = "cdi.kubevirt.io/storage.import.vddk.nbdConnection"
 
+	// Secret with ca-cert.pem / client-cert.pem / client-key.pem for nbds://.
+	AnnVddkNbdTlsSecret = "cdi.kubevirt.io/storage.import.vddk.nbdTlsSecret"
+
 	// CDI import backing file annotation on PVC
 	AnnImportBackingFile = "cdi.kubevirt.io/storage.import.backingFile"
 

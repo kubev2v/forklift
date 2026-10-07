@@ -16,7 +16,7 @@ import (
 // comes from the provider; these come from the ForkliftController.
 func withSyncSettings(t *testing.T) {
 	t.Helper()
-	withToeholdSettings(t)
+	withCopyApplianceTemplateSettings(t)
 	Settings.TemplateCPU = 4
 	Settings.TemplateMemoryMiB = 8192
 	Settings.BuilderImage = "builder:latest"
@@ -36,7 +36,7 @@ func syncProvider() *api.Provider {
 // provider dictates are empty or wrong, and the ones it does not are set.
 func syncTemplate() *api.CopyApplianceTemplate {
 	return &api.CopyApplianceTemplate{
-		ObjectMeta: meta.ObjectMeta{Namespace: "forklift", Name: "vcenter-toehold"},
+		ObjectMeta: meta.ObjectMeta{Namespace: "forklift", Name: "vcenter-copy-appliance-template"},
 		Spec: api.CopyApplianceTemplateSpec{
 			Datastore:       "the-old-datastore",
 			TransferNetwork: &core.ObjectReference{Name: "migration-net", Namespace: "openshift-mtv"},
@@ -45,20 +45,20 @@ func syncTemplate() *api.CopyApplianceTemplate {
 	}
 }
 
-func testToeholdSync(t *testing.T, provider *api.Provider, objs ...client.Object) *toeholdSync {
+func testCopyApplianceTemplateSync(t *testing.T, provider *api.Provider, objs ...client.Object) *copyApplianceTemplateSync {
 	t.Helper()
 	cl := fake.NewClientBuilder().
 		WithScheme(testCheckScheme(t)).
 		WithObjects(objs...).
 		WithStatusSubresource(&api.Provider{}, &api.CopyAppliance{}, &api.CopyApplianceTemplate{}).
 		Build()
-	return newToeholdSync(cl, provider)
+	return newCopyApplianceTemplateSync(cl, provider)
 }
 
-func getTemplate(t *testing.T, s *toeholdSync) *api.CopyApplianceTemplate {
+func getTemplate(t *testing.T, s *copyApplianceTemplateSync) *api.CopyApplianceTemplate {
 	t.Helper()
 	found := &api.CopyApplianceTemplate{}
-	key := client.ObjectKey{Namespace: "forklift", Name: "vcenter-toehold"}
+	key := client.ObjectKey{Namespace: "forklift", Name: "vcenter-copy-appliance-template"}
 	if err := s.client.Get(context.TODO(), key, found); err != nil {
 		t.Fatalf("get template: %v", err)
 	}
@@ -67,10 +67,10 @@ func getTemplate(t *testing.T, s *toeholdSync) *api.CopyApplianceTemplate {
 
 // The spec has fields the provider dictates and fields it does not. Replacing
 // the whole spec would wipe the ones nothing else ever writes back.
-func TestToeholdSyncPreservesFieldsTheProviderDoesNotOwn(t *testing.T) {
+func TestCopyApplianceTemplateSyncPreservesFieldsTheProviderDoesNotOwn(t *testing.T) {
 	withSyncSettings(t)
 	provider := syncProvider()
-	s := testToeholdSync(t, provider, provider, syncTemplate())
+	s := testCopyApplianceTemplateSync(t, provider, provider, syncTemplate())
 
 	if err := s.Run(context.TODO()); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -88,7 +88,7 @@ func TestToeholdSyncPreservesFieldsTheProviderDoesNotOwn(t *testing.T) {
 	if spec.Provider.Name != "vcenter" || spec.Provider.Namespace != "forklift" {
 		t.Errorf("Provider = %v, want the provider", spec.Provider)
 	}
-	if spec.TemplateName != "vcenter-toehold" {
+	if spec.TemplateName != "vcenter-copy-appliance-template" {
 		t.Errorf("TemplateName = %q", spec.TemplateName)
 	}
 	if spec.BaseDisk.ContainerImage != "registry.example/rhel:9" {
@@ -108,10 +108,10 @@ func TestToeholdSyncPreservesFieldsTheProviderDoesNotOwn(t *testing.T) {
 
 // The template is created by the console or the API. A provider that makes its
 // own would start a build nobody asked for.
-func TestToeholdSyncDoesNotCreate(t *testing.T) {
+func TestCopyApplianceTemplateSyncDoesNotCreate(t *testing.T) {
 	withSyncSettings(t)
 	provider := syncProvider()
-	s := testToeholdSync(t, provider, provider)
+	s := testCopyApplianceTemplateSync(t, provider, provider)
 
 	if err := s.Run(context.TODO()); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -127,11 +127,11 @@ func TestToeholdSyncDoesNotCreate(t *testing.T) {
 }
 
 // The provider reconciles every 30s. A sync that wrote every time would be a
-// write per provider per 30s, and would wake the toehold controller each time.
-func TestToeholdSyncIsIdempotent(t *testing.T) {
+// write per provider per 30s, and would wake the copyApplianceTemplate controller each time.
+func TestCopyApplianceTemplateSyncIsIdempotent(t *testing.T) {
 	withSyncSettings(t)
 	provider := syncProvider()
-	s := testToeholdSync(t, provider, provider, syncTemplate())
+	s := testCopyApplianceTemplateSync(t, provider, provider, syncTemplate())
 
 	if err := s.Run(context.TODO()); err != nil {
 		t.Fatalf("first pass: %v", err)
@@ -148,12 +148,12 @@ func TestToeholdSyncIsIdempotent(t *testing.T) {
 }
 
 // Ownership is what makes deleting the provider delete its template.
-func TestToeholdSyncSetsOwnership(t *testing.T) {
+func TestCopyApplianceTemplateSyncSetsOwnership(t *testing.T) {
 	withSyncSettings(t)
 	provider := syncProvider()
 
 	t.Run("on a template it has not seen", func(t *testing.T) {
-		s := testToeholdSync(t, provider, provider, syncTemplate())
+		s := testCopyApplianceTemplateSync(t, provider, provider, syncTemplate())
 		if err := s.Run(context.TODO()); err != nil {
 			t.Fatalf("Run: %v", err)
 		}
@@ -165,7 +165,7 @@ func TestToeholdSyncSetsOwnership(t *testing.T) {
 
 	// The spec already matching is not a reason to leave it unowned.
 	t.Run("on a template whose spec already matches", func(t *testing.T) {
-		s := testToeholdSync(t, provider, provider, syncTemplate())
+		s := testCopyApplianceTemplateSync(t, provider, provider, syncTemplate())
 		if err := s.Run(context.TODO()); err != nil {
 			t.Fatalf("settle: %v", err)
 		}
@@ -185,9 +185,9 @@ func TestToeholdSyncSetsOwnership(t *testing.T) {
 	})
 }
 
-// Writing placement the provider has not resolved yet would send the toehold
+// Writing placement the provider has not resolved yet would send the copyApplianceTemplate
 // controller off to build against empty strings.
-func TestToeholdSyncWaitsForTheProvider(t *testing.T) {
+func TestCopyApplianceTemplateSyncWaitsForTheProvider(t *testing.T) {
 	tests := []struct {
 		name     string
 		provider func(*api.Provider)
@@ -213,15 +213,15 @@ func TestToeholdSyncWaitsForTheProvider(t *testing.T) {
 		},
 		{
 			name:     "no datastore is set",
-			provider: func(p *api.Provider) { delete(p.Spec.Settings, api.ToeholdDatastore) },
+			provider: func(p *api.Provider) { delete(p.Spec.Settings, api.CopyApplianceDatastore) },
 		},
 		{
 			name:     "no folder is set",
-			provider: func(p *api.Provider) { delete(p.Spec.Settings, api.ToeholdFolder) },
+			provider: func(p *api.Provider) { delete(p.Spec.Settings, api.CopyApplianceFolder) },
 		},
 		{
 			name:     "no network is set",
-			provider: func(p *api.Provider) { delete(p.Spec.Settings, api.ToeholdNetwork) },
+			provider: func(p *api.Provider) { delete(p.Spec.Settings, api.CopyApplianceNetwork) },
 		},
 	}
 	for _, tt := range tests {
@@ -234,7 +234,7 @@ func TestToeholdSyncWaitsForTheProvider(t *testing.T) {
 			if tt.provider != nil {
 				tt.provider(provider)
 			}
-			s := testToeholdSync(t, provider, provider, syncTemplate())
+			s := testCopyApplianceTemplateSync(t, provider, provider, syncTemplate())
 			before := getTemplate(t, s).ResourceVersion
 
 			if err := s.Run(context.TODO()); err != nil {

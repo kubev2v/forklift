@@ -2,11 +2,20 @@ package copyappliance
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/kubev2v/forklift/pkg/nbd-container/announce"
+	core "k8s.io/api/core/v1"
 )
 
 // testKeyDir is the appliance secret as the pod finds it mounted.
@@ -24,7 +33,7 @@ func testKeyDir(t *testing.T, keys ...string) string {
 
 // everyKey is what the controller projects into the setup pod.
 func everyKey() []string {
-	return []string{sshPrivateKeyData, announce.CACert, announce.ServerCert, announce.ServerKey}
+	return []string{sshPrivateKeyData, announce.CACert, announce.CAKey, announce.ServerCert, announce.ServerKey}
 }
 
 func TestReadKeyDir(t *testing.T) {
@@ -54,7 +63,7 @@ func TestReadKeyDir(t *testing.T) {
 		if err == nil {
 			t.Fatal("readKeyDir succeeded with a key missing")
 		}
-		if !errorMentions(t, err, filepath.Join(dir, announce.ServerKey)) {
+		if !errorMentions(t, err, filepath.Join(dir, announce.CAKey)) {
 			t.Errorf("error = %q, want it to name the missing file", err)
 		}
 	})
@@ -130,5 +139,48 @@ func TestRunSetupRequiresTheSecret(t *testing.T) {
 	}
 	if !errorMentions(t, err, sshPrivateKeyData) {
 		t.Errorf("error = %q, want it to name the key that is missing", err)
+	}
+}
+
+func TestMintServerTLS(t *testing.T) {
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "ca"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		IsCA:                  true,
+		KeyUsage:              x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+	}
+	caDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &caKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caKeyDER, err := x509.MarshalPKCS8PrivateKey(caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := &core.Secret{Data: map[string][]byte{
+		announce.CACert: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER}),
+		announce.CAKey:  pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: caKeyDER}),
+	}}
+	const address = "192.0.2.10"
+	if err := mintServerTLS(secret, address); err != nil {
+		t.Fatal(err)
+	}
+	block, _ := pem.Decode(secret.Data[announce.ServerCert])
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cert.VerifyHostname(announce.ServerName); err != nil {
+		t.Fatal(err)
+	}
+	if err := cert.VerifyHostname(address); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -135,8 +135,10 @@ func (r *TeardownRunner) execute(ctx context.Context) (reQ time.Duration, err er
 		}
 		reQ = base.SlowReQ
 	case api.PhaseDetachDisks:
+		// Detach only the source VMDKs (no file delete). Leave the toehold
+		// root disk attached so DestroyVM removes it with the VM folder.
 		vm := r.context.VM(r.context.Appliance.Status.MoRef)
-		task, detachErr := r.context.DetachDisks(ctx, vm)
+		task, detachErr := r.context.DetachAttachedDisks(ctx, vm)
 		if detachErr != nil {
 			err = detachErr
 			return
