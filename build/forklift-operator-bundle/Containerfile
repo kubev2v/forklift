@@ -26,6 +26,8 @@ ARG CLI_DOWNLOAD_IMAGE="quay.io/kubev2v/forklift-cli-download:latest"
 ARG OVA_PROVIDER_SERVER_IMAGE="quay.io/kubev2v/forklift-ova-provider-server:latest"
 ARG HYPERV_PROVIDER_SERVER_IMAGE="quay.io/kubev2v/forklift-hyperv-provider-server:latest"
 ARG VALIDATION_IMAGE="quay.io/kubev2v/forklift-validation:latest"
+ARG VIRT_VALIDATION_CONTROLLER_IMAGE="quay.io/openshift-cnv/virt-validation-controller@sha256:e73ca956982c506466e58701d40851346626952bf66ab8aa070e5cfbd14d67a9"
+ARG VIRT_CLUSTER_VALIDATE_IMAGE="quay.io/openshift-cnv/virt-cluster-validate@sha256:308b18a18df009e25db685e4e30039b49f8f2a52c31849046d87b107af7165a5"
 ARG OVA_PROXY_IMAGE="quay.io/kubev2v/forklift-ova-proxy:latest"
 ARG COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE="quay.io/kubev2v/copy-appliance-template-builder:latest"
 

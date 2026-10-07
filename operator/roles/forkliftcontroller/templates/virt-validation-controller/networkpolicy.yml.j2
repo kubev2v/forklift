@@ -1,0 +1,68 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: virt-validation-controller-default-deny
+  namespace: {{ app_namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ app_name }}
+      component: virt-validation-controller
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: virt-validation-controller-allow-api
+  namespace: {{ app_namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ app_name }}
+      component: virt-validation-controller
+  policyTypes: [Egress]
+  egress:
+  - ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 6443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: virt-validation-controller-allow-dns
+  namespace: {{ app_namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ app_name }}
+      component: virt-validation-controller
+  policyTypes: [Egress]
+  egress:
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: virt-validation-controller-allow-metrics
+  namespace: {{ app_namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ app_name }}
+      component: virt-validation-controller
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-monitoring
+    ports:
+    - protocol: TCP
+      port: 8443
