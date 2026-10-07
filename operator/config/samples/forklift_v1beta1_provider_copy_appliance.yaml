@@ -1,0 +1,19 @@
+---
+# Example vSphere Provider with copyApplianceTemplate / copy-appliance placement settings.
+# Pair with forklift_v1beta1_forkliftcontroller_copyApplianceTemplate.yaml for images + feature gate.
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: vsphere
+  namespace: openshift-mtv
+spec:
+  type: vsphere
+  url: https://vcenter.example.com/sdk
+  secret:
+    name: vsphere
+    namespace: openshift-mtv
+  settings:
+    copyApplianceDatastore: datastore1
+    copyApplianceFolder: /Datacenter/vm
+    copyApplianceNetwork: VM Network
+    copyApplianceResourcePool: /Datacenter/host/my-cluster/Resources

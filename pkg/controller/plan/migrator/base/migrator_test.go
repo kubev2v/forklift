@@ -208,7 +208,7 @@ func TestItinerary_ConversionOnlyPlanType(t *testing.T) {
 }
 
 func TestItinerary_CopyApplianceCold_IncludesAppliancePhases(t *testing.T) {
-	settings.Settings.Features.Toehold = true
+	settings.Settings.Features.CopyAppliance = true
 	settings.Settings.ContainerImage = "copy-appliance:latest"
 
 	p := &api.Plan{
@@ -237,7 +237,7 @@ func TestItinerary_CopyApplianceCold_IncludesAppliancePhases(t *testing.T) {
 }
 
 func TestItinerary_CopyApplianceWarm_SelectsWarmCopyAppliance(t *testing.T) {
-	settings.Settings.Features.Toehold = true
+	settings.Settings.Features.CopyAppliance = true
 	settings.Settings.ContainerImage = "copy-appliance:latest"
 	settings.Settings.VddkImage = ""
 
@@ -375,7 +375,7 @@ func TestItinerary_CopyApplianceWarm_SelectsWarmCopyAppliance(t *testing.T) {
 }
 
 func TestStep_WarmCopyApplianceReleaseRefreshBelongToDiskTransfer(t *testing.T) {
-	settings.Settings.Features.Toehold = true
+	settings.Settings.Features.CopyAppliance = true
 	settings.Settings.ContainerImage = "copy-appliance:latest"
 	migrator := newBaseMigratorWithProvider(t, &api.Plan{Spec: api.PlanSpec{Warm: true, MigrateSharedDisks: true}}, nil)
 
@@ -404,7 +404,7 @@ func TestStep_WarmCopyApplianceReleaseRefreshBelongToDiskTransfer(t *testing.T) 
 }
 
 func TestItinerary_NormalWarm_SelectsWarm(t *testing.T) {
-	settings.Settings.Features.Toehold = false
+	settings.Settings.Features.CopyAppliance = false
 	p := &api.Plan{Spec: api.PlanSpec{Warm: true}}
 	migrator := newBaseMigratorWithProvider(t, p, nil)
 

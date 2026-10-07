@@ -97,7 +97,7 @@ spec:
       name: conversions.forklift.konveyor.io
       version: v1beta1
     - description: vSphere copy appliance template builder
-      displayName: Toehold Template
+      displayName: CopyApplianceTemplate Template
       kind: CopyApplianceTemplate
       name: copyappliancetemplates.forklift.konveyor.io
       version: v1beta1

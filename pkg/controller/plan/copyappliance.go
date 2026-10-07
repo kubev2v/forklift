@@ -16,15 +16,15 @@ import (
 )
 
 func copyApplianceTemplateForProvider(c client.Client, provider *api.Provider) (*api.CopyApplianceTemplate, error) {
-	toehold := &api.CopyApplianceTemplate{}
+	copyApplianceTemplate := &api.CopyApplianceTemplate{}
 	err := c.Get(context.TODO(), client.ObjectKey{
 		Namespace: provider.Namespace,
 		Name:      provider.CopyApplianceTemplateName(),
-	}, toehold)
+	}, copyApplianceTemplate)
 	if err != nil {
 		return nil, liberr.Wrap(err, "copy appliance template", provider.CopyApplianceTemplateName())
 	}
-	return toehold, nil
+	return copyApplianceTemplate, nil
 }
 
 func (r *Migration) ensureCopyAppliance(vm *plan.VMStatus) error {
@@ -37,7 +37,7 @@ func (r *Migration) ensureCopyAppliance(vm *plan.VMStatus) error {
 		return err
 	}
 
-	toehold, err := copyApplianceTemplateForProvider(r.Client, provider)
+	copyApplianceTemplate, err := copyApplianceTemplateForProvider(r.Client, provider)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (r *Migration) ensureCopyAppliance(vm *plan.VMStatus) error {
 	if err != nil {
 		return err
 	}
-	appliance, err := builder.Appliance(toehold, vm.Ref, r.Migration.UID)
+	appliance, err := builder.Appliance(copyApplianceTemplate, vm.Ref, r.Migration.UID)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func (r *Migration) buildCopyApplianceAttachDisks(vm *plan.VMStatus) ([]api.Atta
 	if provider == nil {
 		return nil, liberr.New("source provider is not available")
 	}
-	toehold, err := copyApplianceTemplateForProvider(r.Client, provider)
+	copyApplianceTemplate, err := copyApplianceTemplateForProvider(r.Client, provider)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (r *Migration) buildCopyApplianceAttachDisks(vm *plan.VMStatus) ([]api.Atta
 	if err != nil {
 		return nil, err
 	}
-	appliance, err := builder.Appliance(toehold, vm.Ref, r.Migration.UID)
+	appliance, err := builder.Appliance(copyApplianceTemplate, vm.Ref, r.Migration.UID)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (r *Migration) waitForCopyAppliance(vm *plan.VMStatus) (bool, error) {
 		!appliancectrl.IsDeployReady(appliance) {
 		return false, nil
 	}
-	_, err = appliancectrl.ExportNbdConnections(appliance, r.Source.Provider.ToeholdNbdSsl())
+	_, err = appliancectrl.ExportNbdConnections(appliance, r.Source.Provider.CopyApplianceNbdSsl())
 	return err == nil, err
 }
 

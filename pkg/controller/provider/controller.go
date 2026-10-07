@@ -286,13 +286,13 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 			r.Log.Error(err, "failed to ensure SSH keys for vSphere provider")
 			return
 		}
-		if Settings.Features.Toehold {
-			err = r.ensureToeholdSSHKeys(provider)
+		if Settings.Features.CopyAppliance {
+			err = r.ensureCopyApplianceTemplateSSHKeys(provider)
 			if err != nil {
-				r.Log.Error(err, "failed to ensure toehold SSH keys for vSphere provider")
+				r.Log.Error(err, "failed to ensure copyApplianceTemplate SSH keys for vSphere provider")
 				return
 			}
-			err = newToeholdSync(r.Client, provider).Run(ctx)
+			err = newCopyApplianceTemplateSync(r.Client, provider).Run(ctx)
 			if err != nil {
 				r.Log.Error(err, "failed to reconcile copy appliance template for vSphere provider")
 				return
@@ -311,10 +311,10 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// because it sets a blocking condition, and both of those bail on one. The
 	// error is logged rather than returned: returning it would skip
 	// updateProviderStatus, discarding the verdict the check just recorded.
-	if provider.Type() == api.VSphere && Settings.Features.Toehold {
+	if provider.Type() == api.VSphere && Settings.Features.CopyAppliance {
 		checkErr := newApplianceCheck(r.Client, provider).Run(ctx)
 		if checkErr != nil {
-			r.Log.Error(checkErr, "toehold appliance check failed")
+			r.Log.Error(checkErr, "copyApplianceTemplate appliance check failed")
 		}
 	}
 
@@ -591,8 +591,8 @@ func (r *Reconciler) ensureSSHKeys(provider *api.Provider) error {
 	return nil
 }
 
-// ensureToeholdSSHKeys generates and stores SSH keys for toehold appliance VMs.
-func (r *Reconciler) ensureToeholdSSHKeys(provider *api.Provider) error {
+// ensureCopyApplianceTemplateSSHKeys generates and stores SSH keys for copyApplianceTemplate appliance VMs.
+func (r *Reconciler) ensureCopyApplianceTemplateSSHKeys(provider *api.Provider) error {
 	if provider.Type() != api.VSphere {
 		return nil
 	}
@@ -601,28 +601,28 @@ func (r *Reconciler) ensureToeholdSSHKeys(provider *api.Provider) error {
 		return fmt.Errorf("provider name is empty")
 	}
 
-	privateSecretName, err := util.GenerateToeholdSSHPrivateSecretName(providerName)
+	privateSecretName, err := util.GenerateCopyApplianceSSHPrivateSecretName(providerName)
 	if err != nil {
-		return fmt.Errorf("failed to generate toehold SSH private secret name: %w", err)
+		return fmt.Errorf("failed to generate copyApplianceTemplate SSH private secret name: %w", err)
 	}
-	publicSecretName, err := util.GenerateToeholdSSHPublicSecretName(providerName)
+	publicSecretName, err := util.GenerateCopyApplianceSSHPublicSecretName(providerName)
 	if err != nil {
-		return fmt.Errorf("failed to generate toehold SSH public secret name: %w", err)
+		return fmt.Errorf("failed to generate copyApplianceTemplate SSH public secret name: %w", err)
 	}
 
 	existing, err := r.getSSHKeySecret(provider.Namespace, privateSecretName)
 	if err == nil {
-		r.Log.V(1).Info("Toehold SSH keys already exist for provider", "provider", provider.Name)
+		r.Log.V(1).Info("Copy appliance SSH keys already exist for provider", "provider", provider.Name)
 		// A secret predating the merge of the two appliance secrets holds only
 		// the SSH key. Fill in the TLS material rather than regenerating the key
 		// pair, whose public half is already built into the copy appliance template.
-		if err := r.ensureToeholdTLS(existing); err != nil {
+		if err := r.ensureCopyApplianceTemplateTLS(existing); err != nil {
 			return err
 		}
 	} else if !k8serr.IsNotFound(err) {
-		return fmt.Errorf("failed to check for existing toehold SSH private key secret: %w", err)
+		return fmt.Errorf("failed to check for existing copyApplianceTemplate SSH private key secret: %w", err)
 	} else {
-		r.Log.Info("Generating toehold SSH keys for vSphere provider", "provider", provider.Name)
+		r.Log.Info("Generating copyApplianceTemplate SSH keys for vSphere provider", "provider", provider.Name)
 		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
 			return fmt.Errorf("failed to generate RSA key: %w", err)
@@ -643,25 +643,25 @@ func (r *Reconciler) ensureToeholdSSHKeys(provider *api.Provider) error {
 		// The TLS material goes in with the key rather than in a later update: the
 		// reconciler reads through the informer cache, where a secret just created
 		// is not there to be read back yet.
-		privateData, err := toeholdTLS()
+		privateData, err := copyApplianceTemplateTLS()
 		if err != nil {
-			return fmt.Errorf("failed to generate toehold TLS material: %w", err)
+			return fmt.Errorf("failed to generate copyApplianceTemplate TLS material: %w", err)
 		}
 		privateData["private-key"] = privateKeyBytes
 
-		err = r.storeSSHKeySecret(provider.Namespace, privateSecretName, privateData, provider, "toehold-ssh-keys")
+		err = r.storeSSHKeySecret(provider.Namespace, privateSecretName, privateData, provider, "copy-appliance-ssh-keys")
 		if err != nil {
-			return fmt.Errorf("failed to store toehold private key: %w", err)
+			return fmt.Errorf("failed to store copyApplianceTemplate private key: %w", err)
 		}
-		err = r.storeSSHKeySecret(provider.Namespace, publicSecretName, map[string][]byte{"public-key": publicKeyBytes}, provider, "toehold-ssh-keys")
+		err = r.storeSSHKeySecret(provider.Namespace, publicSecretName, map[string][]byte{"public-key": publicKeyBytes}, provider, "copy-appliance-ssh-keys")
 		if err != nil {
-			return fmt.Errorf("failed to store toehold public key: %w", err)
+			return fmt.Errorf("failed to store copyApplianceTemplate public key: %w", err)
 		}
-		r.Log.Info("Toehold SSH keys generated and stored successfully", "provider", provider.Name)
+		r.Log.Info("Copy appliance SSH keys generated and stored successfully", "provider", provider.Name)
 	}
 
-	provider.Status.ToeholdSSHPrivateSecret = privateSecretName
-	provider.Status.ToeholdSSHPublicSecret = publicSecretName
+	provider.Status.CopyApplianceSSHPrivateSecret = privateSecretName
+	provider.Status.CopyApplianceSSHPublicSecret = publicSecretName
 	return nil
 }
 

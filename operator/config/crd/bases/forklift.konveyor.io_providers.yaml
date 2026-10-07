@@ -167,6 +167,14 @@ spec:
                   - type
                   type: object
                 type: array
+              copyApplianceSSHPrivateSecret:
+                description: Name of the secret with the copyApplianceTemplate SSH
+                  private key and TLS material.
+                type: string
+              copyApplianceSSHPublicSecret:
+                description: Name of the secret with the copyApplianceTemplate SSH
+                  public key.
+                type: string
               fingerprint:
                 description: Fingerprint.
                 type: string
@@ -225,13 +233,6 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              toeholdSSHPrivateSecret:
-                description: Name of the secret with the toehold SSH private key and
-                  TLS material.
-                type: string
-              toeholdSSHPublicSecret:
-                description: Name of the secret with the toehold SSH public key.
-                type: string
             type: object
         type: object
     served: true

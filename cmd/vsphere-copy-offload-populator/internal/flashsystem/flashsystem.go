@@ -3,11 +3,11 @@ package flashsystem
 import (
 	"bytes"
 	"context"
+	crand "crypto/rand"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
-	crand "crypto/rand"
 	"math/big"
 	"net/http"
 	"strings"

@@ -40,8 +40,8 @@ type ControllerSettings struct {
 	Providers
 	// Copy appliance settings.
 	CopyAppliance
-	// Toehold settings.
-	Toehold
+	// CopyApplianceTemplate settings.
+	CopyApplianceTemplate
 	OpenShift   bool
 	Development bool
 }
@@ -88,7 +88,7 @@ func (r *ControllerSettings) Load() error {
 	if err != nil {
 		return err
 	}
-	err = r.Toehold.Load()
+	err = r.CopyApplianceTemplate.Load()
 	if err != nil {
 		return err
 	}

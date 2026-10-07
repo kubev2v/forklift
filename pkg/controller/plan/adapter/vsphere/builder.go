@@ -663,21 +663,21 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	if cacert, ok := util.GetCACert(in); ok {
 		object.Data["cacert"] = cacert
 	}
-	if r.Source.Provider.ToeholdNbdSsl() {
-		name := r.Source.Provider.Status.ToeholdSSHPrivateSecret
+	if r.Source.Provider.CopyApplianceNbdSsl() {
+		name := r.Source.Provider.Status.CopyApplianceSSHPrivateSecret
 		if name == "" {
-			return fmt.Errorf("provider has no toehold SSH private secret for NBD TLS")
+			return fmt.Errorf("provider has no copyApplianceTemplate SSH private secret for NBD TLS")
 		}
-		toeholdSecret := &core.Secret{}
+		copyApplianceTemplateSecret := &core.Secret{}
 		if err = r.Get(context.Background(), client.ObjectKey{
 			Name: name, Namespace: r.Source.Provider.Namespace,
-		}, toeholdSecret); err != nil {
-			return fmt.Errorf("failed to get toehold secret %s for NBD TLS: %w", name, err)
+		}, copyApplianceTemplateSecret); err != nil {
+			return fmt.Errorf("failed to get copyApplianceTemplate secret %s for NBD TLS: %w", name, err)
 		}
 		for _, key := range []string{announce.CACert, announce.ClientCert, announce.ClientKey} {
-			data, found := toeholdSecret.Data[key]
+			data, found := copyApplianceTemplateSecret.Data[key]
 			if !found || len(data) == 0 {
-				return fmt.Errorf("toehold secret %s missing %s for NBD TLS", name, key)
+				return fmt.Errorf("copyApplianceTemplate secret %s missing %s for NBD TLS", name, key)
 			}
 			object.Data[key] = data
 		}
@@ -915,6 +915,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				return
 			}
 			dv.Annotations[planbase.AnnVddkNbdConnection] = uri
+			if r.Source.Provider.CopyApplianceNbdSsl() && secret != nil {
+				dv.Annotations[planbase.AnnVddkNbdTlsSecret] = secret.Name
+			}
 		}
 		dvs = append(dvs, *dv)
 	}
@@ -935,7 +938,7 @@ func (r *Builder) nbdConnectionsForVM(vmRef ref.Ref) (map[string]string, error) 
 	if appliance == nil {
 		return nil, liberr.New("copy appliance is gone", "vm", vmRef.ID)
 	}
-	return appliancectrl.ExportNbdConnections(appliance, provider.ToeholdNbdSsl())
+	return appliancectrl.ExportNbdConnections(appliance, provider.CopyApplianceNbdSsl())
 }
 
 func (r *Builder) applyHostsConfig(vmRef ref.Ref, url, thumbprint string) (string, string, error) {

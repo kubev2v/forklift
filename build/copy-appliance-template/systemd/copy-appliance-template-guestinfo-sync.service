@@ -1,0 +1,13 @@
+[Unit]
+Description=Publish copyApplianceTemplate guest network info to vCenter
+After=network-online.target copy-appliance-template-vmtoolsd.service
+Wants=network-online.target
+Requires=copy-appliance-template-vmtoolsd.service
+ConditionPathExists=!/var/lib/copy-appliance-template/guestinfo-published
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/copy-appliance-template-publish-guestinfo.sh
+
+[Install]
+WantedBy=multi-user.target

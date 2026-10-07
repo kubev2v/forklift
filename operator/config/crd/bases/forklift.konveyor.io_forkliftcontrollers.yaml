@@ -341,6 +341,15 @@ spec:
                 description: SSH user the controller logs in to copy appliances as.
                   Defaults to root.
                 type: string
+              copy_appliance_template_base_disk_container_image_fqin:
+                description: |-
+                  Fully-qualified base containerdisk image for copy appliance templates
+                  (e.g. "registry.redhat.io/rhel9/rhel-guest-image:latest").
+                type: string
+              copy_appliance_template_builder_image_fqin:
+                description: Copy appliance template builder image. Optional. If left
+                  empty, the operator automatically sets this from the release payload.
+                type: string
               copy_appliance_template_cpu:
                 default: "2"
                 description: Default OVF CPU count for copy appliance templates.
@@ -371,6 +380,13 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_copy_appliance:
+                default: "false"
+                description: Provision copy appliance templates for vSphere providers.
+                enum:
+                - "true"
+                - "false"
+                type: string
               feature_copy_offload:
                 default: "true"
                 description: Enable copy offload plugins.
@@ -397,13 +413,6 @@ spec:
                 default: "true"
                 description: Enable OVF-based appliance management endpoints (OVA,
                   HyperV).
-                enum:
-                - "true"
-                - "false"
-                type: string
-              feature_toehold:
-                default: "false"
-                description: Provision copy appliance templates for vSphere providers.
                 enum:
                 - "true"
                 - "false"
@@ -733,15 +742,6 @@ spec:
               populator_vsphere_copy_offload_image_fqin:
                 description: vSphere xcopy populator image. Optional. If left empty,
                   the operator automatically sets this from the release payload.
-                type: string
-              toehold_base_disk_container_image_fqin:
-                description: |-
-                  Fully-qualified base containerdisk image for copy appliance templates
-                  (e.g. "registry.redhat.io/rhel9/rhel-guest-image:latest").
-                type: string
-              toehold_builder_image_fqin:
-                description: Toehold builder image. Optional. If left empty, the operator
-                  automatically sets this from the release payload.
                 type: string
               ui_plugin_container_limits_cpu:
                 default: 100m

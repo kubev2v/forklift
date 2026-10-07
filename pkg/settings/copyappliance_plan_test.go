@@ -9,7 +9,7 @@ import (
 )
 
 func TestCopyApplianceEnabledForPlan(t *testing.T) {
-	Settings.Features.Toehold = true
+	Settings.Features.CopyAppliance = true
 	Settings.ContainerImage = "copy-appliance:latest"
 	Settings.VddkImage = ""
 
@@ -34,24 +34,24 @@ func TestCopyApplianceEnabledForPlan(t *testing.T) {
 	}
 
 	if !Settings.EnabledForPlan(p) {
-		t.Fatal("expected copy appliance path for vSphere cold migration with toehold enabled")
+		t.Fatal("expected copy appliance path for vSphere cold migration with copyApplianceTemplate enabled")
 	}
 
 	source.Spec.Settings = map[string]string{api.VDDK: "quay.io/example/vddk:latest"}
 	if Settings.EnabledForPlan(p) {
-		t.Fatal("expected VDDK to take priority over toehold")
+		t.Fatal("expected VDDK to take priority over copyApplianceTemplate")
 	}
 
 	// Global VDDK_IMAGE still wins when the provider has no vddkInitImage setting.
 	source.Spec.Settings = nil
 	Settings.VddkImage = "quay.io/example/vddk-global:latest"
 	if Settings.EnabledForPlan(p) {
-		t.Fatal("expected global VDDK image to take priority over toehold")
+		t.Fatal("expected global VDDK image to take priority over copyApplianceTemplate")
 	}
 	Settings.VddkImage = ""
 
-	Settings.Features.Toehold = false
+	Settings.Features.CopyAppliance = false
 	if Settings.EnabledForPlan(p) {
-		t.Fatal("expected copy appliance disabled when toehold feature is off")
+		t.Fatal("expected copy appliance disabled when copyApplianceTemplate feature is off")
 	}
 }

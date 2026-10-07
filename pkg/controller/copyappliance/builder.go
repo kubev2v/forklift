@@ -32,8 +32,8 @@ func NewBuilder(provider *api.Provider) (*Builder, error) {
 }
 
 // Appliance builds a CopyAppliance that attaches the source VM's disks.
-func (r *Builder) Appliance(toehold *api.CopyApplianceTemplate, vmRef ref.Ref, migrationUID types.UID) (*api.CopyAppliance, error) {
-	appliance, err := r.build(toehold)
+func (r *Builder) Appliance(copyApplianceTemplate *api.CopyApplianceTemplate, vmRef ref.Ref, migrationUID types.UID) (*api.CopyAppliance, error) {
+	appliance, err := r.build(copyApplianceTemplate)
 	if err != nil {
 		return nil, err
 	}
@@ -46,8 +46,8 @@ func (r *Builder) Appliance(toehold *api.CopyApplianceTemplate, vmRef ref.Ref, m
 }
 
 // Check builds a CopyAppliance with no attached disks (provider readiness probe).
-func (r *Builder) Check(toehold *api.CopyApplianceTemplate) (*api.CopyAppliance, error) {
-	appliance, err := r.build(toehold)
+func (r *Builder) Check(copyApplianceTemplate *api.CopyApplianceTemplate) (*api.CopyAppliance, error) {
+	appliance, err := r.build(copyApplianceTemplate)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (r *Builder) Check(toehold *api.CopyApplianceTemplate) (*api.CopyAppliance,
 	return appliance, nil
 }
 
-func (r *Builder) build(toehold *api.CopyApplianceTemplate) (*api.CopyAppliance, error) {
+func (r *Builder) build(copyApplianceTemplate *api.CopyApplianceTemplate) (*api.CopyAppliance, error) {
 	provider := r.Provider
 	if provider.Type() != api.VSphere {
 		return nil, liberr.New(fmt.Sprintf(
@@ -77,9 +77,9 @@ func (r *Builder) build(toehold *api.CopyApplianceTemplate) (*api.CopyAppliance,
 				settings.CopyApplianceContainerImage,
 			"image", Settings.ContainerImage)
 	}
-	if provider.Status.ToeholdSSHPrivateSecret == "" {
+	if provider.Status.CopyApplianceSSHPrivateSecret == "" {
 		return nil, liberr.New(
-			"provider has no toehold SSH private secret yet",
+			"provider has no copyApplianceTemplate SSH private secret yet",
 			"provider", provider.Name)
 	}
 
@@ -90,11 +90,11 @@ func (r *Builder) build(toehold *api.CopyApplianceTemplate) (*api.CopyAppliance,
 		},
 		Secret: core.ObjectReference{
 			Namespace: provider.Namespace,
-			Name:      provider.Status.ToeholdSSHPrivateSecret,
+			Name:      provider.Status.CopyApplianceSSHPrivateSecret,
 		},
 		ContainerImage: Settings.ContainerImage,
 	}
-	if err := r.placement(toehold, &spec); err != nil {
+	if err := r.placement(copyApplianceTemplate, &spec); err != nil {
 		return nil, err
 	}
 	return &api.CopyAppliance{
@@ -103,19 +103,19 @@ func (r *Builder) build(toehold *api.CopyApplianceTemplate) (*api.CopyAppliance,
 	}, nil
 }
 
-// placement copies folder/datastore/template from the toehold and resolves
+// placement copies folder/datastore/template from the copyApplianceTemplate and resolves
 // datacenter + resource pool from inventory (by template moref; templates are
 // not listed by path).
-func (r *Builder) placement(toehold *api.CopyApplianceTemplate, spec *api.CopyApplianceSpec) error {
-	spec.Folder = toehold.Spec.Folder
-	spec.Datastore = toehold.Spec.Datastore
-	spec.Template = path.Join(toehold.Spec.Folder, toehold.Spec.TemplateName)
+func (r *Builder) placement(copyApplianceTemplate *api.CopyApplianceTemplate, spec *api.CopyApplianceSpec) error {
+	spec.Folder = copyApplianceTemplate.Spec.Folder
+	spec.Datastore = copyApplianceTemplate.Spec.Datastore
+	spec.Template = path.Join(copyApplianceTemplate.Spec.Folder, copyApplianceTemplate.Spec.TemplateName)
 
-	moRef := toehold.Status.Template.Moref
+	moRef := copyApplianceTemplate.Status.Template.Moref
 	if moRef == "" {
 		return liberr.New(fmt.Sprintf(
 			"copy appliance template %s has no moref to place the appliance from",
-			toehold.Name))
+			copyApplianceTemplate.Name))
 	}
 	vm := &model.VM{}
 	if err := r.Inventory.Find(vm, ref.Ref{ID: moRef}); err != nil {

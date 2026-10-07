@@ -114,7 +114,7 @@ type ForkliftControllerSpec struct {
 	// +kubebuilder:default="false"
 	// +kubebuilder:validation:Enum="true";"false"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:radio:true","urn:alm:descriptor:com.tectonic.ui:radio:false"}
-	FeatureToehold string `json:"feature_toehold,omitempty"`
+	FeatureCopyAppliance string `json:"feature_copy_appliance,omitempty"`
 
 	// Container Images
 
@@ -190,10 +190,10 @@ type ForkliftControllerSpec struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	OVAProxyFQIN string `json:"ova_proxy_fqin,omitempty"`
-	// Toehold builder image. Optional. If left empty, the operator automatically sets this from the release payload.
+	// Copy appliance template builder image. Optional. If left empty, the operator automatically sets this from the release payload.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
-	ToeholdBuilderImageFQIN string `json:"toehold_builder_image_fqin,omitempty"`
+	CopyApplianceTemplateBuilderImageFQIN string `json:"copy_appliance_template_builder_image_fqin,omitempty"`
 
 	// Copy appliance template defaults
 
@@ -201,7 +201,7 @@ type ForkliftControllerSpec struct {
 	// (e.g. "registry.redhat.io/rhel9/rhel-guest-image:latest").
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
-	ToeholdBaseDiskContainerImageFQIN string `json:"toehold_base_disk_container_image_fqin,omitempty"`
+	CopyApplianceTemplateBaseDiskContainerImageFQIN string `json:"copy_appliance_template_base_disk_container_image_fqin,omitempty"`
 	// Default OVF CPU count for copy appliance templates.
 	// +optional
 	// +kubebuilder:default="2"

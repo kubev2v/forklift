@@ -135,7 +135,7 @@ OVA_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG
 CLI_DOWNLOAD_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG)
 VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-copy-offload-populator:$(REGISTRY_TAG)
 DEEP_INSPECTION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-deep-inspection:$(REGISTRY_TAG)
-TOEHOLD_BUILDER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/toehold-builder:$(REGISTRY_TAG)
+COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/copy-appliance-template-builder:$(REGISTRY_TAG)
 NBD_CONTAINER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/nbd-container:$(REGISTRY_TAG)
 
 ### OLM
@@ -403,7 +403,7 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg OVA_PROXY_IMAGE=$(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE=$(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VIRT_V2V_IMAGE_RHEL9=$(VIRT_V2V_IMAGE_RHEL9)$(PLATFORM_SUFFIX) \
-		--build-arg TOEHOLD_BUILDER_IMAGE=$(TOEHOLD_BUILDER_IMAGE)$(PLATFORM_SUFFIX)
+		--build-arg COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE=$(COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE)$(PLATFORM_SUFFIX)
 
 push-operator-bundle-image: build-operator-bundle-image
 	$(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)$(PLATFORM_SUFFIX)
@@ -466,11 +466,11 @@ build-vsphere-copy-offload-populator-image: check_container_runtime
 push-vsphere-copy-offload-populator-image: build-vsphere-copy-offload-populator-image
 	$(CONTAINER_CMD) push $(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
 
-build-toehold-builder-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(TOEHOLD_BUILDER_IMAGE)$(PLATFORM_SUFFIX) -f build/toehold/Containerfile.builder .
+build-copy-appliance-template-builder-image: check_container_runtime
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE)$(PLATFORM_SUFFIX) -f build/copy-appliance-template/Containerfile.builder .
 
-push-toehold-builder-image: build-toehold-builder-image
-	$(CONTAINER_CMD) push $(TOEHOLD_BUILDER_IMAGE)$(PLATFORM_SUFFIX)
+push-copy-appliance-template-builder-image: build-copy-appliance-template-builder-image
+	$(CONTAINER_CMD) push $(COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE)$(PLATFORM_SUFFIX)
 
 build-nbd-container-image: check_container_runtime ## Build nbdkit container image loaded onto copy appliances
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(NBD_CONTAINER_IMAGE)$(PLATFORM_SUFFIX) -f build/nbd-container/Containerfile .
@@ -530,7 +530,7 @@ build-all-images: build-api-image \
                   build-ovirt-populator-image \
                   build-openstack-populator-image\
                   build-vsphere-copy-offload-populator-image\
-                  build-toehold-builder-image \
+                  build-copy-appliance-template-builder-image \
                   build-nbd-container-image \
                   build-ova-provider-server-image \
                   build-hyperv-provider-server-image \
@@ -550,7 +550,7 @@ push-all-images:  push-api-image \
                   push-ovirt-populator-image \
                   push-openstack-populator-image\
                   push-vsphere-copy-offload-populator-image\
-                  push-toehold-builder-image \
+                  push-copy-appliance-template-builder-image \
                   push-nbd-container-image \
                   push-ova-provider-server-image \
                   push-hyperv-provider-server-image \

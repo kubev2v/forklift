@@ -1,0 +1,17 @@
+[Unit]
+Description=VMware Tools from copyApplianceTemplate appliance installroot
+After=network-online.target copy-appliance-template-vgauthd.service
+Wants=network-online.target
+Requires=copy-appliance-template-vgauthd.service
+
+[Service]
+Type=simple
+Environment=LD_LIBRARY_PATH=/opt/copy-appliance-template/appliance-root/usr/lib64:/opt/copy-appliance-template/appliance-root/usr/lib
+ExecStart=/opt/copy-appliance-template/appliance-root/usr/bin/vmtoolsd -p /opt/copy-appliance-template/appliance-root/usr/lib64/open-vm-tools -c /etc/vmware-tools/tools.conf
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=300
+StartLimitBurst=20
+
+[Install]
+WantedBy=multi-user.target

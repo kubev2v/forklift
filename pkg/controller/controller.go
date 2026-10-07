@@ -19,6 +19,7 @@ package controller
 import (
 	"github.com/kubev2v/forklift/pkg/controller/conversion"
 	"github.com/kubev2v/forklift/pkg/controller/copyappliance"
+	"github.com/kubev2v/forklift/pkg/controller/copyappliancetemplate"
 	"github.com/kubev2v/forklift/pkg/controller/hook"
 	"github.com/kubev2v/forklift/pkg/controller/host"
 	"github.com/kubev2v/forklift/pkg/controller/hyperv"
@@ -28,7 +29,6 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/ova"
 	"github.com/kubev2v/forklift/pkg/controller/plan"
 	"github.com/kubev2v/forklift/pkg/controller/provider"
-	"github.com/kubev2v/forklift/pkg/controller/toehold"
 	"github.com/kubev2v/forklift/pkg/settings"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -50,7 +50,7 @@ var MainControllers = []AddFunction{
 	hook.Add,
 	conversion.Add,
 	copyappliance.Add,
-	toehold.Add,
+	copyappliancetemplate.Add,
 }
 
 // List of Inventory controllers

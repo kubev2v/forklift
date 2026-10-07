@@ -2159,7 +2159,7 @@ var _ = Describe("Copy appliance DataVolumes", func() {
 	)
 
 	warmCopyApplianceBuilder := func(objs ...runtime.Object) *Builder {
-		settings.Settings.Features.Toehold = true
+		settings.Settings.Features.CopyAppliance = true
 		settings.Settings.ContainerImage = "copy-appliance:latest"
 		settings.Settings.VddkImage = ""
 
@@ -2239,6 +2239,7 @@ var _ = Describe("Copy appliance DataVolumes", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(dvs).To(HaveLen(1))
 		Expect(dvs[0].Annotations).To(HaveKeyWithValue(planbase.AnnVddkNbdConnection, nbdURI))
+		Expect(dvs[0].Annotations).To(HaveKeyWithValue(planbase.AnnVddkNbdTlsSecret, "test-secret"))
 	})
 })
 
@@ -2251,16 +2252,16 @@ func createBuilder(objs ...runtime.Object) *Builder {
 	_ = storagev1.AddToScheme(scheme)
 	v1beta1.SchemeBuilder.AddToScheme(scheme)
 
-	// Add default toehold SSH secret for NBD TLS (enabled by default)
-	toeholdSecret := &core.Secret{
-		ObjectMeta: meta.ObjectMeta{Name: "test-toehold-ssh-key", Namespace: "test"},
+	// Add default copyApplianceTemplate SSH secret for NBD TLS (enabled by default)
+	copyApplianceTemplateSecret := &core.Secret{
+		ObjectMeta: meta.ObjectMeta{Name: "test-copy-appliance-template-ssh-key", Namespace: "test"},
 		Data: map[string][]byte{
 			"ca-cert.pem":     []byte("-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----\n"),
 			"client-cert.pem": []byte("-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----\n"),
 			"client-key.pem":  []byte("-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n"),
 		},
 	}
-	objs = append(objs, toeholdSecret)
+	objs = append(objs, copyApplianceTemplateSecret)
 
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -2285,7 +2286,7 @@ func createBuilder(objs ...runtime.Object) *Builder {
 						URL:  "https://vcenter.test.example.com/sdk",
 					},
 					Status: v1beta1.ProviderStatus{
-						ToeholdSSHPrivateSecret: "test-toehold-ssh-key",
+						CopyApplianceSSHPrivateSecret: "test-copy-appliance-template-ssh-key",
 					},
 				},
 				Inventory: nil,

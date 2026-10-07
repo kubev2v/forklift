@@ -27,7 +27,7 @@ const ApplianceContainerImageName = "localhost/forklift-copy-appliance"
 
 // AppliancePodmanLoadCommand reads a docker archive on its standard input and
 // adds what it finds to the appliance's podman store.
-const AppliancePodmanLoadCommand = "/usr/local/bin/toehold-podman load"
+const AppliancePodmanLoadCommand = "/usr/local/bin/copy-appliance-template-podman load"
 
 // An appliance is cloned under the name its CR was given, and vCenter rejects a
 // VM name over 80 characters. The API server appends a ~5-char suffix to a
