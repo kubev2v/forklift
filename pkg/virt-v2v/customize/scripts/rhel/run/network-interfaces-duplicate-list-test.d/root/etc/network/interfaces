@@ -1,0 +1,10 @@
+# This file describes the network interfaces available on your system.
+
+auto lo
+iface lo inet loopback
+
+auto ens192
+allow-hotplug ens192
+iface ens192 inet static
+	address 192.0.2.11/24
+	gateway 192.0.2.1
