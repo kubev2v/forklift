@@ -25,6 +25,8 @@ images[UI_PLUGIN_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-o
 images[CLI_DOWNLOAD_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-cli-download@sha256:0000000000000000000000000000000000000000000000000000000000000000
 
 images[VALIDATION_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/validation@sha256:58edf1e9d49c33bdd62abcd632a61ba61e68b8977f3f57e9feb93c1dd4f07fb6
+images[VIRT_VALIDATION_CONTROLLER_IMAGE]=quay.io/openshift-cnv/virt-validation-controller@sha256:e73ca956982c506466e58701d40851346626952bf66ab8aa070e5cfbd14d67a9
+images[VIRT_CLUSTER_VALIDATE_IMAGE]=quay.io/openshift-cnv/virt-cluster-validate@sha256:308b18a18df009e25db685e4e30039b49f8f2a52c31849046d87b107af7165a5
 
 images[VIRT_V2V_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/virt-v2v@sha256:9a8548cf4439121ceaa7a8d626d6c6f1f9280f63b2daf471d24fd62c8185a3f4
 

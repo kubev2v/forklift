@@ -19,6 +19,16 @@ rules:
   verbs:
   - '*'
 - apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - patch
+  - update
+- apiGroups:
   - route.openshift.io
   resources:
   - routes
@@ -36,7 +46,6 @@ rules:
 - apiGroups:
   - monitoring.coreos.com
   resources:
-  - servicemonitors
   - prometheusrules
   verbs:
   - get
@@ -45,6 +54,16 @@ rules:
   - patch
   - list
   - watch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - patch
+  - update
 - apiGroups:
   - apps.openshift.io
   resources:
