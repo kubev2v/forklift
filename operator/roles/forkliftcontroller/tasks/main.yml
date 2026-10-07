@@ -599,14 +599,14 @@
       api_version: validation.kubevirt.io/v1alpha1
       kind: VirtualizationValidation
     register: virtualization_validations
-    when: not k8s_cluster|bool
+    when: not k8s_cluster|bool and 'validation.kubevirt.io' in api_groups
 
   - name: "Require virtualization validations to be removed before finalizing"
     assert:
       that:
       - virtualization_validations.resources | length == 0
       fail_msg: "Delete or cancel all VirtualizationValidation resources before uninstalling MTV."
-    when: not k8s_cluster|bool
+    when: not k8s_cluster|bool and 'validation.kubevirt.io' in api_groups
 
   - name: "Remove virtualization validation controller resources"
     k8s:

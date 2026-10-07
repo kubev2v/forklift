@@ -21,6 +21,13 @@ contains() {
     fi
 }
 
+does_not_contain() {
+    if grep -Fq -- "$2" "$1"; then
+        echo "Unexpected value: $2 ($1)" >&2
+        exit 1
+    fi
+}
+
 command -v ansible-playbook >/dev/null || {
     echo "ansible-playbook is required to render packaging assets" >&2
     exit 1
@@ -56,11 +63,17 @@ contains operator/config/manager/manager.yaml "        - name: VIRT_VALIDATION_C
 contains operator/config/manager/manager.yaml "        - name: VIRT_CLUSTER_VALIDATE_IMAGE"
 contains operator/related_images.yaml "  - name: virt-validation-controller"
 contains operator/related_images.yaml "  - name: virt-cluster-validate"
-contains operator/roles/forkliftcontroller/tasks/main.yml "  - when: not k8s_cluster|bool"
 contains operator/roles/forkliftcontroller/tasks/main.yml "Require virtualization validations to be removed before finalizing"
-contains operator/config/rbac/role.yaml "  - escalate"
-contains operator/config/rbac/role.yaml "  - bind"
-contains operator/config/rbac/role.yaml "  - virt-validation-controller"
+if [[ "$(grep -Fc "when: not k8s_cluster|bool and 'validation.kubevirt.io' in api_groups" operator/roles/forkliftcontroller/tasks/main.yml)" -ne 2 ]]; then
+    echo "VirtualizationValidation finalization checks must require the validation API group" >&2
+    exit 1
+fi
+contains operator/config/rbac/role.yaml "  - validation.kubevirt.io"
+contains operator/config/rbac/role.yaml "  - virtualizationvalidations/status"
+does_not_contain operator/config/rbac/role.yaml "  - escalate"
+does_not_contain operator/config/rbac/role.yaml "  - bind"
+contains operator/streams/upstream/forklift-operator.clusterserviceversion.yaml '      image: "${VIRT_VALIDATION_CONTROLLER_IMAGE}"'
+contains operator/streams/upstream/forklift-operator.clusterserviceversion.yaml '      image: "${VIRT_CLUSTER_VALIDATE_IMAGE}"'
 
 kubectl kustomize operator/config/default >/dev/null
 echo "VirtualizationValidation packaging assets are valid."

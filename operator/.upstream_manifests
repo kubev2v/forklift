@@ -13974,6 +13974,18 @@ rules:
   verbs:
   - '*'
 - apiGroups:
+  - validation.kubevirt.io
+  resources:
+  - virtualizationvalidations
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
@@ -14671,14 +14683,87 @@ rules:
   - patch
   - update
 - apiGroups:
-  - rbac.authorization.k8s.io
-  resourceNames:
-  - virt-validation-controller
+  - ""
   resources:
-  - clusterroles
+  - configmaps
   verbs:
-  - escalate
-  - bind
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  - roles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - validation.kubevirt.io
+  resources:
+  - virtualizationvalidations
+  - virtualizationvalidations/finalizers
+  - virtualizationvalidations/status
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -15804,6 +15889,10 @@ spec:
     name: must_gather
   - image: ${VALIDATION_IMAGE}
     name: validation
+  - image: ${VIRT_VALIDATION_CONTROLLER_IMAGE}
+    name: virt-validation-controller
+  - image: ${VIRT_CLUSTER_VALIDATE_IMAGE}
+    name: virt-cluster-validate
   - image: ${API_IMAGE}
     name: api
   - image: ${POPULATOR_CONTROLLER_IMAGE}

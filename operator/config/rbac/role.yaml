@@ -131,11 +131,84 @@ rules:
   - patch
   - update
 - apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
   - rbac.authorization.k8s.io
   resources:
-  - clusterroles
-  resourceNames:
-  - virt-validation-controller
+  - rolebindings
+  - roles
   verbs:
-  - escalate
-  - bind
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - validation.kubevirt.io
+  resources:
+  - virtualizationvalidations
+  - virtualizationvalidations/finalizers
+  - virtualizationvalidations/status
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch

@@ -37,6 +37,12 @@ const (
 	ConditionFailed    = "Failed"
 	ConditionBlocked   = "Blocked"
 	ConditionDeleted   = "Deleted"
+	// ConditionTargetVirtualizationValid reports the advisory VCV verdict on a
+	// remote OpenShift destination Provider.
+	ConditionTargetVirtualizationValid = "TargetVirtualizationValid"
+	// ConditionDestinationVirtualizationValid mirrors the destination Provider
+	// VCV verdict on a migration Plan.
+	ConditionDestinationVirtualizationValid = "DestinationVirtualizationValid"
 )
 
 // Condition categories
