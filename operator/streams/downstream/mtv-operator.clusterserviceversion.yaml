@@ -167,6 +167,11 @@ spec:
           path: feature_use_conversion_cr
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
+        - description: Run virt-v2v and virt-customize as separate commands (default false)
+          displayName: Split Virt Customize
+          path: feature_split_virt_customize
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
         - description: Require authentication (default true)
           displayName: Require Authentication
           path: feature_auth_required
