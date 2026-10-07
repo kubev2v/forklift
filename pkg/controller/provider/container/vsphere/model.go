@@ -1458,8 +1458,46 @@ func (v *VmAdapter) getDiskGuestInfo(deviceKey int32) *model.DiskMountPoint {
 	return nil
 }
 
+// previousDiskCBT returns CBT flags from the current model disks, keyed by
+// bus address (e.g. scsi0:0) and device key. Device-only inventory updates
+// (snapshot create/delete, disk resize, etc.) rebuild the disk list without
+// ExtraConfig, which would otherwise reset ChangeTrackingEnabled to false.
+func (v *VmAdapter) previousDiskCBT() (byAddress map[string]bool, byKey map[int32]bool) {
+	byAddress = make(map[string]bool, len(v.model.Disks))
+	byKey = make(map[int32]bool, len(v.model.Disks))
+	for _, d := range v.model.Disks {
+		byKey[d.Key] = d.ChangeTrackingEnabled
+		deviceKey := d.BusAddress
+		if deviceKey == "" {
+			deviceKey = diskBusAddress(d.Bus, d.BusNumber, d.UnitNumber)
+		}
+		if deviceKey != "" {
+			byAddress[deviceKey] = d.ChangeTrackingEnabled
+		}
+	}
+	return byAddress, byKey
+}
+
+func restoreDiskCBT(disks []model.Disk, byAddress map[string]bool, byKey map[int32]bool) {
+	for i := range disks {
+		disk := &disks[i]
+		deviceKey := disk.BusAddress
+		if deviceKey == "" {
+			deviceKey = diskBusAddress(disk.Bus, disk.BusNumber, disk.UnitNumber)
+		}
+		if enabled, ok := byAddress[deviceKey]; ok {
+			disk.ChangeTrackingEnabled = enabled
+			continue
+		}
+		if enabled, ok := byKey[disk.Key]; ok {
+			disk.ChangeTrackingEnabled = enabled
+		}
+	}
+}
+
 // Update virtual disk devices.
 func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
+	prevCBTByAddress, prevCBTByKey := v.previousDiskCBT()
 	disks := []model.Disk{}
 	for _, dev := range devArray.VirtualDevice {
 		switch dev.(type) {
@@ -1577,5 +1615,6 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 		}
 	}
 
+	restoreDiskCBT(disks, prevCBTByAddress, prevCBTByKey)
 	v.model.Disks = disks
 }
