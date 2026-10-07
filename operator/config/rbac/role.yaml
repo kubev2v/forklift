@@ -131,7 +131,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - ''
+  - ""
   resources:
   - configmaps
   verbs:
@@ -143,20 +143,20 @@ rules:
   - update
   - watch
 - apiGroups:
-  - ''
+  - ""
   resources:
   - events
   verbs:
   - create
   - patch
 - apiGroups:
-  - ''
+  - ""
   resources:
   - secrets
   verbs:
   - get
 - apiGroups:
-  - ''
+  - ""
   resources:
   - serviceaccounts
   verbs:
