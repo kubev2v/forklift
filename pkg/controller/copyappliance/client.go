@@ -38,7 +38,7 @@ type ApplianceContext struct {
 	ApplianceSecret *core.Secret
 	VCenter         *govmomi.Client
 	Log             logging.LevelLogger
-	// NbdSsl requires mutual TLS on nbdkit exports (provider toeholdNbdSsl).
+	// NbdSsl requires mutual TLS on nbdkit exports (provider copyApplianceNbdSsl).
 	NbdSsl     bool
 	finder     *find.Finder
 	folder     *object.Folder
@@ -54,7 +54,7 @@ func NewApplianceContext(ctx context.Context, appliance *api.CopyAppliance, prov
 		Secret:          secret,
 		ApplianceSecret: applianceSecret,
 		Log:             log,
-		NbdSsl:          provider.ToeholdNbdSsl(),
+		NbdSsl:          provider.CopyApplianceNbdSsl(),
 	}
 	ac.VCenter, err = libvsphere.ConnectProvider(
 		ctx,
@@ -424,44 +424,6 @@ func (r *ApplianceContext) DetachAttachedDisks(ctx context.Context, vm *object.V
 		if path == "" || !toDetach[path] {
 			continue
 		}
-		detach = append(detach, &types.VirtualDeviceConfigSpec{
-			Operation:     types.VirtualDeviceConfigSpecOperationRemove,
-			FileOperation: "",
-			Device:        device,
-		})
-	}
-	if len(detach) == 0 {
-		return
-	}
-	task, err = vm.Reconfigure(ctx, types.VirtualMachineConfigSpec{DeviceChange: detach})
-	if err != nil {
-		task = nil
-		if fault.Is(err, &types.ManagedObjectNotFound{}) {
-			err = nil
-			return
-		}
-		err = liberr.Wrap(err, "vm", vm.Reference().Value)
-		return
-	}
-	return
-}
-
-// DetachDisks removes every virtual disk from the appliance VM and returns the
-// task that will do it. The backing vmdk files are left where they are: they
-// belong to other VMs. A VM with no disks left, or that no longer exists, has
-// no work to do and returns no task.
-func (r *ApplianceContext) DetachDisks(ctx context.Context, vm *object.VirtualMachine) (task *object.Task, err error) {
-	devices, err := vm.Device(ctx)
-	if err != nil {
-		if fault.Is(err, &types.ManagedObjectNotFound{}) {
-			err = nil
-			return
-		}
-		err = liberr.Wrap(err, "vm", vm.Reference().Value)
-		return
-	}
-	var detach []types.BaseVirtualDeviceConfigSpec
-	for _, device := range devices.SelectByType((*types.VirtualDisk)(nil)) {
 		detach = append(detach, &types.VirtualDeviceConfigSpec{
 			Operation:     types.VirtualDeviceConfigSpecOperationRemove,
 			FileOperation: "",

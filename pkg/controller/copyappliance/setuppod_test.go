@@ -149,7 +149,7 @@ func TestCreateSetupPod(t *testing.T) {
 		for _, item := range secret.Items {
 			keys = append(keys, item.Key)
 		}
-		want := []string{sshPrivateKeyData, announce.CACert, announce.ServerCert, announce.ServerKey}
+		want := []string{sshPrivateKeyData, announce.CACert, announce.CAKey, announce.ServerCert, announce.ServerKey}
 		slices.Sort(keys)
 		slices.Sort(want)
 		if !slices.Equal(keys, want) {

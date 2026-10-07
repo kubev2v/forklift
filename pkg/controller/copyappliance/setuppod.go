@@ -110,6 +110,7 @@ func (r *DeployRunner) createSetupPod(ctx context.Context, pullSpec, tag string)
 							Items: []core.KeyToPath{
 								{Key: sshPrivateKeyData, Path: sshPrivateKeyData},
 								{Key: announce.CACert, Path: announce.CACert},
+								{Key: announce.CAKey, Path: announce.CAKey},
 								{Key: announce.ServerCert, Path: announce.ServerCert},
 								{Key: announce.ServerKey, Path: announce.ServerKey},
 							},

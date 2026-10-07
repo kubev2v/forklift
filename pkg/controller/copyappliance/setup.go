@@ -2,7 +2,15 @@ package copyappliance
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
+	"math/big"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
@@ -88,6 +96,11 @@ func RunSetup(ctx context.Context, req SetupRequest) (err error) {
 		return
 	}
 
+	err = mintServerTLS(secret, req.Address)
+	if err != nil {
+		return
+	}
+
 	client, err := connectAppliance(ctx, ac)
 	if err != nil {
 		return
@@ -125,6 +138,7 @@ func readKeyDir(dir string) (secret *core.Secret, err error) {
 	for _, key := range []string{
 		sshPrivateKeyData,
 		announce.CACert,
+		announce.CAKey,
 		announce.ServerCert,
 		announce.ServerKey,
 	} {
@@ -220,4 +234,60 @@ func waitActive(orch *Orchestrator) (err error) {
 		}
 		time.Sleep(setupStartInterval)
 	}
+}
+
+// mintServerTLS replaces the server leaf with DNS SAN nbd-server and an IP SAN
+// for address (el9 libnbd verifies nbds:// against the URI host).
+func mintServerTLS(secret *core.Secret, address string) error {
+	ip := net.ParseIP(address)
+	if ip == nil {
+		return liberr.New("copy appliance guest address is not a valid IP", "address", address)
+	}
+	certBlock, _ := pem.Decode(secret.Data[announce.CACert])
+	keyBlock, _ := pem.Decode(secret.Data[announce.CAKey])
+	if certBlock == nil || keyBlock == nil {
+		return liberr.New("appliance secret missing CA material for server cert mint")
+	}
+	ca, err := x509.ParseCertificate(certBlock.Bytes)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	parsed, err := x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	caKey, ok := parsed.(*ecdsa.PrivateKey)
+	if !ok {
+		return liberr.New(announce.CAKey + " is not an ECDSA private key")
+	}
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return err
+	}
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	der, err := x509.CreateCertificate(rand.Reader, &x509.Certificate{
+		SerialNumber:          serial,
+		Subject:               pkix.Name{CommonName: announce.ServerName},
+		NotBefore:             now.Add(-time.Hour),
+		NotAfter:              now.Add(10 * 365 * 24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		DNSNames:              []string{announce.ServerName},
+		IPAddresses:           []net.IP{ip},
+	}, ca, &key.PublicKey, caKey)
+	if err != nil {
+		return fmt.Errorf("sign server certificate: %w", err)
+	}
+	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return err
+	}
+	secret.Data[announce.ServerCert] = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	secret.Data[announce.ServerKey] = pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
+	return nil
 }

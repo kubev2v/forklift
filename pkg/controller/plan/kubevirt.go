@@ -862,35 +862,35 @@ func (r *KubeVirt) CreateDeepInspectionConversionHyperV(
 func (r *KubeVirt) CreateDeepInspectionConversion(
 	vm *plan.VMStatus, snapshotMoref, planName, planID string,
 ) (*api.Conversion, error) {
-	useToeholdNBD := settings.Settings.EnabledForPlan(r.Plan)
+	useCopyApplianceTemplateNBD := settings.Settings.EnabledForPlan(r.Plan)
 	convSettings := map[string]string{api.SpecSettingsSnapshotMorefKey: snapshotMoref}
 	vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
 
 	// Connection secret goes to Plan.Namespace on the management cluster
 	// (DeepInspection pods run there, not on the destination cluster).
 	connSecretData := r.buildDeepInspectionConnectionSecretData()
-	if useToeholdNBD {
+	if useCopyApplianceTemplateNBD {
 		nbdURIs, nbdErr := r.deepInspectionNbdURIs(vm)
 		if nbdErr != nil {
 			return nil, liberr.Wrap(nbdErr)
 		}
 		convSettings[api.SpecSettingsNbdDisksKey] = strings.Join(nbdURIs, ",")
 		vddkImage = ""
-		if r.Source.Provider.ToeholdNbdSsl() {
-			name := r.Source.Provider.Status.ToeholdSSHPrivateSecret
+		if r.Source.Provider.CopyApplianceNbdSsl() {
+			name := r.Source.Provider.Status.CopyApplianceSSHPrivateSecret
 			if name == "" {
-				return nil, fmt.Errorf("provider has no toehold SSH private secret for NBD TLS")
+				return nil, fmt.Errorf("provider has no copyApplianceTemplate SSH private secret for NBD TLS")
 			}
-			toeholdSecret := &core.Secret{}
+			copyApplianceTemplateSecret := &core.Secret{}
 			if err := r.Get(context.TODO(), types.NamespacedName{
 				Name: name, Namespace: r.Source.Provider.Namespace,
-			}, toeholdSecret); err != nil {
-				return nil, fmt.Errorf("failed to get toehold secret %s for NBD TLS: %w", name, err)
+			}, copyApplianceTemplateSecret); err != nil {
+				return nil, fmt.Errorf("failed to get copyApplianceTemplate secret %s for NBD TLS: %w", name, err)
 			}
 			for _, key := range []string{announce.CACert, announce.ClientCert, announce.ClientKey} {
-				pem, found := toeholdSecret.Data[key]
+				pem, found := copyApplianceTemplateSecret.Data[key]
 				if !found || len(pem) == 0 {
-					return nil, fmt.Errorf("toehold secret %s missing %s for NBD TLS", name, key)
+					return nil, fmt.Errorf("copyApplianceTemplate secret %s missing %s for NBD TLS", name, key)
 				}
 				connSecretData[key] = pem
 			}
@@ -984,7 +984,7 @@ func (r *KubeVirt) deepInspectionNbdURIs(vm *plan.VMStatus) ([]string, error) {
 	if appliance == nil {
 		return nil, liberr.New("copy appliance is gone", "vm", vm.ID)
 	}
-	connections, err := appliancectrl.ExportNbdConnections(appliance, provider.ToeholdNbdSsl())
+	connections, err := appliancectrl.ExportNbdConnections(appliance, provider.CopyApplianceNbdSsl())
 	if err != nil {
 		return nil, err
 	}
@@ -1812,7 +1812,7 @@ func (r *KubeVirt) EnsureNbdConnections(vm *plan.VMStatus) error {
 		return liberr.New("copy appliance is gone", "vm", vm.ID)
 	}
 
-	connections, err := appliancectrl.ExportNbdConnections(appliance, provider.ToeholdNbdSsl())
+	connections, err := appliancectrl.ExportNbdConnections(appliance, provider.CopyApplianceNbdSsl())
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -1828,7 +1828,14 @@ func (r *KubeVirt) EnsureNbdConnections(vm *plan.VMStatus) error {
 		if !present {
 			return liberr.New("no NBD export for disk", "backing", backing)
 		}
-		if dv.Annotations[planbase.AnnVddkNbdConnection] == uri {
+		wantTLS := ""
+		if provider.CopyApplianceNbdSsl() {
+			if dv.Spec.Source != nil && dv.Spec.Source.VDDK != nil {
+				wantTLS = dv.Spec.Source.VDDK.SecretRef
+			}
+		}
+		if dv.Annotations[planbase.AnnVddkNbdConnection] == uri &&
+			dv.Annotations[planbase.AnnVddkNbdTlsSecret] == wantTLS {
 			continue
 		}
 		patch := dv.DeepCopy()
@@ -1836,6 +1843,9 @@ func (r *KubeVirt) EnsureNbdConnections(vm *plan.VMStatus) error {
 			patch.Annotations = map[string]string{}
 		}
 		patch.Annotations[planbase.AnnVddkNbdConnection] = uri
+		if wantTLS != "" {
+			patch.Annotations[planbase.AnnVddkNbdTlsSecret] = wantTLS
+		}
 		err = r.Destination.Update(context.TODO(), patch)
 		if err != nil {
 			return liberr.Wrap(err)
