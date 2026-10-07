@@ -22,7 +22,7 @@ const (
 	FeatureUseConversionCR              = "FEATURE_USE_CONVERSION_CR"
 	FeatureRetainPopulatorPods          = "FEATURE_RETAIN_POPULATOR_PODS"
 	FeatureXfsRepairIgnore              = "FEATURE_XFS_REPAIR_IGNORE"
-	FeatureToehold                      = "FEATURE_TOEHOLD"
+	FeatureCopyAppliance                = "FEATURE_COPY_APPLIANCE"
 )
 
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
@@ -79,7 +79,7 @@ type Features struct {
 	// Whether to ignore xfs_repair exit status during conversion.
 	XfsRepairIgnore bool
 	// Whether to provision copy appliance templates for vSphere providers.
-	Toehold bool
+	CopyAppliance bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -122,6 +122,6 @@ func (r *Features) Load() (err error) {
 	r.UseConversionCR = getEnvBool(FeatureUseConversionCR, true)
 	r.RetainPopulatorPods = getEnvBool(FeatureRetainPopulatorPods, false)
 	r.XfsRepairIgnore = getEnvBool(FeatureXfsRepairIgnore, false)
-	r.Toehold = getEnvBool(FeatureToehold, false)
+	r.CopyAppliance = getEnvBool(FeatureCopyAppliance, false)
 	return
 }

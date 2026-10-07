@@ -128,12 +128,12 @@ func testInventory() *fakeInventory {
 		},
 		template: model.VM{
 			VM1: model.VM1{
-				VM0:  vmResource("vm-900", "/DC0/vm/templates/vcenter-toehold", "folder-templates"),
+				VM0:  vmResource("vm-900", "/DC0/vm/templates/vcenter-copy-appliance-template", "folder-templates"),
 				Host: "host-1",
 				Disks: []vspheremodel.Disk{
 					{
 						Key:       2000,
-						File:      "[templates] vcenter-toehold/disk-0.vmdk",
+						File:      "[templates] vcenter-copy-appliance-template/disk-0.vmdk",
 						Capacity:  8 << 30,
 						Datastore: vspheremodel.Ref{Kind: vspheremodel.DsKind, ID: "ds-2"},
 					},
@@ -187,7 +187,7 @@ func (r *fakeInventory) templateParent(kind, id string) *fakeInventory {
 func TestPlacementFollowsTheTemplate(t *testing.T) {
 	inventory := testInventory()
 	spec := api.CopyApplianceSpec{}
-	if err := (&Builder{Provider: testProvider(), Inventory: inventory}).placement(testToehold(), &spec); err != nil {
+	if err := (&Builder{Provider: testProvider(), Inventory: inventory}).placement(testCopyApplianceTemplate(), &spec); err != nil {
 		t.Fatalf("placement: %v", err)
 	}
 	tests := []struct {
@@ -195,7 +195,7 @@ func TestPlacementFollowsTheTemplate(t *testing.T) {
 		got   string
 		want  string
 	}{
-		{"Template", spec.Template, "/DC0/vm/templates/vcenter-toehold"},
+		{"Template", spec.Template, "/DC0/vm/templates/vcenter-copy-appliance-template"},
 		{"Folder", spec.Folder, "/DC0/vm/templates"},
 		{"Datacenter", spec.Datacenter, "/DC0"},
 		// The appliance is not placed on the template's host; the host is
@@ -218,15 +218,15 @@ func TestPlacementFollowsTheTemplate(t *testing.T) {
 // not where the inventory has the template. The two agree unless the template
 // was moved or renamed after the import, and the spec is what the import was
 // told to do.
-func TestPlacementFollowsTheToeholdSpec(t *testing.T) {
+func TestPlacementFollowsTheCopyApplianceTemplateSpec(t *testing.T) {
 	inventory := testInventory()
-	toehold := testToehold()
-	toehold.Spec.Folder = "/DC0/vm/somewhere-else"
-	toehold.Spec.TemplateName = "renamed-since-import"
-	toehold.Spec.Datastore = "another-datastore"
+	copyApplianceTemplate := testCopyApplianceTemplate()
+	copyApplianceTemplate.Spec.Folder = "/DC0/vm/somewhere-else"
+	copyApplianceTemplate.Spec.TemplateName = "renamed-since-import"
+	copyApplianceTemplate.Spec.Datastore = "another-datastore"
 
 	spec := api.CopyApplianceSpec{}
-	if err := (&Builder{Provider: testProvider(), Inventory: inventory}).placement(toehold, &spec); err != nil {
+	if err := (&Builder{Provider: testProvider(), Inventory: inventory}).placement(copyApplianceTemplate, &spec); err != nil {
 		t.Fatalf("placement: %v", err)
 	}
 	if spec.Folder != "/DC0/vm/somewhere-else" {
@@ -244,14 +244,14 @@ func TestPlacementFollowsTheToeholdSpec(t *testing.T) {
 // datacenter set from the placement below, and joining a template name onto it
 // must not make it absolute.
 func TestPlacementRelativeFolder(t *testing.T) {
-	toehold := testToehold()
-	toehold.Spec.Folder = "vm/templates"
+	copyApplianceTemplate := testCopyApplianceTemplate()
+	copyApplianceTemplate.Spec.Folder = "vm/templates"
 
 	spec := api.CopyApplianceSpec{}
-	if err := (&Builder{Provider: testProvider(), Inventory: testInventory()}).placement(toehold, &spec); err != nil {
+	if err := (&Builder{Provider: testProvider(), Inventory: testInventory()}).placement(copyApplianceTemplate, &spec); err != nil {
 		t.Fatalf("placement: %v", err)
 	}
-	if spec.Template != "vm/templates/vcenter-toehold" {
+	if spec.Template != "vm/templates/vcenter-copy-appliance-template" {
 		t.Errorf("Template = %q, want it relative like the folder it is in", spec.Template)
 	}
 }
@@ -266,7 +266,7 @@ func TestPlacementNestedFolder(t *testing.T) {
 		Datacenter: "dc-1",
 	}
 	spec := api.CopyApplianceSpec{}
-	if err := (&Builder{Provider: testProvider(), Inventory: inventory}).placement(testToehold(), &spec); err != nil {
+	if err := (&Builder{Provider: testProvider(), Inventory: inventory}).placement(testCopyApplianceTemplate(), &spec); err != nil {
 		t.Fatalf("placement: %v", err)
 	}
 	if spec.Datacenter != "/DC0" {
@@ -282,7 +282,7 @@ func TestPlacementDatacenterInAFolder(t *testing.T) {
 		Resource: model.Resource{ID: "dc-1", Path: "/east/DC0"},
 	}
 	spec := api.CopyApplianceSpec{}
-	if err := (&Builder{Provider: testProvider(), Inventory: inventory}).placement(testToehold(), &spec); err != nil {
+	if err := (&Builder{Provider: testProvider(), Inventory: inventory}).placement(testCopyApplianceTemplate(), &spec); err != nil {
 		t.Fatalf("placement: %v", err)
 	}
 	if spec.Datacenter != "/east/DC0" {
@@ -306,7 +306,7 @@ func TestPlacementStandaloneHost(t *testing.T) {
 		},
 	}
 	spec := api.CopyApplianceSpec{}
-	if err := (&Builder{Provider: testProvider(), Inventory: inventory}).placement(testToehold(), &spec); err != nil {
+	if err := (&Builder{Provider: testProvider(), Inventory: inventory}).placement(testCopyApplianceTemplate(), &spec); err != nil {
 		t.Fatalf("placement: %v", err)
 	}
 	if spec.ResourcePool != "/DC0/host/esx1.example.com/Resources" {
@@ -318,15 +318,15 @@ func TestPlacementStandaloneHost(t *testing.T) {
 // a way the template can be wrong.
 func TestPlacementErrors(t *testing.T) {
 	tests := []struct {
-		name    string
-		setup   func(*fakeInventory)
-		toehold func(*api.CopyApplianceTemplate)
-		want    string
+		name                  string
+		setup                 func(*fakeInventory)
+		copyApplianceTemplate func(*api.CopyApplianceTemplate)
+		want                  string
 	}{
 		{
-			name:    "template not imported yet",
-			toehold: func(x *api.CopyApplianceTemplate) { x.Status.Template.Moref = "" },
-			want:    "moref",
+			name:                  "template not imported yet",
+			copyApplianceTemplate: func(x *api.CopyApplianceTemplate) { x.Status.Template.Moref = "" },
+			want:                  "moref",
 		},
 		{
 			name:  "template not in the inventory",
@@ -356,15 +356,15 @@ func TestPlacementErrors(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			inventory := testInventory()
-			toehold := testToehold()
+			copyApplianceTemplate := testCopyApplianceTemplate()
 			if tc.setup != nil {
 				tc.setup(inventory)
 			}
-			if tc.toehold != nil {
-				tc.toehold(toehold)
+			if tc.copyApplianceTemplate != nil {
+				tc.copyApplianceTemplate(copyApplianceTemplate)
 			}
 			spec := api.CopyApplianceSpec{}
-			err := (&Builder{Provider: testProvider(), Inventory: inventory}).placement(toehold, &spec)
+			err := (&Builder{Provider: testProvider(), Inventory: inventory}).placement(copyApplianceTemplate, &spec)
 			if err == nil {
 				t.Fatalf("placement succeeded, want an error mentioning %q", tc.want)
 			}
@@ -382,7 +382,7 @@ func TestAttachDisksIsAllTheSourceVMContributes(t *testing.T) {
 	inventory := testInventory().vmParent("VirtualApp", "vapp-1")
 	inventory.vm.Host = ""
 
-	appliance, err := (&Builder{Provider: testProvider(), Inventory: inventory}).Appliance(testToehold(), testRef, testMigrationUID)
+	appliance, err := (&Builder{Provider: testProvider(), Inventory: inventory}).Appliance(testCopyApplianceTemplate(), testRef, testMigrationUID)
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
@@ -402,7 +402,7 @@ func TestBuildRejectsAnUnknownSourceVM(t *testing.T) {
 	withSettings(t, testSettings())
 	inventory := testInventory()
 
-	_, err := (&Builder{Provider: testProvider(), Inventory: inventory}).Appliance(testToehold(), ref.Ref{ID: "vm-404"}, testMigrationUID)
+	_, err := (&Builder{Provider: testProvider(), Inventory: inventory}).Appliance(testCopyApplianceTemplate(), ref.Ref{ID: "vm-404"}, testMigrationUID)
 	if err == nil {
 		t.Fatal("build succeeded for a VM that is not in the inventory")
 	}
@@ -411,14 +411,14 @@ func TestBuildRejectsAnUnknownSourceVM(t *testing.T) {
 	}
 }
 
-// testToehold is the provider's copy appliance template, imported and placed. The
+// testCopyApplianceTemplate is the provider's copy appliance template, imported and placed. The
 // spec is where the import put it; the moref resolves to that same template VM
 // in the fixture inventory.
-func testToehold() *api.CopyApplianceTemplate {
+func testCopyApplianceTemplate() *api.CopyApplianceTemplate {
 	return &api.CopyApplianceTemplate{
-		ObjectMeta: meta.ObjectMeta{Namespace: "forklift", Name: "vcenter-toehold"},
+		ObjectMeta: meta.ObjectMeta{Namespace: "forklift", Name: "vcenter-copy-appliance-template"},
 		Spec: api.CopyApplianceTemplateSpec{
-			TemplateName: "vcenter-toehold",
+			TemplateName: "vcenter-copy-appliance-template",
 			Folder:       "/DC0/vm/templates",
 			Datastore:    "templates",
 		},
@@ -439,8 +439,8 @@ func testProvider() *api.Provider {
 		},
 		Spec: api.ProviderSpec{Type: &vsphere},
 		Status: api.ProviderStatus{
-			ToeholdSSHPrivateSecret: "toehold-ssh-keys-vcenter-private",
-			ToeholdSSHPublicSecret:  "toehold-ssh-keys-vcenter-public",
+			CopyApplianceSSHPrivateSecret: "copy-appliance-ssh-keys-vcenter-private",
+			CopyApplianceSSHPublicSecret:  "copy-appliance-ssh-keys-vcenter-public",
 		},
 	}
 }
@@ -465,7 +465,7 @@ func TestBuild(t *testing.T) {
 	inventory := testInventory()
 	provider := testProvider()
 
-	appliance, err := (&Builder{Provider: provider, Inventory: inventory}).Appliance(testToehold(), testRef, testMigrationUID)
+	appliance, err := (&Builder{Provider: provider, Inventory: inventory}).Appliance(testCopyApplianceTemplate(), testRef, testMigrationUID)
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
@@ -501,8 +501,8 @@ func TestBuild(t *testing.T) {
 	}
 	// The copy appliance template build injects the matching public key; the private
 	// half and the certificates live with the provider.
-	if spec.Secret.Namespace != "forklift" || spec.Secret.Name != "toehold-ssh-keys-vcenter-private" {
-		t.Errorf("Secret = %v, want the toehold private secret in the provider namespace", spec.Secret)
+	if spec.Secret.Namespace != "forklift" || spec.Secret.Name != "copy-appliance-ssh-keys-vcenter-private" {
+		t.Errorf("Secret = %v, want the copyApplianceTemplate private secret in the provider namespace", spec.Secret)
 	}
 	if len(spec.AttachDisks) != 1 {
 		t.Fatalf("AttachDisks = %+v, want one disk from inventory", spec.AttachDisks)
@@ -514,7 +514,7 @@ func TestBuild(t *testing.T) {
 		t.Errorf("AttachDisks[0].Serial = %q", spec.AttachDisks[0].Serial)
 	}
 	// Placement is the template's; only the disks above are the source VM's.
-	if spec.Template != "/DC0/vm/templates/vcenter-toehold" {
+	if spec.Template != "/DC0/vm/templates/vcenter-copy-appliance-template" {
 		t.Errorf("Template = %q, want the copy appliance template's inventory path", spec.Template)
 	}
 	if spec.Folder != "/DC0/vm/templates" || spec.Datastore != "templates" {
@@ -530,7 +530,7 @@ func TestBuildRejectsAnUnconfiguredContainerImage(t *testing.T) {
 	withSettings(t, applied)
 	inventory := testInventory()
 
-	_, err := (&Builder{Provider: testProvider(), Inventory: inventory}).Appliance(testToehold(), testRef, testMigrationUID)
+	_, err := (&Builder{Provider: testProvider(), Inventory: inventory}).Appliance(testCopyApplianceTemplate(), testRef, testMigrationUID)
 	if err == nil {
 		t.Fatal("build succeeded without a container image")
 	}
@@ -551,7 +551,7 @@ func TestBuildRejectsAnImageThatIsNotAPullSpec(t *testing.T) {
 			withSettings(t, applied)
 
 			_, err := (&Builder{Provider: testProvider(), Inventory: testInventory()}).
-				Appliance(testToehold(), testRef, testMigrationUID)
+				Appliance(testCopyApplianceTemplate(), testRef, testMigrationUID)
 
 			if err == nil {
 				t.Fatalf("build succeeded with %q as the container image", image)
@@ -570,7 +570,7 @@ func TestBuildRejectsANonVSphereProvider(t *testing.T) {
 	ovirt := api.OVirt
 	provider.Spec.Type = &ovirt
 
-	_, err := (&Builder{Provider: provider, Inventory: inventory}).Appliance(testToehold(), testRef, testMigrationUID)
+	_, err := (&Builder{Provider: provider, Inventory: inventory}).Appliance(testCopyApplianceTemplate(), testRef, testMigrationUID)
 	if err == nil {
 		t.Fatal("build succeeded for an oVirt provider")
 	}

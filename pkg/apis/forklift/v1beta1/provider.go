@@ -91,11 +91,11 @@ const (
 	AzureSnapshotRG    = "snapshotResourceGroup"
 	AzureTargetRegion  = "targetRegion"
 	AzureSnapshotClass = "volumeSnapshotClassName"
-	// vSphere toehold / copy-appliance placement (per provider).
-	ToeholdDatastore          = "toeholdDatastore"
-	ToeholdFolder             = "toeholdFolder"
-	ToeholdNetwork            = "toeholdNetwork"
-	ToeholdNbdSsl             = "toeholdNbdSsl"
+	// vSphere copyApplianceTemplate / copy-appliance placement (per provider).
+	CopyApplianceDatastore    = "copyApplianceDatastore"
+	CopyApplianceFolder       = "copyApplianceFolder"
+	CopyApplianceNetwork      = "copyApplianceNetwork"
+	CopyApplianceNbdSsl       = "copyApplianceNbdSsl"
 	CopyApplianceResourcePool = "copyApplianceResourcePool"
 )
 
@@ -156,12 +156,12 @@ type ProviderStatus struct {
 	// Used to detect when credentials have been rotated.
 	// +optional
 	SecretResourceVersion string `json:"secretResourceVersion,omitempty"`
-	// Name of the secret with the toehold SSH private key and TLS material.
+	// Name of the secret with the copyApplianceTemplate SSH private key and TLS material.
 	// +optional
-	ToeholdSSHPrivateSecret string `json:"toeholdSSHPrivateSecret,omitempty"`
-	// Name of the secret with the toehold SSH public key.
+	CopyApplianceSSHPrivateSecret string `json:"copyApplianceSSHPrivateSecret,omitempty"`
+	// Name of the secret with the copyApplianceTemplate SSH public key.
 	// +optional
-	ToeholdSSHPublicSecret string `json:"toeholdSSHPublicSecret,omitempty"`
+	CopyApplianceSSHPublicSecret string `json:"copyApplianceSSHPublicSecret,omitempty"`
 }
 
 // +genclient
@@ -253,15 +253,15 @@ func (p *Provider) Setting(key string) string {
 	return p.Spec.Settings[key]
 }
 
-// ToeholdNbdSsl reports whether mutual TLS is required for copy-appliance NBD exports.
-// Enabled by default; set provider setting toeholdNbdSsl to "false" to disable.
-func (p *Provider) ToeholdNbdSsl() bool {
-	return p.Setting(ToeholdNbdSsl) != "false"
+// CopyApplianceNbdSsl reports whether mutual TLS is required for copy-appliance NBD exports.
+// Enabled by default; set provider setting copyApplianceNbdSsl to "false" to disable.
+func (p *Provider) CopyApplianceNbdSsl() bool {
+	return p.Setting(CopyApplianceNbdSsl) != "false"
 }
 
 // CopyApplianceTemplateName is the name of this provider's copy appliance template. The
 // provider controller, the appliance check, the plan and the console create all
 // have to agree on it.
 func (p *Provider) CopyApplianceTemplateName() string {
-	return p.Name + "-toehold"
+	return p.Name + "-copy-appliance-template"
 }

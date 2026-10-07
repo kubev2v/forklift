@@ -4978,10 +4978,8 @@ spec:
                   server half on the appliance and keeps the client half to query the
                   exports with.
 
-                  The server certificate must be issued for the logical name "nbd-server"
-                  rather than for an address. The appliance is cloned on demand and its
-                  address is not known when the certificate is issued, so the client
-                  verifies the name instead of where it reached it.
+                  Server cert is minted at setup with DNS SAN "nbd-server" and an IP SAN for
+                  the guest address (nbds://). CA key stays in this secret for that mint.
                 properties:
                   apiVersion:
                     description: API version of the referent.
@@ -5266,8 +5264,8 @@ spec:
                 type: object
               builderImage:
                 description: |-
-                  Override for the toehold builder container image.
-                  Defaults to the controller TOEHOLD_BUILDER_IMAGE setting when empty.
+                  Override for the copy appliance template builder container image.
+                  Defaults to the controller COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE setting when empty.
                 type: string
               datastore:
                 description: Target vCenter datastore.
@@ -5880,6 +5878,15 @@ spec:
                 description: SSH user the controller logs in to copy appliances as.
                   Defaults to root.
                 type: string
+              copy_appliance_template_base_disk_container_image_fqin:
+                description: |-
+                  Fully-qualified base containerdisk image for copy appliance templates
+                  (e.g. "registry.redhat.io/rhel9/rhel-guest-image:latest").
+                type: string
+              copy_appliance_template_builder_image_fqin:
+                description: Copy appliance template builder image. Optional. If left
+                  empty, the operator automatically sets this from the release payload.
+                type: string
               copy_appliance_template_cpu:
                 default: "2"
                 description: Default OVF CPU count for copy appliance templates.
@@ -5910,6 +5917,13 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_copy_appliance:
+                default: "false"
+                description: Provision copy appliance templates for vSphere providers.
+                enum:
+                - "true"
+                - "false"
+                type: string
               feature_copy_offload:
                 default: "true"
                 description: Enable copy offload plugins.
@@ -5936,13 +5950,6 @@ spec:
                 default: "true"
                 description: Enable OVF-based appliance management endpoints (OVA,
                   HyperV).
-                enum:
-                - "true"
-                - "false"
-                type: string
-              feature_toehold:
-                default: "false"
-                description: Provision copy appliance templates for vSphere providers.
                 enum:
                 - "true"
                 - "false"
@@ -6272,15 +6279,6 @@ spec:
               populator_vsphere_copy_offload_image_fqin:
                 description: vSphere xcopy populator image. Optional. If left empty,
                   the operator automatically sets this from the release payload.
-                type: string
-              toehold_base_disk_container_image_fqin:
-                description: |-
-                  Fully-qualified base containerdisk image for copy appliance templates
-                  (e.g. "registry.redhat.io/rhel9/rhel-guest-image:latest").
-                type: string
-              toehold_builder_image_fqin:
-                description: Toehold builder image. Optional. If left empty, the operator
-                  automatically sets this from the release payload.
                 type: string
               ui_plugin_container_limits_cpu:
                 default: 100m
@@ -12512,6 +12510,14 @@ spec:
                   - type
                   type: object
                 type: array
+              copyApplianceSSHPrivateSecret:
+                description: Name of the secret with the copyApplianceTemplate SSH
+                  private key and TLS material.
+                type: string
+              copyApplianceSSHPublicSecret:
+                description: Name of the secret with the copyApplianceTemplate SSH
+                  public key.
+                type: string
               fingerprint:
                 description: Fingerprint.
                 type: string
@@ -12570,13 +12576,6 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              toeholdSSHPrivateSecret:
-                description: Name of the secret with the toehold SSH private key and
-                  TLS material.
-                type: string
-              toeholdSSHPublicSecret:
-                description: Name of the secret with the toehold SSH public key.
-                type: string
             type: object
         type: object
     served: true
@@ -14036,8 +14035,8 @@ spec:
           value: ${VIRT_CUSTOMIZE_MAP}
         - name: VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE
           value: ${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}
-        - name: TOEHOLD_BUILDER_IMAGE
-          value: ${TOEHOLD_BUILDER_IMAGE}
+        - name: COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE
+          value: ${COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE}
         image: ${OPERATOR_IMAGE}
         imagePullPolicy: Always
         livenessProbe:
@@ -14906,7 +14905,7 @@ spec:
       name: conversions.forklift.konveyor.io
       version: v1beta1
     - description: vSphere copy appliance template builder
-      displayName: Toehold Template
+      displayName: CopyApplianceTemplate Template
       kind: CopyApplianceTemplate
       name: copyappliancetemplates.forklift.konveyor.io
       version: v1beta1
@@ -15021,8 +15020,8 @@ spec:
     name: cli_download
   - image: ${VIRT_V2V_IMAGE_RHEL9}
     name: virt_v2v_rhel9
-  - image: ${TOEHOLD_BUILDER_IMAGE}
-    name: toehold_builder
+  - image: ${COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE}
+    name: copy_appliance_template_builder
   version: ${MTV_VERSION}
 ---
 apiVersion: scorecard.operatorframework.io/v1alpha3

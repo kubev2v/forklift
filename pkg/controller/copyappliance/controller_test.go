@@ -178,7 +178,7 @@ func TestApplianceForgetForeignVM(t *testing.T) {
 	}
 }
 
-// The provider's toehold check reports why its appliance failed, and this is
+// The provider's copyApplianceTemplate check reports why its appliance failed, and this is
 // the only place the reason is recorded. setConverging writes a Ready condition
 // on every non-terminal phase, so the presence of one is not enough.
 func TestFailureReason(t *testing.T) {
