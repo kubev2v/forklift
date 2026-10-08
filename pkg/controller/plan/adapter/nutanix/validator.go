@@ -58,12 +58,18 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
 	if err := r.Source.Inventory.Find(vm, vmRef); err != nil {
 		return false, liberr.Wrap(err, "vm", vmRef.String())
 	}
+	nicRefs := planbase.NICRefsFrom(vm.NICs, func(n model.NIC) planbase.NICRef {
+		return planbase.NICRef{MAC: n.MACAddress, NetworkID: n.SubnetUUID}
+	})
+	modeByMAC := planbase.ResolveNICModes(nicRefs, r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
 	for _, nic := range vm.NICs {
+		if mode, ok := modeByMAC[nic.MACAddress]; ok && mode != string(api.NetworkIPModePreserve) {
+			continue
+		}
 		if len(nic.StaticIPConfigs) > 0 {
 			return true, nil
 		}
 	}
-	// No NICs have statically configured IPs with known prefix/gateway.
 	return false, nil
 }
 
