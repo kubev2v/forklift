@@ -181,16 +181,16 @@ type StaticIPConfig struct {
 
 // NIC represents a VM network interface
 type NIC struct {
-	UUID             string           `json:"uuid"`
-	NicType          string           `json:"nicType"` // NORMAL_NIC, DIRECT_NIC
-	MACAddress       string           `json:"macAddress"`
-	Model            string           `json:"model"` // VIRTIO, E1000
-	IsConnected      bool             `json:"isConnected"`
-	SubnetUUID       string           `json:"subnetUuid"`
-	SubnetName       string           `json:"subnetName"`
-	IPAddresses      []string         `json:"ipAddresses"`
-	StaticIPConfigs  []StaticIPConfig `json:"staticIpConfigs,omitempty"`
-	VlanMode         string           `json:"vlanMode"`
+	UUID            string           `json:"uuid"`
+	NicType         string           `json:"nicType"` // NORMAL_NIC, DIRECT_NIC
+	MACAddress      string           `json:"macAddress"`
+	Model           string           `json:"model"` // VIRTIO, E1000
+	IsConnected     bool             `json:"isConnected"`
+	SubnetUUID      string           `json:"subnetUuid"`
+	SubnetName      string           `json:"subnetName"`
+	IPAddresses     []string         `json:"ipAddresses"`
+	StaticIPConfigs []StaticIPConfig `json:"staticIpConfigs,omitempty"`
+	VlanMode        string           `json:"vlanMode"`
 }
 
 // Disk represents a VM disk
