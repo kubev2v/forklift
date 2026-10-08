@@ -26,6 +26,7 @@ const (
 	EnvStaticIPsName                    = "V2V_staticIPs"
 	EnvSourceName                       = "V2V_source"
 	EnvDiskPathName                     = "V2V_diskPath"
+	EnvNbdDisksName                     = "V2V_nbdDisks"
 	EnvSecretKeyName                    = "V2V_secretKey"
 	EnvLocalMigrationName               = "LOCAL_MIGRATION"
 	EnvVirtIoWinLegacyDriversName       = "VIRTIO_WIN"
@@ -102,6 +103,8 @@ type AppConfig struct {
 	Source string
 	// V2V_diskPath
 	DiskPath string
+	// V2V_nbdDisks — comma-separated nbd://host:port URIs for copy-appliance input
+	NbdDisks []string
 	// V2V_secretKey
 	SecretKey string
 	// V2V_AccessKeyId
@@ -193,6 +196,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.Var(&excludeDirs, "selinux-relabel-exclude", "Exclude guest directory from SELinux relabeling (repeatable)")
 	flag.BoolVar(&s.XfsCompatibility, "xfs-compatibility", s.getEnvBool(EnvXfsCompatibilityName, false), "XFS compatibility mode: do not pass --no-fstrim to virt-v2v")
 	s.RemoteInspectionDisks = s.getRemoteInspectionDisks()
+	s.NbdDisks = s.getNbdDisks()
 	flag.Parse()
 	s.SelinuxRelabelExclude = []string(excludeDirs)
 
@@ -277,6 +281,21 @@ func (s *AppConfig) getRemoteInspectionDisks() []string {
 	disks := make([]string, len(keys))
 	for i, key := range keys {
 		disks[i] = os.Getenv(key)
+	}
+	return disks
+}
+
+func (s *AppConfig) getNbdDisks() []string {
+	raw := os.Getenv(EnvNbdDisksName)
+	if raw == "" {
+		return nil
+	}
+	var disks []string
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			disks = append(disks, part)
+		}
 	}
 	return disks
 }

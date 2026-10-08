@@ -54,6 +54,8 @@ spec:
           value: "{{ deep_inspection_image_fqin or lookup('env', 'DEEP_INSPECTION_IMAGE') or lookup('env', 'RELATED_IMAGE_DEEP_INSPECTION') }}"
         - name: DEEP_INSPECTION_IMAGE_XFS
           value: "{{ deep_inspection_image_xfs_fqin or lookup('env', 'DEEP_INSPECTION_IMAGE_XFS') or lookup('env', 'RELATED_IMAGE_DEEP_INSPECTION_XFS') }}"
+        - name: COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE
+          value: "{{ copy_appliance_template_builder_image_fqin or lookup('env', 'COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE') or lookup('env', 'RELATED_IMAGE_COPY_APPLIANCE_TEMPLATE_BUILDER') }}"
         - name: API_PORT
           value: "8443"
         - name: METRICS_PORT
@@ -224,6 +226,26 @@ spec:
           value: "{{ feature_windows_wait_for_reboot|bool|lower }}"
         - name: FEATURE_USE_CONVERSION_CR
           value: "{{ feature_use_conversion_cr|bool|lower }}"
+        - name: FEATURE_COPY_APPLIANCE
+          value: "{{ feature_copy_appliance|bool|lower }}"
+        - name: COPY_APPLIANCE_TEMPLATE_BASE_DISK_CONTAINER_IMAGE
+          value: "{{ copy_appliance_template_base_disk_container_image_fqin | default('', true) }}"
+        - name: COPY_APPLIANCE_TEMPLATE_CPU
+          value: "{{ copy_appliance_template_cpu | default('2', true) }}"
+        - name: COPY_APPLIANCE_TEMPLATE_MEMORY_MIB
+          value: "{{ copy_appliance_template_memory_mib | default('4096', true) }}"
+        - name: COPY_APPLIANCE_CONTAINER_IMAGE
+          value: "{{ copy_appliance_container_image_fqin | default('', true) }}"
+        - name: COPY_APPLIANCE_SETUP_IMAGE
+          value: "{{ controller_image_fqin or lookup('env', 'CONTROLLER_IMAGE') or lookup('env', 'RELATED_IMAGE_CONTROLLER') }}"
+        - name: COPY_APPLIANCE_SETUP_TRANSFER_NETWORK
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['k8s.v1.cni.cncf.io/networks']
+{% if copy_appliance_ssh_user is defined and copy_appliance_ssh_user != "" %}
+        - name: COPY_APPLIANCE_SSH_USER
+          value: "{{ copy_appliance_ssh_user }}"
+{% endif %}
 {% if ovirt_osmap_configmap_name is defined %}
         - name: OVIRT_OS_MAP
           value: {{ ovirt_osmap_configmap_name }}
@@ -329,6 +351,8 @@ spec:
               fieldPath: metadata.namespace
         - name: ROLE
           value: inventory
+        - name: API_HOST
+          value: {{ inventory_service_name }}.{{ app_namespace }}.svc.cluster.local
         - name: KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION
           value: "v1"
         - name: AUTH_REQUIRED
@@ -393,6 +417,28 @@ spec:
           value: "false"
 {% else %}
           value: "true"
+{% endif %}
+        - name: FEATURE_COPY_APPLIANCE
+          value: "{{ feature_copy_appliance|bool|lower }}"
+        - name: COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE
+          value: "{{ copy_appliance_template_builder_image_fqin or lookup('env', 'COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE') or lookup('env', 'RELATED_IMAGE_COPY_APPLIANCE_TEMPLATE_BUILDER') }}"
+        - name: COPY_APPLIANCE_TEMPLATE_BASE_DISK_CONTAINER_IMAGE
+          value: "{{ copy_appliance_template_base_disk_container_image_fqin | default('', true) }}"
+        - name: COPY_APPLIANCE_TEMPLATE_CPU
+          value: "{{ copy_appliance_template_cpu | default('2', true) }}"
+        - name: COPY_APPLIANCE_TEMPLATE_MEMORY_MIB
+          value: "{{ copy_appliance_template_memory_mib | default('4096', true) }}"
+        - name: COPY_APPLIANCE_CONTAINER_IMAGE
+          value: "{{ copy_appliance_container_image_fqin | default('', true) }}"
+        - name: COPY_APPLIANCE_SETUP_IMAGE
+          value: "{{ controller_image_fqin or lookup('env', 'CONTROLLER_IMAGE') or lookup('env', 'RELATED_IMAGE_CONTROLLER') }}"
+        - name: COPY_APPLIANCE_SETUP_TRANSFER_NETWORK
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['k8s.v1.cni.cncf.io/networks']
+{% if copy_appliance_ssh_user is defined and copy_appliance_ssh_user != "" %}
+        - name: COPY_APPLIANCE_SSH_USER
+          value: "{{ copy_appliance_ssh_user }}"
 {% endif %}
 {% if controller_profile_kind is defined and controller_profile_path is defined and controller_profile_duration is defined %}
         - name: PROFILE_KIND

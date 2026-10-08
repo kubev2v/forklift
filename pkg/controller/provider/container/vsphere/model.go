@@ -126,6 +126,8 @@ func (b *Base) Ref(in types.AnyType) (ref model.Ref) {
 			ref.Kind = model.DsKind
 		case Host:
 			ref.Kind = model.HostKind
+		case ResourcePool, VirtualApp:
+			ref.Kind = model.ResourcePoolKind
 		case VirtualMachine:
 			ref.Kind = model.VmKind
 		default:
@@ -652,6 +654,20 @@ func (v *DatastoreAdapter) Model() model.Model {
 	return &v.model
 }
 
+// ResourcePool model adapter.
+type ResourcePoolAdapter struct {
+	Base
+	model model.ResourcePool
+}
+
+func (v *ResourcePoolAdapter) Model() model.Model {
+	return &v.model
+}
+
+func (v *ResourcePoolAdapter) Apply(u types.ObjectUpdate) {
+	v.Base.Apply(&v.model.Base, u)
+}
+
 // Apply the update to the model.
 func (v *DatastoreAdapter) Apply(u types.ObjectUpdate) {
 	v.Base.Apply(&v.model.Base, u)
@@ -670,6 +686,10 @@ func (v *DatastoreAdapter) Apply(u types.ObjectUpdate) {
 			case fFreeSpace:
 				if n, cast := p.Val.(int64); cast {
 					v.model.Free = n
+				}
+			case fAccessible:
+				if b, cast := p.Val.(bool); cast {
+					v.model.Accessible = b
 				}
 			case fDsMaintMode:
 				if s, cast := p.Val.(string); cast {
@@ -832,6 +852,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 			case fIsTemplate:
 				if b, cast := p.Val.(bool); cast {
 					v.model.IsTemplate = b
+				}
+			case fAnnotation:
+				if s, cast := p.Val.(string); cast {
+					v.model.Annotation = s
 				}
 			case fSnapshot:
 				if snapshot, cast := p.Val.(types.VirtualMachineSnapshotInfo); cast {

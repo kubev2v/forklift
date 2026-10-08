@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	liburl "net/url"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -14,15 +13,14 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libvsphere "github.com/kubev2v/forklift/pkg/lib/vsphere"
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/fault"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
-	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
-	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
@@ -474,12 +472,6 @@ func (r *Client) getClient(vm *model.VM, hosts util.HostsFunc) (client *vim25.Cl
 }
 
 func (r *Client) getHostClient(hostDef *v1beta1.Host, host *model.Host) (client *vim25.Client, err error) {
-	url, err := liburl.Parse("https://" + formatHostAddress(hostDef.Spec.IpAddress) + "/sdk")
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
 	ref := hostDef.Spec.Secret
 	secret := &core.Secret{}
 	err = r.Get(
@@ -494,19 +486,15 @@ func (r *Client) getHostClient(hostDef *v1beta1.Host, host *model.Host) (client 
 		return
 	}
 
-	url.User = liburl.UserPassword(string(secret.Data["user"]), string(secret.Data["password"]))
-	soapClient := soap.NewClient(url, base.GetInsecureSkipVerifyFlag(r.Source.Secret))
-	soapClient.SetThumbprint(url.Host, host.Thumbprint)
-	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
+	rawURL := "https://" + formatHostAddress(hostDef.Spec.IpAddress) + "/sdk"
+	hostClient, err := libvsphere.Connect(
+		context.TODO(),
+		rawURL,
+		string(secret.Data["user"]),
+		string(secret.Data["password"]),
+		host.Thumbprint,
+		base.GetInsecureSkipVerifyFlag(r.Source.Secret))
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	hostClient := &govmomi.Client{
-		SessionManager: session.NewManager(vimClient),
-		Client:         vimClient,
-	}
-	if err = hostClient.Login(context.TODO(), url.User); err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
@@ -562,26 +550,17 @@ func nullableHosts() (hosts map[string]*v1beta1.Host, err error) {
 // Connect to the vSphere API.
 func (r *Client) connect() error {
 	r.Close()
-	url, err := liburl.Parse(r.Source.Provider.Spec.URL)
+	client, err := libvsphere.ConnectProvider(
+		context.TODO(),
+		r.Source.Provider.Spec.URL,
+		r.user(),
+		r.password(),
+		r.thumbprint(),
+		r.Source.Secret)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	url.User = liburl.UserPassword(r.user(), r.password())
-	soapClient := soap.NewClient(url, base.GetInsecureSkipVerifyFlag(r.Source.Secret))
-	soapClient.SetThumbprint(url.Host, r.thumbprint())
-	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	r.client = &govmomi.Client{
-		SessionManager: session.NewManager(vimClient),
-		Client:         vimClient,
-	}
-	err = r.client.Login(context.TODO(), url.User)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
+	r.client = client
 	return nil
 }
 

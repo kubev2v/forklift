@@ -6,11 +6,13 @@ import (
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	appliancectrl "github.com/kubev2v/forklift/pkg/controller/copyappliance"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/vim25/types"
@@ -2148,6 +2150,99 @@ var _ = Describe("excludeDisks", func() {
 	})
 })
 
+var _ = Describe("Copy appliance DataVolumes", func() {
+	const (
+		dsID         = "ds-1"
+		diskFile     = "[datastore1] test-vm/disk-0.vmdk"
+		storageClass = "test-sc"
+		nbdURI       = "nbds://10.0.0.5:10809"
+	)
+
+	warmCopyApplianceBuilder := func(objs ...runtime.Object) *Builder {
+		settings.Settings.Features.CopyAppliance = true
+		settings.Settings.ContainerImage = "copy-appliance:latest"
+		settings.Settings.VddkImage = ""
+
+		vm := model.VM{
+			ConnectionState: string(types.VirtualMachineConnectionStateConnected),
+			UUID:            "vm-uuid",
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "test-vm-id", Name: "test"},
+				Disks: []vsphere.Disk{{
+					File:      diskFile,
+					Datastore: vsphere.Ref{ID: dsID},
+					Capacity:  1 << 30,
+					Key:       2000,
+					Bus:       vsphere.SCSI,
+				}},
+			},
+		}
+		builder := createBuilder(objs...)
+		builder.Plan.Spec.Warm = true
+		builder.Plan.Provider.Source.Spec.Type = (*v1beta1.ProviderType)(ptr.To(v1beta1.VSphere))
+		builder.Source.Inventory = &mockInventory{
+			ds: model.Datastore{Resource: model.Resource{ID: dsID}},
+			vm: vm,
+		}
+		builder.Map.Storage = &v1beta1.StorageMap{
+			Spec: v1beta1.StorageMapSpec{
+				Map: []v1beta1.StoragePair{{
+					Source:      ref.Ref{ID: dsID},
+					Destination: v1beta1.DestinationStorage{StorageClass: storageClass},
+				}},
+			},
+		}
+		return builder
+	}
+
+	It("fails warm DataVolumes when the copy appliance is missing", func() {
+		builder := warmCopyApplianceBuilder()
+		_, err := builder.DataVolumes(
+			ref.Ref{ID: "test-vm-id"},
+			&core.Secret{ObjectMeta: meta.ObjectMeta{Name: "test-secret"}},
+			nil,
+			&cdi.DataVolume{},
+			nil,
+		)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("annotates warm DataVolumes with NBD when the copy appliance is ready", func() {
+		// Found by its labels. The provider is the one createBuilder makes,
+		// whose UID is empty; the migration UID is its "123".
+		labeler := appliancectrl.Labeler{}
+		appliance := &v1beta1.CopyAppliance{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "copy-appliance-abcde",
+				Namespace: "test",
+				Labels:    labeler.ApplianceLabels(&v1beta1.Provider{}, "123", "test-vm-id"),
+			},
+			Spec: v1beta1.CopyApplianceSpec{
+				AttachDisks: []v1beta1.AttachedDisk{{VMDKPath: diskFile}},
+			},
+			Status: v1beta1.CopyApplianceStatus{
+				Addresses: []v1beta1.ApplianceAddress{{IP: "10.0.0.5"}},
+				Exports: []v1beta1.ApplianceExport{{
+					VMDKPath: diskFile,
+					Port:     10809,
+				}},
+			},
+		}
+		builder := warmCopyApplianceBuilder(appliance)
+		dvs, err := builder.DataVolumes(
+			ref.Ref{ID: "test-vm-id"},
+			&core.Secret{ObjectMeta: meta.ObjectMeta{Name: "test-secret"}},
+			nil,
+			&cdi.DataVolume{},
+			nil,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(dvs).To(HaveLen(1))
+		Expect(dvs[0].Annotations).To(HaveKeyWithValue(planbase.AnnVddkNbdConnection, nbdURI))
+		Expect(dvs[0].Annotations).To(HaveKeyWithValue(planbase.AnnVddkNbdTlsSecret, "test-secret"))
+	})
+})
+
 //nolint:errcheck
 func createBuilder(objs ...runtime.Object) *Builder {
 	scheme := runtime.NewScheme()
@@ -2156,6 +2251,18 @@ func createBuilder(objs ...runtime.Object) *Builder {
 	_ = rbacv1.AddToScheme(scheme)
 	_ = storagev1.AddToScheme(scheme)
 	v1beta1.SchemeBuilder.AddToScheme(scheme)
+
+	// Add default copyApplianceTemplate SSH secret for NBD TLS (enabled by default)
+	copyApplianceTemplateSecret := &core.Secret{
+		ObjectMeta: meta.ObjectMeta{Name: "test-copy-appliance-template-ssh-key", Namespace: "test"},
+		Data: map[string][]byte{
+			"ca-cert.pem":     []byte("-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----\n"),
+			"client-cert.pem": []byte("-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----\n"),
+			"client-key.pem":  []byte("-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n"),
+		},
+	}
+	objs = append(objs, copyApplianceTemplateSecret)
+
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithRuntimeObjects(objs...).
@@ -2177,6 +2284,9 @@ func createBuilder(objs ...runtime.Object) *Builder {
 					Spec: v1beta1.ProviderSpec{
 						Type: (*v1beta1.ProviderType)(ptr.To("vsphere")),
 						URL:  "https://vcenter.test.example.com/sdk",
+					},
+					Status: v1beta1.ProviderStatus{
+						CopyApplianceSSHPrivateSecret: "test-copy-appliance-template-ssh-key",
 					},
 				},
 				Inventory: nil,

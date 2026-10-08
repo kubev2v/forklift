@@ -1,0 +1,14 @@
+[Unit]
+Description=Forklift copy appliance NBD orchestrator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# nbdkit uses --cgroups=disabled and joins this cgroup; cgroup kill on restart leaves dead exports.
+KillMode=process
+ExecStart={{.Binary}} -certs-dir={{.CertsDir}} -image={{.Image}} -listen=:{{.AnnouncePort}} -base-port={{.BasePort}}{{if .TLS}} -tls{{end}}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

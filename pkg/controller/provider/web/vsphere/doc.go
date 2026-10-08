@@ -56,6 +56,11 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 				base.Handler{Container: container},
 			},
 		},
+		&ResourcePoolHandler{
+			Handler: Handler{
+				base.Handler{Container: container},
+			},
+		},
 		&CustomFieldDefHandler{
 			Handler: Handler{
 				base.Handler{Container: container},

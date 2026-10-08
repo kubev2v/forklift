@@ -96,6 +96,16 @@ spec:
       kind: Conversion
       name: conversions.forklift.konveyor.io
       version: v1beta1
+    - description: vSphere copy appliance template builder
+      displayName: CopyApplianceTemplate Template
+      kind: CopyApplianceTemplate
+      name: copyappliancetemplates.forklift.konveyor.io
+      version: v1beta1
+    - description: Copy appliance VM for vSphere disk export over NBD
+      displayName: Copy Appliance
+      kind: CopyAppliance
+      name: copyappliances.forklift.konveyor.io
+      version: v1beta1
     - description: ForkliftController is the Schema for the forkliftcontrollers API.
       displayName: Forklift Controller
       kind: ForkliftController

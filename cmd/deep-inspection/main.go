@@ -38,22 +38,43 @@ func main() {
 
 	srv := newResultServer()
 
-	source := strings.TrimSpace(os.Getenv("V2V_SOURCE"))
-
 	go func() {
-		var result *vmdetect.DetectResult
-		var detectErr error
-
-		switch source {
-		case "hyperv":
-			result, detectErr = detectLocalDisks(log)
-		default:
-			result, detectErr = detectVSphere(log)
-		}
+		result, detectErr := runDetection(log)
 		srv.setResult(result, detectErr)
 	}()
 
 	os.Exit(srv.run())
+}
+
+func runDetection(log *logrus.Logger) (*vmdetect.DetectResult, error) {
+	if nbdDisks := strings.TrimSpace(os.Getenv("V2V_nbdDisks")); nbdDisks != "" {
+		var urls []string
+		for _, p := range strings.Split(nbdDisks, ",") {
+			if u := strings.TrimSpace(p); u != "" {
+				urls = append(urls, u)
+			}
+		}
+		if len(urls) == 0 {
+			return nil, fmt.Errorf("V2V_nbdDisks is set but contains no NBD URIs")
+		}
+		detector, err := vmdetect.NewDetector(vmdetect.DetectorConfig{Logger: log})
+		if err != nil {
+			return nil, err
+		}
+		return detector.DetectNBD(vmdetect.DetectNBDParams{
+			Ctx:             context.Background(),
+			NBDURLs:         urls,
+			TLSCertificates: secretDir,
+		})
+	}
+
+	source := strings.TrimSpace(os.Getenv("V2V_SOURCE"))
+	switch source {
+	case "hyperv":
+		return detectLocalDisks(log)
+	default:
+		return detectVSphere(log)
+	}
 }
 
 func detectVSphere(log *logrus.Logger) (*vmdetect.DetectResult, error) {
@@ -61,7 +82,6 @@ func detectVSphere(log *logrus.Logger) (*vmdetect.DetectResult, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	detector, err := vmdetect.NewDetector(vmdetect.DetectorConfig{
 		Credentials: creds,
 		VDDKLibDir:  "/opt/vmware-vix-disklib-distrib",
@@ -71,12 +91,10 @@ func detectVSphere(log *logrus.Logger) (*vmdetect.DetectResult, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	vmMoref, snapshotMoref, err := vmAndSnapshotFromEnv()
 	if err != nil {
 		return nil, err
 	}
-
 	return detector.Detect(vmdetect.DetectParams{
 		Ctx:           context.Background(),
 		VMMoref:       vmMoref,

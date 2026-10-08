@@ -809,6 +809,16 @@ spec:
         kind: Conversion
         name: conversions.forklift.konveyor.io
         version: v1beta1
+      - description: vSphere copy appliance template builder
+        displayName: CopyApplianceTemplate Template
+        kind: CopyApplianceTemplate
+        name: copyappliancetemplates.forklift.konveyor.io
+        version: v1beta1
+      - description: Copy appliance VM for vSphere disk export over NBD
+        displayName: Copy Appliance
+        kind: CopyAppliance
+        name: copyappliances.forklift.konveyor.io
+        version: v1beta1
   relatedImages:
     - name: forklift-operator
       image: "${OPERATOR_IMAGE}"
@@ -842,3 +852,5 @@ spec:
       image: "${CLI_DOWNLOAD_IMAGE}"
     - name: virt_v2v_rhel9
       image: "${VIRT_V2V_IMAGE_RHEL9}"
+    - name: copy_appliance_template_builder
+      image: "${COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE}"

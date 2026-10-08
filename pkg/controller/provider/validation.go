@@ -59,6 +59,14 @@ const (
 	SMBMountFailed          = "SMBMountFailed"
 	WaitingForService       = "WaitingForService"
 	ForkliftNotInstalled    = "ForkliftNotInstalled"
+	// CopyApplianceChecked records the outcome of the last copyApplianceTemplate
+	// appliance check, and what it was a check of. It is durable: it is the
+	// only reason a check that has already run is not run again.
+	CopyApplianceChecked = "CopyApplianceChecked"
+	// CopyApplianceCheckNotReady blocks the provider while the appliance has
+	// not been shown to work. It is deliberately not durable; see
+	// ensureCopyApplianceTemplateApplianceCheck.
+	CopyApplianceCheckNotReady = "CopyApplianceCheckNotReady"
 )
 
 // Forklift operator is installed on a remote cluster.
@@ -80,15 +88,18 @@ const (
 
 // Reasons
 const (
-	NotSet              = "NotSet"
-	NotFound            = "NotFound"
-	NotSupported        = "NotSupported"
-	DataErr             = "DataErr"
-	Malformed           = "Malformed"
-	Completed           = "Completed"
-	Tested              = "Tested"
-	Started             = "Started"
-	SkipTLSVerification = "SkipTLSVerification"
+	NotSet                    = "NotSet"
+	NotFound                  = "NotFound"
+	NotSupported              = "NotSupported"
+	DataErr                   = "DataErr"
+	Malformed                 = "Malformed"
+	Completed                 = "Completed"
+	Tested                    = "Tested"
+	Started                   = "Started"
+	SkipTLSVerification       = "SkipTLSVerification"
+	CopyApplianceCheckPassed  = "CopyApplianceCheckPassed"
+	CopyApplianceCheckFailed  = "CopyApplianceCheckFailed"
+	CopyApplianceCheckPending = "CopyApplianceCheckPending"
 )
 
 // Phases

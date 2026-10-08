@@ -109,6 +109,12 @@ type ForkliftControllerSpec struct {
 	// +kubebuilder:validation:Enum="true";"false"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:radio:true","urn:alm:descriptor:com.tectonic.ui:radio:false"}
 	FeatureUseConversionCR string `json:"feature_use_conversion_cr,omitempty"`
+	// Provision copy appliance templates for vSphere providers.
+	// +optional
+	// +kubebuilder:default="false"
+	// +kubebuilder:validation:Enum="true";"false"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:radio:true","urn:alm:descriptor:com.tectonic.ui:radio:false"}
+	FeatureCopyAppliance string `json:"feature_copy_appliance,omitempty"`
 
 	// Container Images
 
@@ -184,6 +190,42 @@ type ForkliftControllerSpec struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	OVAProxyFQIN string `json:"ova_proxy_fqin,omitempty"`
+	// Copy appliance template builder image. Optional. If left empty, the operator automatically sets this from the release payload.
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	CopyApplianceTemplateBuilderImageFQIN string `json:"copy_appliance_template_builder_image_fqin,omitempty"`
+
+	// Copy appliance template defaults
+
+	// Fully-qualified base containerdisk image for copy appliance templates
+	// (e.g. "registry.redhat.io/rhel9/rhel-guest-image:latest").
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	CopyApplianceTemplateBaseDiskContainerImageFQIN string `json:"copy_appliance_template_base_disk_container_image_fqin,omitempty"`
+	// Default OVF CPU count for copy appliance templates.
+	// +optional
+	// +kubebuilder:default="2"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	CopyApplianceTemplateCPU string `json:"copy_appliance_template_cpu,omitempty"`
+	// Default OVF memory in MiB for copy appliance templates.
+	// +optional
+	// +kubebuilder:default="4096"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	CopyApplianceTemplateMemoryMiB string `json:"copy_appliance_template_memory_mib,omitempty"`
+
+	// Copy appliance defaults
+
+	// Fully-qualified nbd-container image loaded onto copy appliances
+	// (e.g. "quay.io/kubev2v/nbd-container:latest"). The setup pod that reads
+	// it carries no registry credential, so it has to be readable without one.
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	CopyApplianceContainerImageFQIN string `json:"copy_appliance_container_image_fqin,omitempty"`
+	// SSH user the controller logs in to copy appliances as. Defaults to root.
+	// +optional
+	// +kubebuilder:default="root"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	CopyApplianceSSHUser string `json:"copy_appliance_ssh_user,omitempty"`
 
 	// Controller Resource Configuration
 

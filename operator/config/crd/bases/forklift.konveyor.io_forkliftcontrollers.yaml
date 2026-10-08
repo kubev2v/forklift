@@ -339,6 +339,34 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
+              copy_appliance_container_image_fqin:
+                description: |-
+                  Fully-qualified nbd-container image loaded onto copy appliances
+                  (e.g. "quay.io/kubev2v/nbd-container:latest"). The setup pod that reads
+                  it carries no registry credential, so it has to be readable without one.
+                type: string
+              copy_appliance_ssh_user:
+                default: root
+                description: SSH user the controller logs in to copy appliances as.
+                  Defaults to root.
+                type: string
+              copy_appliance_template_base_disk_container_image_fqin:
+                description: |-
+                  Fully-qualified base containerdisk image for copy appliance templates
+                  (e.g. "registry.redhat.io/rhel9/rhel-guest-image:latest").
+                type: string
+              copy_appliance_template_builder_image_fqin:
+                description: Copy appliance template builder image. Optional. If left
+                  empty, the operator automatically sets this from the release payload.
+                type: string
+              copy_appliance_template_cpu:
+                default: "2"
+                description: Default OVF CPU count for copy appliance templates.
+                type: string
+              copy_appliance_template_memory_mib:
+                default: "4096"
+                description: Default OVF memory in MiB for copy appliance templates.
+                type: string
               deep_inspection_image_fqin:
                 description: Deep inspection image. Optional. If left empty, the operator
                   automatically sets this from the release payload.
@@ -357,6 +385,13 @@ spec:
               feature_cli_download:
                 default: "true"
                 description: Enable CLI download service.
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_copy_appliance:
+                default: "false"
+                description: Provision copy appliance templates for vSphere providers.
                 enum:
                 - "true"
                 - "false"

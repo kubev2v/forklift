@@ -9,7 +9,6 @@ import (
 	"io"
 	"maps"
 	"math/rand"
-	"net"
 	"net/http"
 	"os"
 	"path"
@@ -25,8 +24,10 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	ctrlbase "github.com/kubev2v/forklift/pkg/controller/base"
 	convbuilder "github.com/kubev2v/forklift/pkg/controller/conversion"
 	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
+	appliancectrl "github.com/kubev2v/forklift/pkg/controller/copyappliance"
 	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
@@ -41,6 +42,7 @@ import (
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
+	"github.com/kubev2v/forklift/pkg/nbd-container/announce"
 	"github.com/kubev2v/forklift/pkg/settings"
 	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	template "github.com/openshift/api/template/v1"
@@ -72,18 +74,10 @@ const (
 
 // Annotations
 const (
-	// Legacy transfer network annotation (value=network-attachment-definition name)
-	// FIXME: this should be phased out and replaced with the
-	// k8s.v1.cni.cncf.io/networks annotation.
-	AnnLegacyTransferNetwork = "v1.multus-cni.io/default-network"
-	// Transfer network annotation (value=network-attachment-definition name)
-	AnnTransferNetwork = "k8s.v1.cni.cncf.io/networks"
-	// Annotation to specify the default route for the transfer network.
-	// To be set on the transfer network NAD by the end user.
-	AnnForkliftNetworkRoute = "forklift.konveyor.io/route"
-	// Special value for AnnForkliftNetworkRoute to explicitly request no gateway.
-	// Use this to enable modern k8s.v1.cni.cncf.io/networks annotation without default-route.
-	AnnForkliftRouteValueNone = "none"
+	AnnLegacyTransferNetwork  = ctrlbase.AnnLegacyTransferNetwork
+	AnnTransferNetwork        = ctrlbase.AnnTransferNetwork
+	AnnForkliftNetworkRoute   = ctrlbase.AnnForkliftNetworkRoute
+	AnnForkliftRouteValueNone = ctrlbase.AnnForkliftRouteValueNone
 	// Contains validations for a Kubevirt VM. Needs to be removed when
 	// creating a VM from a template.
 	AnnKubevirtValidations = "vm.kubevirt.io/validations"
@@ -868,9 +862,40 @@ func (r *KubeVirt) CreateDeepInspectionConversionHyperV(
 func (r *KubeVirt) CreateDeepInspectionConversion(
 	vm *plan.VMStatus, snapshotMoref, planName, planID string,
 ) (*api.Conversion, error) {
+	useCopyApplianceTemplateNBD := settings.Settings.EnabledForPlan(r.Plan)
+	convSettings := map[string]string{api.SpecSettingsSnapshotMorefKey: snapshotMoref}
+	vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
+
 	// Connection secret goes to Plan.Namespace on the management cluster
 	// (DeepInspection pods run there, not on the destination cluster).
 	connSecretData := r.buildDeepInspectionConnectionSecretData()
+	if useCopyApplianceTemplateNBD {
+		nbdURIs, nbdErr := r.deepInspectionNbdURIs(vm)
+		if nbdErr != nil {
+			return nil, liberr.Wrap(nbdErr)
+		}
+		convSettings[api.SpecSettingsNbdDisksKey] = strings.Join(nbdURIs, ",")
+		vddkImage = ""
+		if r.Source.Provider.CopyApplianceNbdSsl() {
+			name := r.Source.Provider.Status.CopyApplianceSSHPrivateSecret
+			if name == "" {
+				return nil, fmt.Errorf("provider has no copyApplianceTemplate SSH private secret for NBD TLS")
+			}
+			copyApplianceTemplateSecret := &core.Secret{}
+			if err := r.Get(context.TODO(), types.NamespacedName{
+				Name: name, Namespace: r.Source.Provider.Namespace,
+			}, copyApplianceTemplateSecret); err != nil {
+				return nil, fmt.Errorf("failed to get copyApplianceTemplate secret %s for NBD TLS: %w", name, err)
+			}
+			for _, key := range []string{announce.CACert, announce.ClientCert, announce.ClientKey} {
+				pem, found := copyApplianceTemplateSecret.Data[key]
+				if !found || len(pem) == 0 {
+					return nil, fmt.Errorf("copyApplianceTemplate secret %s missing %s for NBD TLS", name, key)
+				}
+				connSecretData[key] = pem
+			}
+		}
+	}
 	connLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID,
 		map[string]string{kConnection: "true"})
 	connSecretSpec := r.buildConversionSecret(
@@ -934,11 +959,9 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 				Name:      connSecret.Name,
 			},
 		},
-		Settings: map[string]string{
-			api.SpecSettingsSnapshotMorefKey: snapshotMoref,
-		},
+		Settings:         convSettings,
 		XfsCompatibility: r.Plan.Spec.XfsCompatibility,
-		VDDKImage:        settings.GetVDDKImage(r.Source.Provider.Spec.Settings),
+		VDDKImage:        vddkImage,
 		DiskEncryption:   diskEncryption,
 		PodSettings: api.PodSettings{
 			ServiceAccount: resolveServiceAccount(r.Plan),
@@ -946,6 +969,53 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 	}
 	cr := r.buildConversion(planName, vm.ID, crLabels, spec)
 	return r.ensureConversion(cr)
+}
+
+func (r *KubeVirt) deepInspectionNbdURIs(vm *plan.VMStatus) ([]string, error) {
+	provider := r.Source.Provider
+	ensure := appliancectrl.Ensurer{Client: r.Client, Log: r.Log}
+	appliance, err := ensure.Find(context.TODO(),
+		provider.Namespace,
+		ensure.Labeler.ApplianceLabels(provider, r.Migration.UID, vm.ID),
+		true)
+	if err != nil {
+		return nil, err
+	}
+	if appliance == nil {
+		return nil, liberr.New("copy appliance is gone", "vm", vm.ID)
+	}
+	connections, err := appliancectrl.ExportNbdConnections(appliance, provider.CopyApplianceNbdSsl())
+	if err != nil {
+		return nil, err
+	}
+	obj, err := r.Source.Inventory.VM(&vm.Ref)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	srcVM, ok := obj.(*model.VM)
+	if !ok {
+		return nil, liberr.New("inventory VM is not a vSphere VM", "vm", vm.ID)
+	}
+	var uris []string
+	for _, disk := range srcVM.SortedDisksAsVmware() {
+		if disk.RDM || disk.File == "" {
+			continue
+		}
+		uri, found := connections[disk.File]
+		if !found {
+			uri, found = connections[appliancectrl.BaseVMDKPath(disk.File)]
+		}
+		if !found {
+			return nil, liberr.New("no NBD export for disk", "backing", disk.File)
+		}
+		uris = append(uris, uri)
+	}
+	if len(uris) == 0 {
+		return nil, liberr.New(
+			"copy appliance has exports but no migratable disks mapped for NBD input",
+			"vm", vm.String())
+	}
+	return uris, nil
 }
 
 // DeleteConversion tears down a Conversion CR: pod → snapshot → secrets → CR.
@@ -1435,23 +1505,6 @@ func resolveServiceAccount(plan *api.Plan) string {
 	return cmp.Or(plan.Spec.ServiceAccount, Settings.ServiceAccount)
 }
 
-// CNINetworkConfig represents a CNI network configuration parsed from a NetworkAttachmentDefinition.
-// This includes the IPAM configuration with routes for determining default gateway.
-type CNINetworkConfig struct {
-	IPAM CNIIPAMConfig `json:"ipam"`
-}
-
-// CNIIPAMConfig represents the IPAM section of a CNI network configuration.
-type CNIIPAMConfig struct {
-	Routes []CNIRoute `json:"routes"`
-}
-
-// CNIRoute represents a single route entry in the CNI IPAM configuration.
-type CNIRoute struct {
-	Dst string `json:"dst"` // Destination network in CIDR notation (e.g., "0.0.0.0/0" for default route)
-	GW  string `json:"gw"`  // Gateway IP address
-}
-
 // Build a VirtualMachineMap.
 func (r *KubeVirt) VirtualMachineMap() (mp VirtualMachineMap, err error) {
 	list, err := r.ListVMs()
@@ -1738,6 +1791,67 @@ func (r *KubeVirt) DeleteDataVolumes(vm *plan.VMStatus) (err error) {
 		}
 	}
 	return
+}
+
+// EnsureNbdConnections patches migration DataVolumes with copy-appliance NBD URIs.
+func (r *KubeVirt) EnsureNbdConnections(vm *plan.VMStatus) error {
+	if !settings.Settings.EnabledForPlan(r.Plan) {
+		return nil
+	}
+
+	provider := r.Source.Provider
+	ensure := appliancectrl.Ensurer{Client: r.Client, Log: r.Log}
+	appliance, err := ensure.Find(context.TODO(),
+		provider.Namespace,
+		ensure.Labeler.ApplianceLabels(provider, r.Migration.UID, vm.ID),
+		true)
+	if err != nil {
+		return err
+	}
+	if appliance == nil {
+		return liberr.New("copy appliance is gone", "vm", vm.ID)
+	}
+
+	connections, err := appliancectrl.ExportNbdConnections(appliance, provider.CopyApplianceNbdSsl())
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	dvs, err := r.getDVs(vm)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, edv := range dvs {
+		dv := edv.DataVolume
+		backing := dv.Annotations[planbase.AnnDiskSource]
+		uri, present := connections[backing]
+		if !present {
+			return liberr.New("no NBD export for disk", "backing", backing)
+		}
+		wantTLS := ""
+		if provider.CopyApplianceNbdSsl() {
+			if dv.Spec.Source != nil && dv.Spec.Source.VDDK != nil {
+				wantTLS = dv.Spec.Source.VDDK.SecretRef
+			}
+		}
+		if dv.Annotations[planbase.AnnVddkNbdConnection] == uri &&
+			dv.Annotations[planbase.AnnVddkNbdTlsSecret] == wantTLS {
+			continue
+		}
+		patch := dv.DeepCopy()
+		if patch.Annotations == nil {
+			patch.Annotations = map[string]string{}
+		}
+		patch.Annotations[planbase.AnnVddkNbdConnection] = uri
+		if wantTLS != "" {
+			patch.Annotations[planbase.AnnVddkNbdTlsSecret] = wantTLS
+		}
+		err = r.Destination.Update(context.TODO(), patch)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+	return nil
 }
 
 // Delete the importer pods for a PersistentVolumeClaim.
@@ -4301,62 +4415,7 @@ func (r *KubeVirt) vmAllButMigrationLabels(vmRef ref.Ref) (labels map[string]str
 	return
 }
 
-// guessTransferNetworkDefaultRoute determines the default gateway IP address for the transfer network
-// by checking the NetworkAttachmentDefinition in the following priority order:
-//
-//  1. Checks the AnnForkliftNetworkRoute annotation on the NAD
-//  2. Parses the NAD's spec.config JSON and looks for the default route (0.0.0.0/0 or ::/0)
-//     in the ipam.routes array, extracting the gateway IP from the matching route entry
-//
-// Returns:
-//   - route: The gateway IP address as a string (e.g., "192.168.1.1")
-//   - found: true if a route was found, false otherwise
-func (r *KubeVirt) guessTransferNetworkDefaultRoute(netAttachDef *k8snet.NetworkAttachmentDefinition) (route string, found bool) {
-	// First, try to get the default route from the annotation.
-	route, found = netAttachDef.Annotations[AnnForkliftNetworkRoute]
-	if found {
-		return route, true
-	}
-
-	// If the route annotation is not set, try to get the default route from the gw config value.
-	// Parse the Config string which is a JSON string containing network configuration.
-	if netAttachDef.Spec.Config != "" {
-		var config CNINetworkConfig
-		err := json.Unmarshal([]byte(netAttachDef.Spec.Config), &config)
-		if err != nil {
-			// If we can't parse the config, just return not found
-			return "", false
-		}
-
-		// Look for the default route (0.0.0.0/0 or ::/0) in the routes
-		for _, r := range config.IPAM.Routes {
-			if r.Dst == "0.0.0.0/0" || r.Dst == "::/0" {
-				return r.GW, true
-			}
-		}
-	}
-
-	return "", false
-}
-
-// setTransferNetwork configures the transfer network for the DataVolume's importer pod
-// by setting appropriate annotations based on whether a default gateway route can be determined.
-//
-// Behavior:
-//   - If a default gateway is found (via annotation or NAD config): Sets the
-//     k8s.v1.cni.cncf.io/networks annotation with the gateway IP in default-route
-//   - If route annotation is explicitly set to "none" (AnnForkliftRouteValueNone):
-//     Sets k8s.v1.cni.cncf.io/networks annotation without default-route field.
-//     Useful for example when only ESXi hosts are accessible via transfer network
-//     but vCenter is not.
-//   - If no route annotation exists and no gateway found in NAD config:
-//     Falls back to setting the legacy
-//     v1.multus-cni.io/default-network annotation with the NAD's namespaced name
-//
-// The default gateway is discovered by checking the NAD annotation and IPAM config
-// (see guessTransferNetworkDefaultRoute for details).
-//
-// FIXME: the codepath using the multus annotation should be phased out.
+// setTransferNetwork fetches the Plan TransferNetwork NAD and applies Multus annotations.
 func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error) {
 	key := client.ObjectKey{
 		Namespace: r.Plan.Spec.TransferNetwork.Namespace,
@@ -4368,37 +4427,7 @@ func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error)
 		err = liberr.Wrap(err)
 		return
 	}
-
-	route, found := r.guessTransferNetworkDefaultRoute(netAttachDef)
-	if found {
-		nse := k8snet.NetworkSelectionElement{
-			Namespace: key.Namespace,
-			Name:      key.Name,
-		}
-
-		if route != AnnForkliftRouteValueNone {
-			ip := net.ParseIP(route)
-			if ip != nil {
-				nse.GatewayRequest = []net.IP{ip}
-			} else {
-				err = liberr.New(
-					"Transfer network default route is not a valid IP address.",
-					"route", route)
-				return
-			}
-		}
-
-		transferNetwork, jErr := json.Marshal([]k8snet.NetworkSelectionElement{nse})
-		if jErr != nil {
-			err = liberr.Wrap(jErr)
-			return
-		}
-		annotations[AnnTransferNetwork] = string(transferNetwork)
-	} else {
-		annotations[AnnLegacyTransferNetwork] = path.Join(key.Namespace, key.Name)
-	}
-
-	return
+	return ctrlbase.ApplyTransferNetworkAnnotations(netAttachDef, annotations)
 }
 
 // Represents a CDI DataVolume, its associated PVC, and added behavior.

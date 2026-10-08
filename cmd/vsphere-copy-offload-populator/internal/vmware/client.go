@@ -713,7 +713,6 @@ func diskPathMatches(path1, path2 string) bool {
 	return normalize(path1) == normalize(path2)
 }
 
-
 type Obj struct {
 	XMLName          xml.Name `xml:"urn:vim25 obj"`
 	VersionID        string   `xml:"versionId,attr"`

@@ -11,23 +11,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kubev2v/forklift/pkg/lib/util"
 	"github.com/kubev2v/forklift/pkg/settings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
-	"github.com/kubev2v/forklift/pkg/controller/base"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	libvsphere "github.com/kubev2v/forklift/pkg/lib/vsphere"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/property"
-	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vapi/tags"
-	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
-	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,6 +53,7 @@ const (
 	DVSwitch        = "VmwareDistributedVirtualSwitch"
 	Datastore       = "Datastore"
 	ResourcePool    = "ResourcePool"
+	VirtualApp      = "VirtualApp"
 )
 
 // Fields
@@ -119,6 +116,7 @@ const (
 	fDsType                           = "summary.type"
 	fCapacity                         = "summary.capacity"
 	fFreeSpace                        = "summary.freeSpace"
+	fAccessible                       = "summary.accessible"
 	fDsMaintMode                      = "summary.maintenanceMode"
 	fVmfsExtent                       = "info"
 	fDsCapabilityStorageIORMSupported = "capability.storageIORMSupported"
@@ -153,6 +151,7 @@ const (
 	fConsolidationNeeded      = "runtime.consolidationNeeded"
 	fSnapshot                 = "snapshot"
 	fIsTemplate               = "config.template"
+	fAnnotation               = "config.annotation"
 	fGuestNet                 = "guest.net"
 	fGuestDisk                = "guest.disk"
 	fGuestIpStack             = "guest.ipStack"
@@ -261,6 +260,28 @@ var TsDatacenterVApp = &types.TraversalSpec{
 	},
 }
 
+// ComputeResource root resource pool (standalone ESXi / non-cluster).
+var TsComputeResourcePool = &types.TraversalSpec{
+	Type: ComputeResource,
+	Path: fResourcePool,
+	SelectSet: []types.BaseSelectionSpec{
+		&types.SelectionSpec{
+			Name: TraverseVApps,
+		},
+	},
+}
+
+// ClusterComputeResource root resource pool.
+var TsClusterResourcePool = &types.TraversalSpec{
+	Type: Cluster,
+	Path: fResourcePool,
+	SelectSet: []types.BaseSelectionSpec{
+		&types.SelectionSpec{
+			Name: TraverseVApps,
+		},
+	},
+}
+
 // Root Folder traversal Spec
 var TsRootFolder = &types.TraversalSpec{
 	SelectionSpec: types.SelectionSpec{
@@ -273,6 +294,8 @@ var TsRootFolder = &types.TraversalSpec{
 			Name: TraverseFolders,
 		},
 		TsComputeResourceHost,
+		TsComputeResourcePool,
+		TsClusterResourcePool,
 		TsDatacenterVM,
 		TsDatacenterHost,
 		TsDatacenterNet,
@@ -838,37 +861,7 @@ func (r *Collector) validateServerType() error {
 
 // Build the client.
 func (r *Collector) buildClient(ctx context.Context) (*govmomi.Client, error) {
-	url, err := liburl.Parse(r.url)
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-	url.User = liburl.UserPassword(
-		r.user(),
-		r.password())
-	thumbprint := r.thumbprint()
-	skipVerifying := base.GetInsecureSkipVerifyFlag(r.secret)
-
-	if !skipVerifying {
-		cert, errtls := base.VerifyTLSConnection(r.url, r.secret)
-		if errtls != nil {
-			return nil, liberr.Wrap(errtls)
-		}
-		thumbprint = util.Fingerprint(cert)
-	}
-
-	soapClient := soap.NewClient(url, skipVerifying)
-	soapClient.SetThumbprint(url.Host, thumbprint)
-	vimClient, err := vim25.NewClient(ctx, soapClient)
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-	client := &govmomi.Client{
-		SessionManager: session.NewManager(vimClient),
-		Client:         vimClient,
-	}
-	err = client.Login(ctx, url.User)
-	return client, err
-
+	return libvsphere.ConnectProvider(ctx, r.url, r.user(), r.password(), r.thumbprint(), r.secret)
 }
 
 // Close connections.
@@ -1054,11 +1047,26 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fDsType,
 				fCapacity,
 				fFreeSpace,
+				fAccessible,
 				fDsMaintMode,
 				fVmfsExtent,
 				fHost,
 				fDsCapabilityStorageIORMSupported,
 				fIormConfiguration,
+			},
+		},
+		{ // ResourcePool
+			Type: ResourcePool,
+			PathSet: []string{
+				fName,
+				fParent,
+			},
+		},
+		{ // VirtualApp (ResourcePool subtype)
+			Type: VirtualApp,
+			PathSet: []string{
+				fName,
+				fParent,
 			},
 		},
 		{ // VM
@@ -1102,6 +1110,7 @@ func (r *Collector) vmPathSet() []string {
 		fConnectionState,
 		fConsolidationNeeded,
 		fIsTemplate,
+		fAnnotation,
 		fSnapshot,
 		fChangeTracking,
 		fGuestIpStack,
@@ -1259,6 +1268,26 @@ func (r *Collector) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 			model: model.Datastore{
 				Base: model.Base{
 					ID: datastoreId,
+				},
+				// Assume accessible until summary.accessible says otherwise so a
+				// partial update never leaves every datastore looking dead.
+				Accessible: true,
+			},
+		}
+	case ResourcePool:
+		adapter = &ResourcePoolAdapter{
+			model: model.ResourcePool{
+				Base: model.Base{
+					ID: u.Obj.Value,
+				},
+			},
+		}
+	case VirtualApp:
+		adapter = &ResourcePoolAdapter{
+			model: model.ResourcePool{
+				Base: model.Base{
+					Variant: model.VirtualApp,
+					ID:      u.Obj.Value,
 				},
 			},
 		}

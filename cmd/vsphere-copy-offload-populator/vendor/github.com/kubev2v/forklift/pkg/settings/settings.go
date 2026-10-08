@@ -38,6 +38,10 @@ type ControllerSettings struct {
 	Features
 	// Provider settings.
 	Providers
+	// Copy appliance settings.
+	CopyAppliance
+	// CopyApplianceTemplate settings.
+	CopyApplianceTemplate
 	OpenShift   bool
 	Development bool
 }
@@ -80,6 +84,14 @@ func (r *ControllerSettings) Load() error {
 	if err != nil {
 		return err
 	}
+	err = r.CopyAppliance.Load()
+	if err != nil {
+		return err
+	}
+	err = r.CopyApplianceTemplate.Load()
+	if err != nil {
+		return err
+	}
 	r.OpenShift = getEnvBool(OpenShift, false)
 	r.Development = getEnvBool(Development, false)
 	return nil
@@ -117,8 +129,8 @@ func getEnvLimit(name string, def, minimum int) (int, error) {
 	return limit, nil
 }
 
-// Get boolean.
-func getEnvBool(name string, def bool) bool {
+// LookupBool reads a boolean environment variable.
+func LookupBool(name string, def bool) bool {
 	boolean := def
 	if s, found := os.LookupEnv(name); found {
 		parsed, err := strconv.ParseBool(s)
@@ -126,8 +138,23 @@ func getEnvBool(name string, def bool) bool {
 			boolean = parsed
 		}
 	}
-
 	return boolean
+}
+
+// LookupInt reads an integer environment variable.
+func LookupInt(name string, def int) int {
+	if s, found := os.LookupEnv(name); found {
+		n, err := strconv.Atoi(s)
+		if err == nil {
+			return n
+		}
+	}
+	return def
+}
+
+// Get boolean.
+func getEnvBool(name string, def bool) bool {
+	return LookupBool(name, def)
 }
 
 // GetVDDKImage gets the VDDK image from provider spec settings with fall back to global settings.

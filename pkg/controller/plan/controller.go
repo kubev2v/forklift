@@ -913,6 +913,7 @@ func (r *Reconciler) cleanupOrphanedResources(planName, planNamespace string) {
 	r.deleteOrphanedResources(&core.SecretList{}, labels, "Secret", false)
 	r.deleteOrphanedResources(&core.ConfigMapList{}, labels, "ConfigMap", false)
 	r.deleteOrphanedResources(&core.PersistentVolumeList{}, labels, "PV", false)
+	r.deleteOrphanedResources(&api.CopyApplianceList{}, labels, "CopyAppliance", false)
 
 	r.Log.Info(
 		"Orphaned resource cleanup completed.",
