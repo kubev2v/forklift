@@ -1863,6 +1863,8 @@ func missingStaticIPsMessage(plan *api.Plan) string {
 			guestTools = "VMware Tools"
 		case api.HyperV:
 			guestTools = "Hyper-V Integration Services"
+		case api.Nutanix:
+			guestTools = "Nutanix Guest Tools"
 		}
 	}
 	return fmt.Sprintf("Guest information on vNICs is missing, cannot preserve static IPs. Make sure %s is installed and the VM is running.", guestTools)
