@@ -22,7 +22,20 @@ func (e vmEntity) mergedResources() libclient.VMResources {
 	if out.PowerState == "" {
 		out.PowerState = status.PowerState
 	}
-	if len(status.NICList) > 0 {
+	// Merge ip_endpoint_list from status into spec NICs.
+	// Spec has the NIC configuration (subnet, MAC, type);
+	// status has the runtime IP data reported by NGT.
+	if len(out.NICList) > 0 && len(status.NICList) > 0 {
+		statusByMAC := make(map[string]libclient.VMNIC, len(status.NICList))
+		for _, nic := range status.NICList {
+			statusByMAC[nic.MACAddress] = nic
+		}
+		for i := range out.NICList {
+			if statusNIC, ok := statusByMAC[out.NICList[i].MACAddress]; ok {
+				out.NICList[i].IPEndpointList = statusNIC.IPEndpointList
+			}
+		}
+	} else if len(out.NICList) == 0 {
 		out.NICList = status.NICList
 	}
 	if len(out.DiskList) == 0 {
