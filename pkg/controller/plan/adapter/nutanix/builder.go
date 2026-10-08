@@ -1029,22 +1029,36 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, _ *core.Secret) (env []core.EnvV
 	}
 	env = append(env, core.EnvVar{Name: "V2V_vmName", Value: vm.Name})
 
-	nicRefs := planbase.NICRefsFrom(vm.NICs, func(n model.NIC) planbase.NICRef {
-		return planbase.NICRef{MAC: n.MACAddress, NetworkID: n.SubnetUUID}
-	})
-	modeByMAC := planbase.ResolveNICModes(nicRefs, r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
-	if planbase.HasPreserveMode(modeByMAC) {
-		staticIPs, staticErr := r.mapMacStaticIps(vm, modeByMAC)
-		if staticErr != nil {
-			err = staticErr
-			return
-		}
-		if staticIPs != "" {
-			env = append(env, core.EnvVar{Name: "V2V_staticIPs", Value: staticIPs})
-		}
+	staticIPs, staticErr := r.mapMacStaticIps(vm)
+	if staticErr != nil {
+		err = staticErr
+		return
+	}
+	if staticIPs != "" {
+		env = append(env, core.EnvVar{Name: "V2V_staticIPs", Value: staticIPs})
 	}
 
 	return
+}
+
+// nicPreservesStaticIP returns true when the NIC's static IP should be passed
+// to virt-v2v. The NetworkMap pair's networkIPMode overrides the plan-level
+// preserveStaticIPs flag; when no matching pair exists, the flag wins.
+func nicPreservesStaticIP(nic model.NIC, ctx *plancontext.Context) bool {
+	if ctx.Map.Network != nil {
+		for _, pair := range ctx.Map.Network.Spec.Map {
+			if pair.Source.ID == nic.SubnetUUID {
+				if pair.Destination.Type == planbase.Ignored {
+					return false
+				}
+				if pair.NetworkIPMode != "" {
+					return pair.NetworkIPMode == api.NetworkIPModePreserve
+				}
+				break
+			}
+		}
+	}
+	return ctx.Plan.Spec.PreserveStaticIPs
 }
 
 // mapMacStaticIps builds the V2V_staticIPs value for virt-v2v's --mac flag.
@@ -1055,13 +1069,13 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, _ *core.Secret) (env []core.EnvV
 //
 // Multiple entries are joined with "_". Returns an error if a NIC's subnet
 // cannot be found in inventory.
-func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) (string, error) {
+func (r *Builder) mapMacStaticIps(vm *model.VM) (string, error) {
 	var entries []string
 	for _, nic := range vm.NICs {
 		if len(nic.StaticIPConfigs) == 0 {
 			continue
 		}
-		if mode, ok := modeByMAC[nic.MACAddress]; ok && mode != string(api.NetworkIPModePreserve) {
+		if !nicPreservesStaticIP(nic, r.Context) {
 			continue
 		}
 
