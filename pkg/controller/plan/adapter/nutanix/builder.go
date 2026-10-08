@@ -1053,8 +1053,8 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, _ *core.Secret) (env []core.EnvV
 //
 //	<MAC>:ip:<IP>,<Gateway>,<PrefixLength>,<DNS1>,<DNS2>,...
 //
-// Multiple entries are joined with "_". NICs whose subnet cannot be found or
-// has no gateway are skipped with a warning rather than failing the migration.
+// Multiple entries are joined with "_". Returns an error if a NIC's subnet
+// cannot be found in inventory.
 func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) (string, error) {
 	var entries []string
 	for _, nic := range vm.NICs {
@@ -1069,9 +1069,10 @@ func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) (st
 		dnsString := ""
 		if nic.SubnetUUID != "" {
 			network := &model.Network{}
-			if err := r.Source.Inventory.Find(network, ref.Ref{ID: nic.SubnetUUID}); err == nil {
-				dnsString = strings.Join(network.DNSServers, ",")
+			if err := r.Source.Inventory.Find(network, ref.Ref{ID: nic.SubnetUUID}); err != nil {
+				return "", liberr.Wrap(err, "nic", nic.MACAddress, "subnet", nic.SubnetUUID)
 			}
+			dnsString = strings.Join(network.DNSServers, ",")
 		}
 
 		for _, cfg := range nic.StaticIPConfigs {
