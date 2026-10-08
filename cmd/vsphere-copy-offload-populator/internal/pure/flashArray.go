@@ -21,6 +21,7 @@ var _ populator.RDMCapable = &FlashArrayClonner{}
 var _ populator.VVolCapable = &FlashArrayClonner{}
 var _ populator.VMDKCapable = &FlashArrayClonner{}
 var _ populator.StorageArrayInfoProvider = &FlashArrayClonner{}
+var _ populator.ProtocolConflictResolver = &FlashArrayClonner{}
 
 type FlashArrayClonner struct {
 	restClient    *RestClient
@@ -191,6 +192,108 @@ func (f *FlashArrayClonner) CurrentMappedGroups(targetLUN populator.LUN, context
 	// we don't use the host group feature, as a host in pure flasharray can not belong to two separate groups, and we
 	// definitely don't want to break host from their current groups. insted we'll just map/unmap the volume to individual hosts
 	return nil, nil
+}
+
+// EvictConflictingConnections disconnects any NVMe-connected hosts from targetLUN before
+// the iSCSI/FC xcopy mapping is established.
+//
+// Pure FlashArray rejects connecting an iSCSI or FC host to a volume that already has an
+// NVMe-oF host connected (and vice versa).  The target PVC will have been provisioned by
+// the CSI driver on OpenShift via NVMe-oF/TCP, leaving one or more NVMe host connections
+// in place.  Since the xcopy operation always uses iSCSI or FC (SCSI XCOPY requires SCSI),
+// those NVMe connections must be temporarily removed before MapTarget is called.
+//
+// The evicted host names are stored in mappingContext["evictedHosts"] as []string so that
+// RestoreConflictingConnections can reconnect them after xcopy finishes.
+func (f *FlashArrayClonner) EvictConflictingConnections(targetLUN populator.LUN, mappingContext populator.MappingContext) error {
+	if targetLUN.Name == "" {
+		return nil
+	}
+
+	f.log.Info("checking for NVMe-connected hosts before xcopy mapping", "volume", targetLUN.Name)
+
+	// List all current connections for this volume.
+	connections, err := f.restClient.ListVolumeConnections(targetLUN.Name)
+	if err != nil {
+		return fmt.Errorf("failed to list connections for volume %s: %w", targetLUN.Name, err)
+	}
+
+	if len(connections) == 0 {
+		f.log.V(2).Info("no existing connections on volume, nothing to evict", "volume", targetLUN.Name)
+		return nil
+	}
+
+	// Build a lookup of all Pure hosts so we can check each connected host's NQNs.
+	allHosts, err := f.restClient.ListHosts()
+	if err != nil {
+		return fmt.Errorf("failed to list hosts for NVMe eviction check: %w", err)
+	}
+	hostByName := make(map[string]Host, len(allHosts))
+	for _, h := range allHosts {
+		hostByName[h.Name] = h
+	}
+
+	var evicted []string
+	for _, conn := range connections {
+		connHostName := conn.Host.Name
+		h, ok := hostByName[connHostName]
+		if !ok {
+			f.log.V(2).Info("connected host not found in host list, skipping", "host", connHostName)
+			continue
+		}
+
+		// Only evict NVMe-connected hosts; iSCSI/FC hosts are compatible with xcopy.
+		if len(h.Nqn) == 0 {
+			continue
+		}
+
+		f.log.Info("evicting NVMe-connected host before xcopy", "volume", targetLUN.Name, "host", connHostName)
+		if err := f.restClient.DisconnectHost(connHostName, targetLUN.Name); err != nil {
+			if strings.Contains(err.Error(), "does not exist") || strings.Contains(err.Error(), "Connection does not exist") {
+				f.log.V(2).Info("connection already gone, ignoring", "host", connHostName, "volume", targetLUN.Name)
+			} else {
+				return fmt.Errorf("failed to evict NVMe host %s from volume %s: %w", connHostName, targetLUN.Name, err)
+			}
+		}
+		evicted = append(evicted, connHostName)
+	}
+
+	if len(evicted) > 0 {
+		f.log.Info("evicted NVMe connections; will restore after xcopy", "volume", targetLUN.Name, "evicted", evicted)
+		mappingContext["evictedHosts"] = evicted
+	}
+	return nil
+}
+
+// RestoreConflictingConnections reconnects any hosts that were evicted by
+// EvictConflictingConnections.  It is a best-effort operation: individual
+// reconnect failures are logged but do not stop the restore loop.
+func (f *FlashArrayClonner) RestoreConflictingConnections(targetLUN populator.LUN, mappingContext populator.MappingContext) error {
+	if targetLUN.Name == "" {
+		return nil
+	}
+
+	evicted, _ := mappingContext["evictedHosts"].([]string)
+	if len(evicted) == 0 {
+		return nil
+	}
+
+	f.log.Info("restoring evicted connections after xcopy", "volume", targetLUN.Name, "hosts", evicted)
+	var lastErr error
+	for _, hostName := range evicted {
+		f.log.Info("reconnecting host", "host", hostName, "volume", targetLUN.Name)
+		if err := f.restClient.ConnectHost(hostName, targetLUN.Name); err != nil {
+			if strings.Contains(err.Error(), "Connection already exists.") {
+				f.log.V(2).Info("connection already restored", "host", hostName, "volume", targetLUN.Name)
+				continue
+			}
+			f.log.Info("failed to restore connection", "host", hostName, "volume", targetLUN.Name, "err", err)
+			lastErr = err
+		} else {
+			f.log.Info("connection restored", "host", hostName, "volume", targetLUN.Name)
+		}
+	}
+	return lastErr
 }
 
 // ResolvePVToLUN resolves a PersistentVolume to Pure FlashArray LUN details
