@@ -96,6 +96,17 @@ type VM struct {
 	Disks                 []Disk    `sql:""`
 	Networks              []Network `sql:""`
 	Concerns              []Concern `sql:""`
+	// The following fields are Nutanix OVA only (ntnx:NtnxConfig);
+	// unset for VMware and other sources.
+	NumSockets            int32     `sql:""`
+	ThreadsPerCore        int32     `sql:""`
+	TpmEnabled            bool      `sql:""`
+	MachineType           string    `sql:""`
+	IsAgentVm             bool      `sql:""`
+	CpuPassthroughEnabled bool      `sql:""`
+	NestedVirtualization  bool      `sql:""`
+	BootDeviceOrder       string    `sql:""`
+	HardwareClockTimezone string    `sql:""`
 }
 
 // Virtual Disk.

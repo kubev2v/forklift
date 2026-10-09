@@ -229,6 +229,17 @@ type VM struct {
 	NICs                  []model.NIC     `json:"nics"`
 	Disks                 []model.Disk    `json:"disks"`
 	Networks              []model.Network `json:"networks"`
+	// The following fields are Nutanix OVA only (ntnx:NtnxConfig);
+	// unset for VMware and other sources.
+	NumSockets            int32           `json:"numSockets"`
+	ThreadsPerCore        int32           `json:"threadsPerCore"`
+	TpmEnabled            bool            `json:"tpmEnabled"`
+	MachineType           string          `json:"machineType"`
+	IsAgentVm             bool            `json:"isAgentVm"`
+	CpuPassthroughEnabled bool            `json:"cpuPassthroughEnabled"`
+	NestedVirtualization  bool            `json:"nestedVirtualization"`
+	BootDeviceOrder       string          `json:"bootDeviceOrder"`
+	HardwareClockTimezone string          `json:"hardwareClockTimezone"`
 }
 
 func (r *VM) GetConcerns() []model.Concern {
@@ -260,6 +271,15 @@ func (r *VM) With(m *model.VM) {
 	r.IpAddress = m.IpAddress
 	r.StorageUsed = m.StorageUsed
 	r.FaultToleranceEnabled = m.FaultToleranceEnabled
+	r.NumSockets = m.NumSockets
+	r.ThreadsPerCore = m.ThreadsPerCore
+	r.TpmEnabled = m.TpmEnabled
+	r.MachineType = m.MachineType
+	r.IsAgentVm = m.IsAgentVm
+	r.CpuPassthroughEnabled = m.CpuPassthroughEnabled
+	r.NestedVirtualization = m.NestedVirtualization
+	r.BootDeviceOrder = m.BootDeviceOrder
+	r.HardwareClockTimezone = m.HardwareClockTimezone
 	r.Devices = m.Devices
 	r.NumaNodeAffinity = m.NumaNodeAffinity
 	r.NICs = m.NICs

@@ -20,6 +20,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
@@ -209,6 +210,9 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, vmRef, object)
+	r.mapTpm(vm, object)
+	r.mapMachine(vm, object)
+	r.mapClock(vm, object)
 	r.mapInput(object)
 	if !usesInstanceType {
 		r.mapCPU(vmRef, vm, object)
@@ -304,11 +308,22 @@ func (r *Builder) mapCPU(vmRef ref.Ref, vm *model.VM, object *cnv.VirtualMachine
 		vm.CoresPerSocket = 1
 	}
 
-	object.Template.Spec.Domain.CPU = &cnv.CPU{
-		Sockets: uint32(vm.CpuCount / vm.CoresPerSocket),
-		Cores:   uint32(vm.CoresPerSocket),
+	sockets := uint32(vm.CpuCount / vm.CoresPerSocket)
+	if vm.NumSockets > 0 {
+		sockets = uint32(vm.NumSockets)
 	}
-	if enableNestedVirt := r.NestedVirtualizationSetting(vmRef, false); enableNestedVirt != nil {
+	threads := uint32(1)
+	if vm.ThreadsPerCore > 0 {
+		threads = uint32(vm.ThreadsPerCore)
+	}
+
+	object.Template.Spec.Domain.CPU = &cnv.CPU{
+		Sockets: sockets,
+		Cores:   uint32(vm.CoresPerSocket),
+		Threads: threads,
+	}
+	nestedDefault := vm.NestedVirtualization
+	if enableNestedVirt := r.NestedVirtualizationSetting(vmRef, nestedDefault); enableNestedVirt != nil {
 		policy := "optional"
 		if !*enableNestedVirt {
 			policy = "disable"
@@ -318,6 +333,42 @@ func (r *Builder) mapCPU(vmRef ref.Ref, vm *model.VM, object *cnv.VirtualMachine
 			cnv.CPUFeature{Name: "svm", Policy: policy},
 		)
 	}
+}
+
+func (r *Builder) mapTpm(vm *model.VM, object *cnv.VirtualMachineSpec) {
+	if vm.TpmEnabled {
+		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Persistent: ptr.To(true)}
+		return
+	}
+	object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Enabled: ptr.To(false)}
+}
+
+func (r *Builder) mapMachine(vm *model.VM, object *cnv.VirtualMachineSpec) {
+	mt := strings.ToLower(strings.TrimSpace(vm.MachineType))
+	if mt == "" {
+		return
+	}
+	// Only pass through types KubeVirt admits (q35* / pc-q35*). Nutanix OVAs
+	// often set machineType=pc (i440fx); leave Machine unset so KubeVirt's default applies.
+	if !strings.HasPrefix(mt, "q35") && !strings.HasPrefix(mt, "pc-q35") {
+		return
+	}
+	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: vm.MachineType}
+}
+
+func (r *Builder) mapClock(vm *model.VM, object *cnv.VirtualMachineSpec) {
+	if vm.HardwareClockTimezone == "" {
+		return
+	}
+	if object.Template.Spec.Domain.Clock == nil {
+		object.Template.Spec.Domain.Clock = &cnv.Clock{}
+	}
+	if strings.EqualFold(vm.HardwareClockTimezone, "UTC") {
+		object.Template.Spec.Domain.Clock.UTC = &cnv.ClockOffsetUTC{}
+		return
+	}
+	tz := cnv.ClockOffsetTimezone(vm.HardwareClockTimezone)
+	object.Template.Spec.Domain.Clock.Timezone = &tz
 }
 
 func (r *Builder) mapFirmware(vm *model.VM, vmRef ref.Ref, object *cnv.VirtualMachineSpec) {
@@ -374,6 +425,7 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []*core.Persiste
 			pvcMap[source] = pvc
 		}
 	}
+	bootDiskPath := ovaBootDiskPath(vm.BootDeviceOrder, disks)
 	for i, disk := range disks {
 		pvc := pvcMap[getDiskFullPath(&disk)]
 		volumeName := fmt.Sprintf("vol-%v", i)
@@ -396,11 +448,30 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []*core.Persiste
 			},
 			Serial: planbase.DiskSerial(disk.DiskId, vm.ID, i),
 		}
+		if bootDiskPath != "" && getDiskFullPath(&disk) == bootDiskPath {
+			kubevirtDisk.BootOrder = ptr.To(uint(1))
+		}
 		kVolumes = append(kVolumes, volume)
 		kDisks = append(kDisks, kubevirtDisk)
 	}
 	object.Template.Spec.Volumes = kVolumes
 	object.Template.Spec.Domain.Devices.Disks = kDisks
+}
+
+// ovaBootDiskPath returns the inventory path of the disk that should receive
+// KubeVirt boot order when BootDeviceOrder lists DISK (Nutanix OVA). Empty
+// BootDeviceOrder leaves boot order unset so VMware OVAs stay unchanged.
+func ovaBootDiskPath(order string, disks []ovfmodel.Disk) string {
+	if order == "" || len(disks) == 0 {
+		return ""
+	}
+	for _, part := range strings.Split(order, ",") {
+		switch strings.ToUpper(strings.TrimSpace(part)) {
+		case "DISK":
+			return getDiskFullPath(&disks[0])
+		}
+	}
+	return ""
 }
 
 // Build tasks.
