@@ -231,15 +231,15 @@ type VM struct {
 	Networks              []model.Network `json:"networks"`
 	// The following fields are Nutanix OVA only (ntnx:NtnxConfig);
 	// unset for VMware and other sources.
-	NumSockets            int32           `json:"numSockets"`
-	ThreadsPerCore        int32           `json:"threadsPerCore"`
-	TpmEnabled            bool            `json:"tpmEnabled"`
-	MachineType           string          `json:"machineType"`
-	IsAgentVm             bool            `json:"isAgentVm"`
-	CpuPassthroughEnabled bool            `json:"cpuPassthroughEnabled"`
-	NestedVirtualization  bool            `json:"nestedVirtualization"`
-	BootDeviceOrder       string          `json:"bootDeviceOrder"`
-	HardwareClockTimezone string          `json:"hardwareClockTimezone"`
+	NumSockets            int32  `json:"numSockets"`
+	ThreadsPerCore        int32  `json:"threadsPerCore"`
+	TpmEnabled            bool   `json:"tpmEnabled"`
+	MachineType           string `json:"machineType"`
+	IsAgentVm             bool   `json:"isAgentVm"`
+	CpuPassthroughEnabled bool   `json:"cpuPassthroughEnabled"`
+	NestedVirtualization  bool   `json:"nestedVirtualization"`
+	BootDeviceOrder       string `json:"bootDeviceOrder"`
+	HardwareClockTimezone string `json:"hardwareClockTimezone"`
 }
 
 func (r *VM) GetConcerns() []model.Concern {

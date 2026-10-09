@@ -77,6 +77,25 @@ func TestApplyNtnxConfigs_UefiBootFalseDefaultsBIOS(t *testing.T) {
 	}
 }
 
+func TestApplyNtnxConfigs_UefiBootFalseOverridesVMwareEFI(t *testing.T) {
+	vm := &VM{Firmware: "efi"}
+	vm.ApplyNtnxConfigs([]NtnxConfig{{Key: "uefi_boot", Value: "False"}})
+	if vm.Firmware != "bios" {
+		t.Fatalf("Firmware: got %q, want bios", vm.Firmware)
+	}
+}
+
+func TestApplyNtnxConfigs_UefiBootFalseKeepsSecureBootEFI(t *testing.T) {
+	vm := &VM{}
+	vm.ApplyNtnxConfigs([]NtnxConfig{
+		{Key: "secure_boot", Value: "True"},
+		{Key: "uefi_boot", Value: "False"},
+	})
+	if vm.Firmware != "efi" {
+		t.Fatalf("Firmware: got %q, want efi", vm.Firmware)
+	}
+}
+
 func TestNormalizeNtnxTopology_DefaultsThreads(t *testing.T) {
 	vm := &VM{NumSockets: 2, CoresPerSocket: 3}
 	vm.normalizeNtnxTopology()

@@ -74,6 +74,7 @@ func (r *VM) ApplyNtnxFromVirtualSystem(vs VirtualSystem) {
 	r.normalizeNtnxTopology()
 }
 
+// ApplyNtnxConfigs applies Prism Central ntnx:NtnxConfig key/value pairs to the VM.
 func (r *VM) ApplyNtnxConfigs(configs []NtnxConfig) {
 	for _, config := range configs {
 		r.applyNtnx(config.Key, config.Value)
@@ -98,12 +99,15 @@ func (r *VM) apply(key string, value string) {
 	}
 }
 
-func (r *VM) applyNtnx(key string, value string) {
+// applyNtnx maps a single Nutanix OVA extension key onto VM fields.
+func (r *VM) applyNtnx(key, value string) {
 	switch key {
 	case "uefi_boot":
 		if parseNtnxBool(value) {
 			r.Firmware = "efi"
-		} else if r.Firmware == "" {
+		} else if !r.SecureBoot {
+			// Explicit Nutanix BIOS wins over a prior VMware firmware=efi,
+			// unless secure_boot already forced EFI.
 			r.Firmware = "bios"
 		}
 	case "secure_boot":
@@ -155,6 +159,7 @@ func (r *VM) normalizeNtnxTopology() {
 	r.CpuCount = r.NumSockets * r.CoresPerSocket * threads
 }
 
+// parseNtnxBool parses Nutanix "True"/"False" (and other strconv.ParseBool forms).
 func parseNtnxBool(value string) bool {
 	// Nutanix writes "True"/"False"; strconv.ParseBool accepts those.
 	v, err := strconv.ParseBool(strings.TrimSpace(value))

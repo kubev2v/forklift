@@ -25,3 +25,9 @@ test_with_legacy_ova_source_key if {
 	results := concerns with input as mock_vm
 	count(results) == 0
 }
+
+test_with_missing_source if {
+	mock_vm := {"name": "test"}
+	results := concerns with input as mock_vm
+	count(results) == 0
+}
