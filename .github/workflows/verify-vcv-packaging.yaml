@@ -27,11 +27,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Checkout pinned virt-cluster-validate source
-        # TODO(VIRTCE-181): Use openshift-cnv after the VCV controller merges.
         uses: actions/checkout@v4
         with:
-          repository: tiraboschi/virt-cluster-validate
-          ref: e9ea26c79951df7b47bcf614b67b339fed95b23d
+          repository: openshift-cnv/virt-cluster-validate
+          ref: 8aad9e5d742a04723f792dc3f5e106507cd833ae
           path: virt-cluster-validate
 
       - name: Set up Python
