@@ -15,6 +15,7 @@ const (
 	SourceVirtualBox = "VirtualBox"
 	SourceXen        = "Xen"
 	SourceOvirt      = "oVirt"
+	SourceNutanix    = "Nutanix"
 )
 
 const (
@@ -82,12 +83,20 @@ func GuessSource(envelope Envelope) string {
 		"http://www.citrix.com/xenclient/ovf/1":    SourceXen,
 		"http://www.virtualbox.org/ovf/machine":    SourceVirtualBox,
 		"http://www.ovirt.org/ovf":                 SourceOvirt,
+		"http://www.nutanix.com/ova":               SourceNutanix,
 	}
 
 	foundVMware := false
+	foundNutanix := false
 
 	for _, attribute := range envelope.Attributes {
 		if source, present := namespaceMap[attribute.Value]; present {
+			// Nutanix OVAs also declare the VMware schema for CoresPerSocket;
+			// prefer the Nutanix namespace when both are present.
+			if source == SourceNutanix {
+				foundNutanix = true
+				continue
+			}
 			return source
 		}
 
@@ -98,6 +107,9 @@ func GuessSource(envelope Envelope) string {
 		}
 	}
 
+	if foundNutanix {
+		return SourceNutanix
+	}
 	if foundVMware {
 		return SourceVMware
 	}
@@ -120,6 +132,30 @@ type Item struct {
 	Connection      string          `xml:"Connection,omitempty"`
 	Configs         []VirtualConfig `xml:"Config"`
 	CoresPerSocket  string          `xml:"CoresPerSocket"`
+	NtnxConfigs     []NtnxConfig    `xml:"NtnxConfig"`
+}
+
+// NtnxConfig is a Prism Central OVA extension key/value pair
+// (http://www.nutanix.com/ova).
+type NtnxConfig struct {
+	XMLName  xml.Name `xml:"http://www.nutanix.com/ova NtnxConfig"`
+	Required string   `xml:"required,attr"`
+	Key      string   `xml:"key,attr"`
+	Value    string   `xml:"value,attr"`
+}
+
+// NtnxBootOrderSection carries AHV firmware / boot-order settings.
+type NtnxBootOrderSection struct {
+	XMLName xml.Name     `xml:"http://www.nutanix.com/ova NtnxBootOrderSection"`
+	Info    string       `xml:"Info"`
+	Configs []NtnxConfig `xml:"NtnxConfig"`
+}
+
+// NtnxVtpmSection carries AHV vTPM settings.
+type NtnxVtpmSection struct {
+	XMLName xml.Name     `xml:"http://www.nutanix.com/ova NtnxVtpmSection"`
+	Info    string       `xml:"Info"`
+	Configs []NtnxConfig `xml:"NtnxConfig"`
 }
 
 type VirtualConfig struct {
@@ -141,6 +177,7 @@ type VirtualHardwareSection struct {
 	Items       []Item               `xml:"Item"`
 	Configs     []VirtualConfig      `xml:"Config"`
 	ExtraConfig []ExtraVirtualConfig `xml:"ExtraConfig"`
+	NtnxConfigs []NtnxConfig         `xml:"NtnxConfig"`
 }
 
 type References struct {
@@ -185,7 +222,9 @@ type VirtualSystem struct {
 		Description string `xml:"Description"`
 		OsType      string `xml:"osType,attr"`
 	} `xml:"OperatingSystemSection"`
-	HardwareSection VirtualHardwareSection `xml:"VirtualHardwareSection"`
+	HardwareSection  VirtualHardwareSection `xml:"VirtualHardwareSection"`
+	BootOrderSection NtnxBootOrderSection   `xml:"NtnxBootOrderSection"`
+	VtpmSection      NtnxVtpmSection        `xml:"NtnxVtpmSection"`
 }
 
 type Envelope struct {

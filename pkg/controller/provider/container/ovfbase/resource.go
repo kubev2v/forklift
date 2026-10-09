@@ -64,6 +64,17 @@ type VM struct {
 		Name        string `json:"Name"`
 		Description string `json:"Description"`
 	} `json:"Networks"`
+	// The following fields are Nutanix OVA only (ntnx:NtnxConfig);
+	// unset for VMware and other sources.
+	NumSockets            int32  `json:"NumSockets"`
+	ThreadsPerCore        int32  `json:"ThreadsPerCore"`
+	TpmEnabled            bool   `json:"TpmEnabled"`
+	MachineType           string `json:"MachineType"`
+	IsAgentVm             bool   `json:"IsAgentVm"`
+	CpuPassthroughEnabled bool   `json:"CpuPassthroughEnabled"`
+	NestedVirtualization  bool   `json:"NestedVirtualization"`
+	BootDeviceOrder       string `json:"BootDeviceOrder"`
+	HardwareClockTimezone string `json:"HardwareClockTimezone"`
 }
 
 // Apply to (update) the model.
@@ -93,6 +104,15 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.NumaNodeAffinity = r.NumaNodeAffinity
 	m.StorageUsed = r.StorageUsed
 	m.ChangeTrackingEnabled = r.ChangeTrackingEnabled
+	m.NumSockets = r.NumSockets
+	m.ThreadsPerCore = r.ThreadsPerCore
+	m.TpmEnabled = r.TpmEnabled
+	m.MachineType = r.MachineType
+	m.IsAgentVm = r.IsAgentVm
+	m.CpuPassthroughEnabled = r.CpuPassthroughEnabled
+	m.NestedVirtualization = r.NestedVirtualization
+	m.BootDeviceOrder = r.BootDeviceOrder
+	m.HardwareClockTimezone = r.HardwareClockTimezone
 	r.addNICs(m)
 	r.addDisks(m)
 	r.addDevices(m)
