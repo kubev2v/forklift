@@ -4,9 +4,13 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	ovfmodel "github.com/kubev2v/forklift/pkg/controller/provider/model/ovf"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cnv "kubevirt.io/api/core/v1"
@@ -29,7 +33,8 @@ func TestMapMachine(t *testing.T) {
 		{name: "pc leaves unset for KubeVirt default", machineType: "pc", wantSet: false},
 		{name: "q35 passed through", machineType: "q35", wantType: "q35", wantSet: true},
 		{name: "pc-q35 passed through", machineType: "pc-q35-rhel9.4.0", wantType: "pc-q35-rhel9.4.0", wantSet: true},
-		{name: "Q35 case preserved from inventory", machineType: "Q35", wantType: "Q35", wantSet: true},
+		{name: "Q35 normalized to q35", machineType: "Q35", wantType: "q35", wantSet: true},
+		{name: "q35-invalid left unset", machineType: "q35-invalid", wantSet: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -45,6 +50,40 @@ func TestMapMachine(t *testing.T) {
 				t.Fatalf("Machine=%+v, want type %q", spec.Template.Spec.Domain.Machine, tt.wantType)
 			}
 		})
+	}
+}
+
+func testBuilder() *Builder {
+	return &Builder{Context: &plancontext.Context{
+		Log:  logging.WithName("test"),
+		Plan: &api.Plan{},
+	}}
+}
+
+func TestMapCPU_IncompleteNutanixTopology(t *testing.T) {
+	spec := emptyVMSpec()
+	// CpuCount=8 with num_sockets=2 but no per-socket cores must not shrink to 2 vCPUs.
+	testBuilder().mapCPU(ref.Ref{}, &model.VM{
+		CpuCount:   8,
+		NumSockets: 2,
+	}, spec)
+	cpu := spec.Template.Spec.Domain.CPU
+	if cpu == nil || cpu.Sockets != 8 || cpu.Cores != 1 || cpu.Threads != 1 {
+		t.Fatalf("CPU=%+v, want sockets=8 cores=1 threads=1", cpu)
+	}
+}
+
+func TestMapCPU_CompleteNutanixTopology(t *testing.T) {
+	spec := emptyVMSpec()
+	testBuilder().mapCPU(ref.Ref{}, &model.VM{
+		CpuCount:       8,
+		NumSockets:     2,
+		CoresPerSocket: 4,
+		ThreadsPerCore: 1,
+	}, spec)
+	cpu := spec.Template.Spec.Domain.CPU
+	if cpu == nil || cpu.Sockets != 2 || cpu.Cores != 4 || cpu.Threads != 1 {
+		t.Fatalf("CPU=%+v, want sockets=2 cores=4 threads=1", cpu)
 	}
 }
 
@@ -87,7 +126,8 @@ func TestOvaBootDiskPath(t *testing.T) {
 	}{
 		{name: "empty order", order: "", want: ""},
 		{name: "disk first", order: "DISK,CDROM,NETWORK", want: "/ova/disk0.vmdk::disk0"},
-		{name: "cdrom before disk", order: "CDROM,DISK,NETWORK", want: "/ova/disk0.vmdk::disk0"},
+		{name: "cdrom before disk", order: "CDROM,DISK,NETWORK", want: ""},
+		{name: "network before disk", order: "NETWORK,DISK", want: ""},
 		{name: "no disk entry", order: "CDROM,NETWORK", want: ""},
 	}
 	for _, tt := range tests {

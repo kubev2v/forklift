@@ -303,18 +303,28 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) error 
 	return nil
 }
 
+// mapCPU sets KubeVirt CPU topology from inventory, preferring a complete
+// Nutanix sockets×cores×threads description when it matches CpuCount.
 func (r *Builder) mapCPU(vmRef ref.Ref, vm *model.VM, object *cnv.VirtualMachineSpec) {
 	if vm.CoresPerSocket == 0 {
 		vm.CoresPerSocket = 1
 	}
-
-	sockets := uint32(vm.CpuCount / vm.CoresPerSocket)
-	if vm.NumSockets > 0 {
-		sockets = uint32(vm.NumSockets)
-	}
 	threads := uint32(1)
 	if vm.ThreadsPerCore > 0 {
 		threads = uint32(vm.ThreadsPerCore)
+	}
+
+	sockets := uint32(0)
+	if vm.CpuCount > 0 {
+		sockets = uint32(vm.CpuCount / vm.CoresPerSocket)
+	}
+	// Prefer Nutanix num_sockets only when it is consistent with CpuCount
+	// (or CpuCount is unset). Incomplete topology must not shrink vCPUs.
+	if vm.NumSockets > 0 {
+		expected := int64(vm.NumSockets) * int64(vm.CoresPerSocket) * int64(threads)
+		if vm.CpuCount == 0 || int64(vm.CpuCount) == expected {
+			sockets = uint32(vm.NumSockets)
+		}
 	}
 
 	object.Template.Spec.Domain.CPU = &cnv.CPU{
@@ -335,6 +345,7 @@ func (r *Builder) mapCPU(vmRef ref.Ref, vm *model.VM, object *cnv.VirtualMachine
 	}
 }
 
+// mapTpm enables a persistent TPM when inventory reports vTPM, otherwise disables it.
 func (r *Builder) mapTpm(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	if vm.TpmEnabled {
 		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Persistent: ptr.To(true)}
@@ -343,19 +354,20 @@ func (r *Builder) mapTpm(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Enabled: ptr.To(false)}
 }
 
+// mapMachine sets Domain.Machine for supported QEMU types (q35 / pc-q35*).
+// Unsupported values such as Nutanix "pc" are left unset for the KubeVirt default.
 func (r *Builder) mapMachine(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	mt := strings.ToLower(strings.TrimSpace(vm.MachineType))
 	if mt == "" {
 		return
 	}
-	// Only pass through types KubeVirt admits (q35* / pc-q35*). Nutanix OVAs
-	// often set machineType=pc (i440fx); leave Machine unset so KubeVirt's default applies.
-	if !strings.HasPrefix(mt, "q35") && !strings.HasPrefix(mt, "pc-q35") {
+	if mt != "q35" && !strings.HasPrefix(mt, "pc-q35") {
 		return
 	}
-	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: vm.MachineType}
+	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: mt}
 }
 
+// mapClock sets the guest clock from HardwareClockTimezone when present.
 func (r *Builder) mapClock(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	if vm.HardwareClockTimezone == "" {
 		return
@@ -467,8 +479,13 @@ func ovaBootDiskPath(order string, disks []ovfmodel.Disk) string {
 	}
 	for _, part := range strings.Split(order, ",") {
 		switch strings.ToUpper(strings.TrimSpace(part)) {
+		case "":
+			continue
 		case "DISK":
 			return getDiskFullPath(&disks[0])
+		default:
+			// CDROM/NETWORK before DISK: do not promote the disk ahead of them.
+			return ""
 		}
 	}
 	return ""

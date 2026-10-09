@@ -3,12 +3,9 @@ package io.konveyor.forklift.ova
 import rego.v1
 
 # Inventory exposes exportSource (camelCase JSON from the web API).
-# Keep ovaSource as a fallback for older test fixtures.
-export_source := input.exportSource if {
-	input.exportSource
-} else := input.ovaSource if {
-	input.ovaSource
-} else := "Unknown"
+# Keep ovaSource as a fallback for older fixtures. Empty when both are absent
+# so other OVA policies are not forced to set a source.
+export_source := object.get(input, "exportSource", object.get(input, "ovaSource", ""))
 
 supported_export_source if {
 	export_source == "VMware"
@@ -19,6 +16,7 @@ supported_export_source if {
 }
 
 unsupported_export_source if {
+	export_source != ""
 	not supported_export_source
 }
 
