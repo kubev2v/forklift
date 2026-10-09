@@ -25,6 +25,8 @@ images[UI_PLUGIN_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-o
 images[CLI_DOWNLOAD_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-cli-download@sha256:0000000000000000000000000000000000000000000000000000000000000000
 
 images[VALIDATION_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/validation@sha256:58edf1e9d49c33bdd62abcd632a61ba61e68b8977f3f57e9feb93c1dd4f07fb6
+images[VIRT_VALIDATION_CONTROLLER_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/virt-validation-controller@sha256:0000000000000000000000000000000000000000000000000000000000000000
+images[VIRT_CLUSTER_VALIDATE_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/virt-cluster-validate@sha256:0000000000000000000000000000000000000000000000000000000000000000
 
 images[VIRT_V2V_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/virt-v2v@sha256:9a8548cf4439121ceaa7a8d626d6c6f1f9280f63b2daf471d24fd62c8185a3f4
 
@@ -45,6 +47,8 @@ replacements[POPULATOR_CONTROLLER_IMAGE]=mtv-populator-controller-rhel9
 replacements[UI_PLUGIN_IMAGE]=mtv-console-plugin-rhel9
 replacements[CLI_DOWNLOAD_IMAGE]=mtv-cli-download-rhel9
 replacements[VALIDATION_IMAGE]=mtv-validation-rhel8
+replacements[VIRT_VALIDATION_CONTROLLER_IMAGE]=mtv-virt-validation-controller-rhel9
+replacements[VIRT_CLUSTER_VALIDATE_IMAGE]=mtv-virt-cluster-validate-rhel9
 replacements[VIRT_V2V_IMAGE]=mtv-virt-v2v-rhel8
 replacements[VIRT_V2V_IMAGE_RHEL9]=mtv-virt-v2v-rhel9
 

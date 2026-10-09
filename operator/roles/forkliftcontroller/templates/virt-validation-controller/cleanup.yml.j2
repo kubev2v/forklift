@@ -1,0 +1,58 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ virt_validation_controller_name }}
+  namespace: {{ app_namespace }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ virt_validation_controller_service_name }}
+  namespace: {{ app_namespace }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ virt_validation_controller_name }}
+  namespace: {{ app_namespace }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: virt-validation-controller-default-deny
+  namespace: {{ app_namespace }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: virt-validation-controller-allow-api
+  namespace: {{ app_namespace }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: virt-validation-controller-allow-dns
+  namespace: {{ app_namespace }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: virt-validation-controller-allow-metrics
+  namespace: {{ app_namespace }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: virt-validation-controller
+  namespace: {{ app_namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: virt-validation-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: virt-validation-controller

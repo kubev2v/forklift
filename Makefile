@@ -123,6 +123,8 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_TAG)
 API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG)
 VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG)
+VIRT_VALIDATION_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/virt-validation-controller:$(REGISTRY_TAG)
+VIRT_CLUSTER_VALIDATE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/virt-cluster-validate:$(REGISTRY_TAG)
 VIRT_V2V_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG)
 VIRT_V2V_IMAGE_RHEL9 ?= $(VIRT_V2V_IMAGE)
 OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)
@@ -282,6 +284,14 @@ generate: controller-gen ## Generate deepcopy and CRD code
 generate-verify: generate ## Verify generated code is up to date
 	./hack/verify-generate.sh
 
+.PHONY: verify-vcv-packaging
+verify-vcv-packaging: ## Verify VirtualizationValidation packaging assets
+	./hack/verify-vcv-packaging.sh
+
+.PHONY: verify-vcv-source-drift
+verify-vcv-source-drift: ## Verify copied VCV assets against VCV_ROOT
+	./hack/verify-vcv-source-drift.sh
+
 ##@ Kubernetes Manifests
 
 .PHONY: manifests
@@ -388,6 +398,8 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg CONTROLLER_IMAGE=$(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg API_IMAGE=$(API_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VALIDATION_IMAGE=$(VALIDATION_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg VIRT_VALIDATION_CONTROLLER_IMAGE=$(VIRT_VALIDATION_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg VIRT_CLUSTER_VALIDATE_IMAGE=$(VIRT_CLUSTER_VALIDATE_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OPERATOR_IMAGE=$(OPERATOR_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) \
@@ -800,5 +812,3 @@ validate-commits-range:
 
 $(GOLANGCI_LINT_BIN):
 	$(MAKE) lint-install
-
-

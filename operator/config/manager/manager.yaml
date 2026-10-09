@@ -54,6 +54,10 @@ spec:
           value: ${CLI_DOWNLOAD_IMAGE}
         - name: VALIDATION_IMAGE
           value: ${VALIDATION_IMAGE}
+        - name: VIRT_VALIDATION_CONTROLLER_IMAGE
+          value: ${VIRT_VALIDATION_CONTROLLER_IMAGE}
+        - name: VIRT_CLUSTER_VALIDATE_IMAGE
+          value: ${VIRT_CLUSTER_VALIDATE_IMAGE}
         - name: VIRT_V2V_IMAGE
           value: ${VIRT_V2V_IMAGE}
         - name: VIRT_V2V_IMAGE_XFS
