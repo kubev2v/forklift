@@ -3,6 +3,7 @@ package vsphere
 import (
 	"encoding/xml"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/kubev2v/forklift/pkg/lib/logging"
@@ -104,10 +105,32 @@ func GetOperationSystemFromConfig(vmConfigXML string) (string, error) {
 	if ok {
 		return os, nil
 	}
+	if suseKey, isSUSE := suseOsinfoKey(osInfo); isSUSE {
+		if os, ok = osV2VMap[suseKey]; ok {
+			return os, nil
+		}
+	}
 	log.Info(fmt.Sprintf("Received %s, mapped to: %s", inspection.OS.Osinfo, os))
 
 	if inspection.OS.Name == "linux" {
 		return "genericLinuxGuest", nil
 	}
 	return "otherGuest64", nil
+}
+
+// SUSE releases do not follow the "<distro><major>.<minor>" form handled above.
+// SLES is reported as sles12sp5 (SLES 12), sle15sp5 or sles15sp5 (SLES 15,
+// depending on the libguestfs version) and sle16 (SLES 16), and openSUSE Leap
+// as opensuse15.6.
+var suseOsinfoPattern = regexp.MustCompile(`^sles?([0-9]+)(sp[0-9]+)?$`)
+
+// suseOsinfoKey reduces a SUSE osinfo id to its osV2VMap key.
+func suseOsinfoKey(osInfo string) (string, bool) {
+	if m := suseOsinfoPattern.FindStringSubmatch(osInfo); m != nil {
+		return "sles" + m[1], true
+	}
+	if strings.HasPrefix(osInfo, "opensuse") {
+		return "opensuse", true
+	}
+	return "", false
 }
