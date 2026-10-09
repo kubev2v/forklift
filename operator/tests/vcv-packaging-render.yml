@@ -1,0 +1,34 @@
+---
+- name: Render VirtualizationValidation controller packaging assets
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    app_name: forklift-controller
+    app_namespace: openshift-mtv
+    image_pull_policy: IfNotPresent
+    output_dir: /tmp/vcv-packaging-render
+    virt_cluster_validate_image_fqin: quay.io/example/virt-cluster-validate@sha256:validator
+    virt_validation_controller_image_fqin: quay.io/example/virt-validation-controller@sha256:controller
+    virt_validation_controller_name: virt-validation-controller
+    virt_validation_controller_service_name: virt-validation-controller-metrics
+    virt_validation_controller_tls_secret_name: virt-validation-controller-metrics-tls
+  tasks:
+    - name: Create rendered asset directory
+      ansible.builtin.file:
+        path: "{{ output_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Render VirtualizationValidation controller assets
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../roles/forkliftcontroller/templates/virt-validation-controller/{{ item }}.yml.j2"
+        dest: "{{ output_dir }}/{{ item }}.yaml"
+        mode: "0644"
+      loop:
+        - deployment
+        - service
+        - servicemonitor
+        - networkpolicy
+        - rbac
+        - cleanup

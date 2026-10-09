@@ -1,0 +1,52 @@
+name: Verify VirtualizationValidation packaging
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-vcv-packaging.yaml"
+      - "Makefile"
+      - "build/forklift-operator-bundle/**"
+      - "hack/verify-vcv-*.sh"
+      - "operator/config/**"
+      - "operator/export-vars-*.sh"
+      - "operator/related_images.yaml"
+      - "operator/roles/forkliftcontroller/**"
+      - "operator/streams/**"
+      - "operator/tests/vcv-packaging-render.yml"
+      - "operator/virt-validation-controller-source.env"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-vcv-packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Forklift
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned virt-cluster-validate source
+        # TODO(VIRTCE-181): Use openshift-cnv after the VCV controller merges.
+        uses: actions/checkout@v4
+        with:
+          repository: tiraboschi/virt-cluster-validate
+          ref: e9ea26c79951df7b47bcf614b67b339fed95b23d
+          path: virt-cluster-validate
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Ansible
+        run: python -m pip install --user ansible-core
+
+      - name: Make Ansible available
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify packaging assets
+        run: ./hack/verify-vcv-packaging.sh
+
+      - name: Verify VCV source drift
+        run: VCV_ROOT="$GITHUB_WORKSPACE/virt-cluster-validate" ./hack/verify-vcv-source-drift.sh
