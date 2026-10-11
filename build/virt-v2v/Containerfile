@@ -1,9 +1,9 @@
-FROM registry.access.redhat.com/ubi10:10.2-1777462922 AS winlegacyiso
+FROM registry.access.redhat.com/ubi10:10.2-1791444044 AS winlegacyiso
 
 COPY build/virt-v2v/prefetch/ /tmp/virtio-win-prefetch/
 RUN rpm -Uvh --nodeps /tmp/virtio-win-prefetch/virtio-win-*.noarch.rpm
 
-FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1788411200 AS builder
+FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1791462472 AS builder
 USER 0
 COPY build/virt-v2v/repos/centos-stream10-builder.repo /tmp/cs10-repos/centos-stream10-builder.repo
 COPY build/virt-v2v/scripts/enable-cs10-repos.sh /tmp/enable-cs10-repos.sh
@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldfl
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o forklift-wait-for-reboot github.com/kubev2v/forklift/cmd/forklift-wait-for-reboot
 
-FROM registry.access.redhat.com/ubi10:10.2-1777462922 AS runtime
+FROM registry.access.redhat.com/ubi10:10.2-1791444044 AS runtime
 
 # Upstream-specific: downstream installs a pinned RHEL 10.1 kernel with local
 # kernel-modules-internal and libguestfs-fssupport RPMs here; those packages
