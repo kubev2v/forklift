@@ -13,12 +13,11 @@ limitations under the License.
 package iboxapi
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
-	"fmt"
+	"errors"
 	"net/http"
-
-	"github.com/go-logr/logr"
 )
 
 const (
@@ -27,19 +26,23 @@ const (
 	INFO_LEVEL  = 0
 )
 
+var ErrMappingExists = errors.New("mapping already exists")
+var ErrNotFound = errors.New("item not found")
+
 var ERROR_CODE_HOST_NOT_FOUND = "HOST_NOT_FOUND"
 
 const (
-	IBOXAPI_RESOURCE_NOT_FOUND_ERROR = 1
-	PARAMETER_APPROVED               = "approved"
-	PARAMETER_VALUE_TRUE             = "true"
-	PARAMETER_VALUE_FALSE            = "false"
-	CONTENT_TYPE                     = "Content-Type"
-	JSON_CONTENT_TYPE                = "application/json; charset=UTF-8"
-	PARAMETER_PAGE_SIZE              = "page_size"
-	PARAMETER_PAGE                   = "page"
+	RESOURCE_NOT_FOUND    = 1
+	PARAMETER_APPROVED    = "approved"
+	PARAMETER_VALUE_TRUE  = "true"
+	PARAMETER_VALUE_FALSE = "false"
+	CONTENT_TYPE          = "Content-Type"
+	JSON_CONTENT_TYPE     = "application/json; charset=UTF-8"
+	PARAMETER_PAGE_SIZE   = "page_size"
+	PARAMETER_PAGE        = "page"
 )
 
+/**
 type APIError struct {
 	Code int
 	Err  error
@@ -48,6 +51,7 @@ type APIError struct {
 func (r *APIError) Error() string {
 	return fmt.Sprintf("iboxapi error code %d: err %v", r.Code, r.Err)
 }
+*/
 
 type Metadata struct {
 	Ready           bool `json:"ready"`
@@ -68,98 +72,100 @@ type Error struct {
 
 type Client interface {
 	// pools
-	GetPoolByName(name string) (*PoolResult, error)
-	GetPoolByID(id int) (*PoolResult, error)
+	GetPoolByName(ctx context.Context, name string) (*PoolResult, error)
+	GetPoolByID(ctx context.Context, id int) (*PoolResult, error)
 
 	// volumes
-	DeleteVolume(volumeID int) (*DeleteVolumeResponse, error)
-	GetVolumeByName(volumeName string) (*Volume, error)
-	GetVolume(volumeID int) (*Volume, error)
-	UpdateVolume(volumeID int, volume Volume) (*Volume, error)
-	CreateSnapshotVolume(snapshotParam CreateSnapshotVolumeRequest) (*Snapshot, error)
-	GetVolumesByParentID(parentID int) ([]Volume, error)
+	DeleteVolume(ctx context.Context, volumeID int) (*DeleteVolumeResponse, error)
+	GetVolumeByName(ctx context.Context, volumeName string) (*Volume, error)
+	GetVolume(ctx context.Context, volumeID int) (*Volume, error)
+	UpdateVolume(ctx context.Context, volumeID int, volume Volume) (*Volume, error)
+	CreateSnapshotVolume(ctx context.Context, snapshotParam CreateSnapshotVolumeRequest) (*Snapshot, error)
+	PromoteSnapshot(ctx context.Context, snapshotID int) (*Volume, error)
+	GetVolumesByParentID(ctx context.Context, parentID int) ([]Volume, error)
 
 	// network spaces
-	GetNetworkSpaceByName(networkSpaceName string) (nspace *NetworkSpace, err error)
+	GetNetworkSpaceByName(ctx context.Context, networkSpaceName string) (nspace *NetworkSpace, err error)
 
 	// datasets
-	GetAllSnapshots() ([]Volume, error)
+	GetAllSnapshots(ctx context.Context) ([]Volume, error)
 
 	// hosts
-	GetAllHosts() (host []Host, err error)
-	GetHostByName(hostName string) (host *Host, err error)
-	CreateHost(hostName string) (host *Host, err error)
-	DeleteHost(hostID int) (resp *Host, err error)
-	AddHostSecurity(chapCreds map[string]string, hostID int) (host *AddHostSecurityResponse, err error)
-	AddHostPort(portType, portAddress string, hostID int) (addPortResponse *AddPortResponse, err error)
-	GetHostPort(hostID int, portAddress string) (hostPort *HostPort, err error)
-	MapVolumeToHost(hostID, volumeID, lun int) (lunInfo *LunInfo, err error)
-	GetAllLunByHost(hostID int) (luninfo []LunInfo, err error)
-	GetLunByHostVolume(hostID, volumeID int) (lun *LunInfo, err error)
-	UnMapVolumeFromHost(hostID, volumeID int) (resp *UnMapVolumeFromHostResponse, err error)
+	GetAllHosts(ctx context.Context) (host []Host, err error)
+	GetHostByName(ctx context.Context, hostName string) (host *Host, err error)
+	CreateHost(ctx context.Context, hostName string) (host *Host, err error)
+	DeleteHost(ctx context.Context, hostID int) (resp *Host, err error)
+	AddHostSecurity(ctx context.Context, chapCreds map[string]string, hostID int) (host *AddHostSecurityResponse, err error)
+	AddHostPort(ctx context.Context, portType, portAddress string, hostID int) (addPortResponse *AddPortResponse, err error)
+	GetHostPort(ctx context.Context, hostID int, portAddress string) (hostPort *HostPort, err error)
+	MapVolumeToHost(ctx context.Context, hostID, volumeID, lun int) (lunInfo *LunInfo, err error)
+	GetAllLunByHost(ctx context.Context, hostID int) (luninfo []LunInfo, err error)
+	GetLunByHostVolume(ctx context.Context, hostID, volumeID int) (lun *LunInfo, err error)
+	UnMapVolumeFromHost(ctx context.Context, hostID, volumeID int) (resp *UnMapVolumeFromHostResponse, err error)
 
 	// volumes
-	GetLunsByVolume(volumeID int) (resp []LunInfo, err error)
-	CreateVolume(request CreateVolumeRequest) (*Volume, error)
+	GetLunsByVolume(ctx context.Context, volumeID int) (resp []LunInfo, err error)
+	CreateVolume(ctx context.Context, request CreateVolumeRequest) (*Volume, error)
 
 	// config
-	GetMaxTreeqPerFs() (int, error)
-	GetMaxFileSystems() (int, error)
+	GetMaxTreeqPerFs(ctx context.Context) (int, error)
+	GetMaxFileSystems(ctx context.Context) (int, error)
 
 	// components
-	GetFCPorts() (fcNodes []FCNode, err error)
+	GetFCPorts(ctx context.Context) (fcNodes []FCNode, err error)
 
 	// consistency group (volume group)
-	GetConsistencyGroup(cgID int) (*ConsistencyGroupInfo, error)
-	DeleteConsistencyGroup(cgID int) error
-	GetConsistencyGroupByName(name string) (*ConsistencyGroupInfo, error)
-	CreateSnapshotGroup(req CreateSnapshotGroupRequest) (*ConsistencyGroupInfo, error)
-	GetMembersByCGID(cgID int) ([]MemberInfo, error)
-	AddMemberToSnapshotGroup(volumeID, cgID int) error
-	CreateConsistencyGroup(req CreateConsistencyGroupRequest) (*ConsistencyGroupInfo, error)
+	GetConsistencyGroup(ctx context.Context, cgID int) (*ConsistencyGroupInfo, error)
+	DeleteConsistencyGroup(ctx context.Context, cgID int) error
+	GetConsistencyGroupByName(ctx context.Context, name string) (*ConsistencyGroupInfo, error)
+	CreateSnapshotGroup(ctx context.Context, req CreateSnapshotGroupRequest) (*ConsistencyGroupInfo, error)
+	GetMembersByCGID(ctx context.Context, cgID int) ([]MemberInfo, error)
+	AddMemberToSnapshotGroup(ctx context.Context, volumeID, cgID int) error
+	CreateConsistencyGroup(ctx context.Context, req CreateConsistencyGroupRequest) (*ConsistencyGroupInfo, error)
 
 	// for nfs
-	GetFileSystemByName(name string) (*FileSystem, error)
-	GetFileSystemsByPool(poolID int, fsPrefix string) ([]FileSystem, error)
-	GetFileSystemsByParentID(parentID int) ([]FileSystem, error)
-	GetFileSystemByID(fileSystemID int) (*FileSystem, error)
-	CreateFileSystem(request CreateFileSystemRequest) (*FileSystem, error)
-	DeleteFileSystem(fileSystemID int) error
-	UpdateFileSystem(fileSystemID int, fileSystem FileSystem) (*FileSystem, error)
-	CreateFileSystemSnapshot(snapshotParam FileSystemSnapshot) (*FileSystemSnapshotResponse, error)
+	GetFileSystemByName(ctx context.Context, name string) (*FileSystem, error)
+	GetFileSystemsByPool(ctx context.Context, poolID int, fsPrefix string) ([]FileSystem, error)
+	GetFileSystemsByParentID(ctx context.Context, parentID int) ([]FileSystem, error)
+	GetFileSystemByID(ctx context.Context, fileSystemID int) (*FileSystem, error)
+	CreateFileSystem(ctx context.Context, request CreateFileSystemRequest) (*FileSystem, error)
+	DeleteFileSystem(ctx context.Context, fileSystemID int) error
+	UpdateFileSystem(ctx context.Context, fileSystemID int, fileSystem FileSystem) (*FileSystem, error)
+	CreateFileSystemSnapshot(ctx context.Context, snapshotParam FileSystemSnapshot) (*FileSystemSnapshotResponse, error)
 
 	// treeq
-	GetTreeqsByFileSystem(filesystemID int) ([]Treeq, error)
-	UpdateTreeq(fileSystemID, treeqID int, body UpdateTreeqRequest) (*Treeq, error)
-	CreateTreeq(filesystemID int, treeqParameter CreateTreeqRequest) (*Treeq, error)
-	DeleteTreeq(fileSystemID, treeqID int) (*Treeq, error)
-	GetTreeq(fileSystemID, treeqID int) (*Treeq, error)
-	GetTreeqByName(fileSystemID int, treeqName string) (*Treeq, error)
+	GetTreeqsByFileSystem(ctx context.Context, filesystemID int) ([]Treeq, error)
+	UpdateTreeq(ctx context.Context, fileSystemID, treeqID int, body UpdateTreeqRequest) (*Treeq, error)
+	CreateTreeq(ctx context.Context, filesystemID int, treeqParameter CreateTreeqRequest) (*Treeq, error)
+	DeleteTreeq(ctx context.Context, fileSystemID, treeqID int) (*Treeq, error)
+	GetTreeq(ctx context.Context, fileSystemID, treeqID int) (*Treeq, error)
+	GetTreeqByName(ctx context.Context, fileSystemID int, treeqName string) (*Treeq, error)
 
 	// exports
-	GetExportsByFileSystemID(filesystemID int) ([]Export, error)
-	DeleteExport(exportID int) (*Export, error)
-	CreateExport(request CreateExportRequest) (*Export, error)
-	UpdateExportPermissions(export Export, exportPathRef ExportPathRef) (*Export, error)
+	GetExportsByFileSystemID(ctx context.Context, filesystemID int) ([]Export, error)
+	GetExportByID(ctx context.Context, exportID int) (*Export, error)
+	DeleteExport(ctx context.Context, exportID int) (*Export, error)
+	CreateExport(ctx context.Context, request CreateExportRequest) (*Export, error)
+	UpdateExportPermissions(ctx context.Context, export Export, exportPathRef ExportPathRef) (*Export, error)
 
 	// metadata
-	PutMetadata(objectID int, metadata map[string]interface{}) (*PutMetadataResponse, error)
-	GetMetadata(objectID int) ([]GetMetadataResult, error)
-	DeleteMetadata(objectID int) (*DeleteMetadataResponse, error)
+	PutMetadata(ctx context.Context, objectID int, metadata map[string]any) (*PutMetadataResponse, error)
+	GetMetadata(ctx context.Context, objectID int) ([]GetMetadataResult, error)
+	DeleteMetadata(ctx context.Context, objectID int) (*DeleteMetadataResponse, error)
 
 	// links and replication
-	GetLink(linkID int) (*Link, error)
-	GetLinks() ([]Link, error)
-	CreateReplica(request CreateReplicaRequest) (*Replica, error)
-	GetReplicas() ([]Replica, error)
-	DeleteReplica(id int) error
-	GetReplica(id int) (*Replica, error)
+	GetLink(ctx context.Context, linkID int) (*Link, error)
+	GetLinks(ctx context.Context) ([]Link, error)
+	CreateReplica(ctx context.Context, request CreateReplicaRequest) (*Replica, error)
+	GetReplicas(ctx context.Context) ([]Replica, error)
+	DeleteReplica(ctx context.Context, id int) error
+	GetReplica(ctx context.Context, id int) (*Replica, error)
 
 	// system
-	GetSystem() (*SystemDetails, error)
-	GetNtpStatus() ([]NtpStatus, error)
+	GetSystem(ctx context.Context) (*SystemDetails, error)
+	GetNtpStatus(ctx context.Context) ([]NtpStatus, error)
 
-	CreateEvent(request EventRequest) error
+	CreateEvent(ctx context.Context, request EventRequest) error
 }
 
 type Credentials struct {
@@ -170,11 +176,10 @@ type Credentials struct {
 
 type IboxClient struct {
 	Creds      Credentials
-	Log        logr.Logger
 	HTTPClient *http.Client
 }
 
-func NewIboxClient(log logr.Logger, creds Credentials) (cl *IboxClient) {
+func NewIboxClient(creds Credentials) (cl *IboxClient) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -182,7 +187,6 @@ func NewIboxClient(log logr.Logger, creds Credentials) (cl *IboxClient) {
 
 	return &IboxClient{
 		Creds:      creds,
-		Log:        log,
 		HTTPClient: httpClient,
 	}
 }

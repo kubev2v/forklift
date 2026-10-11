@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dell/csmlog"
 	types "github.com/dell/goscaleio/types/v1"
 )
 
@@ -122,7 +123,10 @@ var findVolumeIDFunc = func(c *Client, volumename string) (string, error) {
 
 	volumeID, err := c.getStringWithRetry(http.MethodPost, path,
 		volumeQeryIDByKeyParam)
-	fmt.Printf("[FindVolumeID] volumeID: %+v\n", volumeID)
+	csmlog.WithFields(csmlog.Fields{
+		csmlog.FieldComponent: "goscaleio",
+		csmlog.FieldOperation: "FindVolumeID",
+	}).Debugf("volumeID: %+v", volumeID)
 	if err != nil {
 		return "", err
 	}

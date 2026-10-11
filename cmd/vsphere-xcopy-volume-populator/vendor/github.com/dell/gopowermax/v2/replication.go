@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dell/csmlog"
 	types "github.com/dell/gopowermax/v2/types/v100"
-	log "github.com/sirupsen/logrus"
 )
 
 // The follow constants are for internal use within the pmax library.
@@ -66,7 +66,7 @@ func (c *Client) GetStorageGroupSnapshots(ctx context.Context, symID string, sto
 	resp, err := c.api.DoAndGetResponseBody(
 		ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetStorageGroupSnapshots failed: " + err.Error())
+		csmlog.Error("GetStorageGroupSnapshots failed: " + err.Error())
 		return nil, err
 	}
 	if err = c.checkResponse(resp); err != nil {
@@ -96,7 +96,7 @@ func (c *Client) GetStorageGroupSnapshotSnapIDs(ctx context.Context, symID strin
 	resp, err := c.api.DoAndGetResponseBody(
 		ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetStorageGroupSnapshotSnapIDs failed: " + err.Error())
+		csmlog.Error("GetStorageGroupSnapshotSnapIDs failed: " + err.Error())
 		return nil, err
 	}
 	if err = c.checkResponse(resp); err != nil {
@@ -113,7 +113,7 @@ func (c *Client) GetStorageGroupSnapshotSnapIDs(ctx context.Context, symID strin
 	if err != nil {
 		return nil, err
 	}
-	log.Info(fmt.Sprintf("Successfully Fetched Snapids for StorageGroup %s", storageGroupID))
+	csmlog.Info(fmt.Sprintf("Successfully Fetched Snapids for StorageGroup %s", storageGroupID))
 	return snapids, nil
 }
 
@@ -127,7 +127,7 @@ func (c *Client) GetStorageGroupSnapshotSnap(ctx context.Context, symID string, 
 	resp, err := c.api.DoAndGetResponseBody(
 		ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetStorageGroupSnapshotSnapIDs failed: " + err.Error())
+		csmlog.Error("GetStorageGroupSnapshotSnapIDs failed: " + err.Error())
 		return nil, err
 	}
 	if err = c.checkResponse(resp); err != nil {
@@ -144,7 +144,7 @@ func (c *Client) GetStorageGroupSnapshotSnap(ctx context.Context, symID string, 
 	if err != nil {
 		return nil, err
 	}
-	log.Info(fmt.Sprintf("Successfully Fetched Snapids for StorageGroup %s", storageGroupID))
+	csmlog.Info(fmt.Sprintf("Successfully Fetched Snapids for StorageGroup %s", storageGroupID))
 	return snap, nil
 }
 
@@ -158,10 +158,10 @@ func (c *Client) CreateStorageGroupSnapshot(ctx context.Context, symID string, s
 	snap := &types.StorageGroupSnap{}
 	err := c.api.Post(ctx, URL, c.getDefaultHeaders(), payload, snap)
 	if err != nil {
-		log.Error("CreateStorageGroupSnapshot failed: " + err.Error())
+		csmlog.Error("CreateStorageGroupSnapshot failed: " + err.Error())
 		return nil, err
 	}
-	log.Info("Successfully created CreateStorageGroupSnapshot")
+	csmlog.Info("Successfully created CreateStorageGroupSnapshot")
 	return snap, nil
 }
 
@@ -234,10 +234,10 @@ func (c *Client) ModifyStorageGroupSnapshot(ctx context.Context, symID string, s
 	err := c.api.Put(
 		ctx, URL, c.getDefaultHeaders(), putPayload, snap)
 	if err != nil {
-		log.Error("ModifyStorageGroupSnapshot failed: " + err.Error())
+		csmlog.Error("ModifyStorageGroupSnapshot failed: " + err.Error())
 		return nil, err
 	}
-	log.Info("Successfully created ModifyStorageGroupSnapshot")
+	csmlog.Info("Successfully created ModifyStorageGroupSnapshot")
 	return snap, nil
 }
 
@@ -249,9 +249,9 @@ func (c *Client) DeleteStorageGroupSnapshot(ctx context.Context, symID string, s
 	defer cancel()
 	err := c.api.Delete(ctx, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("Error in Delete Storage Group Snapshot: " + err.Error())
+		csmlog.Error("Error in Delete Storage Group Snapshot: " + err.Error())
 	} else {
-		log.Infof("Successfully deleted Storage Group Snapshot: %s", snapID)
+		csmlog.Infof("Successfully deleted Storage Group Snapshot: %s", snapID)
 	}
 	return err
 }
@@ -268,7 +268,7 @@ func (c *Client) GetSnapshotPolicy(ctx context.Context, symID string, snapshotPo
 	resp, err := c.api.DoAndGetResponseBody(
 		ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetSnapshotPolicy failed: " + err.Error())
+		csmlog.Error("GetSnapshotPolicy failed: " + err.Error())
 		return nil, err
 	}
 
@@ -299,10 +299,10 @@ func (c *Client) DeleteSnapshotPolicy(ctx context.Context, symID string, snapsho
 	defer cancel()
 	err := c.api.Delete(ctx, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("DeleteSnapshotPolicy failed: " + err.Error())
+		csmlog.Error("DeleteSnapshotPolicy failed: " + err.Error())
 		return err
 	}
-	log.Info(fmt.Sprintf("Successfully deleted SnapshotPolicy: %s", snapshotPolicyID))
+	csmlog.Info(fmt.Sprintf("Successfully deleted SnapshotPolicy: %s", snapshotPolicyID))
 	return nil
 }
 
@@ -311,7 +311,6 @@ func (c *Client) CreateSnapshotPolicy(ctx context.Context, symID string, snapsho
 	complianceCountCritical int64, optionalPayload map[string]interface{},
 ) (*types.SnapshotPolicy, error) {
 	defer c.TimeSpent("CreateSnapshotPolicy", time.Now())
-
 	if _, err := c.IsAllowedArray(symID); err != nil {
 		return nil, err
 	}
@@ -337,17 +336,16 @@ func (c *Client) CreateSnapshotPolicy(ctx context.Context, symID string, snapsho
 	}
 
 	snapshotPolicy := &types.SnapshotPolicy{}
-	Debug = true
 	ifDebugLogPayload(snapshotPolicyParam)
 	URL := c.urlPrefix() + Replication + SymmetrixX + symID + SnapshotPolicy
 	ctx, cancel := c.GetTimeoutContext(ctx)
 	defer cancel()
 	err := c.api.Post(ctx, URL, c.getDefaultHeaders(), snapshotPolicyParam, snapshotPolicy)
 	if err != nil {
-		log.Error("Create Snapshot Policy failed: " + err.Error())
+		csmlog.Error("Create Snapshot Policy failed: " + err.Error())
 		return nil, err
 	}
-	log.Info(fmt.Sprintf("Successfully created Snapshot Policy: %s", snapshotPolicyID))
+	csmlog.Info(fmt.Sprintf("Successfully created Snapshot Policy: %s", snapshotPolicyID))
 	return snapshotPolicy, nil
 }
 
@@ -388,7 +386,7 @@ func (c *Client) UpdateSnapshotPolicy(ctx context.Context, symID string, action 
 	err := c.api.Put(
 		ctx, URL, c.getDefaultHeaders(), updateSnapshotPolicyParam, nil)
 	if err != nil {
-		log.WithFields(fields).Error("Error in UpdateSnapshotPolicy: " + err.Error())
+		csmlog.WithFields(fields).Error("Error in UpdateSnapshotPolicy: " + err.Error())
 		return err
 	}
 	return nil
@@ -406,7 +404,7 @@ func (c *Client) GetSnapshotPolicyList(ctx context.Context, symID string) (*type
 	resp, err := c.api.DoAndGetResponseBody(
 		ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetSnapshotPolicyList failed: " + err.Error())
+		csmlog.Error("GetSnapshotPolicyList failed: " + err.Error())
 		return nil, err
 	}
 

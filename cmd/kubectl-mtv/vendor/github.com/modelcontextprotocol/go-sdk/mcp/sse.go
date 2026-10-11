@@ -7,13 +7,18 @@ package mcp
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
+	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/internal/jsonrpc2"
+	"github.com/modelcontextprotocol/go-sdk/internal/util"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 )
 
@@ -51,9 +56,23 @@ type SSEHandler struct {
 }
 
 // SSEOptions specifies options for an [SSEHandler].
-// for now, it is empty, but may be extended in future.
-// https://github.com/modelcontextprotocol/go-sdk/issues/507
-type SSEOptions struct{}
+type SSEOptions struct {
+	// DisableLocalhostProtection disables automatic DNS rebinding protection.
+	// By default, requests arriving via a localhost address (127.0.0.1, [::1])
+	// that have a non-localhost Host header are rejected with 403 Forbidden.
+	// This protects against DNS rebinding attacks regardless of whether the
+	// server is listening on localhost specifically or on 0.0.0.0.
+	//
+	// Only disable this if you understand the security implications.
+	// See: https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices#local-mcp-server-compromise
+	DisableLocalhostProtection bool
+
+	// MaxRequestBodyBytes limits the number of bytes read from an incoming
+	// POST body before the server responds with 413 Request Entity Too Large.
+	// It matches [StreamableHTTPOptions.MaxRequestBodyBytes]: if zero,
+	// [DefaultMaxRequestBodyBytes] is used; a negative value disables the limit.
+	MaxRequestBodyBytes int64
+}
 
 // NewSSEHandler returns a new [SSEHandler] that creates and manages MCP
 // sessions created via incoming HTTP requests.
@@ -110,6 +129,12 @@ type SSEServerTransport struct {
 	// Response is the hanging response body to the incoming GET request.
 	Response http.ResponseWriter
 
+	// MaxRequestBodyBytes limits the number of bytes read from a POSTed
+	// message body before [SSEServerTransport.ServeHTTP] responds with 413
+	// Request Entity Too Large. If zero, [DefaultMaxRequestBodyBytes] is used;
+	// a negative value disables the limit. See [SSEOptions.MaxRequestBodyBytes].
+	MaxRequestBodyBytes int64
+
 	// incoming is the queue of incoming messages.
 	// It is never closed, and by convention, incoming is non-nil if and only if
 	// the transport is connected.
@@ -131,9 +156,22 @@ func (t *SSEServerTransport) ServeHTTP(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
+	limit := t.MaxRequestBodyBytes
+	if limit == 0 {
+		limit = DefaultMaxRequestBodyBytes
+	}
+	if limit > 0 && req.Body != nil {
+		req.Body = http.MaxBytesReader(w, req.Body, limit)
+	}
+
 	// Read and parse the message.
 	data, err := io.ReadAll(req.Body)
 	if err != nil {
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			http.Error(w, fmt.Sprintf("request body exceeds %d bytes", mbe.Limit), http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "failed to read body", http.StatusBadRequest)
 		return
 	}
@@ -177,10 +215,35 @@ func (t *SSEServerTransport) Connect(context.Context) (Connection, error) {
 	return &sseServerConn{t: t}, nil
 }
 
-func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	sessionID := req.URL.Query().Get("sessionid")
+// SupportsProtocolVersion reports whether the HTTP+SSE transport can serve the
+// given protocol version. MCP 2026-07-28 defines only the stdio and Streamable
+// HTTP bindings, so this (deprecated) transport does not advertise that revision.
+func (t *SSEServerTransport) SupportsProtocolVersion(version string) bool {
+	return version < protocolVersion20260728
+}
 
-	// TODO: consider checking Content-Type here. For now, we are lax.
+func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// DNS rebinding protection: auto-enabled for localhost servers.
+	// See: https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices#local-mcp-server-compromise
+	if !h.opts.DisableLocalhostProtection {
+		if localAddr, ok := req.Context().Value(http.LocalAddrContextKey).(net.Addr); ok && localAddr != nil {
+			if util.IsLoopback(localAddr.String()) && !util.IsLoopback(req.Host) {
+				http.Error(w, fmt.Sprintf("Forbidden: invalid Host header %q", req.Host), http.StatusForbidden)
+				return
+			}
+		}
+	}
+
+	// Validate 'Content-Type' header.
+	if req.Method == http.MethodPost {
+		mediaType, _, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
+		if err != nil || mediaType != "application/json" {
+			http.Error(w, "Content-Type must be 'application/json'", http.StatusUnsupportedMediaType)
+			return
+		}
+	}
+
+	sessionID := req.URL.Query().Get("sessionid")
 
 	// For POST requests, the message body is a message to send to a session.
 	if req.Method == http.MethodPost {
@@ -202,7 +265,8 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if req.Method != http.MethodGet {
-		http.Error(w, "invalid method", http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", "GET, POST")
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -215,14 +279,18 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	sessionID = randText()
+	sessionID = rand.Text()
 	endpoint, err := req.URL.Parse("?sessionid=" + sessionID)
 	if err != nil {
 		http.Error(w, "internal error: failed to create endpoint", http.StatusInternalServerError)
 		return
 	}
 
-	transport := &SSEServerTransport{Endpoint: endpoint.RequestURI(), Response: w}
+	transport := &SSEServerTransport{
+		Endpoint:            endpoint.RequestURI(),
+		Response:            w,
+		MaxRequestBodyBytes: h.opts.MaxRequestBodyBytes,
+	}
 
 	// The session is terminated when the request exits.
 	h.mu.Lock()
@@ -329,6 +397,11 @@ type SSEClientTransport struct {
 	// HTTPClient is the client to use for making HTTP requests. If nil,
 	// http.DefaultClient is used.
 	HTTPClient *http.Client
+
+	// MaxEventSize bounds the number of bytes buffered while reading a single
+	// server-sent event. A value of 0 selects [DefaultMaxEventSize], a negative
+	// value disables the cap.
+	MaxEventSize int
 }
 
 // Connect connects through the client endpoint.
@@ -351,9 +424,22 @@ func (c *SSEClientTransport) Connect(ctx context.Context) (Connection, error) {
 		return nil, err
 	}
 
+	// Check HTTP status code before attempting to parse SSE events.
+	// This ensures proper error reporting for authentication failures (401),
+	// authorization failures (403), and other HTTP errors.
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		resp.Body.Close()
+		return nil, fmt.Errorf("failed to connect: %s", http.StatusText(resp.StatusCode))
+	}
+
+	maxEventSize := c.MaxEventSize
+	if maxEventSize == 0 {
+		maxEventSize = DefaultMaxEventSize
+	}
+
 	msgEndpoint, err := func() (*url.URL, error) {
 		var evt Event
-		for evt, err = range scanEvents(resp.Body) {
+		for evt, err = range scanEventsLimited(resp.Body, maxEventSize) {
 			break
 		}
 		if err != nil {
@@ -382,7 +468,7 @@ func (c *SSEClientTransport) Connect(ctx context.Context) (Connection, error) {
 	go func() {
 		defer s.Close() // close the transport when the GET exits
 
-		for evt, err := range scanEvents(resp.Body) {
+		for evt, err := range scanEventsLimited(resp.Body, maxEventSize) {
 			if err != nil {
 				return
 			}

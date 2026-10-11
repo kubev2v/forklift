@@ -246,6 +246,28 @@ func (v *Volume) GetVolumeStatistics() (*types.VolumeStatistics, error) {
 	return &stats, nil
 }
 
+// QuerySelectedVolumeStatistics queries selected statistics for a batch of volumes in a single
+// API call using POST /api/types/Volume/instances/action/querySelectedStatistics.
+// ids is the list of volume IDs to query; properties is the list of statistic field names to
+// return (e.g. "userDataReadBwc", "userDataWriteBwc", "userDataTrimBwc",
+// "userDataSdcReadLatency", "userDataSdcWriteLatency", "userDataSdcTrimLatency").
+// Returns a map of volume ID to VolumeStatistics.
+func (c *Client) QuerySelectedVolumeStatistics(ids []string, properties []string) (map[string]types.VolumeStatistics, error) {
+	defer TimeSpent("QuerySelectedVolumeStatistics", time.Now())
+
+	path := "/api/types/Volume/instances/action/querySelectedStatistics"
+	body := types.QuerySelectedVolumeStatisticsParam{
+		IDs:        ids,
+		Properties: properties,
+	}
+	var result map[string]types.VolumeStatistics
+	err := c.getJSONWithRetry(http.MethodPost, path, body, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // RemoveVolume removes a volume
 func (v *Volume) RemoveVolume(removeMode string) error {
 	defer TimeSpent("RemoveVolume", time.Now())

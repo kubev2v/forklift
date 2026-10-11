@@ -16,6 +16,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,7 +31,7 @@ import (
 // If value implements the Marshaler interface, Marshal calls its
 // MarshalCBOR method.
 //
-// If value implements encoding.BinaryMarshaler, Marhsal calls its
+// If value implements encoding.BinaryMarshaler, Marshal calls its
 // MarshalBinary method and encode it as CBOR byte string.
 //
 // Boolean values encode as CBOR booleans (type 7).
@@ -129,6 +130,20 @@ func (e *MarshalerError) Error() string {
 }
 
 func (e *MarshalerError) Unwrap() error {
+	return e.err
+}
+
+type TranscodeError struct {
+	err                        error
+	rtype                      reflect.Type
+	sourceFormat, targetFormat string
+}
+
+func (e TranscodeError) Error() string {
+	return "cbor: cannot transcode from " + e.sourceFormat + " to " + e.targetFormat + ": " + e.err.Error()
+}
+
+func (e TranscodeError) Unwrap() error {
 	return e.err
 }
 
@@ -293,25 +308,54 @@ func (icm InfConvertMode) valid() bool {
 	return icm >= 0 && icm < maxInfConvert
 }
 
-// TimeMode specifies how to encode time.Time values.
+// TimeMode selects the RFC 8949 (CBOR) format to use when encoding time.Time values:
+//   - Section 3.4.1: Standard Date/Time String (CBOR tag 0)
+//   - Section 3.4.2: Epoch-Based Date/Time (CBOR tag 1, integer or floating-point)
+//
+// To emit CBOR tag number 0 or 1, use EncOptions{TimeTag: EncTagRequired}.
+//
+// RFC 8949 specifies fractional seconds as text or floating-point, but not as integers.
+// User-defined types can use integer-based format for fractional seconds by implementing
+// cbor.Marshaler and cbor.Unmarshaler (without CBOR tag number 0 or 1).
 type TimeMode int
 
 const (
-	// TimeUnix causes time.Time to be encoded as epoch time in integer with second precision.
+	// TimeUnix encodes to the integer format specified by RFC 8949 for whole seconds,
+	// with 1-second precision.  For fractional seconds, use other TimeMode options or
+	// a custom CBOR time format (see TimeMode and cbor.Marshaler).
 	TimeUnix TimeMode = iota
 
-	// TimeUnixMicro causes time.Time to be encoded as epoch time in float-point rounded to microsecond precision.
+	// TimeUnixMicro encodes to the floating-point format specified by RFC 8949 for
+	// fractional seconds, with up to 1-microsecond precision that decreases for times
+	// far from 1970.  Like all binary floating-point formats, IEEE 754 binary64
+	// (float64) cannot represent most decimal fractions exactly.
+	// For more precision, use TimeRFC3339NanoUTC or a custom CBOR time format (see
+	// TimeMode and cbor.Marshaler) to store fractional seconds in an integer.
 	TimeUnixMicro
 
-	// TimeUnixDynamic causes time.Time to be encoded as integer if time.Time doesn't have fractional seconds,
-	// otherwise float-point rounded to microsecond precision.
+	// TimeUnixDynamic encodes to the integer or floating-point format specified by
+	// RFC 8949.  It encodes to an integer if the time rounded to microseconds is a
+	// whole second, and otherwise to the floating-point format.  Like all binary
+	// floating-point formats, IEEE 754 binary64 (float64) cannot represent most decimal
+	// fractions exactly.  For precision details and alternative formats, see TimeMode
+	// and TimeUnixMicro.
 	TimeUnixDynamic
 
-	// TimeRFC3339 causes time.Time to be encoded as RFC3339 formatted string with second precision.
+	// TimeRFC3339 encodes to the text format specified by RFC 8949, with 1-second
+	// precision and the UTC offset of the time.Time.  To always encode "Z" (zero
+	// offset), use UTC time.Time values or TimeRFC3339NanoUTC.
+	// For fractional seconds, use other TimeMode options or a custom CBOR time format
+	// (see TimeMode and cbor.Marshaler).
 	TimeRFC3339
 
-	// TimeRFC3339Nano causes time.Time to be encoded as RFC3339 formatted string with nanosecond precision.
+	// TimeRFC3339Nano encodes to the text format specified by RFC 8949, with
+	// 1-nanosecond precision and the UTC offset of the time.Time.  To always encode
+	// "Z" (zero offset), use UTC time.Time values or TimeRFC3339NanoUTC.
 	TimeRFC3339Nano
+
+	// TimeRFC3339NanoUTC encodes to the text format specified by RFC 8949, with
+	// 1-nanosecond precision and the time converted to UTC ("Z").
+	TimeRFC3339NanoUTC
 
 	maxTimeMode
 )
@@ -395,7 +439,7 @@ const (
 	// FieldNameToTextString encodes struct fields to CBOR text string (major type 3).
 	FieldNameToTextString FieldNameMode = iota
 
-	// FieldNameToTextString encodes struct fields to CBOR byte string (major type 2).
+	// FieldNameToByteString encodes struct fields to CBOR byte string (major type 2).
 	FieldNameToByteString
 
 	maxFieldNameMode
@@ -483,6 +527,24 @@ func (bmm BinaryMarshalerMode) valid() bool {
 	return bmm >= 0 && bmm < maxBinaryMarshalerMode
 }
 
+// TextMarshalerMode specifies how to encode types that implement encoding.TextMarshaler.
+type TextMarshalerMode int
+
+const (
+	// TextMarshalerNone does not recognize TextMarshaler implementations during encode.
+	// This is the default behavior.
+	TextMarshalerNone TextMarshalerMode = iota
+
+	// TextMarshalerTextString encodes the output of MarshalText to a CBOR text string.
+	TextMarshalerTextString
+
+	maxTextMarshalerMode
+)
+
+func (tmm TextMarshalerMode) valid() bool {
+	return tmm >= 0 && tmm < maxTextMarshalerMode
+}
+
 // EncOptions specifies encoding options.
 type EncOptions struct {
 	// Sort specifies sorting order.
@@ -508,7 +570,7 @@ type EncOptions struct {
 	// RFC3339 format gets tag number 0, and numeric epoch time tag number 1.
 	TimeTag EncTagMode
 
-	// IndefLength specifies whether to allow indefinite length CBOR items.
+	// IndefLength specifies whether to allow indefinite-length CBOR items.
 	IndefLength IndefLengthMode
 
 	// NilContainers specifies how to encode nil slices and maps.
@@ -540,6 +602,14 @@ type EncOptions struct {
 
 	// BinaryMarshaler specifies how to encode types that implement encoding.BinaryMarshaler.
 	BinaryMarshaler BinaryMarshalerMode
+
+	// TextMarshaler specifies how to encode types that implement encoding.TextMarshaler.
+	TextMarshaler TextMarshalerMode
+
+	// JSONMarshalerTranscoder sets the transcoding scheme used to marshal types that implement
+	// json.Marshaler but do not also implement cbor.Marshaler. If nil, encoding behavior is not
+	// influenced by whether or not a type implements json.Marshaler.
+	JSONMarshalerTranscoder Transcoder
 }
 
 // CanonicalEncOptions returns EncOptions for "Canonical CBOR" encoding,
@@ -750,6 +820,9 @@ func (opts EncOptions) encMode() (*encMode, error) { //nolint:gocritic // ignore
 	if !opts.BinaryMarshaler.valid() {
 		return nil, errors.New("cbor: invalid BinaryMarshaler " + strconv.Itoa(int(opts.BinaryMarshaler)))
 	}
+	if !opts.TextMarshaler.valid() {
+		return nil, errors.New("cbor: invalid TextMarshaler " + strconv.Itoa(int(opts.TextMarshaler)))
+	}
 	em := encMode{
 		sort:                      opts.Sort,
 		shortestFloat:             opts.ShortestFloat,
@@ -769,6 +842,8 @@ func (opts EncOptions) encMode() (*encMode, error) { //nolint:gocritic // ignore
 		byteSliceLaterEncodingTag: byteSliceLaterEncodingTag,
 		byteArray:                 opts.ByteArray,
 		binaryMarshaler:           opts.BinaryMarshaler,
+		textMarshaler:             opts.TextMarshaler,
+		jsonMarshalerTranscoder:   opts.JSONMarshalerTranscoder,
 	}
 	return &em, nil
 }
@@ -814,6 +889,8 @@ type encMode struct {
 	byteSliceLaterEncodingTag uint64
 	byteArray                 ByteArrayMode
 	binaryMarshaler           BinaryMarshalerMode
+	textMarshaler             TextMarshalerMode
+	jsonMarshalerTranscoder   Transcoder
 }
 
 var defaultEncMode, _ = EncOptions{}.encMode()
@@ -890,22 +967,24 @@ func getMarshalerDecMode(indefLength IndefLengthMode, tagsMd TagsMode) *decMode 
 // EncOptions returns user specified options used to create this EncMode.
 func (em *encMode) EncOptions() EncOptions {
 	return EncOptions{
-		Sort:                 em.sort,
-		ShortestFloat:        em.shortestFloat,
-		NaNConvert:           em.nanConvert,
-		InfConvert:           em.infConvert,
-		BigIntConvert:        em.bigIntConvert,
-		Time:                 em.time,
-		TimeTag:              em.timeTag,
-		IndefLength:          em.indefLength,
-		NilContainers:        em.nilContainers,
-		TagsMd:               em.tagsMd,
-		OmitEmpty:            em.omitEmpty,
-		String:               em.stringType,
-		FieldName:            em.fieldName,
-		ByteSliceLaterFormat: em.byteSliceLaterFormat,
-		ByteArray:            em.byteArray,
-		BinaryMarshaler:      em.binaryMarshaler,
+		Sort:                    em.sort,
+		ShortestFloat:           em.shortestFloat,
+		NaNConvert:              em.nanConvert,
+		InfConvert:              em.infConvert,
+		BigIntConvert:           em.bigIntConvert,
+		Time:                    em.time,
+		TimeTag:                 em.timeTag,
+		IndefLength:             em.indefLength,
+		NilContainers:           em.nilContainers,
+		TagsMd:                  em.tagsMd,
+		OmitEmpty:               em.omitEmpty,
+		String:                  em.stringType,
+		FieldName:               em.fieldName,
+		ByteSliceLaterFormat:    em.byteSliceLaterFormat,
+		ByteArray:               em.byteArray,
+		BinaryMarshaler:         em.binaryMarshaler,
+		TextMarshaler:           em.textMarshaler,
+		JSONMarshalerTranscoder: em.jsonMarshalerTranscoder,
 	}
 }
 
@@ -977,7 +1056,7 @@ func putEncodeBuffer(e *bytes.Buffer) {
 
 type encodeFunc func(e *bytes.Buffer, em *encMode, v reflect.Value) error
 type isEmptyFunc func(em *encMode, v reflect.Value) (empty bool, err error)
-type isZeroFunc func(v reflect.Value) (zero bool, err error)
+type isZeroFunc func(em *encMode, v reflect.Value) (zero bool, err error)
 
 func encode(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 	if !v.IsValid() {
@@ -1056,10 +1135,11 @@ func encodeFloat(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 	if fopt == ShortestFloat16 {
 		var f16 float16.Float16
 		p := float16.PrecisionFromfloat32(f32)
-		if p == float16.PrecisionExact {
+		switch p {
+		case float16.PrecisionExact:
 			// Roundtrip float32->float16->float32 test isn't needed.
 			f16 = float16.Fromfloat32(f32)
-		} else if p == float16.PrecisionUnknown {
+		case float16.PrecisionUnknown:
 			// Try roundtrip float32->float16->float32 to determine if float32 can fit into float16.
 			f16 = float16.Fromfloat32(f32)
 			if f16.Float32() == f32 {
@@ -1217,10 +1297,10 @@ func encodeByteString(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 	if slen == 0 {
 		return e.WriteByte(byte(cborTypeByteString))
 	}
-	encodeHead(e, byte(cborTypeByteString), uint64(slen))
+	encodeHead(e, byte(cborTypeByteString), uint64(slen)) //nolint:gosec
 	if vk == reflect.Array {
 		for i := 0; i < slen; i++ {
-			e.WriteByte(byte(v.Index(i).Uint()))
+			e.WriteByte(byte(v.Index(i).Uint())) //nolint:gosec
 		}
 		return nil
 	}
@@ -1257,7 +1337,7 @@ func (ae arrayEncodeFunc) encode(e *bytes.Buffer, em *encMode, v reflect.Value) 
 	if alen == 0 {
 		return e.WriteByte(byte(cborTypeArray))
 	}
-	encodeHead(e, byte(cborTypeArray), uint64(alen))
+	encodeHead(e, byte(cborTypeArray), uint64(alen)) //nolint:gosec
 	for i := 0; i < alen; i++ {
 		if err := ae.f(e, em, v.Index(i)); err != nil {
 			return err
@@ -1288,7 +1368,7 @@ func (me mapEncodeFunc) encode(e *bytes.Buffer, em *encMode, v reflect.Value) er
 		return e.WriteByte(byte(cborTypeMap))
 	}
 
-	encodeHead(e, byte(cborTypeMap), uint64(mlen))
+	encodeHead(e, byte(cborTypeMap), uint64(mlen)) //nolint:gosec
 	if em.sort == SortNone || em.sort == SortFastShuffle || mlen <= 1 {
 		return me.e(e, em, v, nil)
 	}
@@ -1351,7 +1431,7 @@ func (x *bytewiseKeyValueSorter) Swap(i, j int) {
 
 func (x *bytewiseKeyValueSorter) Less(i, j int) bool {
 	kvi, kvj := x.kvs[i], x.kvs[j]
-	return bytes.Compare(x.data[kvi.offset:kvi.valueOffset], x.data[kvj.offset:kvj.valueOffset]) <= 0
+	return bytes.Compare(x.data[kvi.offset:kvi.valueOffset], x.data[kvj.offset:kvj.valueOffset]) < 0
 }
 
 type lengthFirstKeyValueSorter struct {
@@ -1372,7 +1452,7 @@ func (x *lengthFirstKeyValueSorter) Less(i, j int) bool {
 	if keyLengthDifference := (kvi.valueOffset - kvi.offset) - (kvj.valueOffset - kvj.offset); keyLengthDifference != 0 {
 		return keyLengthDifference < 0
 	}
-	return bytes.Compare(x.data[kvi.offset:kvi.valueOffset], x.data[kvj.offset:kvj.valueOffset]) <= 0
+	return bytes.Compare(x.data[kvi.offset:kvi.valueOffset], x.data[kvj.offset:kvj.valueOffset]) < 0
 }
 
 var keyValuePool = sync.Pool{}
@@ -1459,8 +1539,8 @@ func encodeStruct(e *bytes.Buffer, em *encMode, v reflect.Value) (err error) {
 	// Head is rewritten later if actual encoded field count is different from struct field count.
 	encodedHeadLen := encodeHead(e, byte(cborTypeMap), uint64(len(flds)))
 
-	kvbegin := e.Len()
-	kvcount := 0
+	kvBeginOffset := e.Len()
+	kvCount := 0
 	for offset := 0; offset < len(flds); offset++ {
 		f := flds[(start+offset)%len(flds)]
 
@@ -1487,7 +1567,7 @@ func encodeStruct(e *bytes.Buffer, em *encMode, v reflect.Value) (err error) {
 			}
 		}
 		if f.omitZero {
-			zero, err := f.izf(fv)
+			zero, err := f.izf(em, fv)
 			if err != nil {
 				return err
 			}
@@ -1506,10 +1586,10 @@ func encodeStruct(e *bytes.Buffer, em *encMode, v reflect.Value) (err error) {
 			return err
 		}
 
-		kvcount++
+		kvCount++
 	}
 
-	if len(flds) == kvcount {
+	if len(flds) == kvCount {
 		// Encoded element count in head is the same as actual element count.
 		return nil
 	}
@@ -1517,8 +1597,8 @@ func encodeStruct(e *bytes.Buffer, em *encMode, v reflect.Value) (err error) {
 	// Overwrite the bytes that were reserved for the head before encoding the map entries.
 	var actualHeadLen int
 	{
-		headbuf := *bytes.NewBuffer(e.Bytes()[kvbegin-encodedHeadLen : kvbegin-encodedHeadLen : kvbegin])
-		actualHeadLen = encodeHead(&headbuf, byte(cborTypeMap), uint64(kvcount))
+		headbuf := *bytes.NewBuffer(e.Bytes()[kvBeginOffset-encodedHeadLen : kvBeginOffset-encodedHeadLen : kvBeginOffset])
+		actualHeadLen = encodeHead(&headbuf, byte(cborTypeMap), uint64(kvCount))
 	}
 
 	if actualHeadLen == encodedHeadLen {
@@ -1531,8 +1611,8 @@ func encodeStruct(e *bytes.Buffer, em *encMode, v reflect.Value) (err error) {
 	// encoded. The encoded entries are offset to the right by the number of excess reserved
 	// bytes. Shift the entries left to remove the gap.
 	excessReservedBytes := encodedHeadLen - actualHeadLen
-	dst := e.Bytes()[kvbegin-excessReservedBytes : e.Len()-excessReservedBytes]
-	src := e.Bytes()[kvbegin:e.Len()]
+	dst := e.Bytes()[kvBeginOffset-excessReservedBytes : e.Len()-excessReservedBytes]
+	src := e.Bytes()[kvBeginOffset:e.Len()]
 	copy(dst, src)
 
 	// After shifting, the excess bytes are at the end of the output buffer and they are
@@ -1549,6 +1629,13 @@ func encodeIntf(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 	return encode(e, em, v.Elem())
 }
 
+// Inclusive range of Unix seconds within which Time.UnixNano is defined
+// for any nanosecond fraction.
+const (
+	minUnixNanoSecs = math.MinInt64 / 1_000_000_000
+	maxUnixNanoSecs = math.MaxInt64/1_000_000_000 - 1
+)
+
 func encodeTime(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 	t := v.Interface().(time.Time)
 	if t.IsZero() {
@@ -1557,11 +1644,12 @@ func encodeTime(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 	}
 	if em.timeTag == EncTagRequired {
 		tagNumber := 1
-		if em.time == TimeRFC3339 || em.time == TimeRFC3339Nano {
+		if em.time == TimeRFC3339 || em.time == TimeRFC3339Nano || em.time == TimeRFC3339NanoUTC {
 			tagNumber = 0
 		}
 		encodeHead(e, byte(cborTypeTag), uint64(tagNumber))
 	}
+	var s string
 	switch em.time {
 	case TimeUnix:
 		secs := t.Unix()
@@ -1569,12 +1657,22 @@ func encodeTime(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 
 	case TimeUnixMicro:
 		t = t.UTC().Round(time.Microsecond)
-		f := float64(t.UnixNano()) / 1e9
+		var f float64
+		if secs := t.Unix(); secs >= minUnixNanoSecs && secs <= maxUnixNanoSecs {
+			// Unix seconds within [minUnixNanoSecs, maxUnixNanoSecs]
+			// are encoded from time.UnixNano to keep encoded data unchanged.
+			f = float64(t.UnixNano()) / 1e9
+		} else {
+			// Unix seconds outside [minUnixNanoSecs, maxUnixNanoSecs]
+			// are encoded from Unix seconds and nanoseconds.
+			nsecs := t.Nanosecond()
+			f = float64(secs) + float64(nsecs)/1e9
+		}
 		return encodeFloat(e, em, reflect.ValueOf(f))
 
 	case TimeUnixDynamic:
 		t = t.UTC().Round(time.Microsecond)
-		secs, nsecs := t.Unix(), uint64(t.Nanosecond())
+		secs, nsecs := t.Unix(), uint64(t.Nanosecond()) //nolint:gosec
 		if nsecs == 0 {
 			return encodeInt(e, em, reflect.ValueOf(secs))
 		}
@@ -1582,13 +1680,28 @@ func encodeTime(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 		return encodeFloat(e, em, reflect.ValueOf(f))
 
 	case TimeRFC3339:
-		s := t.Format(time.RFC3339)
-		return encodeString(e, em, reflect.ValueOf(s))
+		s = t.Format(time.RFC3339)
+
+	case TimeRFC3339NanoUTC:
+		s = t.UTC().Format(time.RFC3339Nano)
 
 	default: // TimeRFC3339Nano
-		s := t.Format(time.RFC3339Nano)
-		return encodeString(e, em, reflect.ValueOf(s))
+		s = t.Format(time.RFC3339Nano)
 	}
+	if isWrongYearFromGo(t, s) {
+		return &UnsupportedValueError{msg: "time.Time formatted by Go with a wrong year"}
+	}
+	return encodeString(e, em, reflect.ValueOf(s))
+}
+
+// isWrongYearFromGo reports whether s, the text Go formatted from t, has a wrong year.
+// Go's standard library can return wrong results for times in the ~257-year range about
+// 292 billion years ago, extended by the size of any negative UTC offset.
+func isWrongYearFromGo(t time.Time, s string) bool {
+	// When t plus one week is before year 0, the text must have a '-' prefix
+	// with any time zone offset under one week.
+	const cutoff = -62167219200 - 7*24*60*60 // 0000-01-01T00:00:00Z minus one week for time zone offsets
+	return t.Unix() < cutoff && !strings.HasPrefix(s, "-")
 }
 
 func encodeBigInt(e *bytes.Buffer, em *encMode, v reflect.Value) error {
@@ -1633,10 +1746,15 @@ func encodeBigInt(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 type binaryMarshalerEncoder struct {
 	alternateEncode  encodeFunc
 	alternateIsEmpty isEmptyFunc
+	alternateIsZero  isZeroFunc
+	isZeroFunc       isZeroFunc
 }
 
 func (bme binaryMarshalerEncoder) encode(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 	if em.binaryMarshaler != BinaryMarshalerByteString {
+		if bme.alternateEncode == nil {
+			return &UnsupportedTypeError{Type: v.Type()}
+		}
 		return bme.alternateEncode(e, em, v)
 	}
 
@@ -1661,6 +1779,9 @@ func (bme binaryMarshalerEncoder) encode(e *bytes.Buffer, em *encMode, v reflect
 
 func (bme binaryMarshalerEncoder) isEmpty(em *encMode, v reflect.Value) (bool, error) {
 	if em.binaryMarshaler != BinaryMarshalerByteString {
+		if bme.alternateIsEmpty == nil {
+			return false, &UnsupportedTypeError{Type: v.Type()}
+		}
 		return bme.alternateIsEmpty(em, v)
 	}
 
@@ -1675,6 +1796,153 @@ func (bme binaryMarshalerEncoder) isEmpty(em *encMode, v reflect.Value) (bool, e
 		return false, err
 	}
 	return len(data) == 0, nil
+}
+
+func (bme binaryMarshalerEncoder) isZero(em *encMode, v reflect.Value) (bool, error) {
+	if em.binaryMarshaler != BinaryMarshalerByteString {
+		if bme.alternateEncode == nil {
+			return false, &UnsupportedTypeError{Type: v.Type()}
+		}
+		return bme.alternateIsZero(em, v)
+	}
+	return bme.isZeroFunc(em, v)
+}
+
+type textMarshalerEncoder struct {
+	alternateEncode  encodeFunc
+	alternateIsEmpty isEmptyFunc
+	alternateIsZero  isZeroFunc
+	isZeroFunc       isZeroFunc
+}
+
+func (tme textMarshalerEncoder) encode(e *bytes.Buffer, em *encMode, v reflect.Value) error {
+	if em.textMarshaler == TextMarshalerNone {
+		if tme.alternateEncode == nil {
+			return &UnsupportedTypeError{Type: v.Type()}
+		}
+		return tme.alternateEncode(e, em, v)
+	}
+
+	vt := v.Type()
+	m, ok := v.Interface().(encoding.TextMarshaler)
+	if !ok {
+		pv := reflect.New(vt)
+		pv.Elem().Set(v)
+		m = pv.Interface().(encoding.TextMarshaler)
+	}
+	data, err := m.MarshalText()
+	if err != nil {
+		return fmt.Errorf("cbor: cannot marshal text for %s: %w", vt, err)
+	}
+	if b := em.encTagBytes(vt); b != nil {
+		e.Write(b)
+	}
+
+	encodeHead(e, byte(cborTypeTextString), uint64(len(data)))
+	e.Write(data)
+	return nil
+}
+
+func (tme textMarshalerEncoder) isEmpty(em *encMode, v reflect.Value) (bool, error) {
+	if em.textMarshaler == TextMarshalerNone {
+		if tme.alternateIsEmpty == nil {
+			return false, &UnsupportedTypeError{Type: v.Type()}
+		}
+		return tme.alternateIsEmpty(em, v)
+	}
+
+	m, ok := v.Interface().(encoding.TextMarshaler)
+	if !ok {
+		pv := reflect.New(v.Type())
+		pv.Elem().Set(v)
+		m = pv.Interface().(encoding.TextMarshaler)
+	}
+	data, err := m.MarshalText()
+	if err != nil {
+		return false, fmt.Errorf("cbor: cannot marshal text for %s: %w", v.Type(), err)
+	}
+	return len(data) == 0, nil
+}
+
+func (tme textMarshalerEncoder) isZero(em *encMode, v reflect.Value) (bool, error) {
+	if em.textMarshaler == TextMarshalerNone {
+		if tme.alternateEncode == nil {
+			return false, &UnsupportedTypeError{Type: v.Type()}
+		}
+		return tme.alternateIsZero(em, v)
+	}
+	return tme.isZeroFunc(em, v)
+}
+
+type jsonMarshalerEncoder struct {
+	alternateEncode  encodeFunc
+	alternateIsEmpty isEmptyFunc
+	alternateIsZero  isZeroFunc
+	isZeroFunc       isZeroFunc
+}
+
+func (jme jsonMarshalerEncoder) encode(e *bytes.Buffer, em *encMode, v reflect.Value) error {
+	if em.jsonMarshalerTranscoder == nil {
+		if jme.alternateEncode == nil {
+			return &UnsupportedTypeError{Type: v.Type()}
+		}
+		return jme.alternateEncode(e, em, v)
+	}
+
+	vt := v.Type()
+	m, ok := v.Interface().(jsonMarshaler)
+	if !ok {
+		pv := reflect.New(vt)
+		pv.Elem().Set(v)
+		m = pv.Interface().(jsonMarshaler)
+	}
+
+	json, err := m.MarshalJSON()
+	if err != nil {
+		return err
+	}
+
+	offset := e.Len()
+
+	if b := em.encTagBytes(vt); b != nil {
+		e.Write(b)
+	}
+
+	if err := em.jsonMarshalerTranscoder.Transcode(e, bytes.NewReader(json)); err != nil {
+		return &TranscodeError{err: err, rtype: vt, sourceFormat: "json", targetFormat: "cbor"}
+	}
+
+	// Validate that the transcode function has written exactly one well-formed data item.
+	d := decoder{data: e.Bytes()[offset:], dm: getMarshalerDecMode(em.indefLength, em.tagsMd)}
+	if err := d.wellformed(false, true); err != nil {
+		e.Truncate(offset)
+		return &TranscodeError{err: err, rtype: vt, sourceFormat: "json", targetFormat: "cbor"}
+	}
+
+	return nil
+}
+
+func (jme jsonMarshalerEncoder) isEmpty(em *encMode, v reflect.Value) (bool, error) {
+	if em.jsonMarshalerTranscoder == nil {
+		if jme.alternateIsEmpty == nil {
+			return false, &UnsupportedTypeError{Type: v.Type()}
+		}
+		return jme.alternateIsEmpty(em, v)
+	}
+
+	// As with types implementing cbor.Marshaler, transcoded json.Marshaler values always encode
+	// as exactly one complete CBOR data item.
+	return false, nil
+}
+
+func (jme jsonMarshalerEncoder) isZero(em *encMode, v reflect.Value) (bool, error) {
+	if em.jsonMarshalerTranscoder == nil {
+		if jme.alternateEncode == nil {
+			return false, &UnsupportedTypeError{Type: v.Type()}
+		}
+		return jme.alternateIsZero(em, v)
+	}
+	return jme.isZeroFunc(em, v)
 }
 
 func encodeMarshalerType(e *bytes.Buffer, em *encMode, v reflect.Value) error {
@@ -1780,17 +2048,33 @@ func encodeHead(e *bytes.Buffer, t byte, n uint64) int {
 	return headSize
 }
 
+type jsonMarshaler interface{ MarshalJSON() ([]byte, error) }
+
 var (
 	typeMarshaler       = reflect.TypeOf((*Marshaler)(nil)).Elem()
 	typeBinaryMarshaler = reflect.TypeOf((*encoding.BinaryMarshaler)(nil)).Elem()
+	typeTextMarshaler   = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
+	typeJSONMarshaler   = reflect.TypeOf((*jsonMarshaler)(nil)).Elem()
 	typeRawMessage      = reflect.TypeOf(RawMessage(nil))
 	typeByteString      = reflect.TypeOf(ByteString(""))
 )
 
-func getEncodeFuncInternal(t reflect.Type) (ef encodeFunc, ief isEmptyFunc, izf isZeroFunc) {
+func getEncodeFuncInternal(t reflect.Type, newEncodeFuncs map[reflect.Type]*inProgressEncodeFuncs) (ef encodeFunc, ief isEmptyFunc, izf isZeroFunc) {
+	// baseIzf stores the original izf before marshaler encoders unwinding.
+	var baseIzf isZeroFunc
+
+	fs := &inProgressEncodeFuncs{}
+	newEncodeFuncs[t] = fs
+	defer func() {
+		fs.ef = ef
+		fs.ief = ief
+		fs.izf = izf
+		fs.complete = true
+	}()
+
 	k := t.Kind()
 	if k == reflect.Pointer {
-		return getEncodeIndirectValueFunc(t), isEmptyPtr, getIsZeroFunc(t)
+		return getEncodeIndirectValueFunc(t, newEncodeFuncs), isEmptyPtr, getIsZeroFunc(t)
 	}
 	switch t {
 	case typeSimpleValue:
@@ -1820,11 +2104,49 @@ func getEncodeFuncInternal(t reflect.Type) (ef encodeFunc, ief isEmptyFunc, izf 
 			bme := binaryMarshalerEncoder{
 				alternateEncode:  ef,
 				alternateIsEmpty: ief,
+				alternateIsZero:  izfOrDefault(t, izf),
+				isZeroFunc:       baseIzf,
 			}
 			ef = bme.encode
 			ief = bme.isEmpty
+			izf = bme.isZero
 		}()
 	}
+	if reflect.PointerTo(t).Implements(typeTextMarshaler) {
+		defer func() {
+			// capture encoding method used for modes that disable TextMarshaler
+			tme := textMarshalerEncoder{
+				alternateEncode:  ef,
+				alternateIsEmpty: ief,
+				alternateIsZero:  izfOrDefault(t, izf),
+				isZeroFunc:       baseIzf,
+			}
+			ef = tme.encode
+			ief = tme.isEmpty
+			izf = tme.isZero
+		}()
+	}
+	if reflect.PointerTo(t).Implements(typeJSONMarshaler) {
+		defer func() {
+			// capture encoding method used for modes that don't support transcoding
+			// from types that implement json.Marshaler.
+			jme := jsonMarshalerEncoder{
+				alternateEncode:  ef,
+				alternateIsEmpty: ief,
+				alternateIsZero:  izfOrDefault(t, izf),
+				isZeroFunc:       baseIzf,
+			}
+			ef = jme.encode
+			ief = jme.isEmpty
+			izf = jme.isZero
+		}()
+	}
+
+	// Capture base izf before marshaler encoder unwinding.
+	defer func() {
+		baseIzf = izfOrDefault(t, izf)
+	}()
+
 	switch k {
 	case reflect.Bool:
 		return encodeBool, isEmptyBool, getIsZeroFunc(t)
@@ -1848,14 +2170,14 @@ func getEncodeFuncInternal(t reflect.Type) (ef encodeFunc, ief isEmptyFunc, izf 
 		fallthrough
 
 	case reflect.Array:
-		f, _, _ := getEncodeFunc(t.Elem())
+		f := getEncodeFuncWithNewEncodeFuncs(t.Elem(), newEncodeFuncs)
 		if f == nil {
 			return nil, nil, nil
 		}
 		return arrayEncodeFunc{f: f}.encode, isEmptySlice, getIsZeroFunc(t)
 
 	case reflect.Map:
-		f := getEncodeMapFunc(t)
+		f := getEncodeMapFunc(t, newEncodeFuncs)
 		if f == nil {
 			return nil, nil, nil
 		}
@@ -1879,11 +2201,11 @@ func getEncodeFuncInternal(t reflect.Type) (ef encodeFunc, ief isEmptyFunc, izf 
 	return nil, nil, nil
 }
 
-func getEncodeIndirectValueFunc(t reflect.Type) encodeFunc {
+func getEncodeIndirectValueFunc(t reflect.Type, newEncodeFuncs map[reflect.Type]*inProgressEncodeFuncs) encodeFunc {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
-	f, _, _ := getEncodeFunc(t)
+	f := getEncodeFuncWithNewEncodeFuncs(t, newEncodeFuncs)
 	if f == nil {
 		return nil
 	}
@@ -2030,7 +2352,7 @@ func getIsZeroFunc(t reflect.Type) isZeroFunc {
 
 // isZeroInterfaceCustom returns true for nil or pointer-to-nil values,
 // and delegates to the custom IsZero() implementation otherwise.
-func isZeroInterfaceCustom(v reflect.Value) (bool, error) {
+func isZeroInterfaceCustom(_ *encMode, v reflect.Value) (bool, error) {
 	kind := v.Kind()
 
 	switch kind {
@@ -2052,7 +2374,7 @@ func isZeroInterfaceCustom(v reflect.Value) (bool, error) {
 
 // isZeroPointerCustom returns true for nil values,
 // and delegates to the custom IsZero() implementation otherwise.
-func isZeroPointerCustom(v reflect.Value) (bool, error) {
+func isZeroPointerCustom(_ *encMode, v reflect.Value) (bool, error) {
 	if v.IsNil() {
 		return true, nil
 	}
@@ -2060,12 +2382,12 @@ func isZeroPointerCustom(v reflect.Value) (bool, error) {
 }
 
 // isZeroCustom delegates to the custom IsZero() implementation.
-func isZeroCustom(v reflect.Value) (bool, error) {
+func isZeroCustom(_ *encMode, v reflect.Value) (bool, error) {
 	return v.Interface().(isZeroer).IsZero(), nil
 }
 
 // isZeroAddrCustom delegates to the custom IsZero() implementation of the addr of the value.
-func isZeroAddrCustom(v reflect.Value) (bool, error) {
+func isZeroAddrCustom(_ *encMode, v reflect.Value) (bool, error) {
 	if !v.CanAddr() {
 		// Temporarily box v so we can take the address.
 		v2 := reflect.New(v.Type()).Elem()
@@ -2076,7 +2398,7 @@ func isZeroAddrCustom(v reflect.Value) (bool, error) {
 }
 
 // isZeroDefault calls reflect.Value#IsZero()
-func isZeroDefault(v reflect.Value) (bool, error) {
+func isZeroDefault(_ *encMode, v reflect.Value) (bool, error) {
 	if !v.IsValid() {
 		// v is zero value
 		return true, nil
@@ -2085,10 +2407,17 @@ func isZeroDefault(v reflect.Value) (bool, error) {
 }
 
 // isZeroFieldStruct is used to determine whether to omit toarray structs
-func isZeroFieldStruct(v reflect.Value) (bool, error) {
+func isZeroFieldStruct(_ *encMode, v reflect.Value) (bool, error) {
 	structType, err := getEncodingStructType(v.Type())
 	if err != nil {
 		return false, err
 	}
 	return len(structType.fields) == 0, nil
+}
+
+func izfOrDefault(t reflect.Type, izf isZeroFunc) isZeroFunc {
+	if izf == nil {
+		return getIsZeroFunc(t)
+	}
+	return izf
 }

@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dell/csmlog"
 	types "github.com/dell/goscaleio/types/v1"
 )
 
@@ -86,7 +87,10 @@ func (c *Client) ModifyPeerMdmIP(id string, ips []string) error {
 	path := "/api/instances/PeerMdm::" + id + "/action/modifyPeerMdmIp"
 
 	if err := c.getJSONWithRetry(http.MethodPost, path, param, nil); err != nil {
-		fmt.Printf("c.getJSONWithRetry(http.MethodPost, path, param, nil) returned %s", err)
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "ModifyPeerMdmIP",
+		}).Errorf("Failed to modify peer MDM IP: %v", err)
 		return err
 	}
 
@@ -100,7 +104,10 @@ func (c *Client) ModifyPeerMdmName(id string, name *types.ModifyPeerMDMNameParam
 	path := "/api/instances/PeerMdm::" + id + "/action/modifyPeerMdmName"
 
 	if err := c.getJSONWithRetry(http.MethodPost, path, name, nil); err != nil {
-		fmt.Printf("c.getJSONWithRetry(http.MethodPost, path, name, nil) returned %s", err)
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "ModifyPeerMdmName",
+		}).Errorf("Failed to modify peer MDM name: %v", err)
 		return err
 	}
 
@@ -114,7 +121,10 @@ func (c *Client) ModifyPeerMdmPort(id string, port *types.ModifyPeerMDMPortParam
 	path := "/api/instances/PeerMdm::" + id + "/action/modifyPeerMdmPort"
 
 	if err := c.getJSONWithRetry(http.MethodPost, path, port, nil); err != nil {
-		fmt.Printf("c.getJSONWithRetry(http.MethodPost, path, port, nil) returned %s", err)
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "ModifyPeerMdmPort",
+		}).Errorf("Failed to modify peer MDM port: %v", err)
 		return err
 	}
 
@@ -128,7 +138,10 @@ func (c *Client) ModifyPeerMdmPerformanceParameters(id string, param *types.Modi
 	path := "/api/instances/PeerMdm::" + id + "/action/setPeerMdmPerformanceParameters"
 
 	if err := c.getJSONWithRetry(http.MethodPost, path, param, nil); err != nil {
-		fmt.Printf("c.getJSONWithRetry(http.MethodPost, path, param, nil) returned %s", err)
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "ModifyPeerMdmPerformanceParameters",
+		}).Errorf("Failed to modify peer MDM performance parameters: %v", err)
 		return err
 	}
 
@@ -155,7 +168,10 @@ func (c *Client) AddPeerMdm(param *types.AddPeerMdm) (*types.PeerMDM, error) {
 	}
 
 	if err := c.getJSONWithRetry(http.MethodPost, path, paramCreate, peerMdm); err != nil {
-		fmt.Printf("c.getJSONWithRetry(http.MethodPost, path, paramCreate, peerMdm) returned %s", err)
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "AddPeerMdm",
+		}).Errorf("Failed to add peer MDM: %v", err)
 		return nil, err
 	}
 
@@ -169,7 +185,10 @@ func (c *Client) RemovePeerMdm(id string) error {
 	path := "/api/instances/PeerMdm::" + id + "/action/removePeerMdm"
 	params := types.EmptyPayload{}
 	if err := c.getJSONWithRetry(http.MethodPost, path, params, nil); err != nil {
-		fmt.Printf("c.getJSONWithRetry(http.MethodPost, path, params, nil) returned %s", err)
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "RemovePeerMdm",
+		}).Errorf("Failed to remove peer MDM: %v", err)
 		return err
 	}
 
@@ -245,7 +264,10 @@ func (c *Client) CreateReplicationConsistencyGroup(rcg *types.ReplicationConsist
 
 	err := c.getJSONWithRetry(http.MethodPost, path, rcg, rcgResp)
 	if err != nil {
-		fmt.Printf("c.getJSONWithRetry(http.MethodPost, path, rcg, rcgResp) returned %s", err)
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "CreateReplicationConsistencyGroup",
+		}).Errorf("Failed to create replication consistency group: %v", err)
 		return nil, err
 	}
 	return rcgResp, nil
@@ -305,7 +327,10 @@ func (c *Client) CreateReplicationPair(rp *types.QueryReplicationPair) (*types.R
 	rpResp := &types.ReplicationPair{}
 
 	if err := c.getJSONWithRetry(http.MethodPost, path, rp, rpResp); err != nil {
-		fmt.Printf("c.getJSONWithRetry(http.MethodPost, path, rp, rpResp) returned %s", err)
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "CreateReplicationPair",
+		}).Errorf("Failed to create replication pair: %v", err)
 		return nil, err
 	}
 
@@ -326,7 +351,10 @@ func (rp *ReplicationPair) RemoveReplicationPair(force bool) (*types.Replication
 	}
 
 	if err := rp.client.getJSONWithRetry(http.MethodPost, uri, param, resp); err != nil {
-		fmt.Printf("c.getJSONWithRetry(http.MethodPost, path, rp, pair) returned %s", err)
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "RemoveReplicationPair",
+		}).Errorf("Failed to remove replication pair: %v", err)
 		return nil, err
 	}
 
@@ -564,6 +592,25 @@ func (rcg *ReplicationConsistencyGroup) ExecuteTerminateOnReplicationGroup() err
 
 	err := rcg.client.getJSONWithRetry(http.MethodPost, uri, param, nil)
 	return err
+}
+
+// GetStatistics returns lag, bandwidth, and latency statistics for the ReplicationConsistencyGroup.
+// Calls GET /api/instances/ReplicationConsistencyGroup::{id}/relationships/Statistics.
+// Requires PowerFlex 4.0+.
+func (rcg *ReplicationConsistencyGroup) GetStatistics() (*types.ReplicationConsistencyGroupStatistics, error) {
+	defer TimeSpent("GetReplicationConsistencyGroupStatistics", time.Now())
+
+	link, err := GetLink(rcg.ReplicationConsistencyGroup.Links, "self")
+	if err != nil {
+		return nil, err
+	}
+	path := fmt.Sprintf("%v/relationships/Statistics", link.HREF)
+	stats := &types.ReplicationConsistencyGroupStatistics{}
+	err = rcg.client.getJSONWithRetry(http.MethodGet, path, nil, stats)
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
 }
 
 // GetSyncStateOnReplicationGroup returns the sync status of the ReplicaitonConsistencyGroup.

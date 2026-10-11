@@ -21,9 +21,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dell/csmlog"
 	types "github.com/dell/gopowermax/v2/types/v100"
 	v100 "github.com/dell/gopowermax/v2/types/v100"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -89,7 +89,7 @@ func (c *Client) CreateMigrationEnvironment(ctx context.Context, localSymID, rem
 	if err != nil {
 		return nil, err
 	}
-	log.Info("Successfully created migration environment")
+	csmlog.Info("Successfully created migration environment")
 	return migEnv, nil
 }
 
@@ -104,7 +104,7 @@ func (c *Client) DeleteMigrationEnvironment(ctx context.Context, localSymID, rem
 	defer cancel()
 	err := c.api.Delete(ctx, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Debugf("error deleting migration env: %s", err.Error())
+		csmlog.Debugf("error deleting migration env: %s", err.Error())
 		return err
 	}
 	return err
@@ -140,7 +140,7 @@ func (c *Client) CreateSGMigration(ctx context.Context, localSymID, remoteSymID,
 	if err != nil {
 		return nil, err
 	}
-	log.Info(" Create SG migration successfully done")
+	csmlog.Info(" Create SG migration successfully done")
 	return sgMig, nil
 }
 
@@ -166,7 +166,7 @@ func (c *Client) MigrateStorageGroup(ctx context.Context, symID, storageGroupID,
 	if err = decoder.Decode(storageGroup); err != nil {
 		return nil, err
 	}
-	log.Infof("Successfully Migrated SG: %s", storageGroupID)
+	csmlog.Infof("Successfully Migrated SG: %s", storageGroupID)
 	err = resp.Body.Close()
 	if err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func (c *Client) GetStorageGroupMigration(ctx context.Context, localSymID string
 	resp, err := c.api.DoAndGetResponseBody(
 		ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetStorageGroupMigration failed: " + err.Error())
+		csmlog.Error("GetStorageGroupMigration failed: " + err.Error())
 		return nil, err
 	}
 
@@ -200,7 +200,7 @@ func (c *Client) GetStorageGroupMigration(ctx context.Context, localSymID string
 	if err = decoder.Decode(migSGs); err != nil {
 		return nil, err
 	}
-	log.Info("GetStorageGroupMigration list is successfully done")
+	csmlog.Info("GetStorageGroupMigration list is successfully done")
 	err = resp.Body.Close()
 	if err != nil {
 		return nil, err
@@ -220,7 +220,7 @@ func (c *Client) GetStorageGroupMigrationByID(ctx context.Context, localSymID, s
 	resp, err := c.api.DoAndGetResponseBody(
 		ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetStorageGroupMigrationByID failed: " + err.Error())
+		csmlog.Error("GetStorageGroupMigrationByID failed: " + err.Error())
 		return nil, err
 	}
 
@@ -232,7 +232,7 @@ func (c *Client) GetStorageGroupMigrationByID(ctx context.Context, localSymID, s
 	if err = decoder.Decode(sgMig); err != nil {
 		return nil, err
 	}
-	log.Info("GetStorageGroupMigrationByID is successfully done")
+	csmlog.Info("GetStorageGroupMigrationByID is successfully done")
 	err = resp.Body.Close()
 	if err != nil {
 		return nil, err
@@ -263,7 +263,7 @@ func (c *Client) GetMigrationEnvironment(ctx context.Context, localSymID, remote
 	if err = decoder.Decode(migEnv); err != nil {
 		return nil, err
 	}
-	log.Info("Successfully get migration environment")
+	csmlog.Info("Successfully get migration environment")
 	err = resp.Body.Close()
 	if err != nil {
 		return nil, err

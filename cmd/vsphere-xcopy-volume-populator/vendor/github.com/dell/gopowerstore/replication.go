@@ -31,6 +31,8 @@ const (
 	RsActionResume    ActionType = "resume"
 	RsActionPause     ActionType = "pause"
 	RsActionSync      ActionType = "sync"
+	RsActionDemote    ActionType = "demote"
+	RsActionPromote   ActionType = "promote"
 )
 
 const (
@@ -274,6 +276,20 @@ func (c *ClientIMPL) ExecuteActionOnReplicationSession(ctx context.Context, id s
 			Endpoint: replicationSessionURL,
 			ID:       id,
 			Action:   string(actionType),
+			Body:     params,
+		},
+		&res)
+	return resp, WrapErr(err)
+}
+
+func (c *ClientIMPL) ModifyReplicationSession(ctx context.Context, id string, params *ReplicationSessionParams) (resp EmptyResponse, err error) {
+	var res interface{}
+	_, err = c.APIClient().Query(
+		ctx,
+		RequestConfig{
+			Method:   "PATCH",
+			Endpoint: replicationSessionURL,
+			ID:       id,
 			Body:     params,
 		},
 		&res)

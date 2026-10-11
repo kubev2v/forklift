@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dell/csmlog"
 	types "github.com/dell/gopowermax/v2/types/v100"
-	log "github.com/sirupsen/logrus"
 )
 
 // The following constants are for internal use within the pmax library.
@@ -45,7 +45,6 @@ const (
 // GetFreeLocalAndRemoteRDFg  gets the next free RDFg available
 // This API is only available in 10.x
 func (c *Client) GetFreeLocalAndRemoteRDFg(ctx context.Context, localSymID string, remoteSymID string) (*types.NextFreeRDFGroup, error) {
-	defer c.TimeSpent("GetFreeLocalAndRemoteRDFg", time.Now())
 	if _, err := c.IsAllowedArray(localSymID); err != nil {
 		return nil, err
 	}
@@ -59,7 +58,7 @@ func (c *Client) GetFreeLocalAndRemoteRDFg(ctx context.Context, localSymID strin
 	}
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetFreeLocalAndRemoteRDFg failed: " + err.Error())
+		csmlog.Error("GetFreeLocalAndRemoteRDFg failed: " + err.Error())
 		return nil, err
 	}
 
@@ -80,7 +79,6 @@ func (c *Client) GetFreeLocalAndRemoteRDFg(ctx context.Context, localSymID strin
 
 // GetLocalOnlineRDFDirs gets all Online Directors for the given SYMM
 func (c *Client) GetLocalOnlineRDFDirs(ctx context.Context, localSymID string) (*types.RDFDirList, error) {
-	defer c.TimeSpent("GetLocalOnlineRDFDirs", time.Now())
 	if _, err := c.IsAllowedArray(localSymID); err != nil {
 		return nil, err
 	}
@@ -90,7 +88,7 @@ func (c *Client) GetLocalOnlineRDFDirs(ctx context.Context, localSymID string) (
 	URL := c.urlPrefix() + ReplicationX + SymmetrixX + localSymID + XRDFONLINEDIR
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetLocalOnlineRDFDirs failed: " + err.Error())
+		csmlog.Error("GetLocalOnlineRDFDirs failed: " + err.Error())
 		return nil, err
 	}
 
@@ -111,7 +109,6 @@ func (c *Client) GetLocalOnlineRDFDirs(ctx context.Context, localSymID string) (
 
 // GetLocalOnlineRDFPorts gets all Online Ports for the given ONLINE RDF Director
 func (c *Client) GetLocalOnlineRDFPorts(ctx context.Context, rdfDir string, localSymID string) (*types.RDFPortList, error) {
-	defer c.TimeSpent("GetLocalOnlineRDFPorts", time.Now())
 	if _, err := c.IsAllowedArray(localSymID); err != nil {
 		return nil, err
 	}
@@ -122,7 +119,7 @@ func (c *Client) GetLocalOnlineRDFPorts(ctx context.Context, rdfDir string, loca
 
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetLocalOnlineRDFPorts failed: " + err.Error())
+		csmlog.Error("GetLocalOnlineRDFPorts failed: " + err.Error())
 		return nil, err
 	}
 
@@ -143,7 +140,6 @@ func (c *Client) GetLocalOnlineRDFPorts(ctx context.Context, rdfDir string, loca
 
 // GetRemoteRDFPortOnSAN gets Remote RDF Port on the SAN connected to this Local Array.
 func (c *Client) GetRemoteRDFPortOnSAN(ctx context.Context, localSymID string, rdfDir string, rdfPort string) (*types.RemoteRDFPortDetails, error) {
-	defer c.TimeSpent("GetRemoteRDFPortOnSAN", time.Now())
 	if _, err := c.IsAllowedArray(localSymID); err != nil {
 		return nil, err
 	}
@@ -154,7 +150,7 @@ func (c *Client) GetRemoteRDFPortOnSAN(ctx context.Context, localSymID string, r
 
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetRemoteRDFPortOnSAN failed: " + err.Error())
+		csmlog.Error("GetRemoteRDFPortOnSAN failed: " + err.Error())
 		return nil, err
 	}
 
@@ -175,7 +171,6 @@ func (c *Client) GetRemoteRDFPortOnSAN(ctx context.Context, localSymID string, r
 
 // GetLocalRDFPortDetails gets Local RDF Port Details which are Live on SAN.
 func (c *Client) GetLocalRDFPortDetails(ctx context.Context, localSymID string, rdfDir string, rdfPort int) (*types.RDFPortDetails, error) {
-	defer c.TimeSpent("GetLocalRDFPortDetails", time.Now())
 	if _, err := c.IsAllowedArray(localSymID); err != nil {
 		return nil, err
 	}
@@ -186,7 +181,7 @@ func (c *Client) GetLocalRDFPortDetails(ctx context.Context, localSymID string, 
 
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetLocalRDFportDetails failed: " + err.Error())
+		csmlog.Error("GetLocalRDFportDetails failed: " + err.Error())
 		return nil, err
 	}
 
@@ -207,7 +202,6 @@ func (c *Client) GetLocalRDFPortDetails(ctx context.Context, localSymID string, 
 
 // GetRDFGroupByID returns RDF group information given the RDF group number
 func (c *Client) GetRDFGroupByID(ctx context.Context, symID, rdfGroupNo string) (*types.RDFGroup, error) {
-	defer c.TimeSpent("GetRdfGroup", time.Now())
 	if _, err := c.IsAllowedArray(symID); err != nil {
 		return nil, err
 	}
@@ -216,7 +210,7 @@ func (c *Client) GetRDFGroupByID(ctx context.Context, symID, rdfGroupNo string) 
 	URL := c.urlPrefix() + ReplicationX + SymmetrixX + symID + XRDFGroup + "/" + rdfGroupNo
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetRdfGroup failed: " + err.Error())
+		csmlog.Error("GetRdfGroup failed: " + err.Error())
 		return nil, err
 	}
 
@@ -237,7 +231,6 @@ func (c *Client) GetRDFGroupByID(ctx context.Context, symID, rdfGroupNo string) 
 
 // GetRDFGroupList fetches all RDF group
 func (c *Client) GetRDFGroupList(ctx context.Context, symID string, queryParams types.QueryParams) (*types.RDFGroupList, error) {
-	defer c.TimeSpent("GetRdfGroupList", time.Now())
 	if _, err := c.IsAllowedArray(symID); err != nil {
 		return nil, err
 	}
@@ -259,7 +252,7 @@ func (c *Client) GetRDFGroupList(ctx context.Context, symID string, queryParams 
 	defer cancel()
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetRdfGroupList failed: " + err.Error())
+		csmlog.Error("GetRdfGroupList failed: " + err.Error())
 		return nil, err
 	}
 
@@ -280,7 +273,6 @@ func (c *Client) GetRDFGroupList(ctx context.Context, symID string, queryParams 
 
 // GetProtectedStorageGroup returns protected storage group given the storage group ID
 func (c *Client) GetProtectedStorageGroup(ctx context.Context, symID, storageGroup string) (*types.RDFStorageGroup, error) {
-	defer c.TimeSpent("GetProtectedStorageGroup", time.Now())
 	if _, err := c.IsAllowedArray(symID); err != nil {
 		return nil, err
 	}
@@ -289,7 +281,7 @@ func (c *Client) GetProtectedStorageGroup(ctx context.Context, symID, storageGro
 	URL := c.urlPrefix() + ReplicationX + SymmetrixX + symID + XStorageGroup + "/" + storageGroup
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetProtectedStorageGroup failed: " + err.Error())
+		csmlog.Error("GetProtectedStorageGroup failed: " + err.Error())
 		return nil, err
 	}
 
@@ -310,7 +302,6 @@ func (c *Client) GetProtectedStorageGroup(ctx context.Context, symID, storageGro
 
 // ExecuteCreateRDFGroup creates the RDF Group
 func (c *Client) ExecuteCreateRDFGroup(ctx context.Context, symID string, CreateRDFPayload *types.RDFGroupCreate) error {
-	defer c.TimeSpent("ExecuteCreateRDFGroup", time.Now())
 	if _, err := c.IsAllowedArray(symID); err != nil {
 		return err
 	}
@@ -319,17 +310,15 @@ func (c *Client) ExecuteCreateRDFGroup(ctx context.Context, symID string, Create
 	defer cancel()
 	err := c.api.Post(ctx, URL, c.getDefaultHeaders(), CreateRDFPayload, nil)
 	if err != nil {
-		log.Error("Error in ExecuteCreateRDFGroup: " + err.Error())
+		csmlog.Error("Error in ExecuteCreateRDFGroup: " + err.Error())
 		return err
 	}
-	log.Debugf("sucessfully created RDF group")
+	csmlog.Debugf("sucessfully created RDF group")
 	return nil
 }
 
 // ExecuteReplicationActionOnSG executes supported replication based actions on the protected SG
 func (c *Client) ExecuteReplicationActionOnSG(ctx context.Context, symID, action, storageGroup, rdfGroup string, force, exemptConsistency, bias bool) error {
-	defer c.TimeSpent("ExecuteReplicationActionOnSG", time.Now())
-
 	if _, err := c.IsAllowedArray(symID); err != nil {
 		return err
 	}
@@ -438,10 +427,10 @@ func (c *Client) ExecuteReplicationActionOnSG(ctx context.Context, symID, action
 	err := c.api.Put(
 		ctx, URL, c.getDefaultHeaders(), modifyParam, nil)
 	if err != nil {
-		log.WithFields(fields).Error("Error in ExecuteReplicationActionOnSG: " + err.Error())
+		csmlog.WithFields(fields).Error("Error in ExecuteReplicationActionOnSG: " + err.Error())
 		return err
 	}
-	log.Info(fmt.Sprintf("Action (%s) on protected StorageGroup (%s) with RDF group (%s) is successful", action, storageGroup, rdfGroup))
+	csmlog.Info(fmt.Sprintf("Action (%s) on protected StorageGroup (%s) with RDF group (%s) is successful", action, storageGroup, rdfGroup))
 	return nil
 }
 
@@ -486,13 +475,11 @@ func (c *Client) GetCreateSGReplicaPayload(remoteSymID string, rdfMode string, r
 
 // CreateSGReplica creates a storage group on remote array and protect them with given RDF Mode and a given source storage group
 func (c *Client) CreateSGReplica(ctx context.Context, symID, remoteSymID, rdfMode, rdfGroupNo, sourceSG, remoteSGName, remoteServiceLevel string, bias bool) (*types.SGRDFInfo, error) {
-	defer c.TimeSpent("CreateSGReplica", time.Now())
 	if _, err := c.IsAllowedArray(symID); err != nil {
 		return nil, err
 	}
 	rdfgNo, _ := strconv.Atoi(rdfGroupNo)
 	createSGReplicaPayload := c.GetCreateSGReplicaPayload(remoteSymID, rdfMode, rdfgNo, remoteSGName, remoteServiceLevel, true, bias)
-	Debug = true
 	ifDebugLogPayload(createSGReplicaPayload)
 	URL := c.urlPrefix() + ReplicationX + SymmetrixX + symID + XStorageGroup + "/" + sourceSG + XRDFGroup
 
@@ -509,7 +496,7 @@ func (c *Client) CreateSGReplica(ctx context.Context, symID, remoteSymID, rdfMod
 	if err = decoder.Decode(rdfSG); err != nil {
 		return nil, err
 	}
-	log.Info(fmt.Sprintf("Successfully created SG replica for %s", sourceSG))
+	csmlog.Info(fmt.Sprintf("Successfully created SG replica for %s", sourceSG))
 	err = resp.Body.Close()
 	if err != nil {
 		return nil, err
@@ -555,7 +542,6 @@ func (c *Client) GetCreateRDFPairPayload(devList types.LocalDeviceListCriteria, 
 
 // CreateRDFPair creates an RDF device pair in the given RDF group
 func (c *Client) CreateRDFPair(ctx context.Context, symID, rdfGroupNo, deviceID, rdfMode, rdfType string, establish, exemptConsistency bool) (*types.RDFDevicePairList, error) {
-	defer c.TimeSpent("CreateRDFPair", time.Now())
 	if _, err := c.IsAllowedArray(symID); err != nil {
 		return nil, err
 	}
@@ -565,7 +551,6 @@ func (c *Client) CreateRDFPair(ctx context.Context, symID, rdfGroupNo, deviceID,
 		LocalDeviceList: deviceList,
 	}
 	createPairPayload := c.GetCreateRDFPairPayload(devList, rdfMode, rdfType, establish, exemptConsistency)
-	Debug = true
 	ifDebugLogPayload(createPairPayload)
 	URL := c.urlPrefix() + ReplicationX + SymmetrixX + symID + XRDFGroup + "/" + rdfGroupNo + XVolume + "/" + deviceID
 
@@ -582,7 +567,7 @@ func (c *Client) CreateRDFPair(ctx context.Context, symID, rdfGroupNo, deviceID,
 	if err = decoder.Decode(rdfPairList); err != nil {
 		return nil, err
 	}
-	log.Info(fmt.Sprintf("Successfully created volume replica for %s", deviceID))
+	csmlog.Info(fmt.Sprintf("Successfully created volume replica for %s", deviceID))
 	err = resp.Body.Close()
 	if err != nil {
 		return nil, err
@@ -590,9 +575,32 @@ func (c *Client) CreateRDFPair(ctx context.Context, symID, rdfGroupNo, deviceID,
 	return rdfPairList, nil
 }
 
+// DeleteRDFPair deletes an RDF device pair from the given RDF group
+func (c *Client) DeleteRDFPair(ctx context.Context, symID, rdfGroup, volumeID string, force bool) error {
+	defer c.TimeSpent("DeleteRDFPair", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return err
+	}
+
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+
+	URL := c.urlPrefix() + ReplicationX + SymmetrixX + symID + XRDFGroup + "/" + rdfGroup + XVolume + "/" + volumeID
+	if force {
+		URL += "?force=true"
+	}
+
+	err := c.api.Delete(ctx, URL, c.getDefaultHeaders(), nil)
+	if err != nil {
+		csmlog.Error("Error in DeleteRDFPair: " + err.Error())
+		return err
+	}
+	csmlog.Info(fmt.Sprintf("Successfully deleted RDF pair for volume %s in RDF group %s", volumeID, rdfGroup))
+	return nil
+}
+
 // GetRDFDevicePairInfo returns RDF volume information
 func (c *Client) GetRDFDevicePairInfo(ctx context.Context, symID, rdfGroup, volumeID string) (*types.RDFDevicePair, error) {
-	defer c.TimeSpent("GetRDFDevicePairInfo", time.Now())
 	if _, err := c.IsAllowedArray(symID); err != nil {
 		return nil, err
 	}
@@ -602,7 +610,7 @@ func (c *Client) GetRDFDevicePairInfo(ctx context.Context, symID, rdfGroup, volu
 	URL := c.urlPrefix() + ReplicationX + SymmetrixX + symID + XRDFGroup + "/" + rdfGroup + XVolume + "/" + volumeID
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetRDFDevicePairInfo failed: " + err.Error())
+		csmlog.Error("GetRDFDevicePairInfo failed: " + err.Error())
 		return nil, err
 	}
 
@@ -623,7 +631,6 @@ func (c *Client) GetRDFDevicePairInfo(ctx context.Context, symID, rdfGroup, volu
 
 // GetStorageGroupRDFInfo returns the of RDF info of protected storage group
 func (c *Client) GetStorageGroupRDFInfo(ctx context.Context, symID, sgName, rdfGroupNo string) (*types.StorageGroupRDFG, error) {
-	defer c.TimeSpent("GetStorageGroupRDFInfo", time.Now())
 	if _, err := c.IsAllowedArray(symID); err != nil {
 		return nil, err
 	}
@@ -633,7 +640,7 @@ func (c *Client) GetStorageGroupRDFInfo(ctx context.Context, symID, sgName, rdfG
 	URL := c.urlPrefix() + ReplicationX + SymmetrixX + symID + XStorageGroup + "/" + sgName + XRDFGroup + "/" + rdfGroupNo
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
 	if err != nil {
-		log.Error("GetStorageGroupRDFInfo failed: " + err.Error())
+		csmlog.Error("GetStorageGroupRDFInfo failed: " + err.Error())
 		return nil, err
 	}
 
@@ -650,4 +657,20 @@ func (c *Client) GetStorageGroupRDFInfo(ctx context.Context, symID, sgName, rdfG
 		return nil, err
 	}
 	return sgRdfInfo, nil
+}
+
+// CloneVolumeFromVolume creates a clone between the source volume and the target volume
+func (c *Client) CloneVolumeFromVolume(ctx context.Context, symID string, replicaPair types.ReplicationRequest) error {
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return err
+	}
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	URL := c.privURLPrefix() + ReplicationX + SymmetrixX + symID + XClone + XVolume
+	err := c.api.Post(ctx, URL, c.getDefaultHeaders(), replicaPair, nil)
+	if err != nil {
+		return err
+	}
+	csmlog.Infof("Successfully created volume replica for %+v", replicaPair)
+	return nil
 }

@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -11,6 +11,8 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -46,6 +48,11 @@ func Map(ctx context.Context) *Registry {
 	return ctx.(*Context).Map
 }
 
+// ServiceFromContext returns the simulator Service from the given ctx
+func ServiceFromContext(ctx context.Context) *Service {
+	return ctx.(*Context).svc
+}
+
 // RegisterObject interface supports callbacks when objects are created, updated and deleted from the Registry
 type RegisterObject interface {
 	mo.Reference
@@ -68,14 +75,22 @@ type Registry struct {
 	Cookie    func(*Context) string
 
 	tagManager tagManager
+
+	// ContainerImages maps VM config attributes to OCI container images.
+	// It is consulted during PowerOn to enable container-backed simulation
+	// without requiring modifications to the code under test.
+	// See ContainerImageRegistry for details and usage examples.
+	ContainerImages ContainerImageRegistry
 }
 
 // tagManager is an interface to simplify internal interaction with the vapi tag manager simulator.
 type tagManager interface {
-	AttachedObjects(types.VslmTagEntry) ([]types.ManagedObjectReference, types.BaseMethodFault)
-	AttachedTags(id types.ManagedObjectReference) ([]types.VslmTagEntry, types.BaseMethodFault)
-	AttachTag(types.ManagedObjectReference, types.VslmTagEntry) types.BaseMethodFault
-	DetachTag(types.ManagedObjectReference, types.VslmTagEntry) types.BaseMethodFault
+	AttachedObjects(string) ([]types.ManagedObjectReference, types.BaseMethodFault)
+	AttachedTags(id types.ManagedObjectReference) ([]string, types.BaseMethodFault)
+	AttachTag(types.ManagedObjectReference, string) types.BaseMethodFault
+	DetachTag(types.ManagedObjectReference, string) types.BaseMethodFault
+	GetTagByCategoryAndName(string, string) (string, types.BaseMethodFault)
+	GetTagCategoryAndName(string) (string, string, types.BaseMethodFault)
 }
 
 // NewRegistry creates a new instances of Registry
@@ -135,6 +150,24 @@ func (r *Registry) newReference(item mo.Reference) types.ManagedObjectReference 
 	}
 
 	return ref
+}
+
+func (r *Registry) AlignCounter() error {
+	maxN := int64(0)
+	for ref, _ := range r.objects {
+		prefix := valuePrefix(ref.Type)
+		suffix := strings.TrimPrefix(ref.Value, prefix)
+		n, err := strconv.ParseInt(suffix, 10, 64)
+		if err != nil {
+			continue
+		}
+		if n > maxN {
+			maxN = n
+		}
+	}
+
+	r.counter = maxN
+	return nil
 }
 
 func (r *Registry) setReference(item mo.Reference, ref types.ManagedObjectReference) {
@@ -437,10 +470,8 @@ func (r *Registry) FindByName(name string, refs []types.ManagedObjectReference) 
 // FindReference returns the 1st match found in refs, or nil if not found.
 func FindReference(refs []types.ManagedObjectReference, match ...types.ManagedObjectReference) *types.ManagedObjectReference {
 	for _, ref := range refs {
-		for _, m := range match {
-			if ref == m {
-				return &ref
-			}
+		if slices.Contains(match, ref) {
+			return &ref
 		}
 	}
 

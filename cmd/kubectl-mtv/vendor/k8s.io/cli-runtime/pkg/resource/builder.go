@@ -129,6 +129,10 @@ Example resource specifications include:
 
 var StdinMultiUseError = errors.New("standard input cannot be used for multiple arguments")
 
+// ErrMultipleResourceTypes is returned when Builder.SingleResourceType() was called,
+// but multiple resource types were specified.
+var ErrMultipleResourceTypes = errors.New("you may only specify a single resource type")
+
 // TODO: expand this to include other errors.
 func IsUsageError(err error) bool {
 	if err == nil {
@@ -803,7 +807,16 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 		// if the error is _not_ a *meta.NoKindMatchError, then we had trouble doing discovery,
 		// so we should return the original error since it may help a user diagnose what is actually wrong
 		if meta.IsNoMatchError(err) {
-			return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
+			switch {
+			case len(groupResource.Group) > 0 && len(gvk.Version) > 0:
+				return nil, fmt.Errorf("the server doesn't have a resource type %q in group %q and version %q", groupResource.Resource, groupResource.Group, gvk.Version)
+			case len(groupResource.Group) > 0:
+				return nil, fmt.Errorf("the server doesn't have a resource type %q in group %q", groupResource.Resource, groupResource.Group)
+			case len(gvk.Version) > 0:
+				return nil, fmt.Errorf("the server doesn't have a resource type %q in version %q", groupResource.Resource, gvk.Version)
+			default:
+				return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
+			}
 		}
 		return nil, err
 	}
@@ -813,7 +826,7 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 
 func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 	if len(b.resources) > 1 && b.singleResourceType {
-		return nil, fmt.Errorf("you may only specify a single resource type")
+		return nil, ErrMultipleResourceTypes
 	}
 	mappings := []*meta.RESTMapping{}
 	seen := map[schema.GroupVersionKind]bool{}
@@ -849,7 +862,7 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 		canonical[mapping.Resource] = struct{}{}
 	}
 	if len(canonical) > 1 && b.singleResourceType {
-		return nil, fmt.Errorf("you may only specify a single resource type")
+		return nil, ErrMultipleResourceTypes
 	}
 	return mappings, nil
 }
@@ -1198,7 +1211,7 @@ func (b *Builder) Do() *Result {
 // strings in the original order.
 func SplitResourceArgument(arg string) []string {
 	out := []string{}
-	set := sets.NewString()
+	set := sets.New[string]()
 	for _, s := range strings.Split(arg, ",") {
 		if set.Has(s) {
 			continue

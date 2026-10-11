@@ -1,4 +1,4 @@
-// Copyright © 2023 - 2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright (c) 2023-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,8 +31,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dell/csmlog"
 	"github.com/dell/goscaleio/api"
-	"github.com/dell/goscaleio/log"
 	types "github.com/dell/goscaleio/types/v1"
 	"gopkg.in/yaml.v3"
 )
@@ -71,6 +71,7 @@ func NewGateway(host string, username, password string, insecure, useCerts bool)
 		gc.http.Transport = &http.Transport{
 			// #nosec G402
 			TLSClientConfig: &tls.Config{
+				MinVersion:         tls.VersionTLS12,
 				InsecureSkipVerify: true,
 				CipherSuites:       api.GetSecuredCipherSuites(),
 			},
@@ -86,6 +87,7 @@ func NewGateway(host string, username, password string, insecure, useCerts bool)
 		gc.http.Transport = &http.Transport{
 			// #nosec G402
 			TLSClientConfig: &tls.Config{
+				MinVersion:         tls.VersionTLS12,
 				RootCAs:            pool,
 				InsecureSkipVerify: insecure,
 				CipherSuites:       api.GetSecuredCipherSuites(),
@@ -137,21 +139,24 @@ func (gc *GatewayClient) NewTokenGeneration() (string, error) {
 
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := gc.http.Do(req)
+	resp, err := gc.http.Do(req) // #nosec G704 - Authentication request to user-provided gateway endpoint. This is intended SDK behavior where users configure their own gateway URL
 	if err != nil {
 		return "", err
 	}
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			log.DoLog(log.Log.Error, err.Error())
+			csmlog.WithFields(csmlog.Fields{
+				csmlog.FieldComponent: "goscaleio",
+				csmlog.FieldOperation: "GatewayClient.NewToken",
+			}).Errorf("Failed to close response body while getting token: %v", err)
 		}
 	}()
 
 	// parse the response
 	switch {
 	case resp == nil:
-		return "", errNilReponse
+		return "", errNilResponse
 	case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
 		return "", ParseJSONError(resp)
 	}
@@ -170,7 +175,10 @@ func (gc *GatewayClient) NewTokenGeneration() (string, error) {
 	}
 
 	if result["access_token"] == nil {
-		log.DoLog(log.Log.Info, "authentication defaulting to basic authentication.")
+		csmlog.WithFields(csmlog.Fields{
+			csmlog.FieldComponent: "goscaleio",
+			csmlog.FieldOperation: "GatewayClient.NewToken",
+		}).Info("authentication defaulting to basic authentication")
 		return "", nil
 	}
 
@@ -193,7 +201,7 @@ func (gc *GatewayClient) GetVersion() (string, error) {
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	resp, httpRespError := client.Do(req)
+	resp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return "", httpRespError
 	}
@@ -201,7 +209,7 @@ func (gc *GatewayClient) GetVersion() (string, error) {
 	// parse the response
 	switch {
 	case resp == nil:
-		return "", errNilReponse
+		return "", errNilResponse
 	case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
 		return "", fmt.Errorf("error response: %s", resp.Status)
 	}
@@ -276,7 +284,7 @@ func (gc *GatewayClient) UploadPackages(filePaths []string) (*types.GatewayRespo
 		req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(gc.username+":"+gc.password)))
 	}
 	client := gc.http
-	response, httpRespError := client.Do(req)
+	response, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 
 	if httpRespError != nil {
 		return &gatewayResponse, httpRespError
@@ -318,7 +326,10 @@ func (gc *GatewayClient) ParseCSV(filePath string) (*types.GatewayResponse, erro
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			fmt.Printf("failed to close file: %v", err)
+			csmlog.WithFields(csmlog.Fields{
+				csmlog.FieldComponent: "goscaleio",
+				csmlog.FieldOperation: "UploadPackages",
+			}).Errorf("Failed to close file: %v", err)
 		}
 	}()
 
@@ -338,7 +349,7 @@ func (gc *GatewayClient) ParseCSV(filePath string) (*types.GatewayResponse, erro
 		return &gatewayResponse, fileWriterError
 	}
 
-	req, httpError := http.NewRequest(http.MethodPost, gc.host+"/im/types/Configuration/instances/actions/parseFromCSV", body)
+	req, httpError := http.NewRequest(http.MethodPost, gc.host+"/im/types/Configuration/instances/actions/parseFromCSV", body) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpError != nil {
 		return &gatewayResponse, httpError
 	}
@@ -354,7 +365,7 @@ func (gc *GatewayClient) ParseCSV(filePath string) (*types.GatewayResponse, erro
 		req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(gc.username+":"+gc.password)))
 	}
 	client := gc.http
-	response, httpRespError := client.Do(req)
+	response, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 
 	if httpRespError != nil {
 		return &gatewayResponse, httpRespError
@@ -417,7 +428,7 @@ func (gc *GatewayClient) GetPackageDetails() ([]*types.PackageDetails, error) {
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return packageParam, httpRespError
 	}
@@ -468,7 +479,7 @@ func (gc *GatewayClient) ValidateMDMDetails(mdmTopologyParam []byte) (*types.Gat
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &gatewayResponse, httpRespError
 	}
@@ -534,7 +545,7 @@ func (gc *GatewayClient) GetClusterDetails(mdmTopologyParam []byte, requireJSONO
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &gatewayResponse, httpRespError
 	}
@@ -608,7 +619,7 @@ func (gc *GatewayClient) DeletePackage(packageName string) (*types.GatewayRespon
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &gatewayResponse, httpRespError
 	}
@@ -700,7 +711,7 @@ func (gc *GatewayClient) BeginInstallation(jsonStr, mdmUsername, mdmPassword, li
 
 	client := gc.http
 
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &gatewayResponse, httpRespError
 	}
@@ -747,7 +758,7 @@ func (gc *GatewayClient) MoveToNextPhase() (*types.GatewayResponse, error) {
 
 	client := gc.http
 
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &gatewayResponse, httpRespError
 	}
@@ -801,7 +812,7 @@ func (gc *GatewayClient) RetryPhase() (*types.GatewayResponse, error) {
 
 	client := gc.http
 
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &gatewayResponse, httpRespError
 	}
@@ -855,7 +866,7 @@ func (gc *GatewayClient) AbortOperation() (*types.GatewayResponse, error) {
 
 	client := gc.http
 
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &gatewayResponse, httpRespError
 	}
@@ -909,7 +920,7 @@ func (gc *GatewayClient) ClearQueueCommand() (*types.GatewayResponse, error) {
 
 	client := gc.http
 
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &gatewayResponse, httpRespError
 	}
@@ -963,7 +974,7 @@ func (gc *GatewayClient) MoveToIdlePhase() (*types.GatewayResponse, error) {
 
 	client := gc.http
 
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &gatewayResponse, httpRespError
 	}
@@ -1014,7 +1025,7 @@ func (gc *GatewayClient) RenewInstallationCookie(retryCount int) error {
 	req.Header.Set("Content-Type", "application/json")
 
 	for i := 0; i < retryCount; i++ {
-		httpResp, httpRespError := gc.http.Do(req)
+		httpResp, httpRespError := gc.http.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 		if httpRespError != nil {
 			continue
 		}
@@ -1057,7 +1068,7 @@ func (gc *GatewayClient) GetInQueueCommand() ([]types.MDMQueueCommandDetails, er
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return mdmQueueCommandDetails, httpRespError
 	}
@@ -1179,7 +1190,7 @@ func (gc *GatewayClient) UninstallCluster(jsonStr, mdmUsername, mdmPassword, lia
 
 	client := gc.http
 
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &gatewayResponse, httpRespError
 	}

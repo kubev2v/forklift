@@ -12,8 +12,11 @@ limitations under the License.
 */
 package common
 
+import "log/slog"
+
 // storage class parameter keys
 const (
+	LevelTrace  = slog.Level(-8)
 	NodeRootDir = "/host"
 
 	FSTypeExt3 = "ext3"

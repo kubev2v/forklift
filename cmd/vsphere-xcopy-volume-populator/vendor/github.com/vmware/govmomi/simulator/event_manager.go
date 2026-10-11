@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -9,6 +9,7 @@ import (
 	"container/list"
 	"log"
 	"reflect"
+	"slices"
 	"text/template"
 	"time"
 
@@ -295,12 +296,7 @@ func (c *EventHistoryCollector) typeMatches(_ *Context, event types.BaseEvent, s
 	}
 
 	matches := func(name string) bool {
-		for _, id := range spec.EventTypeId {
-			if id == name {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(spec.EventTypeId, name)
 	}
 
 	if x, ok := event.(*types.EventEx); ok {

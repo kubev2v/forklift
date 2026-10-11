@@ -157,6 +157,9 @@ type VolumeCreate struct {
 	LogicalUnitNumber int64 `json:"logical_unit_number,omitempty"`
 	// Minimum size for the volume, in bytes.
 	MinimumSize int64 `json:"min_size,omitempty"`
+	// Unique identifier of a volume to co-locate with for same-appliance placement.
+	// Used for multi-appliance XCOPY-assisted migrations.
+	CoLocateResourceID string `json:"co_locate_resource_id,omitempty"`
 
 	// Metadata addition for volumes on array with OE version 3.0 and above
 	Metadata *map[string]string `json:"metadata,omitempty"`
@@ -214,15 +217,15 @@ type VolumeModify struct {
 	//  Size must be a multiple of 8192.
 	Size int64 `json:"size,omitempty"`
 	// Unique identifier of the protection policy assigned to the volume.
-	ProtectionPolicyID string `json:"protection_policy_id"`
+	ProtectionPolicyID *string `json:"protection_policy_id,omitempty"`
 	// Unique identifier of the performance policy assigned to the volume.
-	PerformancePolicyID string `json:"performance_policy_id,omitempty"`
+	PerformancePolicyID *string `json:"performance_policy_id,omitempty"`
 	// Description of the volume
-	Description string `json:"description"`
+	Description *string `json:"description,omitempty"`
 	// This attribute indicates the intended use of this volume.
-	AppType string `json:"app_type,omitempty"`
+	AppType *string `json:"app_type,omitempty"`
 	// An optional field used to describe application type usage for a volume.
-	AppTypeOther string `json:"app_type_other,omitempty"`
+	AppTypeOther *string `json:"app_type_other,omitempty"`
 	// ExpirationTimestamp provides time at which snapshot will be auto-purged. Valid only for snapshot type.
 	ExpirationTimestamp *string `json:"expiration_timestamp,omitempty"`
 }

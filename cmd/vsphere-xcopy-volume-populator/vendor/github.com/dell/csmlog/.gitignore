@@ -1,0 +1,32 @@
+# binaries and temporary files
+/csi-powerstore
+semver.mk
+vars.mk
+Dockerfile-debug
+
+# test directories and artifacts
+service/c.out
+service/test/
+vendor
+
+# IDE
+.idea
+.vscode
+
+# gosec
+gosec.log
+gosecresults.csv
+
+# reports
+*.csv
+*.xml
+
+# coverage
+*.out
+*.html
+
+# logs
+*.log
+
+vendor/
+

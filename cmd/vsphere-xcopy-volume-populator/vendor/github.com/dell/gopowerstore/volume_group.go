@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dell/csmlog"
 	"github.com/dell/gopowerstore/api"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -128,7 +128,10 @@ func (c *ClientIMPL) GetVolumeGroupsByVolumeID(ctx context.Context, id string) (
 			QueryParams: qp,
 		},
 		&resp)
-	logrus.Info(resp)
+	csmlog.WithFields(csmlog.Fields{
+		csmlog.FieldComponent: "gopowerstore",
+		csmlog.FieldOperation: "GetVolumeGroupsByVolumeID",
+	}).Info("volume groups retrieved")
 	return resp, WrapErr(err)
 }
 

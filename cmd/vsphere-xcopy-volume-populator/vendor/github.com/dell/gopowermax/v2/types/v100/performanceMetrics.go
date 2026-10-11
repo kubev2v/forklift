@@ -58,10 +58,10 @@ type VolumeMetricsParam struct {
 	SystemID                       string   `json:"systemId"`
 	StartDate                      int64    `json:"startDate"`
 	EndDate                        int64    `json:"endDate"`
-	VolumeStartRange               string   `json:"volumeStartRange"`
-	VolumeEndRange                 string   `json:"volumeEndRange"`
+	VolumeStartRange               string   `json:"volumeStartRange,omitempty"`
+	VolumeEndRange                 string   `json:"volumeEndRange,omitempty"`
 	DataFormat                     string   `json:"dataFormat"`
-	CommaSeparatedStorageGroupList string   `json:"commaSeparatedStorageGroupList"`
+	CommaSeparatedStorageGroupList string   `json:"commaSeparatedStorageGroupList,omitempty"`
 	Metrics                        []string `json:"metrics"`
 }
 
@@ -129,6 +129,22 @@ type ArrayInfo struct {
 	LastAvailableDate  int64  `json:"lastAvailableDate"`
 }
 
+// StorageGroupPerfCategoryResult represents the response from the
+// GET /performance-categories/StorageGroup bulk endpoint.
+type StorageGroupPerfCategoryResult struct {
+	ID              string                       `json:"id"`
+	ResourceType    string                       `json:"resource_type"`
+	System          string                       `json:"system"`
+	MetricInstances []StorageGroupMetricInstance `json:"metric_instances"`
+}
+
+// StorageGroupMetricInstance represents a single storage group's metrics
+// returned by the bulk performance-categories endpoint.
+type StorageGroupMetricInstance struct {
+	ID      string               `json:"id"`
+	Metrics []StorageGroupMetric `json:"metrics"`
+}
+
 // FileSystemMetricsParam contains req param for filesystem metric
 type FileSystemMetricsParam struct {
 	SystemID     string   `json:"systemId"`
@@ -159,4 +175,38 @@ type FileSystemMetricsResultList struct {
 type FileSystemResult struct {
 	PercentBusy float64 `json:"PercentBusy"`
 	Timestamp   int64   `json:"timestamp"`
+}
+
+// RDFGroupMetricsParam parameters for SRDF group performance metrics query
+type RDFGroupMetricsParam struct {
+	SymmetrixID string   `json:"symmetrixId"`
+	StartDate   int64    `json:"startDate"`
+	EndDate     int64    `json:"endDate"`
+	DataFormat  string   `json:"dataFormat"`
+	RDFGroupID  int      `json:"rdfGroupId"`
+	Metrics     []string `json:"metrics"`
+}
+
+// RDFGroupMetricsIterator contains the result of SRDF group performance metrics query
+type RDFGroupMetricsIterator struct {
+	ResultList     RDFGroupMetricsResultList `json:"resultList"`
+	ID             string                    `json:"id"`
+	Count          int                       `json:"count"`
+	ExpirationTime int64                     `json:"expirationTime"`
+	MaxPageSize    int                       `json:"maxPageSize"`
+}
+
+// RDFGroupMetricsResultList contains the list of SRDF group performance metrics results
+type RDFGroupMetricsResultList struct {
+	Result []RDFGroupMetric `json:"result"`
+	From   int              `json:"from"`
+	To     int              `json:"to"`
+}
+
+// RDFGroupMetric holds a single SRDF group performance sample
+type RDFGroupMetric struct {
+	AvgCycleTime float64 `json:"AvgCycleTime"` // average SRDF cycle time in milliseconds (ASYNC lag)
+	WriteMBs     float64 `json:"WriteMBs"`     // write bandwidth MB/s
+	ReadMBs      float64 `json:"ReadMBs"`      // read bandwidth MB/s
+	Timestamp    int64   `json:"timestamp"`
 }

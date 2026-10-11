@@ -1,8 +1,6 @@
 // Copyright (c) Faye Amacker. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-//go:build go1.20
-
 package cbor
 
 import (
@@ -66,9 +64,9 @@ func (me *mapKeyValueEncodeFunc) encodeKeyValues(e *bytes.Buffer, em *encMode, v
 	return nil
 }
 
-func getEncodeMapFunc(t reflect.Type) encodeFunc {
-	kf, _ := getEncodeFunc(t.Key())
-	ef, _ := getEncodeFunc(t.Elem())
+func getEncodeMapFunc(t reflect.Type, newEncodeFuncs map[reflect.Type]*inProgressEncodeFuncs) encodeFunc {
+	kf := getEncodeFuncWithNewEncodeFuncs(t.Key(), newEncodeFuncs)
+	ef := getEncodeFuncWithNewEncodeFuncs(t.Elem(), newEncodeFuncs)
 	if kf == nil || ef == nil {
 		return nil
 	}
@@ -76,13 +74,13 @@ func getEncodeMapFunc(t reflect.Type) encodeFunc {
 		kf: kf,
 		ef: ef,
 		kpool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				rk := reflect.New(t.Key()).Elem()
 				return &rk
 			},
 		},
 		vpool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				rv := reflect.New(t.Elem()).Elem()
 				return &rv
 			},

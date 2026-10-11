@@ -21,9 +21,8 @@ package gopowerstore
 import (
 	"context"
 
+	"github.com/dell/csmlog"
 	"github.com/dell/gopowerstore/api"
-
-	log "github.com/sirupsen/logrus"
 )
 
 const apiFCPortURL = "fc_port"
@@ -43,7 +42,12 @@ func (c *ClientIMPL) GetFCPorts(
 
 		majorMinorVersion, err := c.GetSoftwareMajorMinorVersion(ctx)
 		if err != nil {
-			log.Errorf("Couldn't find the array version %s", err.Error())
+			csmlog.WithFields(csmlog.Fields{
+				csmlog.FieldComponent: "gopowerstore",
+				csmlog.FieldOperation: "GetFCPorts",
+				csmlog.FieldProtocol:  "FC",
+				csmlog.FieldError:     err.Error(),
+			}).Error("couldn't find the array version")
 		} else {
 			if majorMinorVersion >= 3.0 {
 				qp.Select("wwn_nvme,wwn_node")
