@@ -175,6 +175,9 @@ func (h *DatastoreHandler) filter(ctx *gin.Context, list *[]model.Datastore) (er
 type Datastore struct {
 	Resource
 	Type                        string                  `json:"type"`
+	FilesystemType              string                  `json:"filesystemType,omitempty"`
+	FilesystemMajorVersion      int32                   `json:"filesystemMajorVersion,omitempty"`
+	ProtocolEndpointType        string                  `json:"protocolEndpointType,omitempty"`
 	Capacity                    int64                   `json:"capacity"`
 	Free                        int64                   `json:"free"`
 	MaintenanceMode             string                  `json:"maintenance"`
@@ -193,6 +196,9 @@ type Datastore struct {
 func (r *Datastore) With(m *model.Datastore) {
 	r.Resource.With(&m.Base)
 	r.Type = m.Type
+	r.FilesystemType = m.FilesystemType
+	r.FilesystemMajorVersion = m.FilesystemMajorVersion
+	r.ProtocolEndpointType = m.ProtocolEndpointType
 	r.Capacity = m.Capacity
 	r.Free = m.Free
 	r.MaintenanceMode = m.MaintenanceMode

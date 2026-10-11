@@ -200,6 +200,11 @@ type HbaDiskInfo struct {
 	Protocol string `json:"protocol"`
 	// The model name of the host bus adapter.
 	Model string `json:"model"`
+	// The driver name of the host bus adapter.
+	Driver string `json:"driver,omitempty"`
+	// The Fibre Channel node and port WWNs, when provided by the host.
+	NodeWorldWideName string `json:"nodeWorldWideName,omitempty"`
+	PortWorldWideName string `json:"portWorldWideName,omitempty"`
 	// The linkable identifier.
 	Key string `json:"key"`
 }
@@ -300,6 +305,9 @@ type DVSHost struct {
 type Datastore struct {
 	Base
 	Type                        string            `sql:""`
+	FilesystemType              string            `sql:""`
+	FilesystemMajorVersion      int32             `sql:""`
+	ProtocolEndpointType        string            `sql:""`
 	Capacity                    int64             `sql:""`
 	Free                        int64             `sql:""`
 	MaintenanceMode             string            `sql:""`
