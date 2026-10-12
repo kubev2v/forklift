@@ -4,13 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/a/amd-gpu-firmware-20260804-23.2.el10_2.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/a/amd-gpu-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 30561960
-    checksum: sha256:46c9acbda2a9aefe5662c4b723b1538019b259e22b66dfcf88da90f03cb4ec50
+    size: 31686084
+    checksum: sha256:a2aafd628352a5bff84000ba0e38fef67110998da48a844aa5f3366b39351c4d
     name: amd-gpu-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/a/augeas-libs-1.14.2-0.9.20260120gitf4135e3.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
     size: 443906
@@ -116,13 +116,13 @@ arches:
     name: hivex-libs
     evr: 1.3.24-2.el10
     sourcerpm: hivex-1.3.24-2.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/i/intel-gpu-firmware-20260804-23.2.el10_2.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/i/intel-gpu-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 9367746
-    checksum: sha256:a131abe908ae19331a96bdeb5dd6e4bb6750f1605ed0f30e621279ec241a209b
+    size: 9372775
+    checksum: sha256:3611a5ac33013219f94215c69ea315eb4f44b24717569e61086819f218ae961a
     name: intel-gpu-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/i/ipxe-roms-qemu-20240119-5.gitde8a0821.el10.noarch.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
     size: 874350
@@ -389,13 +389,13 @@ arches:
     name: nbdkit-vddk-plugin
     evr: 1.46.2-3.el10_2
     sourcerpm: nbdkit-1.46.2-3.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nvidia-gpu-firmware-20260804-23.2.el10_2.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nvidia-gpu-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 104246107
-    checksum: sha256:ef539533022e0362d96a3d0580a48194cb70c00205883a6ac34e76c6ac84bc0d
+    size: 104251636
+    checksum: sha256:6e8955940591830b31c28c780533a97caf23e6f0d812aa8aae3fbe26983da1b4
     name: nvidia-gpu-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/o/osinfo-db-20250606-2.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
     size: 584561
@@ -410,20 +410,20 @@ arches:
     name: osinfo-db-tools
     evr: 1.11.0-8.el10
     sourcerpm: osinfo-db-tools-1.11.0-8.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/passt-0^20251210.gd04c480-6.el10_2.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/passt-0^20251210.gd04c480-7.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 297952
-    checksum: sha256:8b7f2d970356e6bee2d2aa1b090c92d9ee5fd68ce1b2c2c33f66771f481b67b2
+    size: 298034
+    checksum: sha256:94a50ace0b5cb538e1996389a8488884117eb2d4064a3fb52e12ffe5cec21d3e
     name: passt
-    evr: 0^20251210.gd04c480-6.el10_2
-    sourcerpm: passt-0^20251210.gd04c480-6.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/passt-selinux-0^20251210.gd04c480-6.el10_2.noarch.rpm
+    evr: 0^20251210.gd04c480-7.el10_2
+    sourcerpm: passt-0^20251210.gd04c480-7.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/passt-selinux-0^20251210.gd04c480-7.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 32852
-    checksum: sha256:2b91ac4920719180b38c086f36a05a5d4d56309dbe1f665322e4f993aa3969d8
+    size: 32676
+    checksum: sha256:d00ad1e90fde60b0c7199b5eb4caaf57b6c2406ffa2e6575a2991ca1ae394565
     name: passt-selinux
-    evr: 0^20251210.gd04c480-6.el10_2
-    sourcerpm: passt-0^20251210.gd04c480-6.el10_2.src.rpm
+    evr: 0^20251210.gd04c480-7.el10_2
+    sourcerpm: passt-0^20251210.gd04c480-7.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/pixman-0.43.4-2.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
     size: 294657
@@ -564,13 +564,13 @@ arches:
     name: unbound-libs
     evr: 1.24.2-7.el10_2.6
     sourcerpm: unbound-1.24.2-7.el10_2.6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/v/virt-v2v-2.10.0-23.el10_2.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/v/virt-v2v-2.10.0-24.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 3800979
-    checksum: sha256:35caf09e5ae67d670ee9c1f29cd98983bdf558faf37d51e2928f2b71ef168d88
+    size: 3804824
+    checksum: sha256:df7491e351764057f09253db39bb6b18c8a48e18508809aaf01d96a5beb0cff7
     name: virt-v2v
-    evr: 1:2.10.0-23.el10_2
-    sourcerpm: virt-v2v-2.10.0-23.el10_2.src.rpm
+    evr: 1:2.10.0-24.el10_2
+    sourcerpm: virt-v2v-2.10.0-24.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/v/virtio-win-1.9.58-0.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
     size: 287940012
@@ -585,20 +585,20 @@ arches:
     name: acl
     evr: 2.3.2-4.el10
     sourcerpm: acl-2.3.2-4.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/a/amd-ucode-firmware-20260804-23.2.el10_2.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/a/amd-ucode-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 729041
-    checksum: sha256:85992abf7ea3004e02000dbf2efdfaaf93e36383db34b658257b06f59252e997
+    size: 734044
+    checksum: sha256:5995c83b017d178646df7b773dcb4a05f2682819b3a41f2451993fc2b1dba3fc
     name: amd-ucode-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/a/atheros-firmware-20260804-23.2.el10_2.noarch.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/a/atheros-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 49732894
-    checksum: sha256:fd6c3a41079c46abda33c837cfe3745f75ae4872d4df31248d62d9d1e7751732
+    size: 49772201
+    checksum: sha256:36627d43ca55d1d8a781b8cddb18880731caba941ba15ddc551f01ac3185c0fb
     name: atheros-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/b/binutils-2.41-63.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 6713167
@@ -613,13 +613,13 @@ arches:
     name: binutils-gold
     evr: 2.41-63.el10
     sourcerpm: binutils-2.41-63.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/b/brcmfmac-firmware-20260804-23.2.el10_2.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/b/brcmfmac-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 10144882
-    checksum: sha256:f186739dfce980105fc2b87d9fb0e808566fdb337a45d8c90484cab5cc047352
+    size: 10150055
+    checksum: sha256:a20e96de4e8aeffc71d81bc3255bda081a031276fd60fa0f73b9f974cb9139a0
     name: brcmfmac-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/b/bzip2-1.0.8-25.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 59954
@@ -627,13 +627,13 @@ arches:
     name: bzip2
     evr: 1.0.8-25.el10
     sourcerpm: bzip2-1.0.8-25.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/c/cirrus-audio-firmware-20260804-23.2.el10_2.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/c/cirrus-audio-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 3539326
-    checksum: sha256:f6e795405c210ae7031faca627f3d8a0ba6004aeaf629f8c43a0269c43d1605a
+    size: 3570799
+    checksum: sha256:a82172a76d5efe37202f8eeacd3e082bd5e659c14a1f2276b30c40489fee4e9b
     name: cirrus-audio-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/c/cpio-2.15-3.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 303102
@@ -879,13 +879,13 @@ arches:
     name: inih
     evr: 58-3.el10
     sourcerpm: inih-58-3.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/i/intel-audio-firmware-20260804-23.2.el10_2.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/i/intel-audio-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 3489900
-    checksum: sha256:e1182546ce427924307cb9db0bfad95822e5d8a6f26e1d00bc799ea7649b883d
+    size: 3805723
+    checksum: sha256:0f91918adc1273a785a46b6dd2fb084625da11d2e56f1c8f3a382af80f4602ee
     name: intel-audio-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/i/iproute-tc-6.17.0-2.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 475800
@@ -1012,13 +1012,13 @@ arches:
     name: libbasicobjects
     evr: 0.1.1-58.el10
     sourcerpm: ding-libs-0.6.2-58.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libbrotli-1.1.0-7.el10_1.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libbrotli-1.1.0-8.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 352691
-    checksum: sha256:894800ee7893f8e4aa1d3870afb22b54d92624134bc7cf5d2cdc1a1db92366db
+    size: 359544
+    checksum: sha256:d5aff7d0b4534179a4ecf6b2152d75630dc0682e28ca3a6beeff4fe34e6126fa
     name: libbrotli
-    evr: 1.1.0-7.el10_1
-    sourcerpm: brotli-1.1.0-7.el10_1.src.rpm
+    evr: 1.1.0-8.el10_2
+    sourcerpm: brotli-1.1.0-8.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libcbor-0.11.0-3.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 37307
@@ -1257,20 +1257,20 @@ arches:
     name: libverto-libev
     evr: 0.3.2-10.el10
     sourcerpm: libverto-0.3.2-10.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/linux-firmware-20260804-23.2.el10_2.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/linux-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 66071960
-    checksum: sha256:41251bcbd78799580c7b2ccfb4f1eeae964f2fc0890625cfa6a2cba514fe26af
+    size: 66307899
+    checksum: sha256:be31a1aef6b931dc64303299d77ef03c00ec844183d3c40b4261f3a9419441ab
     name: linux-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/linux-firmware-whence-20260804-23.2.el10_2.noarch.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/linux-firmware-whence-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 147789
-    checksum: sha256:2e63c01642f385b82ebca54b630fa21100f3e2b74824e406b06d7ef84b4bd654
+    size: 153520
+    checksum: sha256:77f1f7868a3f5186f6237218495d4a2b061d7f6f897227b1a1e5380128aef44c
     name: linux-firmware-whence
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/lsscsi-0.32-15.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 66515
@@ -1313,20 +1313,20 @@ arches:
     name: man-db
     evr: 2.12.0-10.el10
     sourcerpm: man-db-2.12.0-10.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/m/mdadm-4.4-3.el10_2.1.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/m/mdadm-4.4-3.el10_2.2.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 465948
-    checksum: sha256:334a4428ccc257ccfde785ffe81cc26deb23387d9df1a7ecb79ca94de6f2dc4c
+    size: 466169
+    checksum: sha256:2618497df2857e0e2044e899140b402fe6b947b942fb5a5aed9fc7fcdecc2ad0
     name: mdadm
-    evr: 4.4-3.el10_2.1
-    sourcerpm: mdadm-4.4-3.el10_2.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/m/mt7xxx-firmware-20260804-23.2.el10_2.noarch.rpm
+    evr: 4.4-3.el10_2.2
+    sourcerpm: mdadm-4.4-3.el10_2.2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/m/mt7xxx-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 34030103
-    checksum: sha256:77cf8254a36a506200e6253a6ff33c452c84a9c1f26d5a7733d0a3786b1de05b
+    size: 34049007
+    checksum: sha256:c968f4e919dfe374bbd69c6425021cd003e2e1cf1f982621742b16f51b6b2041
     name: mt7xxx-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/n/nettle-3.10.1-1.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 576560
@@ -1369,13 +1369,13 @@ arches:
     name: numad
     evr: 0.5-50.20251104git.el10
     sourcerpm: numad-0.5-50.20251104git.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/n/nxpwireless-firmware-20260804-23.2.el10_2.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/n/nxpwireless-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 1701722
-    checksum: sha256:0c5216d59b62de998ffd52675c534cadc0a96fdae7c07b89b09188fe112bb968
+    size: 1706742
+    checksum: sha256:263f9454123bc96e33263d38226897f67a21dc9feb6bf498c3b02553bcc77fa3
     name: nxpwireless-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/o/oniguruma-6.9.9-7.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 224700
@@ -1495,13 +1495,13 @@ arches:
     name: quota-nls
     evr: 1:4.09-10.el10
     sourcerpm: quota-4.09-10.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/r/realtek-firmware-20260804-23.2.el10_2.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/r/realtek-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 6952817
-    checksum: sha256:067374218f4097d5abee9d9882dd13ee2d9d0af84a8a11ffa51c36769e354867
+    size: 6957875
+    checksum: sha256:487bb63b1bc576d0ee203379b102365560d20e08db8a0ed90c9ada72c942b1b1
     name: realtek-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/r/rpcbind-1.2.7-3.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 64011
@@ -1516,20 +1516,20 @@ arches:
     name: rpm-plugin-selinux
     evr: 4.19.1.1-23.el10
     sourcerpm: rpm-4.19.1.1-23.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/s/selinux-policy-42.1.18-4.el10_2.3.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/s/selinux-policy-42.1.18-4.el10_2.4.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 62248
-    checksum: sha256:aba29a2adf524fe433546a8525726c114e97dddafb2a6ae5568c011c177c0524
+    size: 60545
+    checksum: sha256:fd44d1d97bf9969a0f57ef355c9d4d75a673fee4b625469b0137b768400de35b
     name: selinux-policy
-    evr: 42.1.18-4.el10_2.3
-    sourcerpm: selinux-policy-42.1.18-4.el10_2.3.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/s/selinux-policy-targeted-42.1.18-4.el10_2.3.noarch.rpm
+    evr: 42.1.18-4.el10_2.4
+    sourcerpm: selinux-policy-42.1.18-4.el10_2.4.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/s/selinux-policy-targeted-42.1.18-4.el10_2.4.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 6537937
-    checksum: sha256:3fd0fafbda4637b4f9c0923a0699e53a7bf0388f0447f13b3a30100b886e2612
+    size: 6537579
+    checksum: sha256:408432f60b57808e2518bce7930ec02c79fae46de456f2f12d4343871324a26a
     name: selinux-policy-targeted
-    evr: 42.1.18-4.el10_2.3
-    sourcerpm: selinux-policy-42.1.18-4.el10_2.3.src.rpm
+    evr: 42.1.18-4.el10_2.4
+    sourcerpm: selinux-policy-42.1.18-4.el10_2.4.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/s/snappy-1.1.10-7.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 41519
@@ -1551,13 +1551,13 @@ arches:
     name: systemd-udev
     evr: 257-23.el10_2.1
     sourcerpm: systemd-257-23.el10_2.1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/t/tiwilink-firmware-20260804-23.2.el10_2.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/t/tiwilink-firmware-20260827-23.3.el10_2.noarch.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 4922958
-    checksum: sha256:48a6290059e4e26ef5e896876c5042afc1ff98e30c2affbc5424383ee285facd
+    size: 4927976
+    checksum: sha256:11ac85e0eb94260cdc326d5267467205d76b2d5b2b0036ab22beae5690e019ed
     name: tiwilink-firmware
-    evr: 20260804-23.2.el10_2
-    sourcerpm: linux-firmware-20260804-23.2.el10_2.src.rpm
+    evr: 20260827-23.3.el10_2
+    sourcerpm: linux-firmware-20260827-23.3.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/t/tpm2-tools-5.7-5.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 880675
@@ -1788,12 +1788,12 @@ arches:
     checksum: sha256:e5fbded24638979575468af8ece2a9f37076707fe919f6af5feaf0ad5373f3ce
     name: osinfo-db-tools
     evr: 1.11.0-8.el10
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/p/passt-0^20251210.gd04c480-6.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/p/passt-0^20251210.gd04c480-7.el10_2.src.rpm
     repoid: rhel-10-for-x86_64-appstream-source-rpms
-    size: 355938
-    checksum: sha256:2e9f1514be074f3e5c31e4e7669ae4c523ff9f7ab07182c070969fee5258bc83
+    size: 357441
+    checksum: sha256:66588690dc0c28df0a32850629705fef41fafa281d853a5dfe3a81cee819cd60
     name: passt
-    evr: 0^20251210.gd04c480-6.el10_2
+    evr: 0^20251210.gd04c480-7.el10_2
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/p/pixman-0.43.4-2.el10.src.rpm
     repoid: rhel-10-for-x86_64-appstream-source-rpms
     size: 663084
@@ -1842,12 +1842,12 @@ arches:
     checksum: sha256:248a822c13280302e7f081df70f5efaeb10b1aedfd1e54d1ae7240e1ab6c6b7b
     name: unbound
     evr: 1.24.2-7.el10_2.6
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/v/virt-v2v-2.10.0-23.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/v/virt-v2v-2.10.0-24.el10_2.src.rpm
     repoid: rhel-10-for-x86_64-appstream-source-rpms
-    size: 7509853
-    checksum: sha256:9839eea20f2aa75ecfc4a25d8f9b7922fc0e51bcb36906d19443705c5402c52d
+    size: 7511675
+    checksum: sha256:08628a8fb914fc0273ae0fc89a56d529faaa03371be6ab62a7c42c5a0651f498
     name: virt-v2v
-    evr: 1:2.10.0-23.el10_2
+    evr: 1:2.10.0-24.el10_2
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/v/virtio-win-1.9.58-0.el10_2.src.rpm
     repoid: rhel-10-for-x86_64-appstream-source-rpms
     size: 261947531
@@ -1872,12 +1872,12 @@ arches:
     checksum: sha256:6f5d62ce38d5f0a6b3dfd107e453ffc05a1bdaf18f13a130303593cb50a7d5b0
     name: binutils
     evr: 2.41-63.el10
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/b/brotli-1.1.0-7.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/b/brotli-1.1.0-8.el10_2.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
-    size: 541502
-    checksum: sha256:3c06552ab1d70705a78107ccc980ce9043793c4bb0fd945962e023f1c6e41141
+    size: 549818
+    checksum: sha256:3c8cd9269c0c62e46e70d9ac08c9d03692d045190be328b2a60dd9281e8e6c28
     name: brotli
-    evr: 1.1.0-7.el10_1
+    evr: 1.1.0-8.el10_2
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/b/bzip2-1.0.8-25.el10.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
     size: 853873
@@ -2262,12 +2262,12 @@ arches:
     checksum: sha256:3eb6dab92ac6918566b6499e71c46af6d70ebe6ca121fe0504aa08ff420c6484
     name: libxcrypt
     evr: 4.4.36-10.el10
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/linux-firmware-20260804-23.2.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/linux-firmware-20260827-23.3.el10_2.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
-    size: 648153880
-    checksum: sha256:ad2ff052efda2c96327f3c8c38a571d5b523ea68c971d1967e207de149e199c6
+    size: 652380408
+    checksum: sha256:49b0663d60ed7e22adab43435cbd1cc18cb34e570439f707b3e92fdf98653e4f
     name: linux-firmware
-    evr: 20260804-23.2.el10_2
+    evr: 20260827-23.3.el10_2
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/lsscsi-0.32-15.el10.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
     size: 222631
@@ -2298,12 +2298,12 @@ arches:
     checksum: sha256:ab20209daa232130573c123e50c5272bcfac6dc462edded31399f4ec9f1f0e49
     name: man-db
     evr: 2.12.0-10.el10
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/m/mdadm-4.4-3.el10_2.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/m/mdadm-4.4-3.el10_2.2.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
-    size: 834376
-    checksum: sha256:30ceccfdc97e790abaed3c81b9f711cc1edb454790287b18bbe3b37bbd8e55ea
+    size: 835704
+    checksum: sha256:6dbdc948c7fc38b31e701e1d0a834217b19a75bd9c72a2d593381828f2e493c3
     name: mdadm
-    evr: 4.4-3.el10_2.1
+    evr: 4.4-3.el10_2.2
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/n/nettle-3.10.1-1.el10.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
     size: 4767480
@@ -2430,12 +2430,12 @@ arches:
     checksum: sha256:d50ad8dbd7a06cae6c068ed5a695f5e433ce7cbaacb273d6bd7dac09bb126322
     name: rpm
     evr: 4.19.1.1-23.el10
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/s/selinux-policy-42.1.18-4.el10_2.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/s/selinux-policy-42.1.18-4.el10_2.4.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
-    size: 1304975
-    checksum: sha256:590936752e1aaa45e8d49badf85d93328c2ec7245c6f251b4e862211fa85c5f4
+    size: 1303755
+    checksum: sha256:7e36b3cb7125126cfa75421fcf2f4fabcc90a7b45673ca3c971e47d359572d47
     name: selinux-policy
-    evr: 42.1.18-4.el10_2.3
+    evr: 42.1.18-4.el10_2.4
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/s/setools-4.6.0-3.el10.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
     size: 392973
