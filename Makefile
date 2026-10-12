@@ -290,9 +290,12 @@ manifests: controller-gen ## Generate CRD and webhook manifests
 
 .PHONY: generate-csv
 generate-csv: operator-sdk ## Generate CSV specDescriptors from Go markers
-	cd operator && $(OPERATOR_SDK) generate kustomize manifests \
+	cd operator && \
+	sed -i 's/$${VERSION}/$(VERSION)/g' config/manifests/bases/forklift-operator.clusterserviceversion.yaml && \
+	$(OPERATOR_SDK) generate kustomize manifests \
 		--plugins go.kubebuilder.io/v4 --package $(OPERATOR_NAME) \
-		--apis-dir ../pkg/apis --interactive=false -q
+		--apis-dir ../pkg/apis --interactive=false -q && \
+	sed -i 's/$(subst .,\.,$(VERSION))/$${VERSION}/g' config/manifests/bases/forklift-operator.clusterserviceversion.yaml
 
 MANIFEST_VARS = $${CSV_NAME} $${CSV_DISPLAYNAME} $${NAMESPACE} $${CSV_CERTIFIED} $${CSV_SUPPORT} $${MAINTAINER_NAME} $${MAINTAINER_EMAIL} $${PROVIDER} $${DOCS_LINK_NAME} $${DOCS_LINK_URL}
 
