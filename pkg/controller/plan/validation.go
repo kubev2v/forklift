@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -166,6 +167,7 @@ const (
 
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
+	start := time.Now()
 	// Provider.
 	pv := validation.ProviderPair{Client: r}
 	conditions, err := pv.Validate(plan.Spec.Provider)
@@ -209,6 +211,8 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	if err != nil {
 		return err
 	}
+	ctx.Source.Inventory = web.NewCachingClient(ctx.Source.Inventory)
+	ctx.Destination.Inventory = web.NewCachingClient(ctx.Destination.Inventory)
 
 	if err = r.validateUserDefinedNetwork(ctx); err != nil {
 		return err
@@ -285,7 +289,33 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		r.Log.V(1).Info("Failed to validate pod security policies", "error", err)
 	}
 
+	r.logValidateInventoryCache(plan, ctx)
+	r.Log.Info(
+		"Plan validate timing",
+		"plan", plan.Name,
+		"vmCount", len(plan.Spec.VMs),
+		"duration", time.Since(start))
+
 	return nil
+}
+
+func (r *Reconciler) logValidateInventoryCache(plan *api.Plan, ctx *plancontext.Context) {
+	if cached, ok := ctx.Source.Inventory.(*web.CachingClient); ok {
+		r.Log.Info(
+			"Inventory cache stats",
+			"phase", "plan validate",
+			"plan", plan.Name,
+			"inventory", "source",
+			"stats", cached.Stats())
+	}
+	if cached, ok := ctx.Destination.Inventory.(*web.CachingClient); ok {
+		r.Log.Info(
+			"Inventory cache stats",
+			"phase", "plan validate",
+			"plan", plan.Name,
+			"inventory", "destination",
+			"stats", cached.Stats())
+	}
 }
 
 func (r *Reconciler) validateVolumeNameTemplate(plan *api.Plan) error {
@@ -720,6 +750,7 @@ func aggregateWarningConcerns(v interface{}, vmRef string, unsupportedOVFExportS
 
 // Validate listed VMs.
 func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error {
+	start := time.Now()
 	if plan.Status.HasCondition(Executing) {
 		return nil
 	}
@@ -1485,6 +1516,12 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	if len(independentDiskWarning.Items) > 0 {
 		plan.Status.SetCondition(independentDiskWarning)
 	}
+
+	r.Log.Info(
+		"Plan validate VM timing",
+		"plan", plan.Name,
+		"vmCount", len(plan.Spec.VMs),
+		"duration", time.Since(start))
 
 	return nil
 }
