@@ -1,0 +1,34 @@
+packages:
+  - qemu-img
+  - libguestfs-tools
+  - libguestfs-xfs
+  - libguestfs
+  - guestfs-tools
+  - catatonit
+  - open-vm-tools
+  - podman
+  - containernetworking-plugins
+  # needed for installroot
+  - systemd
+  - glibc
+  - sed
+  - tar
+  - grep
+  - which
+  - util-linux
+  - fuse3
+  - xmlsec1-openssl
+  - pciutils
+  - openssl-libs
+  - dbus-tools
+  - iproute
+  - gpgme-devel
+  - libseccomp
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+context:
+  containerfile:
+    file: ../../../build/copy-appliance-template/Containerfile-downstream
+    stageName: runtime
+arches: [x86_64]
