@@ -58,6 +58,9 @@ const (
 	CloneMethodSSH CloneMethod = "ssh"
 	// CloneMethodVIB uses VIB to perform cloning operations
 	CloneMethodVIB CloneMethod = "vib"
+	// CloneMethodAPI uses VirtualDiskManager.CopyVirtualDisk against the ESXi
+	// host SDK, requiring neither the VIB nor SSH access.
+	CloneMethodAPI CloneMethod = "api"
 )
 
 type vmkfstoolsTask struct {
@@ -81,7 +84,35 @@ type RemoteEsxcliPopulator struct {
 	SSHPrivateKey []byte
 	SSHPublicKey  []byte
 	UseSSHMethod  bool
-	copyCtx       CopyContext
+	// APIConfig holds the ESXi host credentials for the API method. Non-nil only
+	// when the clone method is "api".
+	APIConfig *APIConfig
+	copyCtx   CopyContext
+}
+
+// APIConfig carries what the API clone method needs that the other methods do
+// not: a direct login to the ESXi host performing the copy. Going through
+// vCenter would copy the data without offloading to XCOPY.
+type APIConfig struct {
+	// HostAddress is the Host CR's spec.ipAddress.
+	HostAddress string
+	Username    string
+	Password    string
+	// DescriptorName names the transient RDM mapping file; derived from the
+	// populator CR so it is stable per disk and unique between disks.
+	DescriptorName string
+}
+
+// method returns the clone method this populator was built for.
+func (p *RemoteEsxcliPopulator) method() CloneMethod {
+	switch {
+	case p.APIConfig != nil:
+		return CloneMethodAPI
+	case p.UseSSHMethod:
+		return CloneMethodSSH
+	default:
+		return CloneMethodVIB
+	}
 }
 
 func (p *RemoteEsxcliPopulator) GetCopyContext() CopyContext {
@@ -93,6 +124,22 @@ func NewWithRemoteEsxcli(storageApi VMDKCapable, vmwareClient vmware.Client, cop
 		VSphereClient: vmwareClient,
 		StorageApi:    storageApi,
 		UseSSHMethod:  false, // VIB method
+		copyCtx:       copyCtx,
+	}, nil
+}
+
+func NewWithRemoteEsxcliAPI(storageApi VMDKCapable, vmwareClient vmware.Client, copyCtx CopyContext, apiConfig *APIConfig) (Populator, error) {
+	if apiConfig == nil {
+		return nil, fmt.Errorf("api clone method requires ESXi host credentials")
+	}
+	if apiConfig.HostAddress == "" || apiConfig.Username == "" || apiConfig.Password == "" {
+		return nil, fmt.Errorf(
+			"api clone method requires a Host CR with spec.ipAddress and a secret with user and password")
+	}
+	return &RemoteEsxcliPopulator{
+		VSphereClient: vmwareClient,
+		StorageApi:    storageApi,
+		APIConfig:     apiConfig,
 		copyCtx:       copyCtx,
 	}, nil
 }
@@ -133,12 +180,7 @@ func (p *RemoteEsxcliPopulator) Populate(ctx context.Context, vmId string, migra
 		return err
 	}
 
-	var cloneMethod CloneMethod
-	if p.UseSSHMethod {
-		cloneMethod = CloneMethodSSH
-	} else {
-		cloneMethod = CloneMethodVIB
-	}
+	cloneMethod := p.method()
 	setupLog.Info("VMDK/Xcopy populate started", "method", cloneMethod, "source", sourceVMDKFile, "target", pv.Name)
 
 	setupCtx := klog.NewContext(ctx, setupLog)
@@ -156,7 +198,7 @@ func (p *RemoteEsxcliPopulator) Populate(ctx context.Context, vmId string, migra
 	}
 	setupLog.Info("ESXi host", "host", host.String())
 
-	if !p.UseSSHMethod {
+	if cloneMethod == CloneMethodVIB {
 		vibVersion, vibErr := validateVibVersion(setupCtx, p.VSphereClient, host)
 		p.copyCtx.VibVersion = vibVersion
 		if vibErr != nil {
@@ -295,7 +337,22 @@ func (p *RemoteEsxcliPopulator) Populate(ctx context.Context, vmId string, migra
 
 	// Execute the clone using the unified task handling approach
 	var executor TaskExecutor
-	if p.UseSSHMethod {
+	if cloneMethod == CloneMethodAPI {
+		// The copy must be issued against the host's own SDK endpoint; the same
+		// call made through vCenter does not offload to XCOPY.
+		hostClient, err := vmware.NewHostClient(
+			klog.NewContext(ctx, setupLog),
+			p.APIConfig.HostAddress,
+			p.APIConfig.Username,
+			p.APIConfig.Password)
+		if err != nil {
+			return fmt.Errorf("failed to connect to ESXi host SDK at %s: %w", p.APIConfig.HostAddress, err)
+		}
+		defer hostClient.Close(context.Background())
+		setupLog.Info("connected to ESXi host SDK", "address", p.APIConfig.HostAddress)
+
+		executor = NewAPITaskExecutor(hostClient, p.APIConfig.DescriptorName)
+	} else if p.UseSSHMethod {
 		sshSetupCtx := klog.NewContext(ctx, setupLog)
 
 		// Get host IP (needed for SSH version check and connection)

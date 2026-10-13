@@ -109,6 +109,13 @@ const (
 const (
 	ESXiCloneMethodVIB = "vib"
 	ESXiCloneMethodSSH = "ssh"
+	// ESXiCloneMethodAPI performs the clone with the vSphere
+	// VirtualDiskManager.CopyVirtualDisk API instead of vmkfstools, removing the
+	// need for the VIB or SSH access. The call must be issued against the ESXi
+	// host SDK directly -- going through vCenter copies the data but does not
+	// offload to VAAI XCOPY -- so it requires a Host CR with credentials for the
+	// host performing the copy.
+	ESXiCloneMethodAPI = "api"
 )
 
 // Hyper-V management type setting key and values.
