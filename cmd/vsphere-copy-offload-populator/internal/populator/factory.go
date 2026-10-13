@@ -22,6 +22,13 @@ type SSHConfig struct {
 	PublicKey  []byte
 }
 
+// CloneConfig selects how the VMDK/Xcopy populator issues the clone. At most one
+// of SSH or API is set; both nil means the VIB method.
+type CloneConfig struct {
+	SSH *SSHConfig
+	API *APIConfig
+}
+
 // NewPopulator creates a Populator with an embedded CopyContext describing how the
 // copy will be performed (clone method, source disk sizes). StorageProtocol is
 // detected by the populator during Populate() and available via GetCopyContext().
@@ -32,7 +39,7 @@ func NewPopulator(
 	vspherePassword string,
 	vmId string,
 	vmdkPath string,
-	sshConfig *SSHConfig,
+	cloneConfig CloneConfig,
 ) (Populator, error) {
 	// Create vSphere client for type detection
 	vsphereClient, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
@@ -64,7 +71,7 @@ func NewPopulator(
 	}
 
 	log.Info("using VMDK/Xcopy populator")
-	return createVMDKPopulator(storageApi, vsphereClient, sshConfig, sourceDiskCap, sourceDatastoreAlloc)
+	return createVMDKPopulator(storageApi, vsphereClient, cloneConfig, sourceDiskCap, sourceDatastoreAlloc)
 }
 
 // fetchDiskInfo retrieves provisioned capacity, datastore-allocated bytes, and disk
@@ -114,27 +121,36 @@ func createRDMPopulator(storageApi StorageApi, vmwareClient vmware.Client, sourc
 }
 
 // createVMDKPopulator creates VMDK/Xcopy populator (default/fallback)
-func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshConfig *SSHConfig, sourceDiskCap, sourceDatastoreAlloc int64) (Populator, error) {
+func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, cloneConfig CloneConfig, sourceDiskCap, sourceDatastoreAlloc int64) (Populator, error) {
 	vmdkApi, ok := storageApi.(VMDKCapable)
 	if !ok {
 		return nil, fmt.Errorf("storage API does not implement VMDKCapable (required)")
 	}
 
-	cloneMethod := "vib"
-	if sshConfig != nil && sshConfig.UseSSH {
-		cloneMethod = "ssh"
+	useSSH := cloneConfig.SSH != nil && cloneConfig.SSH.UseSSH
+	useAPI := cloneConfig.API != nil
+
+	cloneMethod := CloneMethodVIB
+	switch {
+	case useAPI:
+		cloneMethod = CloneMethodAPI
+	case useSSH:
+		cloneMethod = CloneMethodSSH
 	}
-	copyCtx := CopyContext{CloneMethod: cloneMethod, SourceDiskCapacityBytes: sourceDiskCap, SourceDiskDatastoreAllocatedBytes: sourceDatastoreAlloc}
+	copyCtx := CopyContext{CloneMethod: string(cloneMethod), SourceDiskCapacityBytes: sourceDiskCap, SourceDiskDatastoreAllocatedBytes: sourceDatastoreAlloc}
 
 	var pop Populator
 	var err error
-	if sshConfig != nil && sshConfig.UseSSH {
+	switch cloneMethod {
+	case CloneMethodAPI:
+		pop, err = NewWithRemoteEsxcliAPI(vmdkApi, vmwareClient, copyCtx, cloneConfig.API)
+	case CloneMethodSSH:
 		pop, err = NewWithRemoteEsxcliSSH(vmdkApi,
 			vmwareClient,
 			copyCtx,
-			sshConfig.PrivateKey,
-			sshConfig.PublicKey)
-	} else {
+			cloneConfig.SSH.PrivateKey,
+			cloneConfig.SSH.PublicKey)
+	default:
 		pop, err = NewWithRemoteEsxcli(vmdkApi, vmwareClient, copyCtx)
 	}
 

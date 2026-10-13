@@ -280,6 +280,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	// Validate ESXi host credentials for plans using xcopy with the api clone method
+	if err = r.validateHostCredentials(ctx); err != nil {
+		return err
+	}
+
 	// Validate conversion temp storage configuration
 	if err = r.validateConversionTempStorage(plan); err != nil {
 		return err
