@@ -2,6 +2,7 @@ package builder
 
 import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	core "k8s.io/api/core/v1"
 )
 
@@ -11,7 +12,7 @@ import (
 // the conversion method (disk-based in-place conversion for Azure).
 func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) ([]core.EnvVar, error) {
 	return []core.EnvVar{
-		{Name: "V2V_source", Value: "azure"},
-		{Name: "V2V_vmName", Value: vmRef.Name},
+		{Name: v2vconfig.EnvSourceName, Value: "azure"},
+		{Name: v2vconfig.EnvVmNameName, Value: vmRef.Name},
 	}, nil
 }
