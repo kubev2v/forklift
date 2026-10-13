@@ -392,6 +392,12 @@ func (r *Migration) Archive() {
 			return false
 		}
 		_ = r.cleanup(vm, dontFailOnError, true)
+		if err := r.kubevirt.DeleteHookJobs(vm); err != nil {
+			r.Log.Error(liberr.Wrap(err),
+				"Couldn't delete hook jobs while archiving plan.",
+				"vm",
+				vm.String())
+		}
 		r.migrator.Complete(vm)
 	}
 }
@@ -558,10 +564,6 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, force
 	}
 	r.Log.Info("Deleting config maps.", "vm", vm.String())
 	if err := r.kubevirt.DeleteConfigMap(vm); failOnErr(err) {
-		return err
-	}
-	r.Log.Info("Deleting hook jobs.", "vm", vm.String())
-	if err := r.kubevirt.DeleteHookJobs(vm); failOnErr(err) {
 		return err
 	}
 	if err := r.kubevirt.DeleteWaitForRebootPod(vm); failOnErr(err) {
