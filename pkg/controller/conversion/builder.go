@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	"github.com/kubev2v/forklift/pkg/settings"
+	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -107,7 +108,7 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 	}
 
 	if inPlace {
-		environment = append(environment, core.EnvVar{Name: "V2V_inPlace", Value: "1"})
+		environment = append(environment, core.EnvVar{Name: v2vconfig.EnvInPlaceName, Value: "1"})
 	}
 
 	initContainers := append([]core.Container(nil), cfg.ExtraInitContainers...)
@@ -452,54 +453,54 @@ func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) (
 
 	if settings.Settings.VirtV2vMemSize > 0 {
 		env = append(env, core.EnvVar{
-			Name:  "V2V_memSize",
+			Name:  v2vconfig.EnvMemSizeName,
 			Value: strconv.Itoa(settings.Settings.VirtV2vMemSize),
 		})
 	}
 	if settings.Settings.VirtV2vSmp > 0 {
 		env = append(env, core.EnvVar{
-			Name:  "V2V_smp",
+			Name:  v2vconfig.EnvSmpName,
 			Value: strconv.Itoa(settings.Settings.VirtV2vSmp),
 		})
 	}
 	if settings.Settings.VsphereVmwareDriverRemoval {
 		env = append(env,
 			core.EnvVar{
-				Name:  "V2V_vsphereVmwareDriverRemoval",
+				Name:  v2vconfig.EnvVsphereVmwareDriverRemovalName,
 				Value: "true",
 			})
 	}
 	if b.Config.XfsCompatibility {
 		env = append(env,
 			core.EnvVar{
-				Name:  "V2V_xfsCompatibility",
+				Name:  v2vconfig.EnvXfsCompatibilityName,
 				Value: "true",
 			})
 	}
 	if settings.Settings.XfsRepairIgnore {
 		env = append(env,
 			core.EnvVar{
-				Name:  "V2V_xfsRepairIgnore",
+				Name:  v2vconfig.EnvXfsRepairIgnoreName,
 				Value: "true",
 			})
 	}
 	if settings.Settings.WindowsRegistryNetworkConfig {
 		env = append(env,
 			core.EnvVar{
-				Name:  "V2V_windowsRegistryNetworkConfig",
+				Name:  v2vconfig.EnvWindowsRegistryNetworkConfigName,
 				Value: "true",
 			})
 	}
 	if settings.Settings.WindowsWaitForReboot {
 		env = append(env,
 			core.EnvVar{
-				Name:  "V2V_waitForGuestReboot",
+				Name:  v2vconfig.EnvWaitForGuestRebootName,
 				Value: "true",
 			})
 	}
 
 	env = append(env, core.EnvVar{
-		Name:  "LOCAL_MIGRATION",
+		Name:  v2vconfig.EnvLocalMigrationName,
 		Value: strconv.FormatBool(b.Config.LocalMigration),
 	})
 	env = b.appendDiskEncryptionEnv(env)
@@ -512,7 +513,7 @@ func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) (
 // var is needed.
 func (b *Builder) appendDiskEncryptionEnv(env []core.EnvVar) []core.EnvVar {
 	if b.Config.DiskEncryption != nil && b.Config.DiskEncryption.Type == api.DiskEncryptionTypeClevis {
-		env = append(env, core.EnvVar{Name: "V2V_NBDE_CLEVIS", Value: "true"})
+		env = append(env, core.EnvVar{Name: v2vconfig.EnvNbdeClevis, Value: "true"})
 	}
 	return env
 }

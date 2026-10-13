@@ -16,6 +16,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
@@ -582,9 +583,9 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	}
 
 	env = append(env,
-		core.EnvVar{Name: "V2V_vmName", Value: vm.Name},
-		core.EnvVar{Name: "V2V_source", Value: "hyperv"},
-		core.EnvVar{Name: "V2V_diskPath", Value: strings.Join(diskPaths, ",")},
+		core.EnvVar{Name: v2vconfig.EnvVmNameName, Value: vm.Name},
+		core.EnvVar{Name: v2vconfig.EnvSourceName, Value: "hyperv"},
+		core.EnvVar{Name: v2vconfig.EnvDiskPathName, Value: strings.Join(diskPaths, ",")},
 	)
 
 	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
@@ -592,12 +593,12 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		macsToIps := r.mapMacStaticIps(vm, modeByMAC)
 		if macsToIps != "" {
 			env = append(env,
-				core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps},
+				core.EnvVar{Name: v2vconfig.EnvStaticIPsName, Value: macsToIps},
 			)
 		}
 		if hasMultipleStaticIPsPerNIC(vm, modeByMAC) {
 			env = append(env, core.EnvVar{
-				Name:  "V2V_multipleIPsPerNic",
+				Name:  v2vconfig.EnvMultipleIpsPerNicName,
 				Value: "true",
 			})
 		}

@@ -19,6 +19,7 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	"github.com/kubev2v/forklift/pkg/settings"
+	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	cnv "kubevirt.io/api/core/v1"
@@ -88,15 +89,15 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	env = append(
 		env,
 		core.EnvVar{
-			Name:  "V2V_vmName",
+			Name:  v2vconfig.EnvVmNameName,
 			Value: vm.Name,
 		},
 		core.EnvVar{
-			Name:  "V2V_diskPath",
+			Name:  v2vconfig.EnvDiskPathName,
 			Value: getDiskSourcePath(vm.OvfPath),
 		},
 		core.EnvVar{
-			Name:  "V2V_source",
+			Name:  v2vconfig.EnvSourceName,
 			Value: "ova",
 		})
 
