@@ -156,6 +156,7 @@ const (
 	fGuestDisk                = "guest.disk"
 	fGuestIpStack             = "guest.ipStack"
 	fHostName                 = "guest.hostName"
+	fGuestTimezone            = "guest.timeZone"
 	// fToolsStatus is deprecated since vSphere API 4.0; use fToolsRunningStatus instead
 	fToolsStatus        = "guest.toolsStatus"
 	fToolsRunningStatus = "guest.toolsRunningStatus"
@@ -1115,6 +1116,7 @@ func (r *Collector) vmPathSet() []string {
 		fChangeTracking,
 		fGuestIpStack,
 		fHostName,
+		fGuestTimezone,
 		fToolsStatus,
 		fToolsRunningStatus,
 		fToolsVersionStatus,
