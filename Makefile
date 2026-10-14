@@ -467,10 +467,24 @@ push-vsphere-copy-offload-populator-image: build-vsphere-copy-offload-populator-
 	$(CONTAINER_CMD) push $(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
 
 build-copy-appliance-template-builder-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE)$(PLATFORM_SUFFIX) -f build/copy-appliance-template/Containerfile.builder .
+	# libguestfs appliance generation is AMD64-only
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: copy-appliance-template-builder image build is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping copy-appliance-template-builder image build."; \
+	else \
+		$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) \
+			--build-arg USE_BSDTAR=$$([ "$$(uname -s)" = Darwin ] && echo true || echo false) \
+			-t $(COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE)$(PLATFORM_SUFFIX) \
+			-f build/copy-appliance-template/Containerfile.builder .; \
+	fi
 
 push-copy-appliance-template-builder-image: build-copy-appliance-template-builder-image
-	$(CONTAINER_CMD) push $(COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE)$(PLATFORM_SUFFIX)
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: copy-appliance-template-builder image push is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping copy-appliance-template-builder image push."; \
+	else \
+		$(CONTAINER_CMD) push $(COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE)$(PLATFORM_SUFFIX); \
+	fi
 
 build-nbd-container-image: check_container_runtime ## Build nbdkit container image loaded onto copy appliances
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(NBD_CONTAINER_IMAGE)$(PLATFORM_SUFFIX) -f build/nbd-container/Containerfile .

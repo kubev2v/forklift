@@ -7,6 +7,15 @@ RUN dnf install -y --setopt=install_weak_deps=False \
         supermin \
     && dnf clean all
 
+# supermin extracts its base image by calling tar. GNU tar 1.35 uses openat2,
+# which Rosetta returns as ENOSYS when this amd64 image is built on a Mac.
+ARG USE_BSDTAR=false
+RUN if [ "$USE_BSDTAR" = true ]; then \
+        dnf install -y --setopt=install_weak_deps=False bsdtar \
+        && ln -sf /usr/bin/bsdtar /usr/bin/tar \
+        && dnf clean all; \
+    fi
+
 RUN mkdir -p /usr/lib64/guestfs/appliance && \
     cd /usr/lib64/guestfs/appliance && \
     LIBGUESTFS_BACKEND=direct libguestfs-make-fixed-appliance . && \
