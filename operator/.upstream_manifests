@@ -14037,6 +14037,8 @@ spec:
           value: ${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}
         - name: COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE
           value: ${COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE}
+        - name: NBD_CONTAINER_IMAGE
+          value: ${COPY_APPLIANCE_CONTAINER_IMAGE}
         image: ${OPERATOR_IMAGE}
         imagePullPolicy: Always
         livenessProbe:
