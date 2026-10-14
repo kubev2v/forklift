@@ -158,17 +158,22 @@ type VMSerialPort struct {
 	IsConnected bool `json:"is_connected"`
 }
 
+type VMNICIPEndpoint struct {
+	IP                 string   `json:"ip"`
+	IPType             string   `json:"ip_type"`
+	PrefixLength       int      `json:"prefix_length"`
+	GatewayAddressList []string `json:"gateway_address_list"`
+}
+
 type VMNIC struct {
-	IPEndpointList []struct {
-		IP string `json:"ip"`
-	} `json:"ip_endpoint_list"`
-	IsConnected     bool   `json:"is_connected"`
-	MACAddress      string `json:"mac_address"`
-	Model           string `json:"model"`
-	NicType         string `json:"nic_type"`
-	SubnetReference Ref    `json:"subnet_reference"`
-	UUID            string `json:"uuid"`
-	VlanMode        string `json:"vlan_mode"`
+	IPEndpointList  []VMNICIPEndpoint `json:"ip_endpoint_list"`
+	IsConnected     bool              `json:"is_connected"`
+	MACAddress      string            `json:"mac_address"`
+	Model           string            `json:"model"`
+	NicType         string            `json:"nic_type"`
+	SubnetReference Ref               `json:"subnet_reference"`
+	UUID            string            `json:"uuid"`
+	VlanMode        string            `json:"vlan_mode"`
 }
 
 type VMDisk struct {
