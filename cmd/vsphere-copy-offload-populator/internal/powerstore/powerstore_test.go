@@ -75,6 +75,69 @@ func newMappingContext(hostID, logicalName, realName string) populator.MappingCo
 	}
 }
 
+func TestPowerstoreAPIEndpoint(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:  "bare host defaults to HTTPS",
+			input: "powerstore.example.com",
+			want:  "https://powerstore.example.com/api/rest",
+		},
+		{
+			name:  "bare host preserves port",
+			input: "powerstore.example.com:8443",
+			want:  "https://powerstore.example.com:8443/api/rest",
+		},
+		{
+			name:  "HTTP URL gets API path",
+			input: "http://powerstore.example.com",
+			want:  "http://powerstore.example.com/api/rest",
+		},
+		{
+			name:  "HTTPS URL gets API path",
+			input: "https://powerstore.example.com",
+			want:  "https://powerstore.example.com/api/rest",
+		},
+		{
+			name:  "existing API path is preserved",
+			input: "https://powerstore.example.com/api/rest",
+			want:  "https://powerstore.example.com/api/rest",
+		},
+		{
+			name:    "unsupported scheme is rejected",
+			input:   "ftp://powerstore.example.com",
+			wantErr: true,
+		},
+		{
+			name:    "missing host is rejected",
+			input:   "https:///api/rest",
+			wantErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := powerstoreAPIEndpoint(test.input)
+			if test.wantErr {
+				if err == nil {
+					t.Fatal("expected an error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != test.want {
+				t.Errorf("powerstoreAPIEndpoint(%q) = %q, want %q", test.input, got, test.want)
+			}
+		})
+	}
+}
+
 func TestMap(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
