@@ -13487,6 +13487,12 @@ rules:
   - list
   - watch
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - networks
+  verbs:
+  - get
+- apiGroups:
   - batch
   resources:
   - jobs
