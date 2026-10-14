@@ -168,8 +168,9 @@ type networkResources struct {
 	IPConfig struct {
 		DefaultGatewayIP string `json:"default_gateway_ip"`
 		DHCPOptions      struct {
-			DHCPServerAddress string `json:"dhcp_server_address"`
-			DomainName        string `json:"domain_name"`
+			DHCPServerAddress    string   `json:"dhcp_server_address"`
+			DomainName           string   `json:"domain_name"`
+			DomainNameServerList []string `json:"domain_name_server_list"`
 		} `json:"dhcp_options"`
 		PoolList []struct {
 			Range string `json:"range"`
@@ -200,6 +201,7 @@ func (e *networkEntity) ApplyTo(m *model.Network) {
 	m.DefaultGateway = ipConfig.DefaultGatewayIP
 	m.DHCPServerIP = ipConfig.DHCPOptions.DHCPServerAddress
 	m.DHCPDomainName = ipConfig.DHCPOptions.DomainName
+	m.DNSServers = strings.Join(ipConfig.DHCPOptions.DomainNameServerList, ",")
 
 	ranges := make([]string, 0, len(ipConfig.PoolList))
 	for _, pool := range ipConfig.PoolList {

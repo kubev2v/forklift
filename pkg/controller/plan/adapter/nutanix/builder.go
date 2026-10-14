@@ -1028,7 +1028,74 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, _ *core.Secret) (env []core.EnvV
 		return
 	}
 	env = append(env, core.EnvVar{Name: "V2V_vmName", Value: vm.Name})
+
+	staticIPs, staticErr := r.mapMacStaticIps(vm)
+	if staticErr != nil {
+		err = staticErr
+		return
+	}
+	if staticIPs != "" {
+		env = append(env, core.EnvVar{Name: "V2V_staticIPs", Value: staticIPs})
+	}
+
 	return
+}
+
+// nicPreservesStaticIP returns true when the NIC's static IP should be passed
+// to virt-v2v. The NetworkMap pair's networkIPMode overrides the plan-level
+// preserveStaticIPs flag; when no matching pair exists, the flag wins.
+func nicPreservesStaticIP(nic model.NIC, ctx *plancontext.Context) bool {
+	if ctx.Map.Network != nil {
+		for _, pair := range ctx.Map.Network.Spec.Map {
+			if pair.Source.ID == nic.SubnetUUID {
+				if pair.Destination.Type == planbase.Ignored {
+					return false
+				}
+				if pair.NetworkIPMode != "" {
+					return pair.NetworkIPMode == api.NetworkIPModePreserve
+				}
+				break
+			}
+		}
+	}
+	return ctx.Plan.Spec.PreserveStaticIPs
+}
+
+// mapMacStaticIps builds the V2V_staticIPs value for virt-v2v's --mac flag.
+// For each NIC that has IP addresses, it looks up the subnet to obtain the
+// default gateway, prefix length, and DNS servers, then formats each IP as:
+//
+//	<MAC>:ip:<IP>,<Gateway>,<PrefixLength>,<DNS1>,<DNS2>,...
+//
+// Multiple entries are joined with "_". Returns an error if a NIC's subnet
+// cannot be found in inventory.
+func (r *Builder) mapMacStaticIps(vm *model.VM) (string, error) {
+	var entries []string
+	for _, nic := range vm.NICs {
+		if len(nic.StaticIPConfigs) == 0 {
+			continue
+		}
+		if !nicPreservesStaticIP(nic, r.Context) {
+			continue
+		}
+
+		// DNS servers come from the subnet (subnet-wide, not per-IP).
+		dnsString := ""
+		if nic.SubnetUUID != "" {
+			network := &model.Network{}
+			if err := r.Source.Inventory.Find(network, ref.Ref{ID: nic.SubnetUUID}); err != nil {
+				return "", liberr.Wrap(err, "nic", nic.MACAddress, "subnet", nic.SubnetUUID)
+			}
+			dnsString = strings.Join(network.DNSServers, ",")
+		}
+
+		for _, cfg := range nic.StaticIPConfigs {
+			entry := fmt.Sprintf("%s:ip:%s,%s,%d,%s",
+				nic.MACAddress, cfg.IP, cfg.Gateway, cfg.Prefix, dnsString)
+			entries = append(entries, strings.TrimSuffix(entry, ","))
+		}
+	}
+	return strings.Join(entries, "_"), nil
 }
 
 // DomainXML generates a libvirt domain XML document from the Nutanix VM

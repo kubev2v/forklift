@@ -167,16 +167,17 @@ func (h *NetworkHandler) filter(ctx *gin.Context, list *[]model.Network) (err er
 // REST resource.
 type Network struct {
 	Resource
-	NetworkUUID    string `json:"networkUuid"`
-	Cluster        string `json:"cluster"`
-	SubnetType     string `json:"subnetType"`
-	VlanID         int    `json:"vlanId"`
-	NetworkAddress string `json:"networkAddress"`
-	PrefixLength   int    `json:"prefixLength"`
-	DefaultGateway string `json:"defaultGateway"`
-	DHCPServerIP   string `json:"dhcpServerIp"`
-	DHCPDomainName string `json:"dhcpDomainName"`
-	IPPoolRanges   string `json:"ipPoolRanges"`
+	NetworkUUID    string   `json:"networkUuid"`
+	Cluster        string   `json:"cluster"`
+	SubnetType     string   `json:"subnetType"`
+	VlanID         int      `json:"vlanId"`
+	NetworkAddress string   `json:"networkAddress"`
+	PrefixLength   int      `json:"prefixLength"`
+	DefaultGateway string   `json:"defaultGateway"`
+	DHCPServerIP   string   `json:"dhcpServerIp"`
+	DHCPDomainName string   `json:"dhcpDomainName"`
+	DNSServers     []string `json:"dnsServers,omitempty"`
+	IPPoolRanges   string   `json:"ipPoolRanges"`
 }
 
 // Build the resource using the model.
@@ -192,6 +193,9 @@ func (r *Network) With(m *model.Network) {
 	r.DHCPServerIP = m.DHCPServerIP
 	r.DHCPDomainName = m.DHCPDomainName
 	r.IPPoolRanges = m.IPPoolRanges
+	if m.DNSServers != "" {
+		r.DNSServers = strings.Split(m.DNSServers, ",")
+	}
 }
 
 // Build self link (URI).
