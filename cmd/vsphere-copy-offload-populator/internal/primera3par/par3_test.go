@@ -1,7 +1,10 @@
 package primera3par
 
 import (
+	"context"
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"github.com/stretchr/testify/assert"
@@ -52,6 +55,25 @@ func TestPrimera3ParClonner(t *testing.T) {
 }
 
 func TestNewPrimera3ParClonner(t *testing.T) {
-	_, err := NewPrimera3ParClonner("hostname", "username", "password", false)
+	_, err := NewPrimera3ParClonner("https://127.0.0.1:1", "username", "password", false)
 	assert.NoError(t, err, "Expected no error when creating a new clonner")
+}
+
+func TestAddHostToHostSetRequestTimeout(t *testing.T) {
+	client := NewPrimera3ParClientWsImpl("https://storage.example:8080", "username", "password", false)
+	client.SessionKey = "test-session"
+	client.SessionStartTime = time.Now()
+	client.HTTPClient.Transport = roundTripperFunc(func(*http.Request) (*http.Response, error) {
+		return nil, context.DeadlineExceeded
+	})
+
+	err := client.AddHostToHostSet("test-set", "test-host")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "request failed for AddHostToHostSet")
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }

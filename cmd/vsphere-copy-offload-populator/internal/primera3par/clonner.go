@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"net/url"
+	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -16,6 +18,8 @@ import (
 const maxHostSetNameLen = 27
 
 const PROVIDER_ID = "60002ac"
+
+const storageURLRequirement = "STORAGE_HOSTNAME must be a full HTTP or HTTPS URL with host and WSAPI port (e.g. https://host:8080)"
 
 // Ensure Primera3ParClonner implements required interfaces
 var _ populator.RDMCapable = &Primera3ParClonner{}
@@ -35,6 +39,10 @@ func (c *Primera3ParClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 }
 
 func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword string, sslSkipVerify bool) (Primera3ParClonner, error) {
+	if err := validateStorageURL(storageHostname); err != nil {
+		return Primera3ParClonner{}, err
+	}
+
 	log := logger.New("primera3par")
 	clon := NewPrimera3ParClientWsImpl(storageHostname, storageUsername, storagePassword, sslSkipVerify)
 	clonner := Primera3ParClonner{
@@ -57,6 +65,21 @@ func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword str
 	}
 
 	return clonner, nil
+}
+
+func validateStorageURL(storageHostname string) error {
+	parsedURL, err := url.Parse(storageHostname)
+	if err != nil {
+		return fmt.Errorf("%s: %w", storageURLRequirement, err)
+	}
+
+	port, err := strconv.Atoi(parsedURL.Port())
+	if (!strings.EqualFold(parsedURL.Scheme, "http") && !strings.EqualFold(parsedURL.Scheme, "https")) ||
+		parsedURL.Hostname() == "" || err != nil || port < 1 || port > 65535 {
+		return fmt.Errorf("%s, got %q", storageURLRequirement, storageHostname)
+	}
+
+	return nil
 }
 
 func sanitizeHostSetName(name string) string {

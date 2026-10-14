@@ -81,6 +81,8 @@ type Link struct {
 	Rel  string `json:"rel"`
 }
 
+const primera3ParHTTPTimeout = 30 * time.Second
+
 type Primera3ParClientWsImpl struct {
 	BaseURL          string
 	SessionKey       string
@@ -97,6 +99,7 @@ func NewPrimera3ParClientWsImpl(storageHostname, storageUsername, storagePasswor
 		Password: storagePassword,
 		Username: storageUsername,
 		HTTPClient: &http.Client{
+			Timeout: primera3ParHTTPTimeout,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: skipSSLVerification}, // Disable SSL verification
 			},
@@ -738,6 +741,10 @@ func (p *Primera3ParClientWsImpl) AddHostToHostSet(hostSetName string, hostName 
 	}
 
 	resp, err := p.doRequest(req, "AddHostToHostSet")
+	if err != nil {
+		return fmt.Errorf("failed to add host to host set: %w", err)
+	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
 		return nil
