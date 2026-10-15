@@ -8,7 +8,9 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main"
+      == "main" && (".tekton/copy-appliance-nbd-container-dev-preview-*.yaml".pathChanged()
+      || "build/nbd-container/***".pathChanged()
+      || ".konflux/nbd-container/rpms.lock.yaml".pathChanged())
   labels:
     appstudio.openshift.io/application: forklift-operator-dev-preview
     appstudio.openshift.io/component: copy-appliance-nbd-container-dev-preview
