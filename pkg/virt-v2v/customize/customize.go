@@ -28,6 +28,7 @@ const (
 
 const vsphereVmwareCleanupScript = "9100_cleanup_vmware.ps1"
 const vsphereVmwareVerifyScript = "verify_vmware_cleanup.ps1"
+const nutanixCleanupScript = "9200_cleanup_nutanix.ps1"
 
 const qemuGAInstallScript = "5001_win_firstboot_qemu_ga_install.ps1"
 
@@ -164,6 +165,11 @@ func (c *Customize) customizeWindows() (err error) {
 	if c.appConfig.VsphereVmwareDriverRemoval && c.appConfig.IsVsphereMigration() {
 		fmt.Println("Adding vSphere VMware driver removal scripts")
 		c.addVsphereVmwareDriverRemoval(cmdBuilder)
+	}
+
+	if c.appConfig.NutanixDriverRemoval {
+		fmt.Println("Adding Nutanix driver removal scripts")
+		c.addNutanixDriverRemoval(cmdBuilder)
 	}
 
 	if err = c.addWinFirstbootScripts(cmdBuilder); err != nil {
@@ -326,6 +332,13 @@ func (c *Customize) runCmd(builder utils.CommandBuilder) error {
 		return fmt.Errorf("error executing virt-customize command: %w", err)
 	}
 	return nil
+}
+
+// addNutanixDriverRemoval uploads the Nutanix cleanup script to the guest Firstboot scripts directory.
+func (c *Customize) addNutanixDriverRemoval(cmdBuilder utils.CommandBuilder) {
+	windowsScriptsPath := filepath.Join(c.appConfig.Workdir, "scripts", "windows")
+	src := filepath.Join(windowsScriptsPath, nutanixCleanupScript)
+	cmdBuilder.AddArg(UploadCmd, c.formatUpload(src, filepath.Join(WinFirstbootScriptsPath, nutanixCleanupScript)))
 }
 
 // addVsphereVmwareDriverRemoval uploads the VMware cleanup and verification scripts to the guest Firstboot scripts directory.
