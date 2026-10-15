@@ -289,6 +289,14 @@ func (v *ClusterAdapter) Apply(u types.ObjectUpdate) {
 	}
 }
 
+// formatWorldWideName renders a vSphere WWN as a zero-padded hexadecimal identifier.
+func formatWorldWideName(value int64) string {
+	if value == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%016x", uint64(value))
+}
+
 // Host model adapter.
 type HostAdapter struct {
 	Base
@@ -470,6 +478,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 						if disk, ok := iScsiLun.(*types.HostScsiDisk); ok {
 							hostScsiDisk.CanonicalName = disk.CanonicalName
 							hostScsiDisk.Vendor = strings.TrimSpace(disk.Vendor)
+							hostScsiDisk.Model = strings.TrimSpace(disk.Model)
 							hostScsiDisk.Key = strings.TrimSpace(disk.Key)
 							v.model.HostScsiDisks = append(v.model.HostScsiDisks, hostScsiDisk)
 						}
@@ -479,6 +488,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				v.model.AdvancedOptions = v.Ref(p.Val)
 			case fHostBusAdapter:
 				if array, cast := p.Val.(types.ArrayOfHostHostBusAdapter); cast {
+					v.model.HbaDiskInfo = nil
 					for _, hba := range array.HostHostBusAdapter {
 						hbaDiskInfo := model.HbaDiskInfo{}
 						protocolType := model.ProtocolUnknown
@@ -503,18 +513,33 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 						hostHba := hba.GetHostHostBusAdapter()
 						hbaDiskInfo.Device = hostHba.Device
 						hbaDiskInfo.Model = hostHba.Model
+						hbaDiskInfo.Driver = hostHba.Driver
 						hbaDiskInfo.Key = hostHba.Key
 						hbaDiskInfo.Protocol = string(protocolType)
+						switch adapter := hba.(type) {
+						case *types.HostFibreChannelHba:
+							hbaDiskInfo.NodeWorldWideName = formatWorldWideName(adapter.NodeWorldWideName)
+							hbaDiskInfo.PortWorldWideName = formatWorldWideName(adapter.PortWorldWideName)
+						case *types.HostFibreChannelOverEthernetHba:
+							hbaDiskInfo.NodeWorldWideName = formatWorldWideName(adapter.NodeWorldWideName)
+							hbaDiskInfo.PortWorldWideName = formatWorldWideName(adapter.PortWorldWideName)
+						}
 						v.model.HbaDiskInfo = append(v.model.HbaDiskInfo, hbaDiskInfo)
 					}
 				}
 			case fScsiTopology:
 				if array, cast := p.Val.(types.ArrayOfHostScsiTopologyInterface); cast {
+					v.model.HostScsiTopology = nil
 					for _, scsiTopologyInterface := range array.HostScsiTopologyInterface {
-						hostScsiTopology := model.HostScsiTopology{}
-						hostScsiTopology.HbaKey = scsiTopologyInterface.Adapter
+						hostScsiTopology := model.HostScsiTopology{
+							HbaKey: scsiTopologyInterface.Adapter,
+						}
 						for _, scsiTopologyTarget := range scsiTopologyInterface.Target {
-							hostScsiTopology.ScsiDiskKeys = append(hostScsiTopology.ScsiDiskKeys, scsiTopologyTarget.Lun[0].ScsiLun)
+							for _, lun := range scsiTopologyTarget.Lun {
+								if lun.ScsiLun != "" {
+									hostScsiTopology.ScsiDiskKeys = append(hostScsiTopology.ScsiDiskKeys, lun.ScsiLun)
+								}
+							}
 						}
 						v.model.HostScsiTopology = append(v.model.HostScsiTopology, hostScsiTopology)
 					}
@@ -715,8 +740,8 @@ func (v *DatastoreAdapter) Apply(u types.ObjectUpdate) {
 	}
 }
 
-// applyDatastoreInfoProperty decodes the datastore "info" property, which is either
-// VMFS (LUN extent names) or NAS (NfsDatastoreInfo with HostNasVolume details).
+// applyDatastoreInfoProperty decodes the datastore "info" property, including
+// VMFS, NAS, and vVOL filesystem metadata.
 func applyDatastoreInfoProperty(val types.AnyType, ds *model.Datastore) {
 	if val == nil {
 		return
@@ -725,6 +750,8 @@ func applyDatastoreInfoProperty(val types.AnyType, ds *model.Datastore) {
 	case types.VmfsDatastoreInfo:
 		backing := []string{}
 		if t.Vmfs != nil {
+			ds.FilesystemType = t.Vmfs.Type
+			ds.FilesystemMajorVersion = t.Vmfs.MajorVersion
 			for _, e := range t.Vmfs.Extent {
 				backing = append(backing, e.DiskName)
 			}
@@ -740,13 +767,49 @@ func applyDatastoreInfoProperty(val types.AnyType, ds *model.Datastore) {
 		if t != nil {
 			applyNasDatastoreNfsInfo(*t, ds)
 		}
+	case types.VvolDatastoreInfo:
+		clearVvolDatastoreInfo(ds)
+		if t.VvolDS != nil {
+			ds.FilesystemType = t.VvolDS.Type
+			ds.ProtocolEndpointType = t.VvolDS.ProtocolEndpointType
+			backing := []string{}
+			seen := map[string]struct{}{}
+			for _, hostPE := range t.VvolDS.HostPE {
+				for _, endpoint := range hostPE.ProtocolEndpoint {
+					deviceID := strings.TrimSpace(endpoint.DeviceId)
+					if deviceID == "" {
+						continue
+					}
+					if _, exists := seen[deviceID]; exists {
+						continue
+					}
+					seen[deviceID] = struct{}{}
+					backing = append(backing, deviceID)
+				}
+			}
+			ds.BackingDevicesNames = backing
+		}
+	case *types.VvolDatastoreInfo:
+		if t == nil {
+			clearVvolDatastoreInfo(ds)
+			return
+		}
+		applyDatastoreInfoProperty(*t, ds)
 	}
+}
+
+func clearVvolDatastoreInfo(ds *model.Datastore) {
+	ds.FilesystemType = ""
+	ds.FilesystemMajorVersion = 0
+	ds.ProtocolEndpointType = ""
+	ds.BackingDevicesNames = nil
 }
 
 func applyNasDatastoreNfsInfo(info types.NasDatastoreInfo, ds *model.Datastore) {
 	if info.Nas == nil {
 		return
 	}
+	ds.FilesystemType = info.Nas.Type
 	ds.NasRemoteHost = info.Nas.RemoteHost
 	ds.NasRemotePath = info.Nas.RemotePath
 	ds.NasRemoteHostNames = append([]string(nil), info.Nas.RemoteHostNames...)
