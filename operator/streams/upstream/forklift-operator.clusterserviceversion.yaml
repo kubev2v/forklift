@@ -115,6 +115,11 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+      - description: Remote OpenShift Virtualization validation request.
+        displayName: Virtualization Validation
+        kind: VirtualizationValidation
+        name: virtualizationvalidations.validation.kubevirt.io
+        version: v1alpha1
       - description: VM migration controller
         displayName: ForkliftController
         kind: ForkliftController

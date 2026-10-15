@@ -11,6 +11,10 @@ relatedImages:
     image: ${MUST_GATHER_IMAGE}
   - name: validation
     image: ${VALIDATION_IMAGE}
+  - name: virt-validation-controller
+    image: ${VIRT_VALIDATION_CONTROLLER_IMAGE}
+  - name: virt-cluster-validate
+    image: ${VIRT_CLUSTER_VALIDATE_IMAGE}
   - name: api
     image: ${API_IMAGE}
   - name: populator_controller
