@@ -194,6 +194,33 @@
       definition: "{{ lookup('template', 'controller/deployment-controller.yml.j2') }}"
       merge_type: "merge"
 
+  - when: not k8s_cluster|bool
+    block:
+    - name: "Setup virtualization validation controller RBAC"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'virt-validation-controller/rbac.yml.j2') }}"
+
+    - name: "Setup virtualization validation controller deployment"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'virt-validation-controller/deployment.yml.j2') }}"
+
+    - name: "Setup virtualization validation controller metrics service"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'virt-validation-controller/service.yml.j2') }}"
+
+    - name: "Setup virtualization validation controller service monitor"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'virt-validation-controller/servicemonitor.yml.j2') }}"
+
+    - name: "Setup virtualization validation controller network policies"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'virt-validation-controller/networkpolicy.yml.j2') }}"
+
   - name: "Setup inventory route"
     k8s:
       state: present
@@ -567,6 +594,26 @@
     when: finalize is not defined
 
 - block:
+  - name: "Check for virtualization validations before finalizing"
+    k8s_info:
+      api_version: validation.kubevirt.io/v1alpha1
+      kind: VirtualizationValidation
+    register: virtualization_validations
+    when: not k8s_cluster|bool
+
+  - name: "Require virtualization validations to be removed before finalizing"
+    assert:
+      that:
+      - virtualization_validations.resources | length == 0
+      fail_msg: "Delete or cancel all VirtualizationValidation resources before uninstalling MTV."
+    when: not k8s_cluster|bool
+
+  - name: "Remove virtualization validation controller resources"
+    k8s:
+      state: absent
+      definition: "{{ lookup('template', 'virt-validation-controller/cleanup.yml.j2') }}"
+    when: not k8s_cluster|bool
+
   - name: "Remove webhook configuration"
     include_tasks: webhooks.yml
     vars:
