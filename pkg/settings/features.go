@@ -23,6 +23,7 @@ const (
 	FeatureRetainPopulatorPods          = "FEATURE_RETAIN_POPULATOR_PODS"
 	FeatureXfsRepairIgnore              = "FEATURE_XFS_REPAIR_IGNORE"
 	FeatureCopyAppliance                = "FEATURE_COPY_APPLIANCE"
+	FeatureSplitVirtCustomize           = "FEATURE_SPLIT_VIRT_CUSTOMIZE"
 )
 
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
@@ -80,6 +81,8 @@ type Features struct {
 	XfsRepairIgnore bool
 	// Whether to provision copy appliance templates for vSphere providers.
 	CopyAppliance bool
+	// Whether to run virt-v2v and virt-customize as separate commands.
+	SplitVirtCustomize bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -123,5 +126,6 @@ func (r *Features) Load() (err error) {
 	r.RetainPopulatorPods = getEnvBool(FeatureRetainPopulatorPods, false)
 	r.XfsRepairIgnore = getEnvBool(FeatureXfsRepairIgnore, false)
 	r.CopyAppliance = getEnvBool(FeatureCopyAppliance, false)
+	r.SplitVirtCustomize = getEnvBool(FeatureSplitVirtCustomize, false)
 	return
 }

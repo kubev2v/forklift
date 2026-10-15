@@ -5,6 +5,7 @@ metadata:
   name: forklift-controller
   namespace: ${NAMESPACE}
 spec:
+  feature_split_virt_customize: "true"
   feature_ui_plugin: "true"
   feature_validation: "true"
   feature_volume_populator: "true"

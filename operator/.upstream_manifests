@@ -5954,6 +5954,13 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_split_virt_customize:
+                default: "true"
+                description: Run virt-v2v and virt-customize as separate commands.
+                enum:
+                - "true"
+                - "false"
+                type: string
               feature_ui_plugin:
                 default: "true"
                 description: Enable UI plugin.
@@ -14066,6 +14073,7 @@ metadata:
   name: forklift-controller
   namespace: konveyor-forklift
 spec:
+  feature_split_virt_customize: "true"
   feature_ui_plugin: "true"
   feature_validation: "true"
   feature_volume_populator: "true"
@@ -14278,6 +14286,12 @@ spec:
           it directly (default true)
         displayName: Enable Conversion CR
         path: feature_use_conversion_cr
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Run virt-v2v and virt-customize as separate commands (default
+          false)
+        displayName: Split Virt Customize
+        path: feature_split_virt_customize
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Require authentication (default true)

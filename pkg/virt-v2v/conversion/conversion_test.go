@@ -66,12 +66,17 @@ var _ = Describe("Conversion", func() {
 		It("keeps the existing monitor path on success", func() {
 			monitorInput := make(chan io.Reader, 1)
 
+			appConfig.Source = config.OVA
+			appConfig.DiskPath = "/path/to/disk.ova"
+
 			mockCommandBuilder.EXPECT().New("virt-v2v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-os", "").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-on", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-i", "ova").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("/path/to/disk.ova").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
 
 			mockCommandBuilder.EXPECT().New("/usr/local/bin/virt-v2v-monitor").Return(mockCommandBuilder)
@@ -91,7 +96,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandExecutor.EXPECT().Wait().Return(nil)
 
 			conversion.AppConfig = appConfig
-			Expect(conversion.RunVirtV2v()).To(Succeed())
+			Expect(conversion.RunVirtV2v(nil)).To(Succeed())
 		})
 
 		It("captures a known failure and writes its termination payload", func() {
@@ -103,12 +108,17 @@ var _ = Describe("Conversion", func() {
 			payload, err := errorreporting.Encode(failure)
 			Expect(err).ToNot(HaveOccurred())
 
+			appConfig.Source = config.OVA
+			appConfig.DiskPath = "/path/to/disk.ova"
+
 			mockCommandBuilder.EXPECT().New("virt-v2v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-os", "").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-on", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-i", "ova").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("/path/to/disk.ova").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
 
 			mockCommandBuilder.EXPECT().New("/usr/local/bin/virt-v2v-monitor").Return(mockCommandBuilder)
@@ -133,7 +143,7 @@ var _ = Describe("Conversion", func() {
 			mockFileSystem.EXPECT().WriteFile("/dev/termination-log", payload, os.FileMode(0644)).Return(nil)
 
 			conversion.AppConfig = appConfig
-			err = conversion.RunVirtV2v()
+			err = conversion.RunVirtV2v(nil)
 			Expect(err).To(MatchError("run virt-v2v: conversion failed"))
 		})
 
@@ -141,12 +151,17 @@ var _ = Describe("Conversion", func() {
 			monitorInput := make(chan io.Reader, 1)
 			monitorErr := errors.New("monitor failed")
 
+			appConfig.Source = config.OVA
+			appConfig.DiskPath = "/path/to/disk.ova"
+
 			mockCommandBuilder.EXPECT().New("virt-v2v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-os", "").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-on", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-i", "ova").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("/path/to/disk.ova").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
 
 			mockCommandBuilder.EXPECT().New("/usr/local/bin/virt-v2v-monitor").Return(mockCommandBuilder)
@@ -166,7 +181,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandExecutor.EXPECT().Wait().Return(monitorErr)
 
 			conversion.AppConfig = appConfig
-			err := conversion.RunVirtV2v()
+			err := conversion.RunVirtV2v(nil)
 			Expect(err).To(MatchError("wait for virt-v2v-monitor: monitor failed"))
 			Expect(errors.Is(err, monitorErr)).To(BeTrue())
 		})
@@ -282,10 +297,54 @@ var _ = Describe("Conversion", func() {
 				mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 				mockCommandExecutor.EXPECT().Run()
 
-				err := conversion.RunVirtV2vInPlace()
+				err := conversion.RunVirtV2vInPlace(nil)
 				Expect(err).ToNot(HaveOccurred())
 			},
 		)
+
+		It("places inline customize args before in-place domain", func() {
+			dir, err := os.MkdirTemp("", "v2v-inline")
+			Expect(err).NotTo(HaveOccurred())
+			defer func() { _ = os.RemoveAll(dir) }()
+
+			appConfig.Workdir = dir
+			appConfig.LibvirtDomainFile = config.V2vInPlaceLibvirtDomain
+
+			var args []string
+			mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag(gomock.Any()).DoAndReturn(func(flag string) utils.CommandBuilder {
+				args = append(args, flag)
+				return mockCommandBuilder
+			}).AnyTimes()
+			mockCommandBuilder.EXPECT().AddArg(gomock.Any(), gomock.Any()).DoAndReturn(func(flag, value string) utils.CommandBuilder {
+				args = append(args, flag, value)
+				return mockCommandBuilder
+			}).AnyTimes()
+			mockCommandBuilder.EXPECT().AddPositional(gomock.Any()).DoAndReturn(func(value string) utils.CommandBuilder {
+				args = append(args, value)
+				return mockCommandBuilder
+			}).AnyTimes()
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+			mockCommandExecutor.EXPECT().Run()
+
+			err = conversion.RunVirtV2vInPlace(&utils.InspectionOS{Osinfo: "rhel9"})
+			Expect(err).NotTo(HaveOccurred())
+
+			runIdx := -1
+			domainIdx := -1
+			for i, arg := range args {
+				if arg == "--run" && runIdx < 0 {
+					runIdx = i
+				}
+				if arg == config.V2vInPlaceLibvirtDomain {
+					domainIdx = i
+				}
+			}
+			Expect(runIdx).To(BeNumerically(">=", 0))
+			Expect(domainIdx).To(BeNumerically(">", runIdx))
+		})
 
 		It("passes virt-v2v-in-place with extra args",
 			func() {
@@ -307,7 +366,7 @@ var _ = Describe("Conversion", func() {
 				mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 				mockCommandExecutor.EXPECT().Run()
 
-				err := conversion.RunVirtV2vInPlace()
+				err := conversion.RunVirtV2vInPlace(nil)
 				Expect(err).ToNot(HaveOccurred())
 			},
 		)
@@ -330,7 +389,7 @@ var _ = Describe("Conversion", func() {
 				mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 				mockCommandExecutor.EXPECT().Run().Return(errors.New("in-place conversion failed"))
 
-				err := conversion.RunVirtV2vInPlace()
+				err := conversion.RunVirtV2vInPlace(nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(Equal("in-place conversion failed"))
 			},
@@ -360,7 +419,7 @@ var _ = Describe("Conversion", func() {
 				mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 				mockCommandExecutor.EXPECT().Run()
 
-				err := conversion.RunVirtV2vInPlaceDisk()
+				err := conversion.RunVirtV2vInPlaceDisk(nil)
 				Expect(err).ToNot(HaveOccurred())
 			},
 		)
@@ -369,7 +428,7 @@ var _ = Describe("Conversion", func() {
 			func() {
 				conversion.Disks = []*Disk{}
 
-				err := conversion.RunVirtV2vInPlaceDisk()
+				err := conversion.RunVirtV2vInPlaceDisk(nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(Equal("no disks found for in-place conversion"))
 			},
@@ -397,7 +456,7 @@ var _ = Describe("Conversion", func() {
 				mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 				mockCommandExecutor.EXPECT().Run()
 
-				err := conversion.RunVirtV2vInPlaceDisk()
+				err := conversion.RunVirtV2vInPlaceDisk(nil)
 				Expect(err).ToNot(HaveOccurred())
 			},
 		)
@@ -557,25 +616,15 @@ var _ = Describe("Conversion", func() {
 		)
 	})
 
-	Describe("virtV2vOVAArgs", func() {
-		It("adds OVA args correctly",
-			func() {
-				appConfig.DiskPath = "/path/to/ova/disk.ova"
-
-				mockCommandBuilder.EXPECT().AddArg("-i", "ova").Return(mockCommandBuilder)
-				mockCommandBuilder.EXPECT().AddPositional("/path/to/ova/disk.ova").Return(mockCommandBuilder)
-
-				conversion.virtV2vOVAArgs(mockCommandBuilder)
-			},
-		)
-	})
-
-	Describe("addVirtV2vVsphereArgs", func() {
+	Describe("vSphere conversion args", func() {
 		It("uses -it nfc when nbdkit-nfc plugin is present", func() {
 			plugin, err := os.CreateTemp("", "nbdkit-nfc-plugin-*.so")
 			Expect(err).ToNot(HaveOccurred())
 			defer func() { _ = os.Remove(plugin.Name()) }()
 			Expect(plugin.Close()).To(Succeed())
+			appConfig.Source = config.VSPHERE
+			appConfig.Workdir = "/var/tmp/v2v"
+			appConfig.NewVmName = "new-vm"
 			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
 			appConfig.SecretKey = "/etc/secret/secretKey"
 			appConfig.HostName = "vcenter.example.com"
@@ -583,6 +632,11 @@ var _ = Describe("Conversion", func() {
 			appConfig.Fingerprint = "AA:BB:CC"
 			appConfig.NfcPluginPath = plugin.Name()
 
+			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-os", appConfig.Workdir).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-on", appConfig.NewVmName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
@@ -593,11 +647,14 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
 
-			err = conversion.addVirtV2vVsphereArgs(mockCommandBuilder)
+			err = conversion.addVirtV2vArgs(mockCommandBuilder, nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("rewrites domain disk sources to NBD when V2V_nbdDisks is set", func() {
+	})
+
+	Describe("NBD domain sources", func() {
+		It("rewrites disk sources to NBD", func() {
 			conversion.NbdDisks = []string{"nbd://10.0.0.5:10809", "nbds://10.0.0.5:10810"}
 
 			domainXML := `<domain type='kvm'>
@@ -673,7 +730,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 			mockCommandExecutor.EXPECT().Run().Return(errors.New("disk conversion failed"))
 
-			err := conversion.RunVirtV2vInPlaceDisk()
+			err := conversion.RunVirtV2vInPlaceDisk(nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("disk conversion failed"))
 		})
@@ -694,7 +751,7 @@ var _ = Describe("Conversion", func() {
 			mockFileSystem.EXPECT().Stat(luksDir).Return(nil, nil)
 			mockFileSystem.EXPECT().ReadDir(luksDir).Return(nil, errors.New("permission denied"))
 
-			err := conversion.RunVirtV2vInPlaceDisk()
+			err := conversion.RunVirtV2vInPlaceDisk(nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("error adding LUKS keys"))
 		})
@@ -749,7 +806,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 			mockCommandExecutor.EXPECT().Run()
 
-			err := conversion.RunVirtV2vInPlace()
+			err := conversion.RunVirtV2vInPlace(nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -767,7 +824,7 @@ var _ = Describe("Conversion", func() {
 			mockFileSystem.EXPECT().Stat(luksDir).Return(nil, nil)
 			mockFileSystem.EXPECT().ReadDir(luksDir).Return(nil, errors.New("read error"))
 
-			err := conversion.RunVirtV2vInPlace()
+			err := conversion.RunVirtV2vInPlace(nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("error adding LUKS keys"))
 		})
@@ -790,11 +847,11 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-i", "ova").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("/path/to/disk.ova").Return(mockCommandBuilder)
 
-			err := conversion.addVirtV2vArgs(mockCommandBuilder)
+			err := conversion.addVirtV2vArgs(mockCommandBuilder, nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("handles unknown source gracefully", func() {
+		It("rejects unknown source", func() {
 			appConfig.Source = "unknown"
 			appConfig.Workdir = "/var/tmp/v2v"
 			appConfig.NewVmName = "new-vm"
@@ -805,16 +862,11 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-os", "/var/tmp/v2v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-on", "new-vm").Return(mockCommandBuilder)
 
-			err := conversion.addVirtV2vArgs(mockCommandBuilder)
-			Expect(err).ToNot(HaveOccurred())
+			err := conversion.addVirtV2vArgs(mockCommandBuilder, nil)
+			Expect(err).To(MatchError(ContainSubstring("unsupported migration source")))
 		})
 
 		It("adds selinux conversion args before vSphere guest name", func() {
-			plugin, err := os.CreateTemp("", "nbdkit-nfc-plugin-*.so")
-			Expect(err).ToNot(HaveOccurred())
-			defer func() { _ = os.Remove(plugin.Name()) }()
-			Expect(plugin.Close()).To(Succeed())
-
 			appConfig.Source = config.VSPHERE
 			appConfig.Workdir = "/var/tmp/v2v"
 			appConfig.NewVmName = "new-vm"
@@ -823,7 +875,6 @@ var _ = Describe("Conversion", func() {
 			appConfig.HostName = "vcenter.example.com"
 			appConfig.VmName = "test-vm"
 			appConfig.Fingerprint = "AA:BB:CC"
-			appConfig.NfcPluginPath = plugin.Name()
 			appConfig.SelinuxRelabelAtBoot = true
 			appConfig.SelinuxRelabelExclude = []string{"/foo"}
 
@@ -839,12 +890,10 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-it", "nfc").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-io", "nfc-thumbprint=AA:BB:CC").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
 
-			err = conversion.addVirtV2vArgs(mockCommandBuilder)
+			err := conversion.addVirtV2vArgs(mockCommandBuilder, nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -864,8 +913,45 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("/hyperv/test-win-vm.vhdx").Return(mockCommandBuilder)
 
-			err := conversion.addVirtV2vArgs(mockCommandBuilder)
+			err := conversion.addVirtV2vArgs(mockCommandBuilder, nil)
 			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("places inline customize args before vSphere guest name", func() {
+			appConfig.Source = config.VSPHERE
+			appConfig.Workdir = "/var/tmp/v2v"
+			appConfig.NewVmName = "new-vm"
+			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
+			appConfig.SecretKey = "/etc/secret/secretKey"
+			appConfig.HostName = "vcenter.example.com"
+			appConfig.VmName = "test-vm"
+			appConfig.Fingerprint = "AA:BB:CC"
+
+			builder := &utils.CommandBuilderImpl{}
+			builder.New("virt-v2v")
+			err := conversion.addVirtV2vArgsExceptGuest(builder)
+			Expect(err).ToNot(HaveOccurred())
+			builder.AddArg("--run", "/var/tmp/v2v/scripts/rhel/run/network_config_util.sh")
+			err = conversion.addVirtV2vGuestArgs(builder)
+			Expect(err).ToNot(HaveOccurred())
+
+			args := builder.Args
+			runIdx := -1
+			guestSepIdx := -1
+			vmIdx := -1
+			for i, arg := range args {
+				switch arg {
+				case "--run":
+					runIdx = i
+				case "--":
+					guestSepIdx = i
+				case "test-vm":
+					vmIdx = i
+				}
+			}
+			Expect(runIdx).To(BeNumerically(">=", 0))
+			Expect(guestSepIdx).To(BeNumerically(">", runIdx))
+			Expect(vmIdx).To(Equal(guestSepIdx + 1))
 		})
 	})
 
@@ -1335,184 +1421,6 @@ var _ = Describe("Conversion", func() {
 		)
 	})
 
-	Describe("addVirtV2vVsphereArgsForInspection", func() {
-		// Auto generated tests for addVirtV2vVsphereArgsForInspection
-		// Generated by: claude-4-5-opus
-		// Reviewed and uploaded by: @yaacov
-
-		It("adds basic vSphere args without VDDK", func() {
-			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
-			appConfig.SecretKey = "/etc/secret/secretKey"
-			appConfig.HostName = "vcenter.example.com"
-			appConfig.VmName = "test-vm"
-			// VddkLibDir is empty, so VDDK args should not be added
-
-			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
-
-			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("does NOT add conversion extra args (critical separation test)", func() {
-			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
-			appConfig.SecretKey = "/etc/secret/secretKey"
-			appConfig.HostName = "vcenter.example.com"
-			appConfig.VmName = "test-vm"
-			// Set ExtraArgs - these should NOT be applied for inspection
-			appConfig.ExtraArgs = []string{"--parallel", "4", "--custom-flag"}
-
-			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
-			// Note: NO AddExtraArgs expectation - this is the critical test
-			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
-
-			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("adds vSphere args with custom root disk", func() {
-			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
-			appConfig.SecretKey = "/etc/secret/secretKey"
-			appConfig.HostName = "vcenter.example.com"
-			appConfig.VmName = "test-vm"
-			appConfig.RootDisk = "/dev/sdb"
-
-			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--root", "/dev/sdb").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
-
-			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("adds vSphere args with static IPs", func() {
-			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
-			appConfig.SecretKey = "/etc/secret/secretKey"
-			appConfig.HostName = "vcenter.example.com"
-			appConfig.VmName = "test-vm"
-			appConfig.StaticIPs = "00:11:22:33:44:55:ip:192.168.1.100"
-
-			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--mac", "00:11:22:33:44:55:ip:192.168.1.100").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
-
-			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("returns error when addCommonArgs fails", func() {
-			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
-			appConfig.SecretKey = "/etc/secret/secretKey"
-			appConfig.HostName = "vcenter.example.com"
-			appConfig.VmName = "test-vm"
-			luksDir := "/etc/luks"
-			appConfig.Luksdir = luksDir
-
-			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
-
-			mockFileSystem.EXPECT().Stat(luksDir).Return(nil, nil)
-			mockFileSystem.EXPECT().ReadDir(luksDir).Return(nil, errors.New("permission denied"))
-
-			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("error adding LUKS keys"))
-		})
-
-		It("adds vSphere args with clevis for NBDE", func() {
-			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
-			appConfig.SecretKey = "/etc/secret/secretKey"
-			appConfig.HostName = "vcenter.example.com"
-			appConfig.VmName = "test-vm"
-			appConfig.NbdeClevis = true
-
-			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArgs("--key", "all:clevis").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
-
-			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("omits --no-fstrim when XfsCompatibility is enabled", func() {
-			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
-			appConfig.SecretKey = "/etc/secret/secretKey"
-			appConfig.HostName = "vcenter.example.com"
-			appConfig.VmName = "test-vm"
-			appConfig.XfsCompatibility = true
-
-			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
-
-			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("uses -it nfc when nbdkit-nfc plugin is present", func() {
-			plugin, err := os.CreateTemp("", "nbdkit-nfc-plugin-*.so")
-			Expect(err).ToNot(HaveOccurred())
-			defer func() { _ = os.Remove(plugin.Name()) }()
-			Expect(plugin.Close()).To(Succeed())
-			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
-			appConfig.SecretKey = "/etc/secret/secretKey"
-			appConfig.HostName = "vcenter.example.com"
-			appConfig.VmName = "test-vm"
-			appConfig.Fingerprint = "AA:BB:CC"
-			appConfig.NfcPluginPath = plugin.Name()
-
-			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-it", "nfc").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("-io", "nfc-thumbprint=AA:BB:CC").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
-
-			err = conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
-			Expect(err).ToNot(HaveOccurred())
-		})
-	})
-
 	Describe("XfsCompatibility", func() {
 		It("omits --no-fstrim for RunVirtV2VInspection", func() {
 			appConfig.InspectionOutputFile = config.InspectionOutputFile
@@ -1551,7 +1459,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 			mockCommandExecutor.EXPECT().Run()
 
-			err := conversion.RunVirtV2vInPlace()
+			err := conversion.RunVirtV2vInPlace(nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -1570,7 +1478,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 			mockCommandExecutor.EXPECT().Run()
 
-			err := conversion.RunVirtV2vInPlaceDisk()
+			err := conversion.RunVirtV2vInPlaceDisk(nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -1613,7 +1521,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 			mockCommandExecutor.EXPECT().Run()
 
-			err := conversion.RunVirtV2vInPlace()
+			err := conversion.RunVirtV2vInPlace(nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -1632,7 +1540,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
 			mockCommandExecutor.EXPECT().Run()
 
-			err := conversion.RunVirtV2vInPlaceDisk()
+			err := conversion.RunVirtV2vInPlaceDisk(nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
