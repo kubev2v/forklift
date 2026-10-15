@@ -17,7 +17,7 @@ ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@
 
 ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:39fddd87f966bd2f42e54236711cc4d679f5e470c4dbc137dae02605ae72d7ce"
 
-ARG COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE="registry.redhat.io/mtv-candidate/mtv-copy-appliance-template-rhel9@sha256:656d609b908b0232252893dfe15be315181dc7ccb2a12e5a0ebf566844d9f1a1"
+ARG COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE="registry.redhat.io/mtv-candidate/mtv-copy-appliance-builder-rhel9@sha256:656d609b908b0232252893dfe15be315181dc7ccb2a12e5a0ebf566844d9f1a1"
 
 ARG DEEP_INSPECTION_IMAGE="registry.redhat.io/mtv-candidate/mtv-deep-inspection-rhel10@sha256:8b6e314f4806c6521432aa03ad927ec520689b7c691c5bd25ebae25a1b5cacd8"
 
@@ -27,7 +27,7 @@ ARG HYPERV_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-hyperv-pr
 
 ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel9@sha256:82cea03de31dc1f5636b4e87abdd26f91522ef80502d1fef98b987d042e08a31"
 
-ARG NBD_CONTAINER_IMAGE="registry.redhat.io/mtv-candidate/mtv-nbd-container-rhel10@sha256:656d609b908b0232252893dfe15be315181dc7ccb2a12e5a0ebf566844d9f1a1"
+ARG NBD_CONTAINER_IMAGE="registry.redhat.io/mtv-candidate/mtv-copy-appliance-nbd-container-rhel10@sha256:656d609b908b0232252893dfe15be315181dc7ccb2a12e5a0ebf566844d9f1a1"
 
 ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:3b51f1c51cfb36e8e19806268ee435c280466a0b0a67195a6cac32ad10d54eaa"
 
