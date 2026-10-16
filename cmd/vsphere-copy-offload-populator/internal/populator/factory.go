@@ -61,6 +61,12 @@ func NewPopulator(
 			log.Info("using RDM populator")
 			return createRDMPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
 		}
+
+	case resolver.DiskTypeNFS:
+		// Unconditional: an NFS disk has no LUN, so the block XCOPY fallback
+		// below cannot copy it
+		log.Info("using NFS populator")
+		return createNFSPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
 	}
 
 	log.Info("using VMDK/Xcopy populator")
@@ -111,6 +117,17 @@ func createRDMPopulator(storageApi StorageApi, vmwareClient vmware.Client, sourc
 
 	copyCtx := CopyContext{CloneMethod: "rdm", SourceDiskCapacityBytes: sourceDiskCap, SourceDiskDatastoreAllocatedBytes: sourceDatastoreAlloc}
 	return NewRDMPopulator(rdmApi, vmwareClient, copyCtx)
+}
+
+// createNFSPopulator creates the NFS file-copy populator
+func createNFSPopulator(storageApi StorageApi, vmwareClient vmware.Client, sourceDiskCap, sourceDatastoreAlloc int64) (Populator, error) {
+	nfsApi, ok := storageApi.(NFSCapable)
+	if !ok {
+		return nil, fmt.Errorf("storage API does not implement NFSCapable")
+	}
+
+	copyCtx := CopyContext{CloneMethod: "nfs", SourceDiskCapacityBytes: sourceDiskCap, SourceDiskDatastoreAllocatedBytes: sourceDatastoreAlloc}
+	return NewNFSPopulator(nfsApi, vmwareClient, copyCtx)
 }
 
 // createVMDKPopulator creates VMDK/Xcopy populator (default/fallback)
