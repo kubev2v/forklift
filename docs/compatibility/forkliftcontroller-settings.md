@@ -205,11 +205,17 @@ Provider CR (type: ova or hyperv)
 
 | Setting | Environment Variable | Description |
 |---------|---------------------|-------------|
+| `virt_v2v_apparmor_profile_path` | `VIRT_V2V_APPARMOR_PROFILE_PATH` | Name of an AppArmor profile loaded on the nodes, used only with the `Localhost` type (default: `forklift-virt-v2v-unshare`) |
+| `virt_v2v_apparmor_profile_type` | `VIRT_V2V_APPARMOR_PROFILE_TYPE` | AppArmor profile for the virt-v2v pods: `RuntimeDefault`, `Localhost` or `Unconfined` (default: unset, field not set on the pod) |
 | `virt_v2v_dont_request_kvm` | `VIRT_V2V_DONT_REQUEST_KVM` | Don't request KVM device (use for nested virt) |
 | `virt_v2v_extra_args` | `VIRT_V2V_EXTRA_ARGS` | Additional virt-v2v arguments |
 | `virt_v2v_extra_conf_config_map` | `VIRT_V2V_EXTRA_CONF_CONFIG_MAP` | ConfigMap with extra virt-v2v configuration |
 | `virt_v2v_memsize` | `VIRT_V2V_MEMSIZE` | Memory (in MB) for the virt-v2v conversion appliance (default: virt-v2v chooses) |
+| `virt_v2v_seccomp_profile_path` | `VIRT_V2V_SECCOMP_PROFILE_PATH` | Seccomp profile path below the kubelet seccomp root, used only with the `Localhost` type (default: `profiles/unshare.json`) |
+| `virt_v2v_seccomp_profile_type` | `VIRT_V2V_SECCOMP_PROFILE_TYPE` | Seccomp profile for the virt-v2v pods: `RuntimeDefault`, `Localhost` or `Unconfined` (default: unset, `Localhost` on OpenShift and `RuntimeDefault` elsewhere) |
 | `virt_v2v_smp` | `VIRT_V2V_SMP` | Number of virtual CPUs for the virt-v2v conversion appliance (default: virt-v2v chooses) |
+
+See `docs/guest-conversion-seccomp.md` for when and how to use the profile settings.
 
 ---
 
