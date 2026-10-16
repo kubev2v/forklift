@@ -28,6 +28,7 @@ ARG HYPERV_PROVIDER_SERVER_IMAGE="quay.io/kubev2v/forklift-hyperv-provider-serve
 ARG VALIDATION_IMAGE="quay.io/kubev2v/forklift-validation:latest"
 ARG OVA_PROXY_IMAGE="quay.io/kubev2v/forklift-ova-proxy:latest"
 ARG COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE="quay.io/kubev2v/copy-appliance-template-builder:latest"
+ARG NBD_CONTAINER_IMAGE="quay.io/kubev2v/nbd-container:latest"
 
 COPY ./operator /repo
 WORKDIR /repo
