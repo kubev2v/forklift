@@ -37,3 +37,5 @@ relatedImages:
     image: ${CLI_DOWNLOAD_IMAGE}
   - name: copy_appliance_template_builder
     image: ${COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE}
+  - name: copy_appliance_container
+    image: ${NBD_CONTAINER_IMAGE}
