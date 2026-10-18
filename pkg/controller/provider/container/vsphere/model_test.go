@@ -626,6 +626,65 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 	}
 }
 
+func TestVmAdapter_Apply_Annotation(t *testing.T) {
+	customValues := []model.CustomFieldValue{{Key: 7, Value: "production"}}
+	tests := []struct {
+		name     string
+		initial  string
+		changes  []types.PropertyChange
+		expected string
+	}{
+		{
+			name:     "collect Notes",
+			changes:  []types.PropertyChange{{Op: Assign, Name: fAnnotation, Val: "First line\nSecond line"}},
+			expected: "First line\nSecond line",
+		},
+		{
+			name:     "update Notes",
+			initial:  "old",
+			changes:  []types.PropertyChange{{Op: Assign, Name: fAnnotation, Val: "new"}},
+			expected: "new",
+		},
+		{
+			name:    "clear Notes with empty assignment",
+			initial: "old",
+			changes: []types.PropertyChange{{Op: Assign, Name: fAnnotation, Val: ""}},
+		},
+		{
+			name:    "clear Notes with property removal",
+			initial: "old",
+			changes: []types.PropertyChange{{Op: types.PropertyChangeOpRemove, Name: fAnnotation}},
+		},
+		{
+			name:     "preserve Notes on unrelated update",
+			initial:  "old",
+			changes:  []types.PropertyChange{{Op: Assign, Name: fFirmware, Val: "efi"}},
+			expected: "old",
+		},
+		{
+			name:     "keep Notes separate from custom values",
+			changes:  []types.PropertyChange{{Op: Assign, Name: fAnnotation, Val: "Notes"}},
+			expected: "Notes",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := &VmAdapter{model: model.VM{
+				Annotation:   tt.initial,
+				CustomValues: customValues,
+			}}
+			v.Apply(types.ObjectUpdate{ChangeSet: tt.changes})
+			if v.model.Annotation != tt.expected {
+				t.Errorf("Annotation = %q, want %q", v.model.Annotation, tt.expected)
+			}
+			if !reflect.DeepEqual(v.model.CustomValues, customValues) {
+				t.Errorf("CustomValues = %+v, want %+v", v.model.CustomValues, customValues)
+			}
+		})
+	}
+}
+
 func TestVmAdapter_Apply_CustomFields(t *testing.T) {
 	tests := []struct {
 		name              string
