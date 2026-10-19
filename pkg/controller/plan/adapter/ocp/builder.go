@@ -306,12 +306,12 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	object.DataVolumeTemplates = targetVmSpec.DataVolumeTemplates
 
 	// Sanitize DataVolumeTemplates to prevent conflicts with Forklift-created DataVolumes:
-	// 1. Match template names to the PVC names (Forklift creates DataVolumes with Name = pvc.Name)
-	// 2. Clear spec.source so CDI does not re-import from source-cluster references
-	//    (HTTP/registry/PVC sources); Forklift already created the destination DataVolumes
+	// 1. Match template names to the destination PVC names (Forklift creates DataVolumes with Name = pvc.Name)
+	// 2. Mark templates externally populated so KubeVirt accepts them and CDI does not
+	//    re-import from source-cluster HTTP/registry/PVC references
 	// 3. Ensure namespace is set correctly (will be set by KubeVirt to match VM namespace)
 	// 4. Update volume references to match renamed DataVolumeTemplates
-	r.sanitizeDataVolumeTemplates(sourceVm, object.DataVolumeTemplates, object)
+	r.sanitizeDataVolumeTemplates(sourceVm, object.DataVolumeTemplates, object, persistentVolumeClaims)
 
 	r.mapNetworks(sourceVm, targetVmSpec)
 	r.mapVolumes(sourceVm, targetVmSpec, persistentVolumeClaims)
@@ -321,47 +321,31 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 
 // sanitizeDataVolumeTemplates ensures DataVolumeTemplates are compatible with Forklift-created DataVolumes.
 // Forklift creates DataVolumes with Name = pvc.Name, so templates must match these names.
-// spec.source is cleared because templates copied from the source VM still point at
-// source-cluster import specs; Forklift has already created the destination DataVolumes.
-// Additionally, we update volume references to match any renamed DataVolumeTemplates.
-func (r *Builder) sanitizeDataVolumeTemplates(sourceVm *cnv.VirtualMachine, templates []cnv.DataVolumeTemplateSpec, object *cnv.VirtualMachineSpec) {
-	// Build a map of volume name -> PVC name from VM volumes
-	// This allows us to match DataVolumeTemplates to the PVCs that Forklift will create DataVolumes for
-	volumeToPVCName := make(map[string]string)
+// Templates are marked externally populated (source cleared, PVC dataSource set to the
+// destination PVC) so KubeVirt accepts them and CDI does not re-import from the source cluster.
+// Volume references are updated to match any renamed DataVolumeTemplates.
+func (r *Builder) sanitizeDataVolumeTemplates(sourceVm *cnv.VirtualMachine, templates []cnv.DataVolumeTemplateSpec, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*v1.PersistentVolumeClaim) {
+	// Destination PVC name keyed by AnnDiskSource (source namespace/name).
+	destPVCBySourceID := make(map[string]string)
+	for _, pvc := range persistentVolumeClaims {
+		if source, ok := pvc.Annotations[planbase.AnnDiskSource]; ok {
+			destPVCBySourceID[source] = pvc.Name
+		}
+	}
+
+	// DataVolumeTemplates are referenced by vol.DataVolume.Name, so key the PVC
+	// lookup by that name instead of scanning volumes again for each template.
+	dataVolumeToPVCName := make(map[string]string)
 	for _, vol := range sourceVm.Spec.Template.Spec.Volumes {
-		var pvcName string
-		switch {
-		case vol.PersistentVolumeClaim != nil:
-			// Volume references PVC directly
-			pvcName = vol.PersistentVolumeClaim.ClaimName
-		case vol.DataVolume != nil:
-			// Volume references DataVolume - need to find the PVC it creates
-			// In OCP, DataVolumes typically create PVCs with the same name as the DataVolume
-			// But we need to check the actual PVC name from the source
-			dv := &cdi.DataVolume{}
-			err := r.sourceClient.Get(context.TODO(), client.ObjectKey{
-				Namespace: sourceVm.Namespace,
-				Name:      vol.DataVolume.Name,
-			}, dv)
-			if err != nil {
-				r.Log.V(1).Info("Could not find source DataVolume, using DataVolume name as PVC name",
-					"dataVolume", vol.DataVolume.Name, "error", err)
-				pvcName = vol.DataVolume.Name
-			} else {
-				// Use the actual PVC name that the DataVolume created
-				if dv.Status.ClaimName != "" {
-					pvcName = dv.Status.ClaimName
-				} else {
-					// Fallback: DataVolume name typically matches PVC name
-					pvcName = vol.DataVolume.Name
-				}
-			}
-		default:
+		if vol.DataVolume == nil {
 			continue
 		}
-		if pvcName != "" {
-			volumeToPVCName[vol.Name] = pvcName
+		sourcePVCName := r.sourcePVCNameForDataVolume(sourceVm, vol.DataVolume.Name)
+		targetPVCName := sourcePVCName
+		if destName, ok := destPVCBySourceID[fmt.Sprintf("%s/%s", sourceVm.Namespace, sourcePVCName)]; ok {
+			targetPVCName = destName
 		}
+		dataVolumeToPVCName[vol.DataVolume.Name] = targetPVCName
 	}
 
 	// Track template name changes so we can update volume references
@@ -371,46 +355,31 @@ func (r *Builder) sanitizeDataVolumeTemplates(sourceVm *cnv.VirtualMachine, temp
 	for i := range templates {
 		template := &templates[i]
 		oldName := template.Name
+		targetPVCName := dataVolumeToPVCName[template.Name]
 
-		// Find the corresponding PVC name by matching template to VM volumes
-		// DataVolumeTemplates are referenced by volumes via vol.DataVolume.Name matching template name
-		var targetPVCName string
-		for volName, pvcName := range volumeToPVCName {
-			// Check if any volume references this template by name
-			for _, vol := range sourceVm.Spec.Template.Spec.Volumes {
-				if vol.Name == volName && vol.DataVolume != nil && vol.DataVolume.Name == template.Name {
-					targetPVCName = pvcName
-					break
-				}
-			}
-			if targetPVCName != "" {
-				break
-			}
-		}
-
-		// If we found a matching PVC name, update the template name to match
-		// Forklift creates DataVolumes with Name = pvc.Name, so template must match
+		// Forklift creates DataVolumes with Name = pvc.Name, so the template must match.
 		if targetPVCName != "" && template.Name != targetPVCName {
 			template.Name = targetPVCName
-			template.GenerateName = ""
 			templateNameMap[oldName] = targetPVCName
 			r.Log.V(1).Info("Updated DataVolumeTemplate name to match Forklift-created DataVolume",
 				"oldName", oldName, "newName", template.Name, "pvcName", targetPVCName)
-		} else {
-			// If we can't find a match, clear GenerateName to use explicit Name
-			// and log a warning
-			if template.GenerateName != "" {
-				r.Log.Info("DataVolumeTemplate has GenerateName but no matching volume found, "+
-					"template may not match Forklift-created DataVolume",
-					"generateName", template.GenerateName, "templateName", template.Name)
-				template.GenerateName = ""
-			}
+		} else if targetPVCName == "" && template.GenerateName != "" {
+			r.Log.Info("DataVolumeTemplate has GenerateName but no matching volume found, "+
+				"template may not match Forklift-created DataVolume",
+				"generateName", template.GenerateName, "templateName", template.Name)
+		}
+		if template.GenerateName != "" {
+			template.GenerateName = ""
 		}
 
-		// Clear spec.source: templates still carry source-cluster import specs, but Forklift
-		// already created the destination DataVolumes. Leaving source set would make CDI try
-		// to import again from URLs/registry/PVC refs that do not exist on the destination.
-		template.Spec.Source = nil
+		// KubeVirt requires Source, SourceRef, or an external population (PVC/Storage dataSource).
+		// Point the dataSource at the destination PVC Forklift already populated and drop the
+		// source-cluster import spec so CDI does not import it again.
+		populatedName := targetPVCName
+		if populatedName == "" {
+			populatedName = template.Name
+		}
+		markDataVolumeExternallyPopulated(&template.Spec, populatedName)
 
 		// Ensure namespace is empty - KubeVirt will set it to match the VM namespace
 		template.Namespace = ""
@@ -430,6 +399,48 @@ func (r *Builder) sanitizeDataVolumeTemplates(sourceVm *cnv.VirtualMachine, temp
 				}
 			}
 		}
+	}
+}
+
+// sourcePVCNameForDataVolume returns the PVC created by the source DataVolume.
+// DataVolume name is used when the source object or its claim name is unavailable.
+func (r *Builder) sourcePVCNameForDataVolume(sourceVm *cnv.VirtualMachine, dataVolumeName string) string {
+	dv := &cdi.DataVolume{}
+	err := r.sourceClient.Get(context.TODO(), client.ObjectKey{
+		Namespace: sourceVm.Namespace,
+		Name:      dataVolumeName,
+	}, dv)
+	if err != nil {
+		r.Log.V(1).Info("Could not find source DataVolume, using DataVolume name as PVC name",
+			"dataVolume", dataVolumeName, "error", err)
+		return dataVolumeName
+	}
+	if dv.Status.ClaimName != "" {
+		return dv.Status.ClaimName
+	}
+	return dataVolumeName
+}
+
+// markDataVolumeExternallyPopulated drops source-cluster import specs and points the
+// template at the PVC Forklift already populated. KubeVirt treats a PVC or Storage
+// dataSource as external population and rejects a template that has neither that nor a source.
+func markDataVolumeExternallyPopulated(spec *cdi.DataVolumeSpec, pvcName string) {
+	spec.Source = nil
+	spec.SourceRef = nil
+	if pvcName == "" {
+		return
+	}
+	dataSource := &core.TypedLocalObjectReference{
+		Kind: "PersistentVolumeClaim",
+		Name: pvcName,
+	}
+	switch {
+	case spec.PVC != nil:
+		spec.PVC.DataSource = dataSource
+		spec.PVC.DataSourceRef = nil
+	case spec.Storage != nil:
+		spec.Storage.DataSource = dataSource
+		spec.Storage.DataSourceRef = nil
 	}
 }
 
