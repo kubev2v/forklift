@@ -430,9 +430,11 @@ func markDataVolumeExternallyPopulated(spec *cdi.DataVolumeSpec, pvcName string)
 	if pvcName == "" {
 		return
 	}
+	apiGroup := ""
 	dataSource := &core.TypedLocalObjectReference{
-		Kind: "PersistentVolumeClaim",
-		Name: pvcName,
+		APIGroup: &apiGroup,
+		Kind:     "PersistentVolumeClaim",
+		Name:     pvcName,
 	}
 	switch {
 	case spec.PVC != nil:
