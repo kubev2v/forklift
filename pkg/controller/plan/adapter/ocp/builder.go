@@ -324,7 +324,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 // Templates are marked externally populated (source cleared, PVC dataSource set to the
 // destination PVC) so KubeVirt accepts them and CDI does not re-import from the source cluster.
 // Volume references are updated to match any renamed DataVolumeTemplates.
-func (r *Builder) sanitizeDataVolumeTemplates(sourceVm *cnv.VirtualMachine, templates []cnv.DataVolumeTemplateSpec, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*v1.PersistentVolumeClaim) {
+func (r *Builder) sanitizeDataVolumeTemplates(sourceVm *cnv.VirtualMachine, templates []cnv.DataVolumeTemplateSpec, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim) {
 	// Destination PVC name keyed by AnnDiskSource (source namespace/name).
 	destPVCBySourceID := make(map[string]string)
 	for _, pvc := range persistentVolumeClaims {
