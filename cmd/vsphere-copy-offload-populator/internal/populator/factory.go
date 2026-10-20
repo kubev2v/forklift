@@ -63,10 +63,10 @@ func NewPopulator(
 		}
 
 	case resolver.DiskTypeNFS:
-		// Unconditional: an NFS disk has no LUN, so the block XCOPY fallback
-		// below cannot copy it
-		log.Info("using NFS populator")
-		return createNFSPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
+		if canUse(storageApi, resolver.DiskTypeNFS) {
+			log.Info("using NFS populator")
+			return createNFSPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
+		}
 	}
 
 	log.Info("using VMDK/Xcopy populator")
@@ -177,6 +177,10 @@ func canUse(storageApi StorageApi, diskType resolver.DiskType) bool {
 			return false
 		}
 		_, ok := storageApi.(RDMCapable)
+		return ok
+
+	case resolver.DiskTypeNFS:
+		_, ok := storageApi.(NFSCapable)
 		return ok
 
 	default:
