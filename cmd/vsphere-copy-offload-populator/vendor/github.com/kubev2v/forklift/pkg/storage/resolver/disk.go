@@ -33,6 +33,9 @@ type DiskBacking struct {
 	// NasRemotePath is the export path the NFS datastore mounts, e.g. "/px_1a2b3c4d-pvc-x".
 	// Set only when IsNAS.
 	NasRemotePath string
+	// NasRemoteHost is the NFS server the datastore mounts from. Used to confirm the
+	// source is served by the same array as the destination. Set only when IsNAS.
+	NasRemoteHost string
 }
 
 // DetectDiskType returns the DiskType for this backing.

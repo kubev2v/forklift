@@ -817,6 +817,55 @@ func (c *RestClient) FindDirectoryByExportName(exportName string) (string, error
 	return directory, nil
 }
 
+// NetworkInterfacesResponse represents the response from the network-interfaces API
+type NetworkInterfacesResponse struct {
+	Items []struct {
+		Name     string   `json:"name"`
+		Enabled  bool     `json:"enabled"`
+		Services []string `json:"services"`
+		Eth      struct {
+			Address string `json:"address"`
+		} `json:"eth"`
+	} `json:"items"`
+}
+
+// ServesFileAddress reports whether address is one of the array's enabled
+// file-services data VIFs. An array can carry several, so a destination and a
+// source may legitimately mount different ones.
+func (c *RestClient) ServesFileAddress(address string) (bool, error) {
+	url := fmt.Sprintf("https://%s/api/%s/network-interfaces", c.hostname, c.apiV2)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to create network interfaces request: %w", err)
+	}
+
+	resp, body, err := c.doWithReauth(req)
+	if err != nil {
+		return false, fmt.Errorf("failed to send network interfaces request: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("network interfaces request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var ifaces NetworkInterfacesResponse
+	if err := json.Unmarshal(body, &ifaces); err != nil {
+		return false, fmt.Errorf("failed to parse network interfaces response: %w", err)
+	}
+
+	for _, i := range ifaces.Items {
+		if !i.Enabled || i.Eth.Address != address {
+			continue
+		}
+		for _, svc := range i.Services {
+			if svc == "file" {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 // CopyFile copies a file between two managed directories on the array.
 // Requires API version 2.26 or later.
 func (c *RestClient) CopyFile(sourceDirectory, sourcePath, targetDirectory, targetPath string) error {
