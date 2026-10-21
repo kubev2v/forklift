@@ -1015,6 +1015,32 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 						isCBTEnabledForDisks(ctkPerDisk, v.model.Disks)
 					}
 				}
+			case fVAppProduct:
+				// VMs without a vApp config report the property as unset,
+				// in which case the previously collected products are cleared.
+				products, cast := p.Val.(types.ArrayOfVAppProductInfo)
+				if !cast {
+					v.model.VAppProducts = nil
+					break
+				}
+				vAppProducts := []model.VAppProduct{}
+				for _, product := range products.VAppProductInfo {
+					vAppProducts = append(
+						vAppProducts,
+						model.VAppProduct{
+							Key:         product.Key,
+							ClassId:     product.ClassId,
+							InstanceId:  product.InstanceId,
+							Name:        product.Name,
+							Vendor:      product.Vendor,
+							Version:     product.Version,
+							FullVersion: product.FullVersion,
+							VendorUrl:   product.VendorUrl,
+							ProductUrl:  product.ProductUrl,
+							AppUrl:      product.AppUrl,
+						})
+				}
+				v.model.VAppProducts = vAppProducts
 			case fNestedHVEnabled:
 				if b, cast := p.Val.(bool); cast {
 					v.model.NestedHVEnabled = b
