@@ -667,26 +667,33 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	if cacert, ok := util.GetCACert(in); ok {
 		object.Data["cacert"] = cacert
 	}
-	if r.Source.Provider.CopyApplianceNbdSsl() {
-		name := r.Source.Provider.Status.CopyApplianceSSHPrivateSecret
-		if name == "" {
-			return fmt.Errorf("provider has no copyApplianceTemplate SSH private secret for NBD TLS")
-		}
-		copyApplianceTemplateSecret := &core.Secret{}
-		if err = r.Get(context.Background(), client.ObjectKey{
-			Name: name, Namespace: r.Source.Provider.Namespace,
-		}, copyApplianceTemplateSecret); err != nil {
-			return fmt.Errorf("failed to get copyApplianceTemplate secret %s for NBD TLS: %w", name, err)
-		}
-		for _, key := range []string{announce.CACert, announce.ClientCert, announce.ClientKey} {
-			data, found := copyApplianceTemplateSecret.Data[key]
-			if !found || len(data) == 0 {
-				return fmt.Errorf("copyApplianceTemplate secret %s missing %s for NBD TLS", name, key)
-			}
-			object.Data[key] = data
-		}
+	if r.Source.Provider.CopyApplianceNbdSsl() && settings.Settings.EnabledForPlan(r.Plan) {
+		return r.addNbdTLSCerts(object)
 	}
 	return
+}
+
+// addNbdTLSCerts copies the copy appliance's NBD TLS client certs into the
+// DataVolume credential secret.
+func (r *Builder) addNbdTLSCerts(object *core.Secret) error {
+	name := r.Source.Provider.Status.CopyApplianceSSHPrivateSecret
+	if name == "" {
+		return fmt.Errorf("provider has no copyApplianceTemplate SSH private secret for NBD TLS")
+	}
+	copyApplianceTemplateSecret := &core.Secret{}
+	if err := r.Get(context.Background(), client.ObjectKey{
+		Name: name, Namespace: r.Source.Provider.Namespace,
+	}, copyApplianceTemplateSecret); err != nil {
+		return fmt.Errorf("failed to get copyApplianceTemplate secret %s for NBD TLS: %w", name, err)
+	}
+	for _, key := range []string{announce.CACert, announce.ClientCert, announce.ClientKey} {
+		data, found := copyApplianceTemplateSecret.Data[key]
+		if !found || len(data) == 0 {
+			return fmt.Errorf("copyApplianceTemplate secret %s missing %s for NBD TLS", name, key)
+		}
+		object.Data[key] = data
+	}
+	return nil
 }
 
 // buildDatastoreMap builds a map of storage mappings keyed by source datastore ID
