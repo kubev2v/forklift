@@ -372,6 +372,7 @@ type VM struct {
 	GuestDisks               []DiskMountPoint   `sql:""`
 	GuestIpStacks            []GuestIpStack     `sql:""`
 	GuestApps                []GuestApp         `sql:""`
+	VAppProducts             []VAppProduct      `sql:""`
 	SecureBoot               bool               `sql:""`
 	ToolsStatus              string             `sql:""`
 	ToolsRunningStatus       string             `sql:""`
@@ -392,6 +393,20 @@ func (m *VM) Validated() bool {
 type GuestApp struct {
 	Name    string `json:"name"`
 	Version string `json:"version,omitempty"`
+}
+
+// vApp product information (config.vAppConfig.product).
+type VAppProduct struct {
+	Key         int32  `json:"key"`
+	ClassId     string `json:"classId,omitempty"`
+	InstanceId  string `json:"instanceId,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Vendor      string `json:"vendor,omitempty"`
+	Version     string `json:"version,omitempty"`
+	FullVersion string `json:"fullVersion,omitempty"`
+	VendorUrl   string `json:"vendorUrl,omitempty"`
+	ProductUrl  string `json:"productUrl,omitempty"`
+	AppUrl      string `json:"appUrl,omitempty"`
 }
 
 // Virtual Controller.

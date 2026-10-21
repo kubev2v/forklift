@@ -307,6 +307,7 @@ type VM struct {
 	ToolsVersionStatus string                   `json:"toolsVersionStatus2"`
 	DiskEnableUuid     bool                     `json:"diskEnableUuid"`
 	NestedHVEnabled    bool                     `json:"nestedHVEnabled"`
+	VAppProducts       []model.VAppProduct      `json:"vAppProducts"`
 	CustomValues       []model.CustomFieldValue `json:"customValues"`
 	Tags               []model.Tag              `json:"tags"`
 }
@@ -360,6 +361,7 @@ func (r *VM) With(m *model.VM) {
 	r.ToolsVersionStatus = m.ToolsVersionStatus
 	r.DiskEnableUuid = m.DiskEnableUuid
 	r.NestedHVEnabled = m.NestedHVEnabled
+	r.VAppProducts = m.VAppProducts
 	r.CustomValues = m.CustomValues
 	r.Tags = m.Tags
 	r.ConsolidationNeeded = m.ConsolidationNeeded

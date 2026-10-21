@@ -1123,3 +1123,62 @@ func TestUpdateDisks_usesBusNumberWhenKeyDiffers(t *testing.T) {
 		t.Errorf("Disk.BusNumber = %d, want 2", v.model.Disks[0].BusNumber)
 	}
 }
+
+func TestVmAdapterApplyVAppProduct(t *testing.T) {
+	v := &VmAdapter{}
+	v.Apply(types.ObjectUpdate{
+		ChangeSet: []types.PropertyChange{
+			{
+				Op:   Assign,
+				Name: fVAppProduct,
+				Val: types.ArrayOfVAppProductInfo{
+					VAppProductInfo: []types.VAppProductInfo{
+						{
+							Key:         1,
+							ClassId:     "com.example",
+							InstanceId:  "appliance",
+							Name:        "Example Appliance",
+							Vendor:      "Example",
+							Version:     "1.2",
+							FullVersion: "1.2.3-build4",
+							VendorUrl:   "https://example.com",
+							ProductUrl:  "https://example.com/product",
+							AppUrl:      "https://${vm.ip}/",
+						},
+					},
+				},
+			},
+		},
+	})
+
+	want := []model.VAppProduct{
+		{
+			Key:         1,
+			ClassId:     "com.example",
+			InstanceId:  "appliance",
+			Name:        "Example Appliance",
+			Vendor:      "Example",
+			Version:     "1.2",
+			FullVersion: "1.2.3-build4",
+			VendorUrl:   "https://example.com",
+			ProductUrl:  "https://example.com/product",
+			AppUrl:      "https://${vm.ip}/",
+		},
+	}
+	if !reflect.DeepEqual(v.model.VAppProducts, want) {
+		t.Errorf("VAppProducts mismatch\ngot:  %+v\nwant: %+v", v.model.VAppProducts, want)
+	}
+
+	// A VM without a vApp config reports the property unset; stale products are cleared.
+	v.Apply(types.ObjectUpdate{
+		ChangeSet: []types.PropertyChange{
+			{
+				Op:   Assign,
+				Name: fVAppProduct,
+			},
+		},
+	})
+	if v.model.VAppProducts != nil {
+		t.Errorf("VAppProducts = %+v, want nil", v.model.VAppProducts)
+	}
+}
