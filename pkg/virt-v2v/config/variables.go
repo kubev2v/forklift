@@ -47,6 +47,7 @@ const (
 	EnvXfsCompatibilityName             = "V2V_xfsCompatibility"
 	EnvXfsRepairIgnoreName              = "V2V_xfsRepairIgnore"
 	EnvOverlayEnabledName               = "V2V_overlayEnabled"
+	EnvExcludeDiskBusAddressesName      = "V2V_excludeDiskBusAddresses"
 )
 
 const (
@@ -142,6 +143,9 @@ type AppConfig struct {
 	SupportsNoFstrim bool
 	// V2V_overlayEnabled — use qcow2 overlay for in-place conversions (default true)
 	OverlayEnabled bool
+	// V2V_excludeDiskBusAddresses — comma-separated bus addresses (e.g. "scsi0:1")
+	// to exclude from domain XML before positional disk mapping.
+	ExcludeDiskBusAddresses string
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
@@ -188,6 +192,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.HostName, "hostname", os.Getenv(EnvHostName), "Hostname of the vm")
 	flag.StringVar(&s.MultipleIpsPerNicName, "multiple-ips-per-nic", os.Getenv(EnvMultipleIpsPerNicName), "Multiple IPs per NIC")
 	flag.StringVar(&s.PodNetworkIPv6MACs, "pod-network-ipv6-macs", os.Getenv(EnvPodNetworkIPv6MACsName), "Comma-separated MAC addresses for Pod network interfaces needing IPv6 masquerade config")
+	flag.StringVar(&s.ExcludeDiskBusAddresses, "exclude-disk-bus-addresses", os.Getenv(EnvExcludeDiskBusAddressesName), "Comma-separated source bus addresses (e.g. scsi0:1) of disks excluded via excludeDisks")
 	flag.BoolVar(&s.IsRemoteInspection, "remote-inspection", s.getEnvBool(EnvRemoteInspection, false), "Run virt-v2v-inspection on remote disks")
 	flag.IntVar(&s.MemSize, "memsize", s.getEnvInt(EnvMemSizeName, 0), "Amount of memory (in MB) allocated for the conversion appliance")
 	flag.IntVar(&s.Smp, "smp", s.getEnvInt(EnvSmpName, 0), "Number of virtual CPUs used for the conversion appliance")

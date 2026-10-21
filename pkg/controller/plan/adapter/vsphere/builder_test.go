@@ -1207,6 +1207,14 @@ var _ = Describe("vSphere builder", func() {
 			}
 			return false
 		}
+		excludeDiskBusAddressesEnv := func(env []core.EnvVar) (string, bool) {
+			for _, e := range env {
+				if e.Name == "V2V_excludeDiskBusAddresses" {
+					return e.Value, true
+				}
+			}
+			return "", false
+		}
 
 		It("should populate V2V_staticIPs when the plan requests preservation (Defect A)", func() {
 			vm := model.VM{
@@ -1423,6 +1431,51 @@ var _ = Describe("vSphere builder", func() {
 			_, found := staticIPsEnv(env)
 			Expect(found).To(BeFalse())
 			Expect(hasPreserveFlagEnv(env)).To(BeFalse())
+		})
+
+		It("should forward excludeDisks bus addresses as V2V_excludeDiskBusAddresses", func() {
+			vm := model.VM{
+				VM1: model.VM1{VM0: model.VM0{ID: "vm-1", Name: "test-vm"}},
+			}
+			vm.GuestID = "rhel8Guest"
+			vm.Disks = []vsphere.Disk{
+				{File: "[ds] vm/disk0.vmdk", BusAddress: "scsi0:0"},
+				{File: "[ds] vm/disk1.vmdk", BusAddress: "scsi0:1"},
+				{File: "[ds] vm/disk2.vmdk", BusAddress: "scsi0:2"},
+			}
+
+			builder := createBuilder()
+			builder.Plan.Spec.VMs = []plan.VM{
+				{Ref: ref.Ref{ID: "vm-1", Name: "test-vm"}, ExcludeDisks: []string{"scsi0:1"}},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			val, found := excludeDiskBusAddressesEnv(env)
+			Expect(found).To(BeTrue())
+			Expect(val).To(Equal("scsi0:1"))
+		})
+
+		It("should not emit V2V_excludeDiskBusAddresses when excludeDisks is unset", func() {
+			vm := model.VM{
+				VM1: model.VM1{VM0: model.VM0{ID: "vm-1", Name: "test-vm"}},
+			}
+			vm.GuestID = "rhel8Guest"
+			vm.Disks = []vsphere.Disk{
+				{File: "[ds] vm/disk0.vmdk", BusAddress: "scsi0:0"},
+			}
+
+			builder := createBuilder()
+			builder.Plan.Spec.VMs = []plan.VM{
+				{Ref: ref.Ref{ID: "vm-1", Name: "test-vm"}},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			_, found := excludeDiskBusAddressesEnv(env)
+			Expect(found).To(BeFalse())
 		})
 	})
 

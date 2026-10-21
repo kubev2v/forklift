@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
@@ -1331,6 +1332,75 @@ var _ = Describe("Conversion", func() {
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("cdrom"))
 				Expect(result).ToNot(ContainSubstring("/original/path/disk2.vmdk"))
+			},
+		)
+		It("drops the excluded disk and realigns remaining disks when excludeDisks is set (MTV-7136)",
+			func() {
+				appConfig.ExcludeDiskBusAddresses = "scsi0:1"
+				conversion.Disks = []*Disk{
+					{Link: "/var/tmp/v2v/vm-sda"},
+					{Link: "/var/tmp/v2v/vm-sdb"},
+				}
+
+				domainXML := `<domain type='kvm'>
+  <name>test-vm</name>
+  <devices>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk0.vmdk'/>
+      <target dev='sda' bus='scsi'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='0'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk1-excluded.vmdk'/>
+      <target dev='sdb' bus='scsi'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='1'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk2-boot.vmdk'/>
+      <target dev='sdc' bus='scsi'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='2'/>
+    </disk>
+  </devices>
+</domain>`
+
+				result, err := conversion.UpdateDiskPaths(domainXML)
+				Expect(err).ToNot(HaveOccurred())
+				// disk0 (scsi0:0) and disk2 (scsi0:2, the boot disk) are kept and
+				// mapped, in order, onto the two attached disks.
+				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
+				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdb"))
+				// The excluded disk (scsi0:1) is dropped entirely, not merged
+				// into another disk's entry.
+				Expect(result).ToNot(ContainSubstring("disk1-excluded"))
+				Expect(result).ToNot(ContainSubstring("disk0.vmdk"))
+				Expect(result).ToNot(ContainSubstring("disk2-boot.vmdk"))
+				// Exactly 2 disks should remain (the excluded one is gone, not
+				// just skipped-over while still counting towards the XML).
+				Expect(strings.Count(result, "<disk ")).To(Equal(2))
+			},
+		)
+
+		It("ignores excludeDisks bus addresses that don't match the domain XML",
+			func() {
+				appConfig.ExcludeDiskBusAddresses = "scsi0:5"
+				conversion.Disks = []*Disk{
+					{Link: "/var/tmp/v2v/vm-sda"},
+				}
+
+				domainXML := `<domain type='kvm'>
+  <name>test-vm</name>
+  <devices>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk0.vmdk'/>
+      <target dev='sda' bus='scsi'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='0'/>
+    </disk>
+  </devices>
+</domain>`
+
+				result, err := conversion.UpdateDiskPaths(domainXML)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 			},
 		)
 	})
