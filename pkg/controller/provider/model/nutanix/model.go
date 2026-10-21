@@ -114,6 +114,7 @@ type Network struct {
 	DefaultGateway string `sql:""`
 	DHCPServerIP   string `sql:""`
 	DHCPDomainName string `sql:""`
+	DNSServers     string `sql:""` // Comma-separated list
 	IPPoolRanges   string `sql:""` // Comma-separated list
 }
 
@@ -170,17 +171,26 @@ type SerialPort struct {
 	IsConnected bool `json:"isConnected"`
 }
 
+// StaticIPConfig holds the full network configuration for a statically-assigned NIC IP,
+// as reported by the Nutanix API (ip_type == "STATIC").
+type StaticIPConfig struct {
+	IP      string `json:"ip"`
+	Prefix  int    `json:"prefix"`
+	Gateway string `json:"gateway"`
+}
+
 // NIC represents a VM network interface
 type NIC struct {
-	UUID        string   `json:"uuid"`
-	NicType     string   `json:"nicType"` // NORMAL_NIC, DIRECT_NIC
-	MACAddress  string   `json:"macAddress"`
-	Model       string   `json:"model"` // VIRTIO, E1000
-	IsConnected bool     `json:"isConnected"`
-	SubnetUUID  string   `json:"subnetUuid"`
-	SubnetName  string   `json:"subnetName"`
-	IPAddresses []string `json:"ipAddresses"`
-	VlanMode    string   `json:"vlanMode"`
+	UUID            string           `json:"uuid"`
+	NicType         string           `json:"nicType"` // NORMAL_NIC, DIRECT_NIC
+	MACAddress      string           `json:"macAddress"`
+	Model           string           `json:"model"` // VIRTIO, E1000
+	IsConnected     bool             `json:"isConnected"`
+	SubnetUUID      string           `json:"subnetUuid"`
+	SubnetName      string           `json:"subnetName"`
+	IPAddresses     []string         `json:"ipAddresses"`
+	StaticIPConfigs []StaticIPConfig `json:"staticIpConfigs,omitempty"`
+	VlanMode        string           `json:"vlanMode"`
 }
 
 // Disk represents a VM disk

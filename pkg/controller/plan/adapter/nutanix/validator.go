@@ -5,6 +5,8 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -48,12 +50,23 @@ func (r *Validator) NICNetworkRefs(_ ref.Ref) ([]ref.Ref, error) {
 	return nil, nil
 }
 
-func (r *Validator) StaticIPs(_ ref.Ref) (bool, error) {
-	// Static IP preservation is not yet supported for Nutanix migrations.
-	if r.Plan.Spec.PreserveStaticIPs {
-		return false, nil
+func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
+	if !r.Plan.Spec.PreserveStaticIPs {
+		return true, nil
 	}
-	return true, nil
+	vm := &model.VM{}
+	if err := r.Source.Inventory.Find(vm, vmRef); err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef.String())
+	}
+	for _, nic := range vm.NICs {
+		if !nicPreservesStaticIP(nic, r.Context) {
+			continue
+		}
+		if len(nic.StaticIPConfigs) > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (r *Validator) UdnStaticIPs(_ ref.Ref, _ client.Client) (bool, error) {
