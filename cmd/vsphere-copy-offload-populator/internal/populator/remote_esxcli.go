@@ -208,6 +208,17 @@ func (p *RemoteEsxcliPopulator) Populate(ctx context.Context, vmId string, migra
 	}
 	setupLog.V(2).Info("current initiator groups for LUN", "lun", lun.IQN, "groups", originalInitiatorGroups)
 
+	// If the storage backend supports protocol-conflict resolution, evict any hosts that
+	// are connected via an incompatible transport family (e.g. NVMe-oF hosts when we
+	// are about to attach an iSCSI/FC xcopy initiator).  The evicted hosts are stored in
+	// mappingContext and restored unconditionally in the cleanup defer below.
+	if resolver, ok := p.StorageApi.(ProtocolConflictResolver); ok {
+		setupLog.Info("checking for protocol-conflicting connections before mapping", "lun", lun.Name)
+		if err := resolver.EvictConflictingConnections(lun, mappingContext); err != nil {
+			return fmt.Errorf("failed to evict conflicting connections for lun %s: %w", lun.Name, err)
+		}
+	}
+
 	fullCleanUpAttempted := false
 
 	defer func() {
@@ -226,6 +237,12 @@ func (p *RemoteEsxcliPopulator) Populate(ctx context.Context, vmId string, migra
 				}
 			} else {
 				setupLog.V(2).Info("skipping partial cleanup unmap (LUN not resolved)")
+			}
+		}
+		// Restore any connections that were evicted for protocol-conflict reasons.
+		if resolver, ok := p.StorageApi.(ProtocolConflictResolver); ok {
+			if errRestore := resolver.RestoreConflictingConnections(lun, mappingContext); errRestore != nil {
+				setupLog.Info("partial cleanup: failed to restore evicted connections", "err", errRestore)
 			}
 		}
 	}()
@@ -278,6 +295,14 @@ func (p *RemoteEsxcliPopulator) Populate(ctx context.Context, vmId string, migra
 		errUnmap := p.StorageApi.UnmapTarget(lun, mappingContext)
 		if errUnmap != nil {
 			cleanupLog.Info("failed to unmap during cleanup", "lun", lun.Name, "err", errUnmap)
+		}
+
+		// Restore any connections that were evicted for protocol-conflict reasons before
+		// we re-map the volume back to its original initiator groups.
+		if resolver, ok := p.StorageApi.(ProtocolConflictResolver); ok {
+			if errRestore := resolver.RestoreConflictingConnections(lun, mappingContext); errRestore != nil {
+				cleanupLog.Info("failed to restore evicted connections during cleanup", "lun", lun.Name, "err", errRestore)
+			}
 		}
 
 		cleanupLog.V(2).Info("mapping volume back to original initiator groups", "groups", originalInitiatorGroups)
@@ -483,6 +508,14 @@ func getScriptVersion(ctx context.Context, sshClient vmware.SSHClient, datastore
 }
 
 func checkScriptVersion(ctx context.Context, sshClient vmware.SSHClient, datastore, embeddedVersion string, publicKey []byte) error {
+	// "dev" is the default when the binary was not built with ldflags (local development).
+	// Skip the version check in that case — any script on the datastore is acceptable.
+	if embeddedVersion == "dev" {
+		setupLog := logger.New("xcopy").WithName("setup")
+		setupLog.Info("embedded script version is 'dev' (non-release build), skipping version check")
+		return nil
+	}
+
 	remoteVersion, err := getScriptVersion(ctx, sshClient, datastore)
 	if err != nil {
 		return fmt.Errorf("old script format detected (likely Python-based). Update script on datastore %s to version %s or newer: %w", datastore, embeddedVersion, err)
