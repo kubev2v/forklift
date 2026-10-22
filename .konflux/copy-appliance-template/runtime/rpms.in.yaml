@@ -8,22 +8,6 @@ packages:
   - open-vm-tools
   - podman
   - containernetworking-plugins
-  # needed for installroot
-  - systemd
-  - glibc
-  - sed
-  - tar
-  - grep
-  - which
-  - util-linux
-  - fuse3
-  - xmlsec1-openssl
-  - pciutils
-  - openssl-libs
-  - dbus-tools
-  - iproute
-  - gpgme-devel
-  - libseccomp
 contentOrigin:
   repofiles:
     - ./redhat.repo
