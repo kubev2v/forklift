@@ -1025,7 +1025,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		Type:     IndependentDiskWarning,
 		Status:   True,
 		Reason:   NotSupported,
-		Category: api.CategoryWarn,
+		Category: api.CategoryCritical,
 		Message:  "VM has independent disks which are not supported with VDDK transfer. Enable copy-offload (XCOPY) in the storage mapping to migrate independent disks, or change them to 'Dependent' mode in VMware.",
 		Items:    []string{},
 	}

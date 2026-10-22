@@ -1306,6 +1306,89 @@ var _ = ginkgo.Describe("Template Validation", func() {
 	})
 })
 
+var _ = ginkgo.Describe("RDM and independent disk checks", func() {
+	var (
+		rdmDiskWarning         libcnd.Condition
+		independentDiskWarning libcnd.Condition
+	)
+
+	ginkgo.BeforeEach(func() {
+		rdmDiskWarning = libcnd.Condition{
+			Type:     RDMDiskWarning,
+			Status:   libcnd.True,
+			Reason:   NotSupported,
+			Category: api.CategoryWarn,
+			Items:    []string{},
+		}
+		independentDiskWarning = libcnd.Condition{
+			Type:     IndependentDiskWarning,
+			Status:   libcnd.True,
+			Reason:   NotSupported,
+			Category: api.CategoryCritical,
+			Items:    []string{},
+		}
+	})
+
+	// checkDisks mirrors the RDM/independent disk loop in validateVM (MTV-5810):
+	// independent disks must block migration (Critical), and the check is
+	// skipped entirely when the plan uses copy-offload.
+	checkDisks := func(vm *vsphere.VM, isWarm, planUsesOffload bool, vmRef ref.Ref) {
+		if planUsesOffload {
+			return
+		}
+		for _, disk := range vm.Disks {
+			if disk.RDM && (!isWarm || disk.PhysicalMode) {
+				rdmDiskWarning.Items = append(rdmDiskWarning.Items, vmRef.String())
+				break
+			}
+		}
+		for _, disk := range vm.Disks {
+			if disk.Mode == "independent_persistent" || disk.Mode == "independent_nonpersistent" {
+				independentDiskWarning.Items = append(independentDiskWarning.Items, vmRef.String())
+				break
+			}
+		}
+	}
+
+	ginkgo.It("blocks migration (Critical) for VMs with independent-persistent disks", func() {
+		vm := &vsphere.VM{VM1: vsphere.VM1{Disks: []vspheremodel.Disk{{Mode: "independent_persistent"}}}}
+		vmRef := ref.Ref{Name: "vm-independent", Namespace: "test"}
+
+		checkDisks(vm, false, false, vmRef)
+
+		gomega.Expect(independentDiskWarning.Category).To(gomega.Equal(api.CategoryCritical))
+		gomega.Expect(independentDiskWarning.Items).To(gomega.ContainElement(vmRef.String()))
+	})
+
+	ginkgo.It("blocks migration (Critical) for VMs with independent-nonpersistent disks", func() {
+		vm := &vsphere.VM{VM1: vsphere.VM1{Disks: []vspheremodel.Disk{{Mode: "independent_nonpersistent"}}}}
+		vmRef := ref.Ref{Name: "vm-independent-np", Namespace: "test"}
+
+		checkDisks(vm, false, false, vmRef)
+
+		gomega.Expect(independentDiskWarning.Items).To(gomega.ContainElement(vmRef.String()))
+	})
+
+	ginkgo.It("skips the check entirely when the plan uses copy-offload", func() {
+		vm := &vsphere.VM{VM1: vsphere.VM1{Disks: []vspheremodel.Disk{{Mode: "independent_persistent"}}}}
+		vmRef := ref.Ref{Name: "vm-offload", Namespace: "test"}
+
+		checkDisks(vm, false, true, vmRef)
+
+		gomega.Expect(independentDiskWarning.Items).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("does not flag VMs without independent or RDM disks", func() {
+		vm := &vsphere.VM{VM1: vsphere.VM1{Disks: []vspheremodel.Disk{{Mode: "persistent"}}}}
+		vmRef := ref.Ref{Name: "vm-ok", Namespace: "test"}
+
+		checkDisks(vm, false, false, vmRef)
+
+		gomega.Expect(independentDiskWarning.Items).To(gomega.BeEmpty())
+		gomega.Expect(rdmDiskWarning.Items).To(gomega.BeEmpty())
+	})
+})
+
 var _ = ginkgo.Describe("aggregateCriticalConcerns", func() {
 	var vmCriticalConcerns libcnd.Condition
 
