@@ -3,12 +3,14 @@ package vsphere
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	liburl "net/url"
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
@@ -21,9 +23,11 @@ import (
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	core "k8s.io/api/core/v1"
 )
 
 var _ = Describe("vSphere collector", func() {
@@ -474,6 +478,42 @@ var _ = Describe("apply with tags", func() {
 		// The leaving VM must be deleted.
 		err = db.Get(&model.VM{Base: model.Base{ID: "vm-tag-leave-batch"}})
 		Expect(err).To(HaveOccurred())
+	})
+})
+
+var _ = Describe("Test() connection timeout", func() {
+	// MTV-6167: Test() is called synchronously by the SecretAdmitter webhook,
+	// which must respond within OpenShift's ~13s combined admission budget.
+	It("should return within TestConnectionTimeout when the endpoint hangs", func() {
+		// Start a TCP listener that accepts but never responds,
+		// simulating an unreachable/hung vCenter.
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		Expect(err).NotTo(HaveOccurred())
+		defer ln.Close()
+		go func() {
+			for {
+				conn, err := ln.Accept()
+				if err != nil {
+					return
+				}
+				// Hold connection open, never respond.
+				go func() { <-time.After(time.Minute); _ = conn.Close() }()
+			}
+		}()
+
+		collector := New(nil,
+			&api.Provider{Spec: api.ProviderSpec{URL: "https://" + ln.Addr().String() + "/sdk"}},
+			&core.Secret{Data: map[string][]byte{
+				"user": []byte("u"), "password": []byte("p"), "insecure": []byte("true"),
+			}})
+
+		start := time.Now()
+		_, testErr := collector.Test()
+		elapsed := time.Since(start)
+
+		Expect(testErr).To(HaveOccurred())
+		Expect(elapsed).To(BeNumerically("<", TestConnectionTimeout+2*time.Second),
+			"Test() must return within the budget, got %s", elapsed)
 	})
 })
 

@@ -2,6 +2,7 @@ package util
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
@@ -18,20 +19,22 @@ import (
 )
 
 func dialTLSWithTimeout(host string, cfg *tls.Config, timeout time.Duration) (*tls.Conn, error) {
-	conn, err := net.DialTimeout("tcp", host, timeout)
+	return dialTLSContext(context.Background(), host, cfg, timeout)
+}
+
+// dialTLSContext dials a TLS connection with both a per-dial timeout and
+// context cancellation on the TCP dial and TLS handshake.
+func dialTLSContext(ctx context.Context, host string, cfg *tls.Config, timeout time.Duration) (*tls.Conn, error) {
+	dialer := &net.Dialer{Timeout: timeout}
+	conn, err := dialer.DialContext(ctx, "tcp", host)
 	if err != nil {
 		return nil, err
 	}
-
 	tlsConn := tls.Client(conn, cfg)
-
-	// Set handshake timeout
-	err = tlsConn.Handshake()
-	if err != nil {
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		_ = conn.Close()
 		return nil, err
 	}
-
 	return tlsConn, nil
 }
 
@@ -44,18 +47,24 @@ func extractServerName(address string) string {
 	return host
 }
 
-func GetTlsCertificate(url *liburl.URL, secret *core.Secret) (crt *x509.Certificate, err error) {
+// GetTlsCertificate retrieves the server's TLS certificate.
+// Compatibility wrapper; use GetTlsCertificateContext for cancellation support.
+func GetTlsCertificate(url *liburl.URL, secret *core.Secret) (*x509.Certificate, error) {
+	return GetTlsCertificateContext(context.Background(), url, secret)
+}
+
+// GetTlsCertificateContext retrieves the server's TLS certificate,
+// respecting the supplied context for cancellation on both the TCP
+// dial and the TLS handshake.
+func GetTlsCertificateContext(ctx context.Context, url *liburl.URL, secret *core.Secret) (crt *x509.Certificate, err error) {
 	cfg, err := tlsConfig(secret)
 	if err != nil {
 		return
 	}
-	host := ""
 	if url.Host == "" {
-		//There are cases where the URL is provided without a host, e.g. "https://path/to/resource"
 		url.Host = url.Path
 	}
-	host = url.Host
-
+	host := url.Host
 	if host == "" {
 		err = liberr.New("URL host or path is empty")
 		return
@@ -63,16 +72,18 @@ func GetTlsCertificate(url *liburl.URL, secret *core.Secret) (crt *x509.Certific
 	if url.Port() == "" {
 		host += ":443"
 	}
-
-	//cfg.ServerName ensures the TLS handshake checks the correct hostname is in the server’s certificate
 	cfg.ServerName = extractServerName(host)
-	// disable verification since we don't trust it yet
 	cfg.InsecureSkipVerify = true
-	conn, err := dialTLSWithTimeout(host, cfg, time.Duration(settings.Settings.TlsConnectionTimeout)*time.Second)
-	if err == nil && len(conn.ConnectionState().PeerCertificates) > 0 {
+	conn, err := dialTLSContext(ctx, host, cfg, time.Duration(settings.Settings.TlsConnectionTimeout)*time.Second)
+	if err != nil {
+		err = liberr.Wrap(err, "url", url)
+		return
+	}
+	defer conn.Close()
+	if len(conn.ConnectionState().PeerCertificates) > 0 {
 		crt = conn.ConnectionState().PeerCertificates[0]
 	} else {
-		err = liberr.Wrap(err, "url", url)
+		err = liberr.Wrap(fmt.Errorf("no peer certificates"), "url", url)
 	}
 	return
 }
