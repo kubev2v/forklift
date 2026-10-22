@@ -235,7 +235,7 @@ spec:
         - name: COPY_APPLIANCE_TEMPLATE_MEMORY_MIB
           value: "{{ copy_appliance_template_memory_mib | default('4096', true) }}"
         - name: COPY_APPLIANCE_CONTAINER_IMAGE
-          value: "{{ copy_appliance_container_image_fqin | default('', true) }}"
+          value: "{{ copy_appliance_container_image_fqin or lookup('env', 'COPY_APPLIANCE_CONTAINER_IMAGE') or lookup('env', 'RELATED_IMAGE_COPY_APPLIANCE_CONTAINER') }}"
         - name: COPY_APPLIANCE_SETUP_IMAGE
           value: "{{ controller_image_fqin or lookup('env', 'CONTROLLER_IMAGE') or lookup('env', 'RELATED_IMAGE_CONTROLLER') }}"
         - name: COPY_APPLIANCE_SETUP_TRANSFER_NETWORK
@@ -429,7 +429,7 @@ spec:
         - name: COPY_APPLIANCE_TEMPLATE_MEMORY_MIB
           value: "{{ copy_appliance_template_memory_mib | default('4096', true) }}"
         - name: COPY_APPLIANCE_CONTAINER_IMAGE
-          value: "{{ copy_appliance_container_image_fqin | default('', true) }}"
+          value: "{{ copy_appliance_container_image_fqin or lookup('env', 'COPY_APPLIANCE_CONTAINER_IMAGE') or lookup('env', 'RELATED_IMAGE_COPY_APPLIANCE_CONTAINER') }}"
         - name: COPY_APPLIANCE_SETUP_IMAGE
           value: "{{ controller_image_fqin or lookup('env', 'CONTROLLER_IMAGE') or lookup('env', 'RELATED_IMAGE_CONTROLLER') }}"
         - name: COPY_APPLIANCE_SETUP_TRANSFER_NETWORK

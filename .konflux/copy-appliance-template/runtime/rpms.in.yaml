@@ -1,0 +1,18 @@
+packages:
+  - qemu-img
+  - libguestfs-tools
+  - libguestfs-xfs
+  - libguestfs
+  - guestfs-tools
+  - catatonit
+  - open-vm-tools
+  - podman
+  - containernetworking-plugins
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+context:
+  containerfile:
+    file: ../../../build/copy-appliance-template/Containerfile-downstream
+    stageName: runtime
+arches: [x86_64]
