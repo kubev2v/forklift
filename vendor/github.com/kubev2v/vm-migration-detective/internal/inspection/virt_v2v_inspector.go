@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kubev2v/vm-migration-detective/internal/cmdbuilder"
+	"github.com/kubev2v/vm-migration-detective/internal/tlsconfig"
 	"github.com/kubev2v/vm-migration-detective/internal/vddk"
 	"github.com/kubev2v/vm-migration-detective/pkg/types"
 	"github.com/sirupsen/logrus"
@@ -45,8 +46,8 @@ func (i *VirtV2vInspector) Inspect(
 	vcenterURL string,
 	username string,
 	password string,
+	tlsConfig *tlsconfig.Config,
 	diskInfo *types.SnapshotDiskInfo, // Snapshot disk info from vm_service
-	sslVerify string, // SSL verification option for vpx:// URL (e.g., "no_verify=1" or "cacert=/path/to/ca-bundle.crt")
 ) (*types.VirtV2VInspectorXML, error) {
 	i.logger.WithFields(logrus.Fields{
 		"vm_moref":       vmMoref,
@@ -75,10 +76,20 @@ func (i *VirtV2vInspector) Inspect(
 		return nil, fmt.Errorf("compute resource path is required for vpx:// URL")
 	}
 
+	// Validate TLS config
+	if tlsConfig == nil {
+		return nil, fmt.Errorf("TLS configuration is required")
+	}
+
+	// Build the TLS verification parameter from the configured TLS policy.
+	// CA mode passes the CA bundle path to virt-v2v; insecure and thumbprint
+	// modes use no_verify=1, with thumbprint verification handled by nbdkit.
+	sslVerify := tlsConfig.ForVirtV2V(tlsConfig.RootCAPath)
+
 	// Build vpx:// URL with username
 	// virt-v2v-inspector extracts the username from this URL to pass to VDDK internally
 	// Password is kept secure in separate file via -ip parameter
-	// Add SSL verification parameter (provided by caller)
+	// Add SSL verification parameter
 	libvirtURL := fmt.Sprintf("vpx://%s@%s%s?%s",
 		encodedUsername, bracketIPv6(vcenterHost), computeResourcePath, sslVerify)
 
@@ -94,10 +105,21 @@ func (i *VirtV2vInspector) Inspect(
 	}
 	defer func() { _ = os.Remove(passwordFile) }()
 
-	// Strip VDDK paths from LD_LIBRARY_PATH so libguestfs/supermin doesn't pick them up.
-	thumbprint, err := getVCenterThumbprint(vcenterHost)
-	if err != nil {
-		i.logger.WithError(err).Warn("Failed to get thumbprint, proceeding without SSL verification")
+	// Get thumbprint from TLS config or compute it
+	var thumbprint string
+	thumbprint = tlsConfig.ForNBDKit()
+
+	// If no thumbprint is configured, retrieve it for nbdkit. Secure modes
+	// must fail closed if the certificate cannot be verified or fingerprinted.
+	if thumbprint == "" && !tlsConfig.Insecure {
+		if i.logger != nil {
+			i.logger.Debug("No thumbprint in config, computing from vCenter certificate")
+		}
+		computed, err := tlsconfig.GetVCenterThumbprint(vcenterHost, tlsConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get vCenter certificate thumbprint: %w", err)
+		}
+		thumbprint = computed
 	}
 	vddkLibDir := vddk.GetLibDir()
 	vddkLibPath := vddk.GetLibPath()

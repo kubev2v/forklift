@@ -124,7 +124,7 @@ CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_T
 API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG)
 VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG)
 VIRT_V2V_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG)
-VIRT_V2V_IMAGE_RHEL9 ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v-xfs:$(REGISTRY_TAG)
+VIRT_V2V_IMAGE_RHEL9 ?= $(VIRT_V2V_IMAGE)
 OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)
 POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG)
 OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)
@@ -135,6 +135,8 @@ OVA_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG
 CLI_DOWNLOAD_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG)
 VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-copy-offload-populator:$(REGISTRY_TAG)
 DEEP_INSPECTION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-deep-inspection:$(REGISTRY_TAG)
+COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/copy-appliance-template-builder:$(REGISTRY_TAG)
+NBD_CONTAINER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/nbd-container:$(REGISTRY_TAG)
 
 ### OLM
 OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG)
@@ -339,13 +341,36 @@ build-operator-image: check_container_runtime
 push-operator-image: build-operator-image
 	$(CONTAINER_CMD) push $(OPERATOR_IMAGE)$(PLATFORM_SUFFIX)
 
-build-virt-v2v-image: check_container_runtime
+VIRTIO_WIN_LEGACY_PREFETCH := build/virt-v2v/prefetch
+VIRTIO_WIN_LEGACY_RPM := $(VIRTIO_WIN_LEGACY_PREFETCH)/virtio-win-0.1.160-1.noarch.rpm
+KERNEL_MODULES_INTERNAL_RPM := $(VIRTIO_WIN_LEGACY_PREFETCH)/kernel-modules-internal-6.12.0-271.el10.x86_64.rpm
+
+fetch-virtio-win-legacy:
+	bash build/virt-v2v/scripts/fetch-virtio-win-legacy.sh
+
+fetch-kernel-modules-internal:
+	bash build/virt-v2v/scripts/fetch-kernel-modules-internal.sh
+
+ensure-virtio-win-legacy:
+	@if [ -s "$(VIRTIO_WIN_LEGACY_RPM)" ]; then :; \
+	elif ls build/virt-v2v/prefetch/virtio-win-*.noarch.rpm >/dev/null 2>&1; then :; \
+	else bash build/virt-v2v/scripts/fetch-virtio-win-legacy.sh || \
+		echo "Note: legacy virtio-win RPM not prefetched; the winlegacyiso stage will fail without it."; fi
+
+ensure-kernel-modules-internal:
+	@if [ -s "$(KERNEL_MODULES_INTERNAL_RPM)" ]; then :; \
+	elif ls build/virt-v2v/prefetch/kernel-modules-internal-*.x86_64.rpm >/dev/null 2>&1; then :; \
+	else bash build/virt-v2v/scripts/fetch-kernel-modules-internal.sh || \
+		echo "Note: kernel-modules-internal RPM not prefetched; the runtime stage will fail without it."; fi
+
+build-virt-v2v-image: check_container_runtime ensure-virtio-win-legacy ensure-kernel-modules-internal
 	# virt-v2v dependencies (libguestfs, nbdkit, etc.) are AMD64-only
 	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
 		echo "Notice: virt-v2v image build is only supported on amd64 platform."; \
 		echo "Current platform: $(PLATFORM) - skipping virt-v2v image build."; \
 	else \
-		$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX) -f build/virt-v2v/Containerfile-upstream .; \
+		$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) \
+			-t $(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX) -f build/virt-v2v/Containerfile .; \
 	fi
 
 push-virt-v2v-image: build-virt-v2v-image
@@ -354,22 +379,6 @@ push-virt-v2v-image: build-virt-v2v-image
 		echo "Current platform: $(PLATFORM) - skipping virt-v2v image push."; \
 	else \
 		$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX); \
-	fi
-
-build-virt-v2v-xfs-image: check_container_runtime
-	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
-		echo "Notice: virt-v2v-xfs image build is only supported on amd64 platform."; \
-		echo "Current platform: $(PLATFORM) - skipping virt-v2v-xfs image build."; \
-	else \
-		$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(VIRT_V2V_IMAGE_RHEL9)$(PLATFORM_SUFFIX) -f build/virt-v2v/Containerfile-upstream-xfs .; \
-	fi
-
-push-virt-v2v-xfs-image: build-virt-v2v-xfs-image
-	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
-		echo "Notice: virt-v2v-xfs image push is only supported on amd64 platform."; \
-		echo "Current platform: $(PLATFORM) - skipping virt-v2v-xfs image push."; \
-	else \
-		$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE_RHEL9)$(PLATFORM_SUFFIX); \
 	fi
 
 build-operator-bundle-image: check_container_runtime
@@ -393,7 +402,9 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg HYPERV_PROVIDER_SERVER_IMAGE=$(HYPERV_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OVA_PROXY_IMAGE=$(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE=$(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) \
-		--build-arg VIRT_V2V_IMAGE_RHEL9=$(VIRT_V2V_IMAGE_RHEL9)$(PLATFORM_SUFFIX)
+		--build-arg VIRT_V2V_IMAGE_RHEL9=$(VIRT_V2V_IMAGE_RHEL9)$(PLATFORM_SUFFIX) \
+		--build-arg COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE=$(COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg NBD_CONTAINER_IMAGE=$(NBD_CONTAINER_IMAGE)$(PLATFORM_SUFFIX)
 
 push-operator-bundle-image: build-operator-bundle-image
 	$(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)$(PLATFORM_SUFFIX)
@@ -456,6 +467,32 @@ build-vsphere-copy-offload-populator-image: check_container_runtime
 push-vsphere-copy-offload-populator-image: build-vsphere-copy-offload-populator-image
 	$(CONTAINER_CMD) push $(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
 
+build-copy-appliance-template-builder-image: check_container_runtime
+	# libguestfs appliance generation is AMD64-only
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: copy-appliance-template-builder image build is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping copy-appliance-template-builder image build."; \
+	else \
+		$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) \
+			--build-arg USE_BSDTAR=$$([ "$$(uname -s)" = Darwin ] && echo true || echo false) \
+			-t $(COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE)$(PLATFORM_SUFFIX) \
+			-f build/copy-appliance-template/Containerfile.builder .; \
+	fi
+
+push-copy-appliance-template-builder-image: build-copy-appliance-template-builder-image
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: copy-appliance-template-builder image push is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping copy-appliance-template-builder image push."; \
+	else \
+		$(CONTAINER_CMD) push $(COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE)$(PLATFORM_SUFFIX); \
+	fi
+
+build-nbd-container-image: check_container_runtime ## Build nbdkit container image loaded onto copy appliances
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(NBD_CONTAINER_IMAGE)$(PLATFORM_SUFFIX) -f build/nbd-container/Containerfile .
+
+push-nbd-container-image: build-nbd-container-image ## Push nbd-container image
+	$(CONTAINER_CMD) push $(NBD_CONTAINER_IMAGE)$(PLATFORM_SUFFIX)
+
 build-ova-provider-server-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(OVA_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) -f build/ova-provider-server/Containerfile .
 
@@ -486,7 +523,7 @@ build-deep-inspection-image: check_container_runtime ## Build forklift-deep-insp
 		echo "Notice: deep-inspection image build is only supported on amd64 platform."; \
 		echo "Current platform: $(PLATFORM) - skipping deep-inspection image build."; \
 	else \
-		$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(DEEP_INSPECTION_IMAGE)$(PLATFORM_SUFFIX) -f build/deep-inspection/Containerfile-upstream .; \
+		$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(DEEP_INSPECTION_IMAGE)$(PLATFORM_SUFFIX) -f build/deep-inspection/Containerfile .; \
 	fi
 
 push-deep-inspection-image: build-deep-inspection-image ## Push forklift-deep-inspection image
@@ -504,11 +541,12 @@ build-all-images: build-api-image \
                   build-validation-image \
                   build-operator-image \
                   build-virt-v2v-image \
-                  build-virt-v2v-xfs-image \
                   build-populator-controller-image \
                   build-ovirt-populator-image \
                   build-openstack-populator-image\
                   build-vsphere-copy-offload-populator-image\
+                  build-copy-appliance-template-builder-image \
+                  build-nbd-container-image \
                   build-ova-provider-server-image \
                   build-hyperv-provider-server-image \
                   build-cli-download-image \
@@ -523,11 +561,12 @@ push-all-images:  push-api-image \
                   push-validation-image \
                   push-operator-image \
                   push-virt-v2v-image \
-                  push-virt-v2v-xfs-image \
                   push-populator-controller-image \
                   push-ovirt-populator-image \
                   push-openstack-populator-image\
                   push-vsphere-copy-offload-populator-image\
+                  push-copy-appliance-template-builder-image \
+                  push-nbd-container-image \
                   push-ova-provider-server-image \
                   push-hyperv-provider-server-image \
                   push-cli-download-image \
@@ -570,12 +609,6 @@ push-virt-v2v-image-manifest:
 	$(CONTAINER_CMD) manifest create $(VIRT_V2V_IMAGE) \
 		$(VIRT_V2V_IMAGE)-amd64
 	$(CONTAINER_CMD) manifest push $(VIRT_V2V_IMAGE)
-
-push-virt-v2v-xfs-image-manifest:
-	$(CONTAINER_CMD) manifest rm $(VIRT_V2V_IMAGE_RHEL9) || true
-	$(CONTAINER_CMD) manifest create $(VIRT_V2V_IMAGE_RHEL9) \
-		$(VIRT_V2V_IMAGE_RHEL9)-amd64
-	$(CONTAINER_CMD) manifest push $(VIRT_V2V_IMAGE_RHEL9)
 
 push-populator-controller-image-manifest:
 	$(CONTAINER_CMD) manifest rm $(POPULATOR_CONTROLLER_IMAGE) || true
@@ -652,7 +685,6 @@ push-all-images-manifest: push-controller-image-manifest \
                           push-validation-image-manifest \
                           push-operator-image-manifest \
                           push-virt-v2v-image-manifest \
-                          push-virt-v2v-xfs-image-manifest \
                           push-populator-controller-image-manifest \
                           push-ovirt-populator-image-manifest \
                           push-openstack-populator-image-manifest \

@@ -5,7 +5,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/url"
-	"path"
 	"strconv"
 	"strings"
 
@@ -338,8 +337,9 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 				kInterface.Masquerade = &cnv.InterfaceMasquerade{}
 			}
 		case Multus:
+			networkName := planbase.QualifiedMultusNetworkName(mapped.Destination.Namespace, mapped.Destination.Name, r.Plan.Spec.TargetNamespace)
 			kNetwork.Multus = &cnv.MultusNetwork{
-				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+				NetworkName: networkName,
 			}
 			if nic.Profile.PassThrough {
 				kInterface.SRIOV = &cnv.InterfaceSRIOV{}
@@ -1071,4 +1071,8 @@ func (r *Builder) RefreshImportCredentials(_ *cdi.DataVolume) (bool, error) {
 
 func (r *Builder) SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *api.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error) {
 	return
+}
+
+func (r *Builder) DomainXML(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (string, error) {
+	return "", nil
 }

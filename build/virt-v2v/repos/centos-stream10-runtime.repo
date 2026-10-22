@@ -1,0 +1,32 @@
+# CentOS Stream 10 repos for the runtime stage (virt-v2v, libguestfs, nbdkit).
+# BaseOS provides the kernel packages that satisfy the prefetched
+# kernel-modules-internal RPM's kernel-*-uname-r requires (and catatonit,
+# xfsprogs). AppStream provides virt-v2v, libguestfs, libvirt and nbdkit.
+# CRB is not needed at runtime.
+# Plus EPEL 10: btrfs-progs (needed for btrfs guests) is not in CS10 repos.
+[cs10-baseos]
+name=CentOS Stream 10 - BaseOS
+baseurl=https://mirror.stream.centos.org/10-stream/BaseOS/$basearch/os/
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official-SHA256
+enabled=1
+skip_if_unavailable=0
+
+[cs10-appstream]
+name=CentOS Stream 10 - AppStream
+baseurl=https://mirror.stream.centos.org/10-stream/AppStream/$basearch/os/
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official-SHA256
+enabled=1
+skip_if_unavailable=0
+
+[epel-10]
+name=EPEL 10
+baseurl=https://dl.fedoraproject.org/pub/epel/10/Everything/$basearch/
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-10
+enabled=1
+skip_if_unavailable=0

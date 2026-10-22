@@ -78,6 +78,17 @@ type PodConfig struct {
 	RequestKVM bool
 }
 
+// IsHyperVSource returns true when the pod config targets a Hyper-V source
+// (V2V_SOURCE=hyperv in the environment).
+func (c *PodConfig) IsHyperVSource() bool {
+	for _, e := range c.Environment {
+		if e.Name == "V2V_SOURCE" && e.Value == "hyperv" {
+			return true
+		}
+	}
+	return false
+}
+
 // PodConfigFromSpec builds a PodConfig from a Conversion CR spec.
 func PodConfigFromSpec(conversion *api.Conversion) PodConfig {
 	ns := conversion.Spec.TargetNamespace
@@ -125,6 +136,7 @@ func PodConfigFromSpec(conversion *api.Conversion) PodConfig {
 		env = append(env, core.EnvVar{Name: k, Value: v})
 	}
 	podConfig.Environment = env
+	podConfig.ExtraInitContainers = conversion.Spec.ExtraInitContainers
 
 	return podConfig
 }

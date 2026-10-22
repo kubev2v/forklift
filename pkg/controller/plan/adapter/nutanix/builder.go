@@ -1,11 +1,13 @@
 package nutanix
 
 import (
+	"bytes"
 	"context"
 	"encoding/pem"
 	"fmt"
 	"net/url"
 	"path"
+	"sort"
 	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -18,6 +20,7 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	libutil "github.com/kubev2v/forklift/pkg/lib/util"
+	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +29,7 @@ import (
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	libvirtxml "libvirt.org/go/libvirtxml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -42,6 +46,7 @@ const (
 	adapterSCSI = "SCSI"
 	adapterSATA = "SATA"
 	adapterIDE  = "IDE"
+	adapterPCI  = "PCI"
 )
 
 // Labels / secret keys for Prism Central download-cookie Secrets referenced
@@ -56,6 +61,30 @@ const (
 	labelDownloadCookie = "forklift.konveyor.io/nutanix-download-cookie"
 	cookieHeaderKey     = "cookie"
 )
+
+// adapterPriority maps Nutanix adapter types to sort priority (lower = first).
+var adapterPriority = map[string]int{
+	adapterSCSI: 0,
+	adapterSATA: 1,
+	adapterIDE:  2,
+	adapterPCI:  3,
+}
+
+// busTypeMap maps Nutanix adapter types to libvirt bus names.
+var busTypeMap = map[string]string{
+	adapterSCSI: "scsi",
+	adapterSATA: "sata",
+	adapterIDE:  "ide",
+	adapterPCI:  "virtio",
+}
+
+// nicModelMap maps Nutanix NIC model names to libvirt model names.
+var nicModelMap = map[string]string{
+	"VIRTIO": "virtio",
+	"E1000":  "e1000",
+}
+
+const diskLetters = "abcdefghijklmnopqrstuvwxyz"
 
 type Builder struct {
 	*plancontext.Context
@@ -73,28 +102,15 @@ func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) error {
 }
 
 // ConfigMap carries a CA certificate for CDI's HTTP importer to trust when
-// downloading catalog images. CDI's DataVolumeSourceHTTP has no
-// insecureSkipVerify field (unlike e.g. ImageIO), so when the provider is
-// configured with insecureSkipVerify instead of a real CA, the only way to
-// honor that is to fetch the server's own certificate once and trust it
-// explicitly here -- the same fallback oVirt uses for older CNV versions.
+// downloading catalog images. In secure mode (no insecureSkipVerify), only
+// ca.crt from the provider secret is copied; CDI verifies import TLS against
+// that bundle. When insecureSkipVerify is set, DataVolumes() may fetch and
+// pin leaf certificates from import endpoints (CDI HTTP import has no
+// insecureSkipVerify field).
 func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) error {
 	if cacert, found := libutil.GetCACert(in); found && len(cacert) > 0 {
 		setCDICACerts(object, cacert)
-		return nil
 	}
-	if !providerbase.GetInsecureSkipVerifyFlag(in) {
-		return nil
-	}
-
-	cacert, err := r.fetchProviderCert()
-	if err != nil {
-		r.Log.Error(err, "Failed to fetch Nutanix provider certificate")
-		// Don't fail here -- let the migration proceed and fail with a
-		// clearer error from CDI if the certificate is actually needed.
-		return nil
-	}
-	setCDICACerts(object, cacert)
 	return nil
 }
 
@@ -109,24 +125,197 @@ func setCDICACerts(object *core.ConfigMap, cacert []byte) {
 	object.BinaryData["tls.crt"] = cacert
 }
 
-// fetchProviderCert dials the Nutanix provider URL and returns its leaf
-// certificate PEM-encoded, for use as a trusted CA when insecureSkipVerify
-// is set instead of a real CA certificate.
-func (r *Builder) fetchProviderCert() ([]byte, error) {
-	providerURL := r.Source.Provider.Spec.URL
-	parsedURL, err := url.Parse(providerURL)
+// configMapHasCert reports whether the ConfigMap already carries CA material.
+func configMapHasCert(configMap *core.ConfigMap) bool {
+	if configMap == nil || len(configMap.BinaryData) == 0 {
+		return false
+	}
+	return len(configMap.BinaryData["ca.pem"]) > 0 || len(configMap.BinaryData["tls.crt"]) > 0
+}
+
+// configMapBundleMatches reports whether both CDI cert keys match the bundle.
+func configMapBundleMatches(configMap *core.ConfigMap, bundle []byte) bool {
+	if configMap == nil || len(bundle) == 0 {
+		return false
+	}
+	return bytes.Equal(configMap.BinaryData["ca.pem"], bundle) &&
+		bytes.Equal(configMap.BinaryData["tls.crt"], bundle)
+}
+
+// ensureImportCertConfigMap updates the CDI cert ConfigMap for Nutanix HTTP
+// imports when insecureSkipVerify is enabled. It merges optional ca.crt with
+// leaf certificates fetched from each distinct import TLS endpoint. Secure
+// migrations rely on a pre-configured ca.crt bundle only.
+func (r *Builder) ensureImportCertConfigMap(
+	configMap *core.ConfigMap,
+	secret *core.Secret,
+	client *Client,
+	vmRef ref.Ref,
+	vm *model.VM,
+) error {
+	if !providerbase.GetInsecureSkipVerifyFlag(secret) {
+		return nil
+	}
+
+	urls, err := r.importCertURLs(client, vmRef, vm)
 	if err != nil {
-		return nil, liberr.Wrap(err, "failed to parse Nutanix provider URL", "url", providerURL)
+		return err
+	}
+
+	bundle, err := r.buildImportCertBundle(secret, urls)
+	if err != nil {
+		return err
+	}
+	if len(bundle) == 0 {
+		return nil
+	}
+	if configMapBundleMatches(configMap, bundle) {
+		return nil
+	}
+
+	setCDICACerts(configMap, bundle)
+	if err = r.Destination.Update(context.TODO(), configMap); err != nil {
+		return liberr.Wrap(err, "configMap", path.Join(configMap.Namespace, configMap.Name))
+	}
+	r.Log.V(1).Info("Updated CDI cert ConfigMap for Nutanix HTTP import endpoints.",
+		"configMap", path.Join(configMap.Namespace, configMap.Name),
+		"urls", urls,
+		"vm", vmRef.String())
+	return nil
+}
+
+// importCertURLs lists HTTPS endpoints whose certificates CDI may need to
+// trust. Prism Element uses the provider URL. Prism Central includes the
+// provider URL plus each resolved entity_download URL (deduped by host).
+func (r *Builder) importCertURLs(client *Client, vmRef ref.Ref, vm *model.VM) ([]string, error) {
+	providerURL := strings.TrimRight(r.Source.Provider.Spec.URL, "/")
+	element, err := client.isPrismElement()
+	if err != nil {
+		return nil, err
+	}
+	if element {
+		return []string{providerURL}, nil
+	}
+
+	seen := map[string]struct{}{}
+	var urls []string
+	urls, err = appendUniqueImportCertURL(urls, seen, providerURL)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, disk := range vm.Disks {
+		if disk.IsCdrom {
+			continue
+		}
+		name := migrationImageName(string(r.Migration.UID), vmRef, disk.UUID)
+		downloadURL, _, err := r.resolveCentralDownload(client, name)
+		if err != nil {
+			return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", disk.UUID)
+		}
+		urls, err = appendUniqueImportCertURL(urls, seen, downloadURL)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(urls) == 0 {
+		return nil, liberr.New("no importable disks found for cert resolution", "vm", vmRef.String())
+	}
+	return urls, nil
+}
+
+// appendUniqueImportCertURL appends rawURL when its TLS host has not been seen.
+func appendUniqueImportCertURL(urls []string, seen map[string]struct{}, rawURL string) ([]string, error) {
+	host, err := importCertTLSHost(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := seen[host]; ok {
+		return urls, nil
+	}
+	seen[host] = struct{}{}
+	return append(urls, strings.TrimRight(rawURL, "/")), nil
+}
+
+// importCertTLSHost returns the host portion of an HTTPS import URL.
+func importCertTLSHost(rawURL string) (string, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "", liberr.Wrap(err, "failed to parse import URL", "url", rawURL)
+	}
+	if parsed.Host == "" {
+		return "", liberr.New("import URL missing host", "url", rawURL)
+	}
+	return parsed.Host, nil
+}
+
+// buildImportCertBundle merges ca.crt from the provider secret with leaf
+// certificates fetched from each import URL when insecureSkipVerify is set.
+// Any fetch failure is returned to the caller so the ConfigMap is not updated
+// with an incomplete trust bundle.
+func (r *Builder) buildImportCertBundle(secret *core.Secret, urls []string) ([]byte, error) {
+	var chunks [][]byte
+	if cacert, found := libutil.GetCACert(secret); found && len(cacert) > 0 {
+		chunks = append(chunks, cacert)
+	}
+	if !providerbase.GetInsecureSkipVerifyFlag(secret) {
+		return mergePEMCertificates(chunks...), nil
+	}
+	for _, rawURL := range urls {
+		cacert, err := r.fetchCertFromURL(rawURL, secret)
+		if err != nil {
+			return nil, liberr.Wrap(err, "url", rawURL)
+		}
+		chunks = append(chunks, cacert)
+	}
+	return mergePEMCertificates(chunks...), nil
+}
+
+// mergePEMCertificates concatenates PEM blocks and deduplicates certificates.
+func mergePEMCertificates(chunks ...[]byte) []byte {
+	seen := map[string]struct{}{}
+	var out []byte
+	for _, chunk := range chunks {
+		rest := chunk
+		for {
+			var block *pem.Block
+			block, rest = pem.Decode(rest)
+			if block == nil {
+				break
+			}
+			if block.Type != "CERTIFICATE" {
+				continue
+			}
+			key := string(block.Bytes)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, pem.EncodeToMemory(block)...)
+		}
+	}
+	return out
+}
+
+// fetchCertFromURL dials the given HTTPS endpoint and returns its leaf
+// certificate PEM-encoded.
+func (r *Builder) fetchCertFromURL(rawURL string, secret *core.Secret) ([]byte, error) {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, liberr.Wrap(err, "failed to parse import URL", "url", rawURL)
+	}
+	if parsedURL.Scheme == "" {
+		parsedURL.Scheme = "https"
 	}
 
 	cert, err := libutil.GetTlsCertificate(parsedURL, &core.Secret{
 		Data: map[string][]byte{"insecureSkipVerify": []byte("true")},
 	})
 	if err != nil {
-		return nil, liberr.Wrap(err, "failed to fetch certificate from Nutanix provider")
+		return nil, liberr.Wrap(err, "failed to fetch certificate from import URL", "url", rawURL)
 	}
 	if cert == nil {
-		return nil, liberr.New("no certificate returned from Nutanix provider")
+		return nil, liberr.New("no certificate returned from import URL", "url", rawURL)
 	}
 
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}), nil
@@ -153,17 +342,19 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	return nil
 }
 
+// mapDisks builds the KubeVirt volumes/disks for the conversion pod's VM spec.
+// Disks are walked in dataDisks(vm) order (SCSI→SATA→IDE→PCI, then DeviceIndex)
+// so that the resulting volume order matches the order buildDomainXML() uses to
+// place PVCs at /mnt/disks/disk{i} -- podVolumeMounts() mounts PVCs at that path
+// using this same volume order (see KubeVirt.getVMVolumes/podVolumeMounts).
 func (r *Builder) mapDisks(vm *model.VM, pvcs []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 
 	bootDisk := bootDiskUUID(vm)
 
-	for _, disk := range vm.Disks {
-		if disk.IsCdrom {
-			continue
-		}
-		pvc := r.findPVC(disk.UUID, pvcs)
+	for _, disk := range dataDisks(vm) {
+		pvc := findPVC(disk.UUID, pvcs)
 		if pvc == nil {
 			r.Log.Info("PVC not found for disk, skipping",
 				"diskID", disk.UUID,
@@ -242,7 +433,9 @@ func parseBootDeviceOrder(order string) []string {
 	return result
 }
 
-func (r *Builder) findPVC(diskID string, pvcs []*core.PersistentVolumeClaim) *core.PersistentVolumeClaim {
+// findPVC returns the PVC annotated as the destination for the given source
+// disk ID, or nil if none of the supplied PVCs match.
+func findPVC(diskID string, pvcs []*core.PersistentVolumeClaim) *core.PersistentVolumeClaim {
 	for _, pvc := range pvcs {
 		if pvc.Annotations != nil {
 			if pvc.Annotations[planbase.AnnDiskSource] == diskID {
@@ -426,13 +619,18 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	if err != nil {
 		return nil, err
 	}
+	if err = r.ensureImportCertConfigMap(configMap, r.Source.Secret, client, vmRef, vm); err != nil {
+		return nil, err
+	}
 
 	baseURL := strings.TrimRight(r.Source.Provider.Spec.URL, "/")
 
-	for _, disk := range vm.Disks {
-		if disk.IsCdrom {
-			continue
-		}
+	// Disks are walked in dataDisks(vm) order (SCSI→SATA→IDE→PCI, then
+	// DeviceIndex) and diskIndex only advances for disks that actually get a
+	// DataVolume, so it matches the volume order mapDisks()/buildDomainXML()
+	// produce for the same VM (both skip disks with no storage mapping).
+	diskIndex := 0
+	for _, disk := range dataDisks(vm) {
 		destination, mapped := storageMap[disk.StorageContainerUUID]
 		if !mapped {
 			return nil, liberr.New(
@@ -453,8 +651,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 			return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", disk.UUID)
 		}
 
-		dv := r.mapDataVolume(disk, destination, dvTemplate, httpSource)
+		dv := r.mapDataVolume(disk, destination, dvTemplate, httpSource, diskIndex)
 		dvs = append(dvs, *dv)
+		diskIndex++
 	}
 
 	return dvs, nil
@@ -739,6 +938,7 @@ func (r *Builder) mapDataVolume(
 	destination api.DestinationStorage,
 	dvTemplate *cdi.DataVolume,
 	httpSource *cdi.DataVolumeSourceHTTP,
+	diskIndex int,
 ) (dv *cdi.DataVolume) {
 	storageClass := destination.StorageClass
 	dvSpec := cdi.DataVolumeSpec{
@@ -765,12 +965,7 @@ func (r *Builder) mapDataVolume(
 		dv.Annotations = make(map[string]string)
 	}
 	dv.Annotations[planbase.AnnDiskSource] = disk.UUID
-	// Nutanix has no conversion pod to act as the first consumer of a
-	// WaitForFirstConsumer storage class during a cold migration to the
-	// local cluster (unlike vSphere), so request immediate binding here --
-	// otherwise the PVC, and thus the import, would never start.
-	// TODO: remove this when Nutanix has a conversion step.
-	dv.Annotations[planbase.AnnBindImmediate] = "true"
+	dv.Annotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
 	return dv
 }
 
@@ -800,35 +995,308 @@ func (r *Builder) Tasks(vmRef ref.Ref) (tasks []*plan.Task, err error) {
 	return
 }
 
-func (r *Builder) TemplateLabels(_ ref.Ref) (labels map[string]string, err error) {
-	labels = make(map[string]string)
-	return
+func (r *Builder) TemplateLabels(_ ref.Ref) (map[string]string, error) {
+	return make(map[string]string), nil
 }
 
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	if dv == nil || dv.Annotations == nil {
-		return ""
+	if dv.Annotations != nil {
+		if id, ok := dv.Annotations[planbase.AnnDiskSource]; ok {
+			return id
+		}
 	}
-	return dv.Annotations[planbase.AnnDiskSource]
+	return dv.Name
 }
 
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
-	if pvc == nil || pvc.Annotations == nil {
-		return ""
+	if pvc.Annotations != nil {
+		if id, ok := pvc.Annotations[planbase.AnnDiskSource]; ok {
+			return id
+		}
 	}
-	return pvc.Annotations[planbase.AnnDiskSource]
+	return pvc.Name
 }
 
-func (r *Builder) PodEnvironment(_ ref.Ref, _ *core.Secret) (env []core.EnvVar, err error) {
+// PodEnvironment sets the VM name env var for the virt-v2v pod.
+// The domain XML is passed to the pod via a ConfigMap mounted at /tmp/input.xml
+// (see ensureNutanixDomainXMLConfigMap in kubevirt.go), so we don't need to
+// encode any hardware metadata here.
+func (r *Builder) PodEnvironment(vmRef ref.Ref, _ *core.Secret) (env []core.EnvVar, err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+	env = append(env,
+		core.EnvVar{Name: "V2V_vmName", Value: vm.Name},
+		core.EnvVar{Name: v2vconfig.EnvNutanixDriverRemovalName, Value: "true"},
+	)
+
+	staticIPs, staticErr := r.mapMacStaticIps(vm)
+	if staticErr != nil {
+		err = staticErr
+		return
+	}
+	if staticIPs != "" {
+		env = append(env, core.EnvVar{Name: "V2V_staticIPs", Value: staticIPs})
+	}
+
+	return
+}
+
+// nicPreservesStaticIP returns true when the NIC's static IP should be passed
+// to virt-v2v. The NetworkMap pair's networkIPMode overrides the plan-level
+// preserveStaticIPs flag; when no matching pair exists, the flag wins.
+func nicPreservesStaticIP(nic model.NIC, ctx *plancontext.Context) bool {
+	if ctx.Map.Network != nil {
+		for _, pair := range ctx.Map.Network.Spec.Map {
+			if pair.Source.ID == nic.SubnetUUID {
+				if pair.Destination.Type == planbase.Ignored {
+					return false
+				}
+				if pair.NetworkIPMode != "" {
+					return pair.NetworkIPMode == api.NetworkIPModePreserve
+				}
+				break
+			}
+		}
+	}
+	return ctx.Plan.Spec.PreserveStaticIPs
+}
+
+// mapMacStaticIps builds the V2V_staticIPs value for virt-v2v's --mac flag.
+// For each NIC that has IP addresses, it looks up the subnet to obtain the
+// default gateway, prefix length, and DNS servers, then formats each IP as:
+//
+//	<MAC>:ip:<IP>,<Gateway>,<PrefixLength>,<DNS1>,<DNS2>,...
+//
+// Multiple entries are joined with "_". Returns an error if a NIC's subnet
+// cannot be found in inventory.
+func (r *Builder) mapMacStaticIps(vm *model.VM) (string, error) {
+	var entries []string
+	for _, nic := range vm.NICs {
+		if len(nic.StaticIPConfigs) == 0 {
+			continue
+		}
+		if !nicPreservesStaticIP(nic, r.Context) {
+			continue
+		}
+
+		// DNS servers come from the subnet (subnet-wide, not per-IP).
+		dnsString := ""
+		if nic.SubnetUUID != "" {
+			network := &model.Network{}
+			if err := r.Source.Inventory.Find(network, ref.Ref{ID: nic.SubnetUUID}); err != nil {
+				return "", liberr.Wrap(err, "nic", nic.MACAddress, "subnet", nic.SubnetUUID)
+			}
+			dnsString = strings.Join(network.DNSServers, ",")
+		}
+
+		for _, cfg := range nic.StaticIPConfigs {
+			entry := fmt.Sprintf("%s:ip:%s,%s,%d,%s",
+				nic.MACAddress, cfg.IP, cfg.Gateway, cfg.Prefix, dnsString)
+			entries = append(entries, strings.TrimSuffix(entry, ","))
+		}
+	}
+	return strings.Join(entries, "_"), nil
+}
+
+// DomainXML generates a libvirt domain XML document from the Nutanix VM
+// inventory data and the volume modes of the supplied PVCs.
+func (r *Builder) DomainXML(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (string, error) {
+	vm := &model.VM{}
+	if err := r.Source.Inventory.Find(vm, vmRef); err != nil {
+		return "", liberr.Wrap(err, "vm", vmRef.String())
+	}
+	return buildDomainXML(vm, pvcs)
+}
+
+// buildDomainXML constructs the libvirt domain XML from a Nutanix VM model and
+// optional PVCs. Exported for testing; callers that don't have PVCs (e.g. tests
+// querying inventory directly) may pass nil, in which case every non-CDROM
+// disk is included using placeholder file-backed paths.
+//
+// Disks are walked in dataDisks(vm) order (SCSI→SATA→IDE→PCI, then
+// DeviceIndex) and matched to a PVC by disk UUID (via AnnDiskSource), exactly
+// as Builder.mapDisks() does when building the conversion pod's VM spec. A
+// disk with no matching PVC (e.g. unmapped storage) is omitted entirely,
+// rather than merely defaulting its volume mode, so the resulting disk index
+// i stays aligned with the pod mount order that podVolumeMounts() derives
+// from that same VM spec (see KubeVirt.getVMVolumes/podVolumeMounts).
+func buildDomainXML(vm *model.VM, pvcs []*core.PersistentVolumeClaim) (string, error) {
+	disks := dataDisks(vm)
+	bootUUID := bootDiskUUID(vm)
+
+	libvirtDisks := make([]libvirtxml.DomainDisk, 0, len(disks))
+	i := 0
+	for _, disk := range disks {
+		var pvc *core.PersistentVolumeClaim
+		if pvcs != nil {
+			pvc = findPVC(disk.UUID, pvcs)
+			if pvc == nil {
+				continue
+			}
+		}
+
+		bus, ok := busTypeMap[disk.AdapterType]
+		if !ok {
+			bus = "scsi"
+		}
+
+		var source libvirtxml.DomainDiskSource
+		if pvc != nil && pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
+			source = libvirtxml.DomainDiskSource{
+				Block: &libvirtxml.DomainDiskSourceBlock{Dev: fmt.Sprintf("/dev/block%d", i)},
+			}
+		} else {
+			source = libvirtxml.DomainDiskSource{
+				File: &libvirtxml.DomainDiskSourceFile{File: fmt.Sprintf("/mnt/disks/disk%d/disk.img", i)},
+			}
+		}
+
+		devPrefix := "sd"
+		if bus == "virtio" {
+			devPrefix = "vd"
+		}
+		devName := devPrefix + diskIndexLetter(i)
+
+		d := libvirtxml.DomainDisk{
+			Device: "disk",
+			Driver: &libvirtxml.DomainDiskDriver{Name: "qemu", Type: "raw"},
+			Source: &source,
+			Target: &libvirtxml.DomainDiskTarget{Dev: devName, Bus: bus},
+		}
+		if disk.UUID == bootUUID {
+			d.Boot = &libvirtxml.DomainDeviceBoot{Order: 1}
+		}
+		libvirtDisks = append(libvirtDisks, d)
+		i++
+	}
+
+	// NICs — DIRECT_NIC (SR-IOV/passthrough) is omitted because we lack the
+	// PCI device data needed to represent it in libvirt XML. Migration concerns
+	// for DIRECT_NIC VMs are the responsibility of the validator/concern system.
+	var interfaces []libvirtxml.DomainInterface
+	for _, nic := range vm.NICs {
+		if nic.NicType == "DIRECT_NIC" {
+			continue
+		}
+		nicModel, ok := nicModelMap[nic.Model]
+		if !ok {
+			nicModel = "virtio"
+		}
+		interfaces = append(interfaces, libvirtxml.DomainInterface{
+			Source: &libvirtxml.DomainInterfaceSource{
+				Ethernet: &libvirtxml.DomainInterfaceSourceEthernet{},
+			},
+			Model: &libvirtxml.DomainInterfaceModel{Type: nicModel},
+			MAC:   &libvirtxml.DomainInterfaceMAC{Address: nic.MACAddress},
+		})
+	}
+
+	// Serial ports
+	var serials []libvirtxml.DomainSerial
+	var consoles []libvirtxml.DomainConsole
+	for _, sp := range vm.SerialPorts {
+		serials = append(serials, libvirtxml.DomainSerial{
+			Target: &libvirtxml.DomainSerialTarget{
+				Port: ptr.To(uint(sp.Index)),
+			},
+		})
+		consoles = append(consoles, libvirtxml.DomainConsole{
+			Target: &libvirtxml.DomainConsoleTarget{
+				Port: ptr.To(uint(sp.Index)),
+			},
+		})
+	}
+
+	machineType := strings.ToLower(vm.MachineType)
+	if machineType == "" {
+		machineType = "pc"
+	}
+	osElem := &libvirtxml.DomainOS{
+		Type: &libvirtxml.DomainOSType{
+			Arch:    "x86_64",
+			Machine: machineType,
+			Type:    "hvm",
+		},
+	}
+	if vm.BootType == "UEFI" || vm.BootType == "SECURE_BOOT" {
+		osElem.Firmware = "efi"
+	}
+
+	// Clock: use timezone offset if HardwareClockTZ is set, otherwise UTC.
+	var clockElem *libvirtxml.DomainClock
+	if vm.HardwareClockTZ != "" && strings.ToUpper(vm.HardwareClockTZ) != "UTC" {
+		clockElem = &libvirtxml.DomainClock{
+			Offset:   "timezone",
+			TimeZone: vm.HardwareClockTZ,
+		}
+	} else {
+		clockElem = &libvirtxml.DomainClock{Offset: "utc"}
+	}
+
+	// SCSI controller: add one virtio-scsi controller when the VM has SCSI disks.
+	var controllers []libvirtxml.DomainController
+	for _, d := range vm.Disks {
+		if d.AdapterType == adapterSCSI {
+			controllers = append(controllers, libvirtxml.DomainController{
+				Type:  "scsi",
+				Index: ptr.To(uint(0)),
+				Model: "virtio-scsi",
+			})
+			break
+		}
+	}
+
+	// Video: present when VGA console is enabled.
+	var videos []libvirtxml.DomainVideo
+	if vm.VGAConsoleEnabled {
+		videos = append(videos, libvirtxml.DomainVideo{
+			Model: libvirtxml.DomainVideoModel{Type: "vga"},
+		})
+	}
+
+	domain := &libvirtxml.Domain{
+		Type: "kvm",
+		Name: vm.Name,
+		Memory: &libvirtxml.DomainMemory{
+			Unit:  "MiB",
+			Value: uint(vm.MemorySizeMiB),
+		},
+		CPU: &libvirtxml.DomainCPU{
+			Topology: &libvirtxml.DomainCPUTopology{
+				Sockets: vm.NumSockets,
+				Cores:   vm.NumVcpusPerSocket,
+				Threads: vm.NumThreadsPerCore,
+			},
+		},
+		Clock: clockElem,
+		OS:    osElem,
+		Devices: &libvirtxml.DomainDeviceList{
+			Disks:       libvirtDisks,
+			Controllers: controllers,
+			Interfaces:  interfaces,
+			Serials:     serials,
+			Consoles:    consoles,
+			Videos:      videos,
+		},
+	}
+
+	out, err := domain.Marshal()
+	if err != nil {
+		return "", err
+	}
+	return out, nil
+}
+
+func (r *Builder) LunPersistentVolumes(_ ref.Ref) ([]core.PersistentVolume, error) {
 	return nil, nil
 }
 
-func (r *Builder) LunPersistentVolumes(_ ref.Ref) (pvs []core.PersistentVolume, err error) {
-	return
-}
-
-func (r *Builder) LunPersistentVolumeClaims(_ ref.Ref) (pvcs []core.PersistentVolumeClaim, err error) {
-	return
+func (r *Builder) LunPersistentVolumeClaims(_ ref.Ref) ([]core.PersistentVolumeClaim, error) {
+	return nil, nil
 }
 
 func (r *Builder) SupportsVolumePopulators() bool {
@@ -863,11 +1331,11 @@ func (r *Builder) PreferenceName(_ ref.Ref, _ *core.ConfigMap) (string, error) {
 	return "", nil
 }
 
-func (r *Builder) ConfigMaps(_ ref.Ref) (list []core.ConfigMap, err error) {
+func (r *Builder) ConfigMaps(_ ref.Ref) ([]core.ConfigMap, error) {
 	return nil, nil
 }
 
-func (r *Builder) Secrets(_ ref.Ref) (list []core.Secret, err error) {
+func (r *Builder) Secrets(_ ref.Ref) ([]core.Secret, error) {
 	return nil, nil
 }
 
@@ -886,4 +1354,32 @@ func (r *Builder) CsiImportPVCs(_ ref.Ref, _ map[string]string) ([]core.Persiste
 func (r *Builder) SourceVMLabelsAndAnnotations(_ ref.Ref, _ *api.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error) {
 	// TODO: map Nutanix categories to destination labels/annotations
 	return
+}
+
+// dataDisks returns non-CDROM disks sorted SCSI→SATA→IDE→PCI then by
+// DeviceIndex. This order determines the disk mount index in the conversion pod.
+func dataDisks(vm *model.VM) []model.Disk {
+	var disks []model.Disk
+	for _, d := range vm.Disks {
+		if !d.IsCdrom && d.DeviceType != "CDROM" {
+			disks = append(disks, d)
+		}
+	}
+	sort.Slice(disks, func(i, j int) bool {
+		pi := adapterPriority[disks[i].AdapterType]
+		pj := adapterPriority[disks[j].AdapterType]
+		if pi != pj {
+			return pi < pj
+		}
+		return disks[i].DeviceIndex < disks[j].DeviceIndex
+	})
+	return disks
+}
+
+func diskIndexLetter(i int) string {
+	if i < len(diskLetters) {
+		return string(diskLetters[i])
+	}
+	adjusted := i - len(diskLetters)
+	return diskIndexLetter(adjusted/len(diskLetters)) + string(diskLetters[adjusted%len(diskLetters)])
 }

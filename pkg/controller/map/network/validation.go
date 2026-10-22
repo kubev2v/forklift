@@ -154,14 +154,9 @@ func (r *Reconciler) validateDestination(mp *api.NetworkMap) (err error) {
 	notFound := []string{}
 	ambiguous := []string{}
 	networkIPModeInvalid := []string{}
-	networkIPModeHasCritical := false
 next:
 	for _, entry := range list {
-		if entry.Destination.Type == Ignored && entry.NetworkIPMode != "" {
-			networkIPModeInvalid = append(networkIPModeInvalid, entry.Source.String())
-			networkIPModeHasCritical = true
-		}
-		if entry.Destination.Type == Pod && entry.NetworkIPMode == api.NetworkIPModePreserve {
+		if (entry.Destination.Type == Ignored || entry.Destination.Type == Pod) && entry.NetworkIPMode != "" {
 			networkIPModeInvalid = append(networkIPModeInvalid, entry.Source.String())
 		}
 		switch entry.Destination.Type {
@@ -215,16 +210,12 @@ next:
 		})
 	}
 	if len(networkIPModeInvalid) > 0 {
-		category := Warn
-		if networkIPModeHasCritical {
-			category = Critical
-		}
 		mp.Status.SetCondition(libcnd.Condition{
 			Type:     NetworkIPModeNotValid,
 			Status:   True,
 			Reason:   NotValidForDestination,
-			Category: category,
-			Message:  "networkIPMode is not valid for the destination type (ignored or pod network).",
+			Category: Critical,
+			Message:  "networkIPMode is not valid for pod or ignored networks.",
 			Items:    networkIPModeInvalid,
 		})
 	}

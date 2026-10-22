@@ -1,12 +1,30 @@
 package base
 
 import (
+	"context"
+	"fmt"
 	"net"
+	"path"
 	"sort"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/settings"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// QualifiedMultusNetworkName returns the Multus NetworkName for a NAD. It is
+// qualified as "namespace/name" when the global setting forces qualified names
+// or the NAD and target VM are in different namespaces, and the bare name when
+// they share a namespace.
+func QualifiedMultusNetworkName(nadNamespace, nadName, targetVMNamespace string) string {
+	if settings.Settings.MultusNetworkNameAlwaysQualified || nadNamespace != targetVMNamespace {
+		return path.Join(nadNamespace, nadName)
+	}
+	return nadName
+}
 
 // SortedIPv4First returns a copy of items with IPv4 addresses before IPv6.
 // ipOf extracts the IP string from each element.
@@ -42,19 +60,24 @@ type NICRef struct {
 	NetworkID string
 }
 
-// NICRefsFrom converts a slice of any NIC type to []NICRef using the provided accessor.
-func NICRefsFrom[N any](nics []N, toRef func(N) NICRef) []NICRef {
-	refs := make([]NICRef, len(nics))
-	for i := range nics {
-		refs[i] = toRef(nics[i])
+// NICRefsFromKeys pairs each MAC with its resolved lookup key. macs and keys
+// must be the same length and share NIC order. Returns an error if they differ.
+func NICRefsFromKeys(macs []string, keys []string) ([]NICRef, error) {
+	if len(macs) != len(keys) {
+		return nil, fmt.Errorf("macs and keys length mismatch: %d != %d", len(macs), len(keys))
 	}
-	return refs
+	refs := make([]NICRef, len(macs))
+	for i := range macs {
+		refs[i] = NICRef{MAC: macs[i], NetworkID: keys[i]}
+	}
+	return refs, nil
 }
 
-// ResolveNICModes returns a MAC->mode map based on NetworkMap pairs and NADPool allocation.
-func ResolveNICModes(nics []NICRef, networkMap *api.NetworkMap, preserveStaticIPs bool) map[string]string {
+// ResolveNICModes returns a MAC->mode map based on pre-resolved NetworkPairs and NADPool
+// allocation. pairsBySource must be keyed by each NIC's resolved network key.
+func ResolveNICModes(nics []NICRef, pairsBySource map[string][]api.NetworkPair, preserveStaticIPs bool) map[string]string {
 	modes := map[string]string{}
-	if networkMap == nil {
+	if pairsBySource == nil {
 		for _, nic := range nics {
 			if preserveStaticIPs {
 				modes[nic.MAC] = string(api.NetworkIPModePreserve)
@@ -66,7 +89,7 @@ func ResolveNICModes(nics []NICRef, networkMap *api.NetworkMap, preserveStaticIP
 	}
 	pool := NewNADPool()
 	for _, nic := range nics {
-		pairs := networkMap.FindAllNetworks(nic.NetworkID)
+		pairs := pairsBySource[nic.NetworkID]
 		if len(pairs) == 0 {
 			continue
 		}
@@ -96,6 +119,15 @@ func ResolveNICModes(nics []NICRef, networkMap *api.NetworkMap, preserveStaticIP
 func HasPreserveMode(modes map[string]string) bool {
 	for _, mode := range modes {
 		if mode == string(api.NetworkIPModePreserve) {
+			return true
+		}
+	}
+	return false
+}
+
+func HasDHCPMode(modes map[string]string) bool {
+	for _, mode := range modes {
+		if mode == string(api.NetworkIPModeDHCP) {
 			return true
 		}
 	}
@@ -230,4 +262,85 @@ func ValidatePodNetworkDuplicates(nicRefs []ref.Ref, networkMap *api.NetworkMap)
 		}
 	}
 	return podCount > 1
+}
+
+// CollectPodNetworkMACs returns MAC addresses for all NICs mapped to Pod networks.
+// Callers should skip this when the destination namespace uses UDN (l2bridge binding)
+// because the masquerade-specific IPv6 config must not be applied to UDN interfaces.
+func CollectPodNetworkMACs[N any](nicKeys []string, pairsBySourceKey map[string][]api.NetworkPair, nics []N, nicToRef func(N) (mac string)) []string {
+	var podMacs []string
+	pool := NewNADPool()
+
+	for i, nic := range nics {
+		if i >= len(nicKeys) {
+			break
+		}
+		pairs := pairsBySourceKey[nicKeys[i]]
+		if len(pairs) == 0 {
+			continue
+		}
+		// Use the same allocation logic as mapNetworks
+		pair, ok := AllocateNetwork(pool, pairs)
+		if !ok {
+			continue
+		}
+		if pair.Destination.Type == Pod {
+			podMacs = append(podMacs, nicToRef(nic))
+		}
+	}
+	return podMacs
+}
+
+// PodNetworkHasIPv6 checks the active OpenShift cluster Pod-network CIDRs.
+func PodNetworkHasIPv6(
+	ctx context.Context,
+	client k8sclient.Client,
+) (bool, error) {
+	network := &unstructured.Unstructured{}
+	network.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "config.openshift.io",
+		Version: "v1",
+		Kind:    "Network",
+	})
+
+	if err := client.Get(
+		ctx, k8sclient.ObjectKey{Name: "cluster"}, network,
+	); err != nil {
+		return false, fmt.Errorf("get destination Network/cluster: %w", err)
+	}
+
+	entries, found, err := unstructured.NestedSlice(
+		network.Object, "status", "clusterNetwork",
+	)
+	if err != nil {
+		return false, fmt.Errorf("read status.clusterNetwork: %w", err)
+	}
+	if !found || len(entries) == 0 {
+		return false, fmt.Errorf("network/cluster has no active Pod-network CIDRs")
+	}
+
+	hasIPv6 := false
+	for i, entry := range entries {
+		pool, ok := entry.(map[string]interface{})
+		if !ok {
+			return false, fmt.Errorf(
+				"status.clusterNetwork[%d] is not an object", i,
+			)
+		}
+		cidr, ok := pool["cidr"].(string)
+		if !ok {
+			return false, fmt.Errorf(
+				"status.clusterNetwork[%d].cidr is missing or invalid", i,
+			)
+		}
+
+		ip, _, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return false, fmt.Errorf("parse Pod-network CIDR %q: %w", cidr, err)
+		}
+		if ip.To4() == nil {
+			hasIPv6 = true
+		}
+	}
+	return hasIPv6, nil
 }

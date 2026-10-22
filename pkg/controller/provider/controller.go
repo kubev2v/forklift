@@ -251,6 +251,28 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		}
 	}
 
+	// Hold the provider until owned CopyAppliances / CopyApplianceTemplates finish
+	// teardown — they need the provider (and its secret) to destroy the VMs.
+	if provider.Type() == api.VSphere {
+		if provider.DeletionTimestamp != nil {
+			var done bool
+			done, err = r.cleanupVSphereProvider(ctx, provider)
+			if err == nil && !done {
+				result.RequeueAfter = base.SlowReQ
+			}
+			return
+		}
+		if !k8sutil.ContainsFinalizer(provider, api.VSphereProviderFinalizer) {
+			cloned := provider.DeepCopy()
+			k8sutil.AddFinalizer(provider, api.VSphereProviderFinalizer)
+			err = r.Patch(ctx, provider, client.MergeFrom(cloned))
+			if err != nil {
+				err = liberr.Wrap(err)
+			}
+			return
+		}
+	}
+
 	// Validations.
 	err = r.validate(provider)
 	if err != nil {
@@ -264,6 +286,18 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 			r.Log.Error(err, "failed to ensure SSH keys for vSphere provider")
 			return
 		}
+		if Settings.Features.CopyAppliance {
+			err = r.ensureCopyApplianceTemplateSSHKeys(provider)
+			if err != nil {
+				r.Log.Error(err, "failed to ensure copyApplianceTemplate SSH keys for vSphere provider")
+				return
+			}
+			err = newCopyApplianceTemplateSync(r.Client, provider).Run(ctx)
+			if err != nil {
+				r.Log.Error(err, "failed to reconcile copy appliance template for vSphere provider")
+				return
+			}
+		}
 	}
 
 	// Update the container.
@@ -272,9 +306,20 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
+	// Prove the copy appliance works, before a migration finds out that it does
+	// not. This runs after updateContainer and the copy appliance template sync
+	// because it sets a blocking condition, and both of those bail on one. The
+	// error is logged rather than returned: returning it would skip
+	// updateProviderStatus, discarding the verdict the check just recorded.
+	if provider.Type() == api.VSphere && Settings.Features.CopyAppliance {
+		checkErr := newApplianceCheck(r.Client, provider).Run(ctx)
+		if checkErr != nil {
+			r.Log.Error(checkErr, "copyApplianceTemplate appliance check failed")
+		}
+	}
+
 	// Ready condition.
-	if !provider.Status.HasBlockerCondition() &&
-		provider.Status.HasCondition(ConnectionTestSucceeded, InventoryCreated) {
+	if inventoryReady(provider) {
 		provider.Status.Phase = Ready
 		provider.Status.SetCondition(
 			libcnd.Condition{
@@ -532,17 +577,91 @@ func (r *Reconciler) ensureSSHKeys(provider *api.Provider) error {
 	publicKeyBytes := ssh.MarshalAuthorizedKey(publicKey)
 
 	// Store SSH keys in secrets
-	err = r.storeSSHKeySecret(provider.Namespace, privateSecretName, "private-key", privateKeyBytes, provider)
+	err = r.storeSSHKeySecret(provider.Namespace, privateSecretName, map[string][]byte{"private-key": privateKeyBytes}, provider, "ssh-keys")
 	if err != nil {
 		return fmt.Errorf("failed to store private key: %w", err)
 	}
 
-	err = r.storeSSHKeySecret(provider.Namespace, publicSecretName, "public-key", publicKeyBytes, provider)
+	err = r.storeSSHKeySecret(provider.Namespace, publicSecretName, map[string][]byte{"public-key": publicKeyBytes}, provider, "ssh-keys")
 	if err != nil {
 		return fmt.Errorf("failed to store public key: %w", err)
 	}
 
 	r.Log.Info("SSH keys generated and stored successfully", "provider", provider.Name)
+	return nil
+}
+
+// ensureCopyApplianceTemplateSSHKeys generates and stores SSH keys for copyApplianceTemplate appliance VMs.
+func (r *Reconciler) ensureCopyApplianceTemplateSSHKeys(provider *api.Provider) error {
+	if provider.Type() != api.VSphere {
+		return nil
+	}
+	providerName := provider.Name
+	if providerName == "" {
+		return fmt.Errorf("provider name is empty")
+	}
+
+	privateSecretName, err := util.GenerateCopyApplianceSSHPrivateSecretName(providerName)
+	if err != nil {
+		return fmt.Errorf("failed to generate copyApplianceTemplate SSH private secret name: %w", err)
+	}
+	publicSecretName, err := util.GenerateCopyApplianceSSHPublicSecretName(providerName)
+	if err != nil {
+		return fmt.Errorf("failed to generate copyApplianceTemplate SSH public secret name: %w", err)
+	}
+
+	existing, err := r.getSSHKeySecret(provider.Namespace, privateSecretName)
+	if err == nil {
+		r.Log.V(1).Info("Copy appliance SSH keys already exist for provider", "provider", provider.Name)
+		// A secret predating the merge of the two appliance secrets holds only
+		// the SSH key. Fill in the TLS material rather than regenerating the key
+		// pair, whose public half is already built into the copy appliance template.
+		if err := r.ensureCopyApplianceTemplateTLS(existing); err != nil {
+			return err
+		}
+	} else if !k8serr.IsNotFound(err) {
+		return fmt.Errorf("failed to check for existing copyApplianceTemplate SSH private key secret: %w", err)
+	} else {
+		r.Log.Info("Generating copyApplianceTemplate SSH keys for vSphere provider", "provider", provider.Name)
+		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			return fmt.Errorf("failed to generate RSA key: %w", err)
+		}
+
+		privateKeyPEM := &pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+		}
+		privateKeyBytes := pem.EncodeToMemory(privateKeyPEM)
+
+		publicKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
+		if err != nil {
+			return fmt.Errorf("failed to create SSH public key: %w", err)
+		}
+		publicKeyBytes := ssh.MarshalAuthorizedKey(publicKey)
+
+		// The TLS material goes in with the key rather than in a later update: the
+		// reconciler reads through the informer cache, where a secret just created
+		// is not there to be read back yet.
+		privateData, err := copyApplianceTemplateTLS()
+		if err != nil {
+			return fmt.Errorf("failed to generate copyApplianceTemplate TLS material: %w", err)
+		}
+		privateData["private-key"] = privateKeyBytes
+
+		err = r.storeSSHKeySecret(provider.Namespace, privateSecretName, privateData, provider, "copy-appliance-ssh-keys")
+		if err != nil {
+			return fmt.Errorf("failed to store copyApplianceTemplate private key: %w", err)
+		}
+		err = r.storeSSHKeySecret(provider.Namespace, publicSecretName, map[string][]byte{"public-key": publicKeyBytes}, provider, "copy-appliance-ssh-keys")
+		if err != nil {
+			return fmt.Errorf("failed to store copyApplianceTemplate public key: %w", err)
+		}
+		r.Log.Info("Copy appliance SSH keys generated and stored successfully", "provider", provider.Name)
+	}
+
+	provider.Status.CopyApplianceSSHPrivateSecret = privateSecretName
+	provider.Status.CopyApplianceSSHPublicSecret = publicSecretName
 	return nil
 }
 
@@ -558,7 +677,7 @@ func (r *Reconciler) getSSHKeySecret(namespace, secretName string) (*v1.Secret, 
 }
 
 // storeSSHKeySecret creates or updates an SSH key secret
-func (r *Reconciler) storeSSHKeySecret(namespace, secretName, keyName string, keyData []byte, provider *api.Provider) error {
+func (r *Reconciler) storeSSHKeySecret(namespace, secretName string, data map[string][]byte, provider *api.Provider, component string) error {
 	providerLabel, err := util.SanitizeProviderName(provider.Name)
 	if err != nil {
 		return fmt.Errorf("failed to sanitize provider name for secret label: %w", err)
@@ -570,7 +689,7 @@ func (r *Reconciler) storeSSHKeySecret(namespace, secretName, keyName string, ke
 			Namespace: namespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/name":        "forklift",
-				"app.kubernetes.io/component":   "ssh-keys",
+				"app.kubernetes.io/component":   component,
 				"app.kubernetes.io/managed-by":  "forklift-controller",
 				"forklift.konveyor.io/provider": providerLabel,
 			},
@@ -586,9 +705,7 @@ func (r *Reconciler) storeSSHKeySecret(namespace, secretName, keyName string, ke
 			},
 		},
 		Type: v1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			keyName: keyData,
-		},
+		Data: data,
 	}
 
 	err = r.Create(context.TODO(), secret)
@@ -619,6 +736,56 @@ func (r *Reconciler) deleteProviderServer(ctx context.Context, provider *api.Pro
 		return r.DeleteHyperVProviderServer(ctx, provider)
 	}
 	return nil
+}
+
+// cleanupVSphereProvider deletes owned CopyAppliances and CopyApplianceTemplates and
+// waits for them to go away before releasing the provider finalizer.
+func (r *Reconciler) cleanupVSphereProvider(ctx context.Context, provider *api.Provider) (done bool, err error) {
+	if !k8sutil.ContainsFinalizer(provider, api.VSphereProviderFinalizer) {
+		return true, nil
+	}
+	pending := false
+	appliances := &api.CopyApplianceList{}
+	if err = r.List(ctx, appliances, client.InNamespace(provider.Namespace)); err != nil {
+		return false, liberr.Wrap(err)
+	}
+	for i := range appliances.Items {
+		obj := &appliances.Items[i]
+		if !metav1.IsControlledBy(obj, provider) {
+			continue
+		}
+		pending = true
+		if obj.DeletionTimestamp.IsZero() {
+			if delErr := r.Delete(ctx, obj); delErr != nil && !k8serr.IsNotFound(delErr) {
+				return false, liberr.Wrap(delErr)
+			}
+		}
+	}
+	templates := &api.CopyApplianceTemplateList{}
+	if err = r.List(ctx, templates, client.InNamespace(provider.Namespace)); err != nil {
+		return false, liberr.Wrap(err)
+	}
+	for i := range templates.Items {
+		obj := &templates.Items[i]
+		if !metav1.IsControlledBy(obj, provider) {
+			continue
+		}
+		pending = true
+		if obj.DeletionTimestamp.IsZero() {
+			if delErr := r.Delete(ctx, obj); delErr != nil && !k8serr.IsNotFound(delErr) {
+				return false, liberr.Wrap(delErr)
+			}
+		}
+	}
+	if pending {
+		return false, nil
+	}
+	cloned := provider.DeepCopy()
+	k8sutil.RemoveFinalizer(provider, api.VSphereProviderFinalizer)
+	if err = r.Patch(ctx, provider, client.MergeFrom(cloned)); err != nil {
+		return false, liberr.Wrap(err)
+	}
+	return true, nil
 }
 
 // cleanupProviderServer handles cleanup during provider deletion, including finalizer removal.
@@ -665,4 +832,11 @@ func (r *Reconciler) cleanupProviderServer(ctx context.Context, provider *api.Pr
 	}
 
 	return nil
+}
+
+// inventoryReady reports whether the provider is far enough along to be used:
+// the connection tested, the inventory built, and nothing blocking.
+func inventoryReady(provider *api.Provider) bool {
+	return !provider.Status.HasBlockerCondition() &&
+		provider.Status.HasCondition(ConnectionTestSucceeded, InventoryCreated)
 }

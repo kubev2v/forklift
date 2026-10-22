@@ -15,8 +15,10 @@ import (
 // stubInventory returns pre-configured VMs and Hosts for testing.
 type stubInventory struct {
 	base.Client
-	vms   map[string]*hyperv.VM
-	hosts map[string]*hyperv.Host
+	vms            map[string]*hyperv.VM
+	hosts          map[string]*hyperv.Host
+	networks       map[string]hyperv.Network // keyed by ID
+	networksByName map[string]hyperv.Network // keyed by name; for name-based NetworkMap sources
 }
 
 func (s *stubInventory) Find(resource interface{}, r base.Ref) error {
@@ -33,6 +35,18 @@ func (s *stubInventory) Find(resource interface{}, r base.Ref) error {
 			return base.NotFoundError{Ref: r}
 		}
 		*res = *host
+	case *hyperv.Network:
+		if net, ok := s.networks[r.ID]; ok {
+			*res = net
+			return nil
+		}
+		if r.ID == "" {
+			if net, ok := s.networksByName[r.Name]; ok {
+				*res = net
+				return nil
+			}
+		}
+		return base.NotFoundError{Ref: r}
 	}
 	return nil
 }
@@ -307,5 +321,29 @@ func TestPVCNameTemplate_UsesInventoryVMIdentity(t *testing.T) {
 	}
 	if !ok {
 		t.Error("expected ok=true: PVC name template should be valid when TargetVmName resolves to spec.targetName")
+	}
+}
+
+func TestPVCNameTemplate_ValidatesDottedVMName(t *testing.T) {
+	vmID := "vm-dotted"
+	vm := &hyperv.VM{}
+	vm.ID = vmID
+	vm.Name = "mtv.redhat.com"
+	vm.Disks = []model.Disk{{Base: model.Base{ID: "disk-1"}}}
+
+	plan := &api.Plan{}
+	plan.Name = "test-plan"
+	plan.Spec.PVCNameTemplate = "{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}"
+	validator := &Validator{Context: &plancontext.Context{
+		Plan:   plan,
+		Source: plancontext.Source{Inventory: &stubInventory{vms: map[string]*hyperv.VM{vmID: vm}}},
+	}}
+
+	ok, err := validator.PVCNameTemplate(ref.Ref{ID: vmID}, plan.Spec.PVCNameTemplate)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected the default PVC name template to validate for a dotted VM name")
 	}
 }

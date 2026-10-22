@@ -3,10 +3,12 @@ package conversion
 
 import (
 	"errors"
+	"io"
 	"os"
 	"testing"
 
 	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/errorreporting"
 	"github.com/kubev2v/forklift/pkg/virt-v2v/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -40,6 +42,134 @@ var _ = Describe("Conversion", func() {
 			CommandBuilder: mockCommandBuilder,
 			fileSystem:     mockFileSystem,
 		}
+	})
+
+	Describe("writeTerminationFailure", func() {
+		It("writes the canonical known failure payload", func() {
+			output := "virt-v2v: error: filesystem was mounted read-only, even though we asked for it to be mounted read-write. " +
+				"This usually means that the filesystem was not cleanly unmounted."
+			failure := errorreporting.Classify(output)
+			payload, err := errorreporting.Encode(failure)
+			Expect(err).ToNot(HaveOccurred())
+
+			mockFileSystem.EXPECT().WriteFile("/dev/termination-log", payload, os.FileMode(0644)).Return(nil)
+
+			conversion.writeTerminationFailure([]byte(output), nil)
+		})
+
+		It("does not write a payload for an unknown failure", func() {
+			conversion.writeTerminationFailure(nil, []byte("virt-v2v: error: unknown failure"))
+		})
+	})
+
+	Describe("RunVirtV2v", func() {
+		It("keeps the existing monitor path on success", func() {
+			monitorInput := make(chan io.Reader, 1)
+
+			mockCommandBuilder.EXPECT().New("virt-v2v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-os", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-on", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+
+			mockCommandBuilder.EXPECT().New("/usr/local/bin/virt-v2v-monitor").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+			mockCommandExecutor.EXPECT().SetStdin(gomock.Any()).Do(func(input io.Reader) {
+				monitorInput <- input
+			})
+			mockCommandExecutor.EXPECT().Start().DoAndReturn(func() error {
+				go func() { _, _ = io.Copy(io.Discard, <-monitorInput) }()
+				return nil
+			})
+			mockCommandExecutor.EXPECT().SetStdout(gomock.Any())
+			mockCommandExecutor.EXPECT().SetStderr(gomock.Any())
+			mockCommandExecutor.EXPECT().Run().Return(nil)
+			mockCommandExecutor.EXPECT().Wait().Return(nil)
+
+			conversion.AppConfig = appConfig
+			Expect(conversion.RunVirtV2v()).To(Succeed())
+		})
+
+		It("captures a known failure and writes its termination payload", func() {
+			var stdout, stderr io.Writer
+			monitorInput := make(chan io.Reader, 1)
+			output := "virt-v2v: error: filesystem was mounted read-only, even though we asked for it to be mounted read-write. " +
+				"This usually means that the filesystem was not cleanly unmounted."
+			failure := errorreporting.Classify(output)
+			payload, err := errorreporting.Encode(failure)
+			Expect(err).ToNot(HaveOccurred())
+
+			mockCommandBuilder.EXPECT().New("virt-v2v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-os", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-on", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+
+			mockCommandBuilder.EXPECT().New("/usr/local/bin/virt-v2v-monitor").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+			mockCommandExecutor.EXPECT().SetStdin(gomock.Any()).Do(func(input io.Reader) {
+				monitorInput <- input
+			})
+			mockCommandExecutor.EXPECT().Start().DoAndReturn(func() error {
+				go func() { _, _ = io.Copy(io.Discard, <-monitorInput) }()
+				return nil
+			})
+			mockCommandExecutor.EXPECT().SetStdout(gomock.Any()).Do(func(writer io.Writer) { stdout = writer })
+			mockCommandExecutor.EXPECT().SetStderr(gomock.Any()).Do(func(writer io.Writer) { stderr = writer })
+			mockCommandExecutor.EXPECT().Run().DoAndReturn(func() error {
+				_, _ = stdout.Write([]byte("normal output"))
+				_, _ = stderr.Write([]byte(output))
+				return errors.New("conversion failed")
+			})
+			mockCommandExecutor.EXPECT().Wait().Return(nil)
+			mockFileSystem.EXPECT().WriteFile("/dev/termination-log", payload, os.FileMode(0644)).Return(nil)
+
+			conversion.AppConfig = appConfig
+			err = conversion.RunVirtV2v()
+			Expect(err).To(MatchError("run virt-v2v: conversion failed"))
+		})
+
+		It("wraps a monitor failure with operation context", func() {
+			monitorInput := make(chan io.Reader, 1)
+			monitorErr := errors.New("monitor failed")
+
+			mockCommandBuilder.EXPECT().New("virt-v2v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-os", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-on", "").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+
+			mockCommandBuilder.EXPECT().New("/usr/local/bin/virt-v2v-monitor").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+			mockCommandExecutor.EXPECT().SetStdin(gomock.Any()).Do(func(input io.Reader) {
+				monitorInput <- input
+			})
+			mockCommandExecutor.EXPECT().Start().DoAndReturn(func() error {
+				go func() { _, _ = io.Copy(io.Discard, <-monitorInput) }()
+				return nil
+			})
+			mockCommandExecutor.EXPECT().SetStdout(gomock.Any())
+			mockCommandExecutor.EXPECT().SetStderr(gomock.Any())
+			mockCommandExecutor.EXPECT().Run().Return(nil)
+			mockCommandExecutor.EXPECT().Wait().Return(monitorErr)
+
+			conversion.AppConfig = appConfig
+			err := conversion.RunVirtV2v()
+			Expect(err).To(MatchError("wait for virt-v2v-monitor: monitor failed"))
+			Expect(errors.Is(err, monitorErr)).To(BeTrue())
+		})
 	})
 
 	Describe("RunVirtV2VInspection", func() {
@@ -466,6 +596,37 @@ var _ = Describe("Conversion", func() {
 			err = conversion.addVirtV2vVsphereArgs(mockCommandBuilder)
 			Expect(err).ToNot(HaveOccurred())
 		})
+
+		It("rewrites domain disk sources to NBD when V2V_nbdDisks is set", func() {
+			conversion.NbdDisks = []string{"nbd://10.0.0.5:10809", "nbds://10.0.0.5:10810"}
+
+			domainXML := `<domain type='kvm'>
+  <name>nbd-vm</name>
+  <os><type arch='x86_64'>hvm</type></os>
+  <devices>
+    <disk type='file' device='disk'>
+      <source file='[ds] vm/disk0.vmdk'/>
+      <target dev='sda' bus='scsi'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <source file='[ds] vm/disk1.vmdk'/>
+      <target dev='sdb' bus='scsi'/>
+    </disk>
+    <interface type='bridge'>
+      <mac address='00:50:56:9d:00:01'/>
+    </interface>
+  </devices>
+</domain>`
+
+			result, err := conversion.updateDiskSourcesToNbd(domainXML)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(ContainSubstring(`protocol="nbd"`))
+			Expect(result).To(ContainSubstring(`port="10809"`))
+			Expect(result).To(ContainSubstring(`port="10810"`))
+			Expect(result).To(ContainSubstring(`00:50:56:9d:00:01`))
+			Expect(result).ToNot(ContainSubstring(`[ds] vm/disk0.vmdk`))
+			Expect(result).ToNot(ContainSubstring(`tls=`))
+		})
 	})
 
 	Describe("addVirtV2vRemoteInspectionArgs", func() {
@@ -799,7 +960,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("/original/path/disk.vmdk"))
@@ -823,7 +984,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("/dev/original-block"))
@@ -852,7 +1013,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdb"))
@@ -871,7 +1032,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).ToNot(ContainSubstring("/var/tmp/v2v/vm-sda"))
 			},
@@ -890,7 +1051,7 @@ var _ = Describe("Conversion", func() {
       <source file='/original/path/disk.vmdk'/>
     <!-- Missing closing tags -->`
 
-				_, err := conversion.updateDiskPaths(invalidXML)
+				_, err := conversion.UpdateDiskPaths(invalidXML)
 				Expect(err).To(HaveOccurred())
 			},
 		)
@@ -915,7 +1076,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				// First disk should be updated
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
@@ -945,7 +1106,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("cdrom.iso"))
@@ -978,7 +1139,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdb"))
@@ -1007,7 +1168,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).ToNot(ContainSubstring("cdrom1.iso"))
 				Expect(result).ToNot(ContainSubstring("cdrom2.iso"))
@@ -1035,7 +1196,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("cdrom.iso"))
@@ -1081,7 +1242,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdb"))
@@ -1106,7 +1267,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-			result, err := conversion.updateDiskPaths(domainXML)
+			result, err := conversion.UpdateDiskPaths(domainXML)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 			Expect(result).To(ContainSubstring(`type="qcow2"`))
@@ -1133,7 +1294,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-			result, err := conversion.updateDiskPaths(domainXML)
+			result, err := conversion.UpdateDiskPaths(domainXML)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 			Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdb"))
@@ -1165,7 +1326,7 @@ var _ = Describe("Conversion", func() {
   </devices>
 </domain>`
 
-				result, err := conversion.updateDiskPaths(domainXML)
+				result, err := conversion.UpdateDiskPaths(domainXML)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("cdrom"))

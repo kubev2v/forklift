@@ -258,6 +258,1430 @@ spec:
                   - name
                   type: object
                 type: array
+              extraInitContainers:
+                description: Extra init containers to prepend to the pod's init container
+                  list.
+                items:
+                  description: A single application container that you want to run
+                    within a pod.
+                  properties:
+                    args:
+                      description: |-
+                        Arguments to the entrypoint.
+                        The container image's CMD is used if this is not provided.
+                        Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
+                        cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+                        to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+                        produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+                        of whether the variable exists or not. Cannot be updated.
+                        More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: atomic
+                    command:
+                      description: |-
+                        Entrypoint array. Not executed within a shell.
+                        The container image's ENTRYPOINT is used if this is not provided.
+                        Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
+                        cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+                        to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+                        produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+                        of whether the variable exists or not. Cannot be updated.
+                        More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: atomic
+                    env:
+                      description: |-
+                        List of environment variables to set in the container.
+                        Cannot be updated.
+                      items:
+                        description: EnvVar represents an environment variable present
+                          in a Container.
+                        properties:
+                          name:
+                            description: Name of the environment variable. Must be
+                              a C_IDENTIFIER.
+                            type: string
+                          value:
+                            description: |-
+                              Variable references $(VAR_NAME) are expanded
+                              using the previously defined environment variables in the container and
+                              any service environment variables. If a variable cannot be resolved,
+                              the reference in the input string will be unchanged. Double $$ are reduced
+                              to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                              "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                              Escaped references will never be expanded, regardless of whether the variable
+                              exists or not.
+                              Defaults to "".
+                            type: string
+                          valueFrom:
+                            description: Source for the environment variable's value.
+                              Cannot be used if value is not empty.
+                            properties:
+                              configMapKeyRef:
+                                description: Selects a key of a ConfigMap.
+                                properties:
+                                  key:
+                                    description: The key to select.
+                                    type: string
+                                  name:
+                                    default: ""
+                                    description: |-
+                                      Name of the referent.
+                                      This field is effectively required, but due to backwards compatibility is
+                                      allowed to be empty. Instances of this type with an empty value here are
+                                      almost certainly wrong.
+                                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    type: string
+                                  optional:
+                                    description: Specify whether the ConfigMap or
+                                      its key must be defined
+                                    type: boolean
+                                required:
+                                - key
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              fieldRef:
+                                description: |-
+                                  Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                                  spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                                properties:
+                                  apiVersion:
+                                    description: Version of the schema the FieldPath
+                                      is written in terms of, defaults to "v1".
+                                    type: string
+                                  fieldPath:
+                                    description: Path of the field to select in the
+                                      specified API version.
+                                    type: string
+                                required:
+                                - fieldPath
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              resourceFieldRef:
+                                description: |-
+                                  Selects a resource of the container: only resources limits and requests
+                                  (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                                properties:
+                                  containerName:
+                                    description: 'Container name: required for volumes,
+                                      optional for env vars'
+                                    type: string
+                                  divisor:
+                                    anyOf:
+                                    - type: integer
+                                    - type: string
+                                    description: Specifies the output format of the
+                                      exposed resources, defaults to "1"
+                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                    x-kubernetes-int-or-string: true
+                                  resource:
+                                    description: 'Required: resource to select'
+                                    type: string
+                                required:
+                                - resource
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              secretKeyRef:
+                                description: Selects a key of a secret in the pod's
+                                  namespace
+                                properties:
+                                  key:
+                                    description: The key of the secret to select from.  Must
+                                      be a valid secret key.
+                                    type: string
+                                  name:
+                                    default: ""
+                                    description: |-
+                                      Name of the referent.
+                                      This field is effectively required, but due to backwards compatibility is
+                                      allowed to be empty. Instances of this type with an empty value here are
+                                      almost certainly wrong.
+                                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    type: string
+                                  optional:
+                                    description: Specify whether the Secret or its
+                                      key must be defined
+                                    type: boolean
+                                required:
+                                - key
+                                type: object
+                                x-kubernetes-map-type: atomic
+                            type: object
+                        required:
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
+                    envFrom:
+                      description: |-
+                        List of sources to populate environment variables in the container.
+                        The keys defined within a source must be a C_IDENTIFIER. All invalid keys
+                        will be reported as an event when the container is starting. When a key exists in multiple
+                        sources, the value associated with the last source will take precedence.
+                        Values defined by an Env with a duplicate key will take precedence.
+                        Cannot be updated.
+                      items:
+                        description: EnvFromSource represents the source of a set
+                          of ConfigMaps
+                        properties:
+                          configMapRef:
+                            description: The ConfigMap to select from
+                            properties:
+                              name:
+                                default: ""
+                                description: |-
+                                  Name of the referent.
+                                  This field is effectively required, but due to backwards compatibility is
+                                  allowed to be empty. Instances of this type with an empty value here are
+                                  almost certainly wrong.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                type: string
+                              optional:
+                                description: Specify whether the ConfigMap must be
+                                  defined
+                                type: boolean
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          prefix:
+                            description: An optional identifier to prepend to each
+                              key in the ConfigMap. Must be a C_IDENTIFIER.
+                            type: string
+                          secretRef:
+                            description: The Secret to select from
+                            properties:
+                              name:
+                                default: ""
+                                description: |-
+                                  Name of the referent.
+                                  This field is effectively required, but due to backwards compatibility is
+                                  allowed to be empty. Instances of this type with an empty value here are
+                                  almost certainly wrong.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                type: string
+                              optional:
+                                description: Specify whether the Secret must be defined
+                                type: boolean
+                            type: object
+                            x-kubernetes-map-type: atomic
+                        type: object
+                      type: array
+                      x-kubernetes-list-type: atomic
+                    image:
+                      description: |-
+                        Container image name.
+                        More info: https://kubernetes.io/docs/concepts/containers/images
+                        This field is optional to allow higher level config management to default or override
+                        container images in workload controllers like Deployments and StatefulSets.
+                      type: string
+                    imagePullPolicy:
+                      description: |-
+                        Image pull policy.
+                        One of Always, Never, IfNotPresent.
+                        Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+                        Cannot be updated.
+                        More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
+                      type: string
+                    lifecycle:
+                      description: |-
+                        Actions that the management system should take in response to container lifecycle events.
+                        Cannot be updated.
+                      properties:
+                        postStart:
+                          description: |-
+                            PostStart is called immediately after a container is created. If the handler fails,
+                            the container is terminated and restarted according to its restart policy.
+                            Other management of the container blocks until the hook completes.
+                            More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
+                          properties:
+                            exec:
+                              description: Exec specifies a command to execute in
+                                the container.
+                              properties:
+                                command:
+                                  description: |-
+                                    Command is the command line to execute inside the container, the working directory for the
+                                    command  is root ('/') in the container's filesystem. The command is simply exec'd, it is
+                                    not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use
+                                    a shell, you need to explicitly call out to that shell.
+                                    Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
+                                  items:
+                                    type: string
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                              type: object
+                            httpGet:
+                              description: HTTPGet specifies an HTTP GET request to
+                                perform.
+                              properties:
+                                host:
+                                  description: |-
+                                    Host name to connect to, defaults to the pod IP. You probably want to set
+                                    "Host" in httpHeaders instead.
+                                  type: string
+                                httpHeaders:
+                                  description: Custom headers to set in the request.
+                                    HTTP allows repeated headers.
+                                  items:
+                                    description: HTTPHeader describes a custom header
+                                      to be used in HTTP probes
+                                    properties:
+                                      name:
+                                        description: |-
+                                          The header field name.
+                                          This will be canonicalized upon output, so case-variant names will be understood as the same header.
+                                        type: string
+                                      value:
+                                        description: The header field value
+                                        type: string
+                                    required:
+                                    - name
+                                    - value
+                                    type: object
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                                path:
+                                  description: Path to access on the HTTP server.
+                                  type: string
+                                port:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: |-
+                                    Name or number of the port to access on the container.
+                                    Number must be in the range 1 to 65535.
+                                    Name must be an IANA_SVC_NAME.
+                                  x-kubernetes-int-or-string: true
+                                scheme:
+                                  description: |-
+                                    Scheme to use for connecting to the host.
+                                    Defaults to HTTP.
+                                  type: string
+                              required:
+                              - port
+                              type: object
+                            sleep:
+                              description: Sleep represents a duration that the container
+                                should sleep.
+                              properties:
+                                seconds:
+                                  description: Seconds is the number of seconds to
+                                    sleep.
+                                  format: int64
+                                  type: integer
+                              required:
+                              - seconds
+                              type: object
+                            tcpSocket:
+                              description: |-
+                                Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept
+                                for backward compatibility. There is no validation of this field and
+                                lifecycle hooks will fail at runtime when it is specified.
+                              properties:
+                                host:
+                                  description: 'Optional: Host name to connect to,
+                                    defaults to the pod IP.'
+                                  type: string
+                                port:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: |-
+                                    Number or name of the port to access on the container.
+                                    Number must be in the range 1 to 65535.
+                                    Name must be an IANA_SVC_NAME.
+                                  x-kubernetes-int-or-string: true
+                              required:
+                              - port
+                              type: object
+                          type: object
+                        preStop:
+                          description: |-
+                            PreStop is called immediately before a container is terminated due to an
+                            API request or management event such as liveness/startup probe failure,
+                            preemption, resource contention, etc. The handler is not called if the
+                            container crashes or exits. The Pod's termination grace period countdown begins before the
+                            PreStop hook is executed. Regardless of the outcome of the handler, the
+                            container will eventually terminate within the Pod's termination grace
+                            period (unless delayed by finalizers). Other management of the container blocks until the hook completes
+                            or until the termination grace period is reached.
+                            More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
+                          properties:
+                            exec:
+                              description: Exec specifies a command to execute in
+                                the container.
+                              properties:
+                                command:
+                                  description: |-
+                                    Command is the command line to execute inside the container, the working directory for the
+                                    command  is root ('/') in the container's filesystem. The command is simply exec'd, it is
+                                    not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use
+                                    a shell, you need to explicitly call out to that shell.
+                                    Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
+                                  items:
+                                    type: string
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                              type: object
+                            httpGet:
+                              description: HTTPGet specifies an HTTP GET request to
+                                perform.
+                              properties:
+                                host:
+                                  description: |-
+                                    Host name to connect to, defaults to the pod IP. You probably want to set
+                                    "Host" in httpHeaders instead.
+                                  type: string
+                                httpHeaders:
+                                  description: Custom headers to set in the request.
+                                    HTTP allows repeated headers.
+                                  items:
+                                    description: HTTPHeader describes a custom header
+                                      to be used in HTTP probes
+                                    properties:
+                                      name:
+                                        description: |-
+                                          The header field name.
+                                          This will be canonicalized upon output, so case-variant names will be understood as the same header.
+                                        type: string
+                                      value:
+                                        description: The header field value
+                                        type: string
+                                    required:
+                                    - name
+                                    - value
+                                    type: object
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                                path:
+                                  description: Path to access on the HTTP server.
+                                  type: string
+                                port:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: |-
+                                    Name or number of the port to access on the container.
+                                    Number must be in the range 1 to 65535.
+                                    Name must be an IANA_SVC_NAME.
+                                  x-kubernetes-int-or-string: true
+                                scheme:
+                                  description: |-
+                                    Scheme to use for connecting to the host.
+                                    Defaults to HTTP.
+                                  type: string
+                              required:
+                              - port
+                              type: object
+                            sleep:
+                              description: Sleep represents a duration that the container
+                                should sleep.
+                              properties:
+                                seconds:
+                                  description: Seconds is the number of seconds to
+                                    sleep.
+                                  format: int64
+                                  type: integer
+                              required:
+                              - seconds
+                              type: object
+                            tcpSocket:
+                              description: |-
+                                Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept
+                                for backward compatibility. There is no validation of this field and
+                                lifecycle hooks will fail at runtime when it is specified.
+                              properties:
+                                host:
+                                  description: 'Optional: Host name to connect to,
+                                    defaults to the pod IP.'
+                                  type: string
+                                port:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: |-
+                                    Number or name of the port to access on the container.
+                                    Number must be in the range 1 to 65535.
+                                    Name must be an IANA_SVC_NAME.
+                                  x-kubernetes-int-or-string: true
+                              required:
+                              - port
+                              type: object
+                          type: object
+                      type: object
+                    livenessProbe:
+                      description: |-
+                        Periodic probe of container liveness.
+                        Container will be restarted if the probe fails.
+                        Cannot be updated.
+                        More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                      properties:
+                        exec:
+                          description: Exec specifies a command to execute in the
+                            container.
+                          properties:
+                            command:
+                              description: |-
+                                Command is the command line to execute inside the container, the working directory for the
+                                command  is root ('/') in the container's filesystem. The command is simply exec'd, it is
+                                not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use
+                                a shell, you need to explicitly call out to that shell.
+                                Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
+                              items:
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          type: object
+                        failureThreshold:
+                          description: |-
+                            Minimum consecutive failures for the probe to be considered failed after having succeeded.
+                            Defaults to 3. Minimum value is 1.
+                          format: int32
+                          type: integer
+                        grpc:
+                          description: GRPC specifies a GRPC HealthCheckRequest.
+                          properties:
+                            port:
+                              description: Port number of the gRPC service. Number
+                                must be in the range 1 to 65535.
+                              format: int32
+                              type: integer
+                            service:
+                              default: ""
+                              description: |-
+                                Service is the name of the service to place in the gRPC HealthCheckRequest
+                                (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
+
+                                If this is not specified, the default behavior is defined by gRPC.
+                              type: string
+                          required:
+                          - port
+                          type: object
+                        httpGet:
+                          description: HTTPGet specifies an HTTP GET request to perform.
+                          properties:
+                            host:
+                              description: |-
+                                Host name to connect to, defaults to the pod IP. You probably want to set
+                                "Host" in httpHeaders instead.
+                              type: string
+                            httpHeaders:
+                              description: Custom headers to set in the request. HTTP
+                                allows repeated headers.
+                              items:
+                                description: HTTPHeader describes a custom header
+                                  to be used in HTTP probes
+                                properties:
+                                  name:
+                                    description: |-
+                                      The header field name.
+                                      This will be canonicalized upon output, so case-variant names will be understood as the same header.
+                                    type: string
+                                  value:
+                                    description: The header field value
+                                    type: string
+                                required:
+                                - name
+                                - value
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            path:
+                              description: Path to access on the HTTP server.
+                              type: string
+                            port:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                Name or number of the port to access on the container.
+                                Number must be in the range 1 to 65535.
+                                Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
+                            scheme:
+                              description: |-
+                                Scheme to use for connecting to the host.
+                                Defaults to HTTP.
+                              type: string
+                          required:
+                          - port
+                          type: object
+                        initialDelaySeconds:
+                          description: |-
+                            Number of seconds after the container has started before liveness probes are initiated.
+                            More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                          format: int32
+                          type: integer
+                        periodSeconds:
+                          description: |-
+                            How often (in seconds) to perform the probe.
+                            Default to 10 seconds. Minimum value is 1.
+                          format: int32
+                          type: integer
+                        successThreshold:
+                          description: |-
+                            Minimum consecutive successes for the probe to be considered successful after having failed.
+                            Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
+                          format: int32
+                          type: integer
+                        tcpSocket:
+                          description: TCPSocket specifies a connection to a TCP port.
+                          properties:
+                            host:
+                              description: 'Optional: Host name to connect to, defaults
+                                to the pod IP.'
+                              type: string
+                            port:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                Number or name of the port to access on the container.
+                                Number must be in the range 1 to 65535.
+                                Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
+                          required:
+                          - port
+                          type: object
+                        terminationGracePeriodSeconds:
+                          description: |-
+                            Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+                            The grace period is the duration in seconds after the processes running in the pod are sent
+                            a termination signal and the time when the processes are forcibly halted with a kill signal.
+                            Set this value longer than the expected cleanup time for your process.
+                            If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
+                            value overrides the value provided by the pod spec.
+                            Value must be non-negative integer. The value zero indicates stop immediately via
+                            the kill signal (no opportunity to shut down).
+                            This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+                            Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
+                          format: int64
+                          type: integer
+                        timeoutSeconds:
+                          description: |-
+                            Number of seconds after which the probe times out.
+                            Defaults to 1 second. Minimum value is 1.
+                            More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                          format: int32
+                          type: integer
+                      type: object
+                    name:
+                      description: |-
+                        Name of the container specified as a DNS_LABEL.
+                        Each container in a pod must have a unique name (DNS_LABEL).
+                        Cannot be updated.
+                      type: string
+                    ports:
+                      description: |-
+                        List of ports to expose from the container. Not specifying a port here
+                        DOES NOT prevent that port from being exposed. Any port which is
+                        listening on the default "0.0.0.0" address inside a container will be
+                        accessible from the network.
+                        Modifying this array with strategic merge patch may corrupt the data.
+                        For more information See https://github.com/kubernetes/kubernetes/issues/108255.
+                        Cannot be updated.
+                      items:
+                        description: ContainerPort represents a network port in a
+                          single container.
+                        properties:
+                          containerPort:
+                            description: |-
+                              Number of port to expose on the pod's IP address.
+                              This must be a valid port number, 0 < x < 65536.
+                            format: int32
+                            type: integer
+                          hostIP:
+                            description: What host IP to bind the external port to.
+                            type: string
+                          hostPort:
+                            description: |-
+                              Number of port to expose on the host.
+                              If specified, this must be a valid port number, 0 < x < 65536.
+                              If HostNetwork is specified, this must match ContainerPort.
+                              Most containers do not need this.
+                            format: int32
+                            type: integer
+                          name:
+                            description: |-
+                              If specified, this must be an IANA_SVC_NAME and unique within the pod. Each
+                              named port in a pod must have a unique name. Name for the port that can be
+                              referred to by services.
+                            type: string
+                          protocol:
+                            default: TCP
+                            description: |-
+                              Protocol for port. Must be UDP, TCP, or SCTP.
+                              Defaults to "TCP".
+                            type: string
+                        required:
+                        - containerPort
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - containerPort
+                      - protocol
+                      x-kubernetes-list-type: map
+                    readinessProbe:
+                      description: |-
+                        Periodic probe of container service readiness.
+                        Container will be removed from service endpoints if the probe fails.
+                        Cannot be updated.
+                        More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                      properties:
+                        exec:
+                          description: Exec specifies a command to execute in the
+                            container.
+                          properties:
+                            command:
+                              description: |-
+                                Command is the command line to execute inside the container, the working directory for the
+                                command  is root ('/') in the container's filesystem. The command is simply exec'd, it is
+                                not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use
+                                a shell, you need to explicitly call out to that shell.
+                                Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
+                              items:
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          type: object
+                        failureThreshold:
+                          description: |-
+                            Minimum consecutive failures for the probe to be considered failed after having succeeded.
+                            Defaults to 3. Minimum value is 1.
+                          format: int32
+                          type: integer
+                        grpc:
+                          description: GRPC specifies a GRPC HealthCheckRequest.
+                          properties:
+                            port:
+                              description: Port number of the gRPC service. Number
+                                must be in the range 1 to 65535.
+                              format: int32
+                              type: integer
+                            service:
+                              default: ""
+                              description: |-
+                                Service is the name of the service to place in the gRPC HealthCheckRequest
+                                (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
+
+                                If this is not specified, the default behavior is defined by gRPC.
+                              type: string
+                          required:
+                          - port
+                          type: object
+                        httpGet:
+                          description: HTTPGet specifies an HTTP GET request to perform.
+                          properties:
+                            host:
+                              description: |-
+                                Host name to connect to, defaults to the pod IP. You probably want to set
+                                "Host" in httpHeaders instead.
+                              type: string
+                            httpHeaders:
+                              description: Custom headers to set in the request. HTTP
+                                allows repeated headers.
+                              items:
+                                description: HTTPHeader describes a custom header
+                                  to be used in HTTP probes
+                                properties:
+                                  name:
+                                    description: |-
+                                      The header field name.
+                                      This will be canonicalized upon output, so case-variant names will be understood as the same header.
+                                    type: string
+                                  value:
+                                    description: The header field value
+                                    type: string
+                                required:
+                                - name
+                                - value
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            path:
+                              description: Path to access on the HTTP server.
+                              type: string
+                            port:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                Name or number of the port to access on the container.
+                                Number must be in the range 1 to 65535.
+                                Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
+                            scheme:
+                              description: |-
+                                Scheme to use for connecting to the host.
+                                Defaults to HTTP.
+                              type: string
+                          required:
+                          - port
+                          type: object
+                        initialDelaySeconds:
+                          description: |-
+                            Number of seconds after the container has started before liveness probes are initiated.
+                            More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                          format: int32
+                          type: integer
+                        periodSeconds:
+                          description: |-
+                            How often (in seconds) to perform the probe.
+                            Default to 10 seconds. Minimum value is 1.
+                          format: int32
+                          type: integer
+                        successThreshold:
+                          description: |-
+                            Minimum consecutive successes for the probe to be considered successful after having failed.
+                            Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
+                          format: int32
+                          type: integer
+                        tcpSocket:
+                          description: TCPSocket specifies a connection to a TCP port.
+                          properties:
+                            host:
+                              description: 'Optional: Host name to connect to, defaults
+                                to the pod IP.'
+                              type: string
+                            port:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                Number or name of the port to access on the container.
+                                Number must be in the range 1 to 65535.
+                                Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
+                          required:
+                          - port
+                          type: object
+                        terminationGracePeriodSeconds:
+                          description: |-
+                            Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+                            The grace period is the duration in seconds after the processes running in the pod are sent
+                            a termination signal and the time when the processes are forcibly halted with a kill signal.
+                            Set this value longer than the expected cleanup time for your process.
+                            If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
+                            value overrides the value provided by the pod spec.
+                            Value must be non-negative integer. The value zero indicates stop immediately via
+                            the kill signal (no opportunity to shut down).
+                            This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+                            Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
+                          format: int64
+                          type: integer
+                        timeoutSeconds:
+                          description: |-
+                            Number of seconds after which the probe times out.
+                            Defaults to 1 second. Minimum value is 1.
+                            More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                          format: int32
+                          type: integer
+                      type: object
+                    resizePolicy:
+                      description: Resources resize policy for the container.
+                      items:
+                        description: ContainerResizePolicy represents resource resize
+                          policy for the container.
+                        properties:
+                          resourceName:
+                            description: |-
+                              Name of the resource to which this resource resize policy applies.
+                              Supported values: cpu, memory.
+                            type: string
+                          restartPolicy:
+                            description: |-
+                              Restart policy to apply when specified resource is resized.
+                              If not specified, it defaults to NotRequired.
+                            type: string
+                        required:
+                        - resourceName
+                        - restartPolicy
+                        type: object
+                      type: array
+                      x-kubernetes-list-type: atomic
+                    resources:
+                      description: |-
+                        Compute Resources required by this container.
+                        Cannot be updated.
+                        More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                      properties:
+                        claims:
+                          description: |-
+                            Claims lists the names of resources, defined in spec.resourceClaims,
+                            that are used by this container.
+
+                            This is an alpha field and requires enabling the
+                            DynamicResourceAllocation feature gate.
+
+                            This field is immutable. It can only be set for containers.
+                          items:
+                            description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                            properties:
+                              name:
+                                description: |-
+                                  Name must match the name of one entry in pod.spec.resourceClaims of
+                                  the Pod where this field is used. It makes that resource available
+                                  inside a container.
+                                type: string
+                              request:
+                                description: |-
+                                  Request is the name chosen for a request in the referenced claim.
+                                  If empty, everything from the claim is made available, otherwise
+                                  only the result of this request.
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
+                        limits:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: |-
+                            Limits describes the maximum amount of compute resources allowed.
+                            More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                          type: object
+                        requests:
+                          additionalProperties:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          description: |-
+                            Requests describes the minimum amount of compute resources required.
+                            If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                            otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                            More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                          type: object
+                      type: object
+                    restartPolicy:
+                      description: |-
+                        RestartPolicy defines the restart behavior of individual containers in a pod.
+                        This field may only be set for init containers, and the only allowed value is "Always".
+                        For non-init containers or when this field is not specified,
+                        the restart behavior is defined by the Pod's restart policy and the container type.
+                        Setting the RestartPolicy as "Always" for the init container will have the following effect:
+                        this init container will be continually restarted on
+                        exit until all regular containers have terminated. Once all regular
+                        containers have completed, all init containers with restartPolicy "Always"
+                        will be shut down. This lifecycle differs from normal init containers and
+                        is often referred to as a "sidecar" container. Although this init
+                        container still starts in the init container sequence, it does not wait
+                        for the container to complete before proceeding to the next init
+                        container. Instead, the next init container starts immediately after this
+                        init container is started, or after any startupProbe has successfully
+                        completed.
+                      type: string
+                    securityContext:
+                      description: |-
+                        SecurityContext defines the security options the container should be run with.
+                        If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
+                        More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+                      properties:
+                        allowPrivilegeEscalation:
+                          description: |-
+                            AllowPrivilegeEscalation controls whether a process can gain more
+                            privileges than its parent process. This bool directly controls if
+                            the no_new_privs flag will be set on the container process.
+                            AllowPrivilegeEscalation is true always when the container is:
+                            1) run as Privileged
+                            2) has CAP_SYS_ADMIN
+                            Note that this field cannot be set when spec.os.name is windows.
+                          type: boolean
+                        appArmorProfile:
+                          description: |-
+                            appArmorProfile is the AppArmor options to use by this container. If set, this profile
+                            overrides the pod's appArmorProfile.
+                            Note that this field cannot be set when spec.os.name is windows.
+                          properties:
+                            localhostProfile:
+                              description: |-
+                                localhostProfile indicates a profile loaded on the node that should be used.
+                                The profile must be preconfigured on the node to work.
+                                Must match the loaded name of the profile.
+                                Must be set if and only if type is "Localhost".
+                              type: string
+                            type:
+                              description: |-
+                                type indicates which kind of AppArmor profile will be applied.
+                                Valid options are:
+                                  Localhost - a profile pre-loaded on the node.
+                                  RuntimeDefault - the container runtime's default profile.
+                                  Unconfined - no AppArmor enforcement.
+                              type: string
+                          required:
+                          - type
+                          type: object
+                        capabilities:
+                          description: |-
+                            The capabilities to add/drop when running containers.
+                            Defaults to the default set of capabilities granted by the container runtime.
+                            Note that this field cannot be set when spec.os.name is windows.
+                          properties:
+                            add:
+                              description: Added capabilities
+                              items:
+                                description: Capability represent POSIX capabilities
+                                  type
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            drop:
+                              description: Removed capabilities
+                              items:
+                                description: Capability represent POSIX capabilities
+                                  type
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          type: object
+                        privileged:
+                          description: |-
+                            Run container in privileged mode.
+                            Processes in privileged containers are essentially equivalent to root on the host.
+                            Defaults to false.
+                            Note that this field cannot be set when spec.os.name is windows.
+                          type: boolean
+                        procMount:
+                          description: |-
+                            procMount denotes the type of proc mount to use for the containers.
+                            The default value is Default which uses the container runtime defaults for
+                            readonly paths and masked paths.
+                            This requires the ProcMountType feature flag to be enabled.
+                            Note that this field cannot be set when spec.os.name is windows.
+                          type: string
+                        readOnlyRootFilesystem:
+                          description: |-
+                            Whether this container has a read-only root filesystem.
+                            Default is false.
+                            Note that this field cannot be set when spec.os.name is windows.
+                          type: boolean
+                        runAsGroup:
+                          description: |-
+                            The GID to run the entrypoint of the container process.
+                            Uses runtime default if unset.
+                            May also be set in PodSecurityContext.  If set in both SecurityContext and
+                            PodSecurityContext, the value specified in SecurityContext takes precedence.
+                            Note that this field cannot be set when spec.os.name is windows.
+                          format: int64
+                          type: integer
+                        runAsNonRoot:
+                          description: |-
+                            Indicates that the container must run as a non-root user.
+                            If true, the Kubelet will validate the image at runtime to ensure that it
+                            does not run as UID 0 (root) and fail to start the container if it does.
+                            If unset or false, no such validation will be performed.
+                            May also be set in PodSecurityContext.  If set in both SecurityContext and
+                            PodSecurityContext, the value specified in SecurityContext takes precedence.
+                          type: boolean
+                        runAsUser:
+                          description: |-
+                            The UID to run the entrypoint of the container process.
+                            Defaults to user specified in image metadata if unspecified.
+                            May also be set in PodSecurityContext.  If set in both SecurityContext and
+                            PodSecurityContext, the value specified in SecurityContext takes precedence.
+                            Note that this field cannot be set when spec.os.name is windows.
+                          format: int64
+                          type: integer
+                        seLinuxOptions:
+                          description: |-
+                            The SELinux context to be applied to the container.
+                            If unspecified, the container runtime will allocate a random SELinux context for each
+                            container.  May also be set in PodSecurityContext.  If set in both SecurityContext and
+                            PodSecurityContext, the value specified in SecurityContext takes precedence.
+                            Note that this field cannot be set when spec.os.name is windows.
+                          properties:
+                            level:
+                              description: Level is SELinux level label that applies
+                                to the container.
+                              type: string
+                            role:
+                              description: Role is a SELinux role label that applies
+                                to the container.
+                              type: string
+                            type:
+                              description: Type is a SELinux type label that applies
+                                to the container.
+                              type: string
+                            user:
+                              description: User is a SELinux user label that applies
+                                to the container.
+                              type: string
+                          type: object
+                        seccompProfile:
+                          description: |-
+                            The seccomp options to use by this container. If seccomp options are
+                            provided at both the pod & container level, the container options
+                            override the pod options.
+                            Note that this field cannot be set when spec.os.name is windows.
+                          properties:
+                            localhostProfile:
+                              description: |-
+                                localhostProfile indicates a profile defined in a file on the node should be used.
+                                The profile must be preconfigured on the node to work.
+                                Must be a descending path, relative to the kubelet's configured seccomp profile location.
+                                Must be set if type is "Localhost". Must NOT be set for any other type.
+                              type: string
+                            type:
+                              description: |-
+                                type indicates which kind of seccomp profile will be applied.
+                                Valid options are:
+
+                                Localhost - a profile defined in a file on the node should be used.
+                                RuntimeDefault - the container runtime default profile should be used.
+                                Unconfined - no profile should be applied.
+                              type: string
+                          required:
+                          - type
+                          type: object
+                        windowsOptions:
+                          description: |-
+                            The Windows specific settings applied to all containers.
+                            If unspecified, the options from the PodSecurityContext will be used.
+                            If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+                            Note that this field cannot be set when spec.os.name is linux.
+                          properties:
+                            gmsaCredentialSpec:
+                              description: |-
+                                GMSACredentialSpec is where the GMSA admission webhook
+                                (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
+                                GMSA credential spec named by the GMSACredentialSpecName field.
+                              type: string
+                            gmsaCredentialSpecName:
+                              description: GMSACredentialSpecName is the name of the
+                                GMSA credential spec to use.
+                              type: string
+                            hostProcess:
+                              description: |-
+                                HostProcess determines if a container should be run as a 'Host Process' container.
+                                All of a Pod's containers must have the same effective HostProcess value
+                                (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
+                                In addition, if HostProcess is true then HostNetwork must also be set to true.
+                              type: boolean
+                            runAsUserName:
+                              description: |-
+                                The UserName in Windows to run the entrypoint of the container process.
+                                Defaults to the user specified in image metadata if unspecified.
+                                May also be set in PodSecurityContext. If set in both SecurityContext and
+                                PodSecurityContext, the value specified in SecurityContext takes precedence.
+                              type: string
+                          type: object
+                      type: object
+                    startupProbe:
+                      description: |-
+                        StartupProbe indicates that the Pod has successfully initialized.
+                        If specified, no other probes are executed until this completes successfully.
+                        If this probe fails, the Pod will be restarted, just as if the livenessProbe failed.
+                        This can be used to provide different probe parameters at the beginning of a Pod's lifecycle,
+                        when it might take a long time to load data or warm a cache, than during steady-state operation.
+                        This cannot be updated.
+                        More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                      properties:
+                        exec:
+                          description: Exec specifies a command to execute in the
+                            container.
+                          properties:
+                            command:
+                              description: |-
+                                Command is the command line to execute inside the container, the working directory for the
+                                command  is root ('/') in the container's filesystem. The command is simply exec'd, it is
+                                not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use
+                                a shell, you need to explicitly call out to that shell.
+                                Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
+                              items:
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          type: object
+                        failureThreshold:
+                          description: |-
+                            Minimum consecutive failures for the probe to be considered failed after having succeeded.
+                            Defaults to 3. Minimum value is 1.
+                          format: int32
+                          type: integer
+                        grpc:
+                          description: GRPC specifies a GRPC HealthCheckRequest.
+                          properties:
+                            port:
+                              description: Port number of the gRPC service. Number
+                                must be in the range 1 to 65535.
+                              format: int32
+                              type: integer
+                            service:
+                              default: ""
+                              description: |-
+                                Service is the name of the service to place in the gRPC HealthCheckRequest
+                                (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
+
+                                If this is not specified, the default behavior is defined by gRPC.
+                              type: string
+                          required:
+                          - port
+                          type: object
+                        httpGet:
+                          description: HTTPGet specifies an HTTP GET request to perform.
+                          properties:
+                            host:
+                              description: |-
+                                Host name to connect to, defaults to the pod IP. You probably want to set
+                                "Host" in httpHeaders instead.
+                              type: string
+                            httpHeaders:
+                              description: Custom headers to set in the request. HTTP
+                                allows repeated headers.
+                              items:
+                                description: HTTPHeader describes a custom header
+                                  to be used in HTTP probes
+                                properties:
+                                  name:
+                                    description: |-
+                                      The header field name.
+                                      This will be canonicalized upon output, so case-variant names will be understood as the same header.
+                                    type: string
+                                  value:
+                                    description: The header field value
+                                    type: string
+                                required:
+                                - name
+                                - value
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            path:
+                              description: Path to access on the HTTP server.
+                              type: string
+                            port:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                Name or number of the port to access on the container.
+                                Number must be in the range 1 to 65535.
+                                Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
+                            scheme:
+                              description: |-
+                                Scheme to use for connecting to the host.
+                                Defaults to HTTP.
+                              type: string
+                          required:
+                          - port
+                          type: object
+                        initialDelaySeconds:
+                          description: |-
+                            Number of seconds after the container has started before liveness probes are initiated.
+                            More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                          format: int32
+                          type: integer
+                        periodSeconds:
+                          description: |-
+                            How often (in seconds) to perform the probe.
+                            Default to 10 seconds. Minimum value is 1.
+                          format: int32
+                          type: integer
+                        successThreshold:
+                          description: |-
+                            Minimum consecutive successes for the probe to be considered successful after having failed.
+                            Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
+                          format: int32
+                          type: integer
+                        tcpSocket:
+                          description: TCPSocket specifies a connection to a TCP port.
+                          properties:
+                            host:
+                              description: 'Optional: Host name to connect to, defaults
+                                to the pod IP.'
+                              type: string
+                            port:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                Number or name of the port to access on the container.
+                                Number must be in the range 1 to 65535.
+                                Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
+                          required:
+                          - port
+                          type: object
+                        terminationGracePeriodSeconds:
+                          description: |-
+                            Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+                            The grace period is the duration in seconds after the processes running in the pod are sent
+                            a termination signal and the time when the processes are forcibly halted with a kill signal.
+                            Set this value longer than the expected cleanup time for your process.
+                            If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
+                            value overrides the value provided by the pod spec.
+                            Value must be non-negative integer. The value zero indicates stop immediately via
+                            the kill signal (no opportunity to shut down).
+                            This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+                            Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
+                          format: int64
+                          type: integer
+                        timeoutSeconds:
+                          description: |-
+                            Number of seconds after which the probe times out.
+                            Defaults to 1 second. Minimum value is 1.
+                            More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                          format: int32
+                          type: integer
+                      type: object
+                    stdin:
+                      description: |-
+                        Whether this container should allocate a buffer for stdin in the container runtime. If this
+                        is not set, reads from stdin in the container will always result in EOF.
+                        Default is false.
+                      type: boolean
+                    stdinOnce:
+                      description: |-
+                        Whether the container runtime should close the stdin channel after it has been opened by
+                        a single attach. When stdin is true the stdin stream will remain open across multiple attach
+                        sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the
+                        first client attaches to stdin, and then remains open and accepts data until the client disconnects,
+                        at which time stdin is closed and remains closed until the container is restarted. If this
+                        flag is false, a container processes that reads from stdin will never receive an EOF.
+                        Default is false
+                      type: boolean
+                    terminationMessagePath:
+                      description: |-
+                        Optional: Path at which the file to which the container's termination message
+                        will be written is mounted into the container's filesystem.
+                        Message written is intended to be brief final status, such as an assertion failure message.
+                        Will be truncated by the node if greater than 4096 bytes. The total message length across
+                        all containers will be limited to 12kb.
+                        Defaults to /dev/termination-log.
+                        Cannot be updated.
+                      type: string
+                    terminationMessagePolicy:
+                      description: |-
+                        Indicate how the termination message should be populated. File will use the contents of
+                        terminationMessagePath to populate the container status message on both success and failure.
+                        FallbackToLogsOnError will use the last chunk of container log output if the termination
+                        message file is empty and the container exited with an error.
+                        The log output is limited to 2048 bytes or 80 lines, whichever is smaller.
+                        Defaults to File.
+                        Cannot be updated.
+                      type: string
+                    tty:
+                      description: |-
+                        Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
+                        Default is false.
+                      type: boolean
+                    volumeDevices:
+                      description: volumeDevices is the list of block devices to be
+                        used by the container.
+                      items:
+                        description: volumeDevice describes a mapping of a raw block
+                          device within a container.
+                        properties:
+                          devicePath:
+                            description: devicePath is the path inside of the container
+                              that the device will be mapped to.
+                            type: string
+                          name:
+                            description: name must match the name of a persistentVolumeClaim
+                              in the pod
+                            type: string
+                        required:
+                        - devicePath
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - devicePath
+                      x-kubernetes-list-type: map
+                    volumeMounts:
+                      description: |-
+                        Pod volumes to mount into the container's filesystem.
+                        Cannot be updated.
+                      items:
+                        description: VolumeMount describes a mounting of a Volume
+                          within a container.
+                        properties:
+                          mountPath:
+                            description: |-
+                              Path within the container at which the volume should be mounted.  Must
+                              not contain ':'.
+                            type: string
+                          mountPropagation:
+                            description: |-
+                              mountPropagation determines how mounts are propagated from the host
+                              to container and the other way around.
+                              When not set, MountPropagationNone is used.
+                              This field is beta in 1.10.
+                              When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
+                              (which defaults to None).
+                            type: string
+                          name:
+                            description: This must match the Name of a Volume.
+                            type: string
+                          readOnly:
+                            description: |-
+                              Mounted read-only if true, read-write otherwise (false or unspecified).
+                              Defaults to false.
+                            type: boolean
+                          recursiveReadOnly:
+                            description: |-
+                              RecursiveReadOnly specifies whether read-only mounts should be handled
+                              recursively.
+
+                              If ReadOnly is false, this field has no meaning and must be unspecified.
+
+                              If ReadOnly is true, and this field is set to Disabled, the mount is not made
+                              recursively read-only.  If this field is set to IfPossible, the mount is made
+                              recursively read-only, if it is supported by the container runtime.  If this
+                              field is set to Enabled, the mount is made recursively read-only if it is
+                              supported by the container runtime, otherwise the pod will not be started and
+                              an error will be generated to indicate the reason.
+
+                              If this field is set to IfPossible or Enabled, MountPropagation must be set to
+                              None (or be unspecified, which defaults to None).
+
+                              If this field is not specified, it is treated as an equivalent of Disabled.
+                            type: string
+                          subPath:
+                            description: |-
+                              Path within the volume from which the container's volume should be mounted.
+                              Defaults to "" (volume's root).
+                            type: string
+                          subPathExpr:
+                            description: |-
+                              Expanded path within the volume from which the container's volume should be mounted.
+                              Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
+                              Defaults to "" (volume's root).
+                              SubPathExpr and SubPath are mutually exclusive.
+                            type: string
+                        required:
+                        - mountPath
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - mountPath
+                      x-kubernetes-list-type: map
+                    workingDir:
+                      description: |-
+                        Container's working directory.
+                        If not specified, the container runtime's default will be used, which
+                        might be configured in the container image.
+                        Cannot be updated.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               extraMounts:
                 description: Extra volume mounts to add to the conversion pod container.
                 items:
@@ -3385,6 +4809,729 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.3
+  name: copyappliances.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: CopyAppliance
+    listKind: CopyApplianceList
+    plural: copyappliances
+    singular: copyappliance
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: Ready
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          CopyAppliance is the Schema for API which causes copy appliances to be created
+          in source hypervisors to facilitate disk transfer.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              CopyAppliance specification.
+
+              The appliance VM is a clone of Template, named after the CopyAppliance
+              itself, and that name is how an operator recognizes the VM in the vSphere
+              inventory. The controller finds it again by the moRef recorded in the status.
+            properties:
+              attachDisks:
+                description: |-
+                  Disks to attach to the appliance VM for export. Each entry names an
+                  existing VMDK and carries the VMware identifiers needed to correlate
+                  guest exports with source inventory. Empty means disks should be
+                  detached (release); non-empty means they should be attached and
+                  exporting. Changing the set while terminal re-enters the export
+                  itinerary.
+                  Capped so that the root disk plus the attached disks fit within the
+                  four SCSI controllers vSphere permits per VM (4 x 15 addressable
+                  units = 60 disks).
+                items:
+                  description: AttachedDisk is an existing VMDK to attach to the copy
+                    appliance.
+                  properties:
+                    capacity:
+                      description: Disk capacity in bytes. Used as a secondary match
+                        key when serial is empty.
+                      format: int64
+                      type: integer
+                    diskKey:
+                      description: VMware virtual device key from inventory.
+                      format: int32
+                      type: integer
+                    serial:
+                      description: backing.Uuid from inventory. Used to match guest
+                        exports.
+                      type: string
+                    vmdkPath:
+                      description: Datastore path of the VMDK (e.g. "[datastore13]
+                        some-vm/disk-0.vmdk").
+                      pattern: ^\[[^\]]+\]\s*.+\.vmdk$
+                      type: string
+                  required:
+                  - vmdkPath
+                  type: object
+                maxItems: 59
+                type: array
+              containerImage:
+                description: |-
+                  Fully qualified pull spec for the container image loaded into the
+                  appliance's podman store. A setup pod reads the image and streams it to
+                  the appliance over SSH, so the appliance needs no registry access of its
+                  own. The pod carries no credential, so the image has to be readable
+                  without one.
+                minLength: 1
+                type: string
+              datacenter:
+                description: Datacenter in which the appliance VM is created.
+                type: string
+              datastore:
+                description: Datastore that holds the appliance VM home directory.
+                type: string
+              folder:
+                description: Inventory folder in which the appliance VM is created.
+                type: string
+              provider:
+                description: Source provider in which the appliance VM is created.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              resourcePool:
+                description: Resource pool in which the appliance VM is created.
+                minLength: 1
+                type: string
+              secret:
+                description: |-
+                  Secret holding everything the controller reaches the appliance with.
+                  Name is required; Namespace defaults to the CopyAppliance namespace.
+
+                  The SSH private key is read from the "private-key" data key; the matching
+                  public key is expected to be installed in the appliance image already.
+
+                  The mutual-TLS material the appliance serves its exports with is read from
+                  the data keys named for the files the appliance expects (see
+                  pkg/nbd-container/announce). The controller installs the CA and the
+                  server half on the appliance and keeps the client half to query the
+                  exports with.
+
+                  Server cert is minted at setup with DNS SAN "nbd-server" and an IP SAN for
+                  the guest address (nbds://). CA key stays in this secret for that mint.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              template:
+                description: |-
+                  Inventory path of the VM template the appliance is cloned from. The
+                  template supplies the root disk, so it must support the controller its
+                  disks are attached to, and the one network the appliance is reached on,
+                  which the clone inherits as-is.
+                minLength: 1
+                type: string
+            required:
+            - containerImage
+            - datastore
+            - folder
+            - provider
+            - resourcePool
+            - secret
+            - template
+            type: object
+          status:
+            description: CopyAppliance status.
+            properties:
+              addresses:
+                description: |-
+                  The addresses the appliance VM's guest reports on its network, one entry
+                  per address, in the order the guest reports them. Empty until the guest
+                  has booted far enough to answer.
+                items:
+                  description: |-
+                    ApplianceAddress is an address the appliance VM's guest reports on its
+                    network adapter. The template gives the appliance one network, and an adapter
+                    can hold more than one address on it.
+                  properties:
+                    ip:
+                      description: IP address.
+                      type: string
+                    mac:
+                      description: MAC address of the adapter.
+                      type: string
+                    network:
+                      description: Name of the portgroup the guest reports the adapter
+                        is attached to.
+                      type: string
+                  required:
+                  - ip
+                  - mac
+                  - network
+                  type: object
+                type: array
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              exporterImage:
+                description: |-
+                  The digest-tagged reference the container image is loaded under in the
+                  appliance's podman store. The orchestrator unit is rendered to run it.
+                type: string
+              exports:
+                description: |-
+                  The disk exports the appliance publishes, one per attached disk. Empty
+                  until the appliance is serving all of them.
+                items:
+                  description: ApplianceExport is one disk the appliance publishes
+                    over NBD.
+                  properties:
+                    device:
+                      description: Device node the export reads, as the appliance's
+                        guest sees it.
+                      type: string
+                    diskKey:
+                      description: VMware virtual device key of the attached source
+                        disk.
+                      format: int32
+                      type: integer
+                    port:
+                      description: Port on the appliance the export is served on.
+                      format: int32
+                      type: integer
+                    sourceSerial:
+                      description: backing.Uuid of the attached source disk from inventory.
+                      type: string
+                    vmdkPath:
+                      description: Datastore path of the attached source VMDK.
+                      type: string
+                    wwid:
+                      description: |-
+                        Stable identifier the appliance's guest resolved for the disk. It falls
+                        back to the device path when the guest can report nothing better.
+                      type: string
+                  required:
+                  - device
+                  - port
+                  - wwid
+                  type: object
+                type: array
+              moRef:
+                description: The managed object reference ID of the created appliance
+                  VM.
+                type: string
+              phase:
+                description: |-
+                  Current deploy, export, or teardown phase. Terminal: DeployCompleted
+                  (exporting), DeployFailed, Released (detached), TeardownCompleted,
+                  TeardownFailed.
+                type: string
+              taskRef:
+                description: |-
+                  The managed object reference ID of the vSphere task the current phase is
+                  waiting on. Empty when the phase has nothing outstanding.
+                type: string
+              vcenterInstanceUUID:
+                description: |-
+                  The instance UUID of the vCenter the appliance VM was created in. A
+                  managed object reference is only unique within one vCenter, so MoRef
+                  must not be trusted when this does not match the connected instance.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
+  name: copyappliancetemplates.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: CopyApplianceTemplate
+    listKind: CopyApplianceTemplateList
+    plural: copyappliancetemplates
+    shortNames:
+    - catpl
+    singular: copyappliancetemplate
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .status.stage
+      name: STAGE
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CopyApplianceTemplateSpec defines the desired state of CopyApplianceTemplate.
+            properties:
+              baseDisk:
+                description: Base containerdisk image for overlay customization.
+                properties:
+                  containerImage:
+                    description: OCI image embedding the base qcow2 (KubeVirt containerdisk
+                      layout under /disk).
+                    type: string
+                  imagePullSecret:
+                    description: Optional dockerconfigjson secret for pulling containerImage.
+                    properties:
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  workGiB:
+                    description: emptyDir size limit for the qcow2 overlay workspace.
+                      Unset means no limit.
+                    format: int64
+                    type: integer
+                type: object
+              builderImage:
+                description: |-
+                  Override for the copy appliance template builder container image.
+                  Defaults to the controller COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE setting when empty.
+                type: string
+              datastore:
+                description: Target vCenter datastore.
+                type: string
+              folder:
+                description: vCenter folder path (e.g. /Datacenter/vm).
+                type: string
+              network:
+                description: Port group for OVF network mapping.
+                type: string
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: Optional node selector for the build pod.
+                type: object
+              provider:
+                description: Reference to a vSphere Provider.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              resources:
+                description: OVF hardware descriptor overrides.
+                properties:
+                  cpu:
+                    default: 2
+                    format: int32
+                    type: integer
+                  memoryMiB:
+                    default: 4096
+                    format: int32
+                    type: integer
+                type: object
+              templateName:
+                description: vCenter template name after OVF import.
+                type: string
+              transferNetwork:
+                description: Multus NAD for the OVA build pod (same as Plan.spec.transferNetwork).
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            required:
+            - baseDisk
+            - datastore
+            - folder
+            - network
+            - provider
+            - templateName
+            type: object
+          status:
+            description: CopyApplianceTemplateStatus defines the observed state of
+              CopyApplianceTemplate.
+            properties:
+              buildPod:
+                description: Reference to the build pod when a template was successfully
+                  created.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              completionTime:
+                format: date-time
+                type: string
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              message:
+                type: string
+              observedGeneration:
+                format: int64
+                type: integer
+              phase:
+                description: CopyApplianceTemplatePhase is the high-level lifecycle
+                  state of a CopyApplianceTemplate resource.
+                enum:
+                - Pending
+                - Running
+                - Succeeded
+                - Failed
+                type: string
+              stage:
+                description: CopyApplianceTemplateStage is the fine-grained pipeline
+                  position within the Running phase.
+                type: string
+              template:
+                description: TemplateStatus tracks the vCenter template artifact.
+                properties:
+                  baseContainerImage:
+                    description: containerImage used for the base disk at build time.
+                    type: string
+                  configHash:
+                    description: Hash of CPU/memory/network configuration.
+                    type: string
+                  diskHash:
+                    description: Hash of the base containerdisk image.
+                    type: string
+                  importedAt:
+                    format: date-time
+                    type: string
+                  moref:
+                    description: vSphere managed object reference.
+                    type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: forkliftcontrollers.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -3601,6 +5748,15 @@ spec:
                   Global default ServiceAccount for migration pods in the target namespace.
                   Overridden by Plan-level serviceAccount.
                 type: string
+              controller_multus_network_name_always_qualified:
+                default: "false"
+                description: |-
+                  Always use qualified namespace/nad-name format for Multus networks.
+                  When false, uses unqualified nad-name when NAD is in same namespace as target VM.
+                enum:
+                - "true"
+                - "false"
+                type: string
               controller_ocp_pvc_name_template:
                 description: |-
                   Global default Go template for generating PVC names during OpenShift (OCP) migrations.
@@ -3711,6 +5867,34 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
+              copy_appliance_container_image_fqin:
+                description: |-
+                  Fully-qualified nbd-container image loaded onto copy appliances
+                  (e.g. "quay.io/kubev2v/nbd-container:latest"). The setup pod that reads
+                  it carries no registry credential, so it has to be readable without one.
+                type: string
+              copy_appliance_ssh_user:
+                default: root
+                description: SSH user the controller logs in to copy appliances as.
+                  Defaults to root.
+                type: string
+              copy_appliance_template_base_disk_container_image_fqin:
+                description: |-
+                  Fully-qualified base containerdisk image for copy appliance templates
+                  (e.g. "registry.redhat.io/rhel9/rhel-guest-image:latest").
+                type: string
+              copy_appliance_template_builder_image_fqin:
+                description: Copy appliance template builder image. Optional. If left
+                  empty, the operator automatically sets this from the release payload.
+                type: string
+              copy_appliance_template_cpu:
+                default: "2"
+                description: Default OVF CPU count for copy appliance templates.
+                type: string
+              copy_appliance_template_memory_mib:
+                default: "4096"
+                description: Default OVF memory in MiB for copy appliance templates.
+                type: string
               deep_inspection_image_fqin:
                 description: Deep inspection image. Optional. If left empty, the operator
                   automatically sets this from the release payload.
@@ -3729,6 +5913,13 @@ spec:
               feature_cli_download:
                 default: "true"
                 description: Enable CLI download service.
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_copy_appliance:
+                default: "false"
+                description: Provision copy appliance templates for vSphere providers.
                 enum:
                 - "true"
                 - "false"
@@ -7635,6 +9826,13 @@ spec:
                     "net-{{.NetworkIndex}}"
                     "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
                 type: string
+              preCopySourceDisks:
+                description: |-
+                  PreCopySourceDisks enables two-phase disk transfer for Hyper-V migrations.
+                  When true, an init container converts the source VHDX files to raw format
+                  directly on the target block device using qemu-img, then virt-v2v performs
+                  only in-place guest customization.
+                type: boolean
               preserveClusterCpuModel:
                 description: Preserve the CPU model and flags the VM runs with in
                   its oVirt cluster.
@@ -10312,6 +12510,14 @@ spec:
                   - type
                   type: object
                 type: array
+              copyApplianceSSHPrivateSecret:
+                description: Name of the secret with the copyApplianceTemplate SSH
+                  private key and TLS material.
+                type: string
+              copyApplianceSSHPublicSecret:
+                description: Name of the secret with the copyApplianceTemplate SSH
+                  public key.
+                type: string
               fingerprint:
                 description: Fingerprint.
                 type: string
@@ -11017,6 +13223,12 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - networks
+  verbs:
+  - get
+- apiGroups:
   - ""
   resources:
   - pods
@@ -11035,6 +13247,13 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods/proxy
+  verbs:
+  - get
+  - create
 - apiGroups:
   - batch
   resources:
@@ -11267,6 +13486,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - networks
+  verbs:
+  - get
 - apiGroups:
   - batch
   resources:
@@ -11816,6 +14041,10 @@ spec:
           value: ${VIRT_CUSTOMIZE_MAP}
         - name: VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE
           value: ${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}
+        - name: COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE
+          value: ${COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE}
+        - name: COPY_APPLIANCE_CONTAINER_IMAGE
+          value: ${NBD_CONTAINER_IMAGE}
         image: ${OPERATOR_IMAGE}
         imagePullPolicy: Always
         livenessProbe:
@@ -12683,6 +14912,14 @@ spec:
       kind: Conversion
       name: conversions.forklift.konveyor.io
       version: v1beta1
+    - description: vSphere copy appliance template builder
+      displayName: CopyApplianceTemplate Template
+      kind: CopyApplianceTemplate
+      name: copyappliancetemplates.forklift.konveyor.io
+    - description: Copy appliance VM for vSphere disk export over NBD
+      displayName: Copy Appliance
+      kind: CopyAppliance
+      name: copyappliances.forklift.konveyor.io
   description: |
     The Migration Toolkit for Virtualization Operator manages the deployment and life cycle of Migration Toolkit for Virtualization on [OpenShift](https://www.openshift.com/) Container Platform.
 
@@ -12700,11 +14937,11 @@ spec:
 
     ### Compatibility
 
-    Migration Toolkit for Virtualization 2.10 is supported on OpenShift 4.18, 4.19 and 4.20
-
-    Migration Toolkit for Virtualization 2.11 is supported on OpenShift 4.19, 4.20 and 4.21
-
     Migration Toolkit for Virtualization 2.12 is supported on OpenShift 4.20, 4.21 and 4.22
+
+    Migration Toolkit for Virtualization 5.0 is supported on OpenShift 4.22, 4.23 and 5.0
+
+    Migration Toolkit for Virtualization 5.1 is supported on OpenShift 4.22, 4.23 and 5.0
 
     More information on compatibility in the [MTV Lifecycle document](https://access.redhat.com/support/policy/updates/migration-toolkit-for-virtualization).
 
@@ -12754,6 +14991,9 @@ spec:
   minKubeVersion: 1.35.0
   provider:
     name: Red Hat
+  relatedImages:
+  - image: ${COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE}
+    name: copy_appliance_template_builder
   version: ${MTV_VERSION}
 ---
 apiVersion: scorecard.operatorframework.io/v1alpha3

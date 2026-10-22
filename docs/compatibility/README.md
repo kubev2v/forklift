@@ -22,6 +22,7 @@ Forklift supports migration from the following source platforms:
 | **OVA** | `ova` | Open Virtual Appliance files (VMware exports) |
 | **Amazon EC2** | `ec2` | AWS EC2 instances with EBS volumes |
 | **Hyper-V** | `hyperv` | Microsoft Hyper-V servers |
+| **Nutanix** | `nutanix` | Nutanix Prism Central and Prism Element |
 
 ## Documentation Index
 
@@ -52,37 +53,37 @@ Forklift supports migration from the following source platforms:
 
 ### Migration Types
 
-| Migration Type | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV |
-|----------------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|
-| Cold | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Warm | Yes | Yes* | No | No | No | No | No |
-| Live | No | No | No | Yes* | No | No | No |
-| Conversion-only | Yes | No | No | No | No | No | No |
+| Migration Type | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV | Nutanix |
+|----------------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|:-------:|
+| Cold | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Warm | Yes | Yes* | No | No | No | No | No | No |
+| Live | No | No | No | Yes* | No | No | No | No |
+| Conversion-only | Yes | No | No | No | No | No | No | No |
 
 *oVirt warm migration requires feature gate `FEATURE_OVIRT_WARM_MIGRATION`<br>
 *OpenShift live migration requires feature gate `FEATURE_OCP_LIVE_MIGRATION` and KubeVirt `DecentralizedLiveMigration` feature on both clusters
 
 ### Guest Conversion
 
-| Feature | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV |
-|---------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|
-| Requires virt-v2v | Yes* | No | No | No | Yes | Yes* | Yes |
-| Driver injection | Yes | No | No | No | Yes | Yes | Yes |
-| Windows support | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Linux support | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Feature | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV | Nutanix |
+|---------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|:-------:|
+| Requires virt-v2v | Yes* | No | No | No | Yes | Yes* | Yes | Yes |
+| Driver injection | Yes | No | No | No | Yes | Yes | Yes | Yes |
+| Windows support | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Linux support | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 
 *vSphere and EC2 support `skipGuestConversion` to bypass virt-v2v; use `useCompatibilityMode` for SATA/E1000E devices or ensure VirtIO drivers are pre-installed. OVA and HyperV always require virt-v2v.
 
 ### Key Features
 
-| Feature | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV |
-|---------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|
-| Static IP preservation | Yes | No | No | No | No | No | No |
-| Shared disk migration | Yes | Yes | No | No | No | No | No |
-| LUKS encryption | Yes | Yes | No | No | No | No | No |
-| Migration hooks | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Naming templates | Yes | No | No | Partial | No | No | No |
-| Storage offload (XCOPY) | Yes | No | No | No | No | No | No |
+| Feature | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV | Nutanix |
+|---------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|:-------:|
+| Static IP preservation | Yes | No | No | No | No | No | No | Yes |
+| Shared disk migration | Yes | Yes | No | No | No | No | No | No |
+| LUKS encryption | Yes | Yes | No | No | No | No | No | No |
+| Migration hooks | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Naming templates | Yes | No | No | Partial | No | No | No | No |
+| Storage offload (XCOPY) | Yes | No | No | No | No | No | No | No |
 
 ## Related Documentation
 

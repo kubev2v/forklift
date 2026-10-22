@@ -18,6 +18,8 @@ package controller
 
 import (
 	"github.com/kubev2v/forklift/pkg/controller/conversion"
+	"github.com/kubev2v/forklift/pkg/controller/copyappliance"
+	"github.com/kubev2v/forklift/pkg/controller/copyappliancetemplate"
 	"github.com/kubev2v/forklift/pkg/controller/hook"
 	"github.com/kubev2v/forklift/pkg/controller/host"
 	"github.com/kubev2v/forklift/pkg/controller/hyperv"
@@ -47,6 +49,8 @@ var MainControllers = []AddFunction{
 	host.Add,
 	hook.Add,
 	conversion.Add,
+	copyappliance.Add,
+	copyappliancetemplate.Add,
 }
 
 // List of Inventory controllers

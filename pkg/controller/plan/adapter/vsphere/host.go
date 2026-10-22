@@ -2,18 +2,13 @@ package vsphere
 
 import (
 	"context"
-	liburl "net/url"
 	"time"
 
-	"github.com/kubev2v/forklift/pkg/controller/base"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
-	"github.com/kubev2v/forklift/pkg/lib/util"
+	libvsphere "github.com/kubev2v/forklift/pkg/lib/vsphere"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
-	"github.com/vmware/govmomi/session"
-	"github.com/vmware/govmomi/vim25"
-	"github.com/vmware/govmomi/vim25/soap"
 	core "k8s.io/api/core/v1"
 )
 
@@ -67,44 +62,11 @@ func (r *EsxHost) connect(ctx context.Context) (err error) {
 	if r.client != nil {
 		return
 	}
-	url, err := liburl.Parse(r.URL)
+	r.client, err = libvsphere.ConnectProvider(ctx, r.URL, r.user(), r.password(), r.thumbprint(), r.Secret)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	url.User = liburl.UserPassword(
-		r.user(),
-		r.password())
-
-	thumbprint := r.thumbprint()
-	skipVerifying := base.GetInsecureSkipVerifyFlag(r.Secret)
-
-	// If thumbprint is not provided, verify the TLS connection to get it.
-	if !skipVerifying && thumbprint == "" {
-		cert, errtls := base.VerifyTLSConnection(r.URL, r.Secret)
-		if errtls != nil {
-			return liberr.Wrap(errtls)
-		}
-		thumbprint = util.Fingerprint(cert)
-	}
-
-	soapClient := soap.NewClient(url, skipVerifying)
-	soapClient.SetThumbprint(url.Host, thumbprint)
-
-	vimClient, err := vim25.NewClient(ctx, soapClient)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	r.client = &govmomi.Client{
-		SessionManager: session.NewManager(vimClient),
-		Client:         vimClient,
-	}
-	err = r.client.Login(ctx, url.User)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	r.finder = find.NewFinder(vimClient)
-
+	r.finder = find.NewFinder(r.client.Client)
 	return nil
 }
 

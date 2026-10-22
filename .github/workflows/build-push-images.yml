@@ -56,14 +56,8 @@ jobs:
             file: build/validation/Containerfile
             repo: forklift-validation
           - name: virt-v2v
-            file: build/virt-v2v/Containerfile-upstream
+            file: build/virt-v2v/Containerfile
             repo: forklift-virt-v2v
-          - name: virt-v2v
-            file: build/virt-v2v/Containerfile-upstream-fedora
-            repo: forklift-virt-v2v-fedora
-          - name: virt-v2v
-            file: build/virt-v2v/Containerfile-upstream-xfs
-            repo: forklift-virt-v2v-xfs
           - name: vsphere-copy-offload-populator
             file: build/vsphere-copy-offload-populator/Containerfile
             repo: vsphere-copy-offload-populator
@@ -79,9 +73,16 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
+      - name: Prefetch virt-v2v build RPMs
+        if: matrix.repo == 'forklift-virt-v2v'
+        run: |
+          bash build/virt-v2v/scripts/fetch-virtio-win-legacy.sh
+          bash build/virt-v2v/scripts/fetch-kernel-modules-internal.sh
+
       - name: Build and push ${{ matrix.name }} image to ${{ env.REGISTRY }}
         uses: docker/build-push-action@v6
         with:
+          context: .
           push: true
           file: "${{ matrix.file }}"
           tags: ${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/${{ matrix.repo }}:${{ env.REGISTRY_TAG }}

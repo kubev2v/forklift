@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/kubev2v/vm-migration-detective/internal/tlsconfig"
 	"github.com/sirupsen/logrus"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
+	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/soap"
 	vimtypes "github.com/vmware/govmomi/vim25/types"
 )
 
@@ -20,8 +24,8 @@ type Client struct {
 	logger *logrus.Logger
 }
 
-// NewClient creates a new vSphere client
-func NewClient(ctx context.Context, vcenterURL, username, password string, insecure bool, logger *logrus.Logger) (*Client, error) {
+// NewClient creates a new vSphere client with TLS configuration
+func NewClient(ctx context.Context, vcenterURL, username, password string, tlsConfig *tlsconfig.Config, logger *logrus.Logger) (*Client, error) {
 	// Parse vCenter URL
 	u, err := url.Parse(vcenterURL)
 	if err != nil {
@@ -31,14 +35,50 @@ func NewClient(ctx context.Context, vcenterURL, username, password string, insec
 	// Set credentials
 	u.User = url.UserPassword(username, password)
 
-	// Connect to vSphere
-	client, err := govmomi.NewClient(ctx, u, insecure)
+	// Validate TLS config
+	if tlsConfig == nil {
+		return nil, fmt.Errorf("TLS configuration is required")
+	}
+
+	// Log deprecation warning if using deprecated default
+	if tlsConfig.IsDeprecatedDefault && logger != nil {
+		logger.Warn("Connecting to vCenter with INSECURE mode (deprecated default)")
+	}
+
+	// Configure the SOAP transport before it performs its initial service-content
+	// request or authenticates. govmomi.NewClient only accepts an insecure bool,
+	// so using it directly would discard CA and thumbprint configuration.
+	soapClient := soap.NewClient(u, tlsConfig.ForGovmomi())
+	if tlsConfig.RootCAPath != "" {
+		if err := soapClient.SetRootCAs(tlsConfig.RootCAPath); err != nil {
+			return nil, fmt.Errorf("failed to configure vSphere CA certificates: %w", err)
+		}
+	}
+	if tlsConfig.Thumbprint != "" {
+		soapClient.SetThumbprint(u.Host, tlsConfig.Thumbprint)
+	}
+
+	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to vSphere: %w", err)
 	}
+	client := &govmomi.Client{
+		Client:         vimClient,
+		SessionManager: session.NewManager(vimClient),
+	}
+	if err := client.Login(ctx, u.User); err != nil {
+		return nil, fmt.Errorf("failed to authenticate to vSphere: %w", err)
+	}
 
 	if logger != nil {
-		logger.WithField("vcenter", vcenterURL).Debug("Connected to vSphere")
+		tlsMode := "secure"
+		if tlsConfig.ForGovmomi() {
+			tlsMode = "insecure"
+		}
+		logger.WithFields(logrus.Fields{
+			"vcenter":  vcenterURL,
+			"tls_mode": tlsMode,
+		}).Debug("Connected to vSphere")
 	}
 
 	return &Client{

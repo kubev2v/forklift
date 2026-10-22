@@ -3,10 +3,7 @@ package inspection
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
-	"crypto/tls"
 	"fmt"
-	"net"
 	"net/url"
 	"os"
 	"os/exec"
@@ -17,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/vm-migration-detective/internal/cmdbuilder"
+	"github.com/kubev2v/vm-migration-detective/internal/tlsconfig"
 	"github.com/kubev2v/vm-migration-detective/internal/vddk"
 	"github.com/sirupsen/logrus"
 )
@@ -49,6 +47,7 @@ func OpenWithNBDKitVDDK(
 	vcenterURL string,
 	username string,
 	password string,
+	tlsConfig *tlsconfig.Config,
 	logger *logrus.Logger,
 ) (*NBDKitSession, error) {
 	// Parse vCenter URL to extract hostname
@@ -58,20 +57,32 @@ func OpenWithNBDKitVDDK(
 	}
 	vcenterHost := parsedURL.Hostname()
 
-	// Get vCenter SSL thumbprint
+	// Validate TLS config
+	if tlsConfig == nil {
+		return nil, fmt.Errorf("TLS configuration is required")
+	}
+
+	// Get thumbprint from TLS config or compute it
 	var thumbprint string
-	if logger != nil {
-		logger.Debug("Getting vCenter SSL thumbprint")
-	}
-	thumbprint, err = getVCenterThumbprint(vcenterHost)
-	if err != nil {
+	thumbprint = tlsConfig.ForNBDKit()
+
+	// If no thumbprint in config but we have CA or insecure mode,
+	// try to retrieve it for nbdkit (which requires thumbprint)
+	if thumbprint == "" && !tlsConfig.Insecure {
 		if logger != nil {
-			logger.WithError(err).Warn("Failed to get thumbprint, proceeding without SSL verification")
+			logger.Debug("No thumbprint in config, computing from vCenter certificate")
 		}
-		thumbprint = ""
+		computed, err := tlsconfig.GetVCenterThumbprint(vcenterHost, tlsConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get vCenter thumbprint: %w", err)
+		}
+		thumbprint = computed
 	}
-	if thumbprint != "" && logger != nil {
-		logger.WithField("thumbprint", thumbprint).Debug("Got vCenter thumbprint")
+
+	if logger != nil && thumbprint != "" {
+		logger.WithField("thumbprint", thumbprint).Debug("Using vCenter thumbprint")
+	} else if logger != nil {
+		logger.Warn("No thumbprint available - nbdkit will not verify TLS certificate")
 	}
 	// Create temporary Unix socket for nbdkit (more reliable than TCP port)
 	socketPath := filepath.Join("/tmp", fmt.Sprintf("nbdkit-%s.sock", uuid.New().String()))
@@ -335,35 +346,6 @@ func bracketIPv6(host string) string {
 		return "[" + host + "]"
 	}
 	return host
-}
-
-// getVCenterThumbprint gets the SSL certificate thumbprint from vCenter
-func getVCenterThumbprint(vcenterHost string) (string, error) {
-	// net.JoinHostPort wraps IPv6 addresses in brackets automatically
-	conn, err := tls.Dial("tcp", net.JoinHostPort(vcenterHost, "443"), &tls.Config{
-		InsecureSkipVerify: true, // We just need the cert, not to verify it
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to connect to vCenter: %w", err)
-	}
-	defer func() { _ = conn.Close() }()
-
-	// Get the certificate chain
-	certs := conn.ConnectionState().PeerCertificates
-	if len(certs) == 0 {
-		return "", fmt.Errorf("no certificates found")
-	}
-
-	// Use the first certificate (server certificate)
-	cert := certs[0]
-
-	// VMware/govmomi compare SHA-1 thumbprints case-sensitively as AA:BB:...
-	sum := sha1.Sum(cert.Raw)
-	parts := make([]string, len(sum))
-	for i, b := range sum {
-		parts[i] = fmt.Sprintf("%02X", b)
-	}
-	return strings.Join(parts, ":"), nil
 }
 
 // createNBDKitPasswordFile creates a temporary file with the password for nbdkit

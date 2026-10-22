@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,6 +59,14 @@ const (
 	SMBMountFailed          = "SMBMountFailed"
 	WaitingForService       = "WaitingForService"
 	ForkliftNotInstalled    = "ForkliftNotInstalled"
+	// CopyApplianceChecked records the outcome of the last copyApplianceTemplate
+	// appliance check, and what it was a check of. It is durable: it is the
+	// only reason a check that has already run is not run again.
+	CopyApplianceChecked = "CopyApplianceChecked"
+	// CopyApplianceCheckNotReady blocks the provider while the appliance has
+	// not been shown to work. It is deliberately not durable; see
+	// ensureCopyApplianceTemplateApplianceCheck.
+	CopyApplianceCheckNotReady = "CopyApplianceCheckNotReady"
 )
 
 // Forklift operator is installed on a remote cluster.
@@ -79,15 +88,18 @@ const (
 
 // Reasons
 const (
-	NotSet              = "NotSet"
-	NotFound            = "NotFound"
-	NotSupported        = "NotSupported"
-	DataErr             = "DataErr"
-	Malformed           = "Malformed"
-	Completed           = "Completed"
-	Tested              = "Tested"
-	Started             = "Started"
-	SkipTLSVerification = "SkipTLSVerification"
+	NotSet                    = "NotSet"
+	NotFound                  = "NotFound"
+	NotSupported              = "NotSupported"
+	DataErr                   = "DataErr"
+	Malformed                 = "Malformed"
+	Completed                 = "Completed"
+	Tested                    = "Tested"
+	Started                   = "Started"
+	SkipTLSVerification       = "SkipTLSVerification"
+	CopyApplianceCheckPassed  = "CopyApplianceCheckPassed"
+	CopyApplianceCheckFailed  = "CopyApplianceCheckFailed"
+	CopyApplianceCheckPending = "CopyApplianceCheckPending"
 )
 
 // Phases
@@ -1420,6 +1432,23 @@ func (r *Reconciler) ValidateHyperVSettings(provider *api.Provider) error {
 				mt, api.HyperVStandalone, api.HyperVCluster),
 		})
 		return nil
+	}
+
+	if s, ok := provider.Spec.Settings[hvutil.SettingSMBMaxChannels]; ok && s != "" {
+		n, parseErr := strconv.Atoi(s)
+		if parseErr != nil || n < 0 || n > hvutil.MaxSMBChannels {
+			provider.Status.Phase = ValidationFailed
+			provider.Status.SetCondition(libcnd.Condition{
+				Type:     SettingsNotValid,
+				Status:   True,
+				Category: Critical,
+				Reason:   "InvalidSMBMaxChannels",
+				Message: fmt.Sprintf(
+					"Invalid smbMaxChannels '%s'. Must be an integer 0-%d (0 disables multichannel).",
+					s, hvutil.MaxSMBChannels),
+			})
+			return nil //nolint:nilerr // parse error is surfaced as a provider status condition
+		}
 	}
 
 	provider.Status.DeleteCondition(SettingsNotValid)

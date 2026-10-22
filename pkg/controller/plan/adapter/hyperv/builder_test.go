@@ -5,14 +5,17 @@ import (
 	"testing"
 
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cnv "kubevirt.io/api/core/v1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
 func TestBuildNICKeys(t *testing.T) {
@@ -127,6 +130,23 @@ func TestMapMemoryUsesInstanceType(t *testing.T) {
 
 	if object.Template.Spec.Domain.Memory != nil {
 		t.Errorf("expected Memory to be nil when usesInstanceType is true, got %+v", object.Template.Spec.Domain.Memory)
+	}
+}
+
+func TestMapDataVolumeSanitizesDotsInTargetVMName(t *testing.T) {
+	builder := createBuilder()
+	builder.Plan.Spec.PVCNameTemplate = "{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}"
+	vm := &model.VM{}
+	vm.ID = "vm-1"
+	vm.Name = "mtv.redhat.com"
+	disk := hyperv.Disk{Base: hyperv.Base{ID: "disk-1"}, Capacity: 1024}
+
+	dv, err := builder.mapDataVolume(vm, disk, 0, &cdi.DataVolume{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if dv.GenerateName != "test-plan-mtv-redhat-com-disk-0-" {
+		t.Fatalf("GenerateName = %q, want %q", dv.GenerateName, "test-plan-mtv-redhat-com-disk-0-")
 	}
 }
 
@@ -314,7 +334,8 @@ var _ = Describe("HyperV builder", func() {
 				"00:15:5D:01:02:03": "preserve",
 				"00:15:5D:01:02:04": "none",
 			}
-			result := b.mapMacStaticIps(vm, modeByMAC)
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
 			Expect(result).NotTo(ContainSubstring("00:15:5D:01:02:04"))
 		})
@@ -330,7 +351,8 @@ var _ = Describe("HyperV builder", func() {
 			modeByMAC := map[string]string{
 				"00:15:5D:01:02:03": "dhcp",
 			}
-			result := b.mapMacStaticIps(vm, modeByMAC)
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(BeEmpty())
 		})
 
@@ -343,7 +365,8 @@ var _ = Describe("HyperV builder", func() {
 				},
 			}
 			modeByMAC := map[string]string{}
-			result := b.mapMacStaticIps(vm, modeByMAC)
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
 		})
 
@@ -356,7 +379,8 @@ var _ = Describe("HyperV builder", func() {
 					{MAC: "00:15:5D:01:02:04", IP: "172.29.3.194", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
 				},
 			}
-			result := b.mapMacStaticIps(vm, nil)
+			result, err := b.mapMacStaticIps(vm, nil)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
 			Expect(result).To(ContainSubstring("00:15:5D:01:02:04"))
 		})
@@ -376,10 +400,261 @@ var _ = Describe("HyperV builder", func() {
 				"00:15:5D:01:02:04": "dhcp",
 				"00:15:5D:01:02:05": "none",
 			}
-			result := b.mapMacStaticIps(vm, modeByMAC)
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
 			Expect(result).NotTo(ContainSubstring("00:15:5D:01:02:04"))
 			Expect(result).NotTo(ContainSubstring("00:15:5D:01:02:05"))
+		})
+
+		// Linux-specific DHCP tests: DHCP mode should be INCLUDED for Linux (for udev rules)
+		It("should include NICs with mode 'dhcp' on Linux guests", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestOS: "Red Hat Enterprise Linux 8",
+				GuestNetworks: []hyperv.GuestNetwork{
+					{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:15:5D:01:02:03": "dhcp",
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			// DHCP on Linux should include the MAC:IP mapping (for udev rules)
+			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
+		})
+
+		It("should skip mode 'dhcp' only on Windows guests", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestOS: "Windows Server 2019",
+				GuestNetworks: []hyperv.GuestNetwork{
+					{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:15:5D:01:02:03": "dhcp",
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			// DHCP on Windows should be skipped (Windows handles DHCP natively)
+			Expect(result).To(BeEmpty())
+		})
+
+		It("should handle mixed modes correctly for Linux", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestOS: "CentOS 7",
+				GuestNetworks: []hyperv.GuestNetwork{
+					{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+					{MAC: "00:15:5D:01:02:04", IP: "172.29.3.194", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+					{MAC: "00:15:5D:01:02:05", IP: "172.29.3.195", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:15:5D:01:02:03": "preserve",
+				"00:15:5D:01:02:04": "dhcp",
+				"00:15:5D:01:02:05": "none",
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			// On Linux: preserve YES, dhcp YES (for udev rules), none NO
+			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
+			Expect(result).To(ContainSubstring("00:15:5D:01:02:04"))
+			Expect(result).NotTo(ContainSubstring("00:15:5D:01:02:05"))
+		})
+	})
+
+	Context("PodEnvironment with a name-based NetworkMap", func() {
+		staticIPsEnv := func(env []core.EnvVar) (string, bool) {
+			for _, e := range env {
+				if e.Name == "V2V_staticIPs" {
+					return e.Value, true
+				}
+			}
+			return "", false
+		}
+		hasPreserveFlagEnv := func(env []core.EnvVar) bool {
+			for _, e := range env {
+				if e.Name == "V2V_preserveStaticIPs" && e.Value == "true" {
+					return true
+				}
+			}
+			return false
+		}
+
+		It("should populate V2V_staticIPs when the plan requests preservation (Defect A)", func() {
+			vm := &model.VM{}
+			vm.ID = "vm-1"
+			vm.Name = "test-vm"
+			vm.GuestOS = "Windows Server 2019"
+			vm.NICs = []hyperv.NIC{
+				{MAC: "00:15:5D:01:02:03", Network: hyperv.Ref{ID: "net-A"}},
+			}
+			vm.GuestNetworks = []hyperv.GuestNetwork{
+				{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+			}
+
+			builder := createBuilder()
+			builder.Plan.Spec.PreserveStaticIPs = true
+			builder.Source.Inventory = &stubInventory{
+				vms: map[string]*model.VM{"vm-1": vm},
+				networksByName: map[string]model.Network{
+					"network-a": {Resource: model.Resource{ID: "net-A"}},
+				},
+			}
+			builder.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{Map: []v1beta1.NetworkPair{
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-a"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}},
+				}},
+			}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			staticIPs, found := staticIPsEnv(env)
+			Expect(found).To(BeTrue())
+			Expect(staticIPs).To(ContainSubstring("00:15:5D:01:02:03"))
+			Expect(hasPreserveFlagEnv(env)).To(BeTrue())
+		})
+
+		It("should honor a per-network 'none' override on a name-based NetworkMap (Defect B)", func() {
+			vm := &model.VM{}
+			vm.ID = "vm-1"
+			vm.Name = "test-vm"
+			vm.GuestOS = "Windows Server 2019"
+			vm.NICs = []hyperv.NIC{
+				{MAC: "00:15:5D:01:02:03", Network: hyperv.Ref{ID: "net-A"}},
+				{MAC: "00:15:5D:01:02:04", Network: hyperv.Ref{ID: "net-B"}},
+			}
+			vm.GuestNetworks = []hyperv.GuestNetwork{
+				{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				{MAC: "00:15:5D:01:02:04", IP: "172.29.3.194", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+			}
+
+			builder := createBuilder()
+			builder.Plan.Spec.PreserveStaticIPs = true
+			builder.Source.Inventory = &stubInventory{
+				vms: map[string]*model.VM{"vm-1": vm},
+				networksByName: map[string]model.Network{
+					"network-a": {Resource: model.Resource{ID: "net-A"}},
+					"network-b": {Resource: model.Resource{ID: "net-B"}},
+				},
+			}
+			builder.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{Map: []v1beta1.NetworkPair{
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-a"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}},
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-b"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}, NetworkIPMode: v1beta1.NetworkIPModeNone},
+				}},
+			}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			staticIPs, found := staticIPsEnv(env)
+			Expect(found).To(BeTrue())
+			Expect(staticIPs).To(ContainSubstring("00:15:5D:01:02:03"))
+			Expect(staticIPs).NotTo(ContainSubstring("00:15:5D:01:02:04"))
+		})
+
+		It("should honor a per-network 'preserve' override when the plan-level flag is false", func() {
+			vm := &model.VM{}
+			vm.ID = "vm-1"
+			vm.Name = "test-vm"
+			vm.GuestOS = "Windows Server 2019"
+			vm.NICs = []hyperv.NIC{
+				{MAC: "00:15:5D:01:02:03", Network: hyperv.Ref{ID: "net-A"}},
+				{MAC: "00:15:5D:01:02:04", Network: hyperv.Ref{ID: "net-B"}},
+			}
+			vm.GuestNetworks = []hyperv.GuestNetwork{
+				{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				{MAC: "00:15:5D:01:02:04", IP: "172.29.3.194", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+			}
+
+			builder := createBuilder()
+			builder.Plan.Spec.PreserveStaticIPs = false
+			builder.Source.Inventory = &stubInventory{
+				vms: map[string]*model.VM{"vm-1": vm},
+				networksByName: map[string]model.Network{
+					"network-a": {Resource: model.Resource{ID: "net-A"}},
+					"network-b": {Resource: model.Resource{ID: "net-B"}},
+				},
+			}
+			builder.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{Map: []v1beta1.NetworkPair{
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-a"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}, NetworkIPMode: v1beta1.NetworkIPModePreserve},
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-b"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}},
+				}},
+			}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			staticIPs, found := staticIPsEnv(env)
+			Expect(found).To(BeTrue())
+			Expect(staticIPs).To(ContainSubstring("00:15:5D:01:02:03"))
+			Expect(staticIPs).NotTo(ContainSubstring("00:15:5D:01:02:04"))
+		})
+
+		It("Linux DHCP override must not set V2V_preserveStaticIPs when the plan-level flag is true", func() {
+			vm := &model.VM{}
+			vm.ID = "vm-1"
+			vm.Name = "test-vm"
+			vm.GuestOS = "Red Hat Enterprise Linux 8"
+			vm.NICs = []hyperv.NIC{
+				{MAC: "00:15:5D:01:02:03", Network: hyperv.Ref{ID: "net-A"}},
+			}
+			vm.GuestNetworks = []hyperv.GuestNetwork{
+				{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+			}
+
+			builder := createBuilder()
+			builder.Plan.Spec.PreserveStaticIPs = true
+			builder.Source.Inventory = &stubInventory{
+				vms: map[string]*model.VM{"vm-1": vm},
+				networksByName: map[string]model.Network{
+					"network-a": {Resource: model.Resource{ID: "net-A"}},
+				},
+			}
+			builder.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{Map: []v1beta1.NetworkPair{
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "network-a"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}, NetworkIPMode: v1beta1.NetworkIPModeDHCP},
+				}},
+			}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			staticIPs, found := staticIPsEnv(env)
+			Expect(found).To(BeTrue(), "Linux DHCP still needs V2V_staticIPs for udev naming")
+			Expect(staticIPs).To(ContainSubstring("00:15:5D:01:02:03"))
+			Expect(hasPreserveFlagEnv(env)).To(BeFalse(), "networkIPMode=dhcp must override plan-level PreserveStaticIPs")
+		})
+
+		It("should fail when a NetworkMap source cannot be resolved", func() {
+			vm := &model.VM{}
+			vm.ID = "vm-1"
+			vm.Name = "test-vm"
+			vm.GuestOS = "Windows Server 2019"
+			vm.NICs = []hyperv.NIC{
+				{MAC: "00:15:5D:01:02:03", Network: hyperv.Ref{ID: "net-A"}},
+			}
+			vm.GuestNetworks = []hyperv.GuestNetwork{
+				{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+			}
+
+			builder := createBuilder()
+			builder.Plan.Spec.PreserveStaticIPs = true
+			builder.Source.Inventory = &stubInventory{
+				vms: map[string]*model.VM{"vm-1": vm},
+			}
+			builder.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{Map: []v1beta1.NetworkPair{
+					{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{Name: "missing-network"}}, Destination: v1beta1.DestinationNetwork{Type: Pod}, NetworkIPMode: v1beta1.NetworkIPModeNone},
+				}},
+			}
+
+			env, err := builder.PodEnvironment(ref.Ref{ID: "vm-1"}, &core.Secret{})
+			Expect(err).To(HaveOccurred())
+			_, found := staticIPsEnv(env)
+			Expect(found).To(BeFalse())
 		})
 	})
 

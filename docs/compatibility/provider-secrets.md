@@ -336,21 +336,63 @@ stringData:
 ```
 
 ---
+## Nutanix
+
+Authentication to Nutanix HTTP API. Standard user/password fields plus CA certificate field. Note that Prism Central providers will redirect to Prism Element nodes for disk transfers; therefore, it is necessary to bundle the CA certificate from Prism Central together with the certificates from all Prism Element nodes that might be used for transfer. Concatenate all certificates in PEM format as below.
+
+Also, it is important that these certificates present an IP subjectAltName, as the redirect may not use domain names. The insecureSkipVerify flag only skips validation for inventory collection - for disk transfers, it causes forklift to automatically fetch the certificate from the redirected endpoint and instruct the importer pod to trust it.
+
+### Example
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nutanix-credentials
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  user: admin
+  password: "your-password"
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    ...
+    -----END CERTIFICATE-----
+    -----BEGIN CERTIFICATE-----
+    ...
+    -----END CERTIFICATE-----
+```
+
+### Required Fields
+
+| Field | Description |
+|-------|-------------|
+| `user` | Prism Central/Prism Element username (e.g., `admin`) |
+| `password` | Prism Central/Prism Element password |
+
+### Optional Fields
+
+| Field | Description |
+|-------|-------------|
+| `ca.crt` | Prism Central plus Prism Element CA certificates bundled in PEM format |
+| `insecureSkipVerify` | Skip TLS verification (`"true"` or `"false"`) |
+
+---
 
 ## Summary Table
 
-| Field | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV |
-|-------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|
-| `user` / `username` | Req | Req | Req* | - | Opt | - | Req |
-| `password` | Req | Req | Req* | - | Opt | - | Req |
-| `token` | - | - | Opt | Req | - | - | - |
-| `ca.crt` | Opt | Opt | Opt | Opt | - | - | Opt |
-| `insecureSkipVerify` | Opt | Opt | Opt | Opt | - | - | Opt |
-| `region` | - | - | Opt | - | - | Req | - |
-| `accessKeyId` | - | - | - | - | - | Req | - |
-| `secretAccessKey` | - | - | - | - | - | Req | - |
-| `projectName` | - | - | Req* | - | - | - | - |
-| `userDomainName` | - | - | Req* | - | - | - | - |
-| `applicationCredentialID` | - | - | Opt | - | - | - | - |
+| Field | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV | Nutanix |
+|-------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|:-------:|
+| `user` / `username` | Req | Req | Req* | - | Opt | - | Req | Req |
+| `password` | Req | Req | Req* | - | Opt | - | Req | Req |
+| `token` | - | - | Opt | Req | - | - | - | - |
+| `ca.crt` | Opt | Opt | Opt | Opt | - | - | Opt | Opt |
+| `insecureSkipVerify` | Opt | Opt | Opt | Opt | - | - | Opt | Opt |
+| `region` | - | - | Opt | - | - | Req | - | - |
+| `accessKeyId` | - | - | - | - | - | Req | - | - |
+| `secretAccessKey` | - | - | - | - | - | Req | - | - |
+| `projectName` | - | - | Req* | - | - | - | - | - |
+| `userDomainName` | - | - | Req* | - | - | - | - | - |
+| `applicationCredentialID` | - | - | Opt | - | - | - | - | - |
 
 **Legend:** Req = Required, Opt = Optional, Req* = Required for specific auth type, - = Not applicable

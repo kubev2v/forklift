@@ -12,7 +12,6 @@ import (
 	"math/rand"
 	"net"
 	liburl "net/url"
-	"path"
 	"regexp"
 	"slices"
 	"strconv"
@@ -24,6 +23,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	basecontroller "github.com/kubev2v/forklift/pkg/controller/base"
+	appliancectrl "github.com/kubev2v/forklift/pkg/controller/copyappliance"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
@@ -35,6 +35,7 @@ import (
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/kubev2v/forklift/pkg/lib/util"
+	"github.com/kubev2v/forklift/pkg/nbd-container/announce"
 	"github.com/kubev2v/forklift/pkg/settings"
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"github.com/kubev2v/forklift/pkg/templateutil"
@@ -210,18 +211,31 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		vm.RemoveSharedDisks()
 	}
 	r.removeExcludedDisks(vm)
+	nicKeys, pairsBySource, err := r.buildNICResolver(vm.NICs)
+	if err != nil {
+		return
+	}
+	macs := make([]string, len(vm.NICs))
+	for i, nic := range vm.NICs {
+		macs[i] = nic.MAC
+	}
 	macsToIps := ""
-	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
-	if planbase.HasPreserveMode(modeByMAC) {
+	nicRefs, err := planbase.NICRefsFromKeys(macs, nicKeys)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	modeByMAC := planbase.ResolveNICModes(nicRefs, pairsBySource, r.Plan.Spec.PreserveStaticIPs)
+	// Honor resolved preserve modes. Fall back to the plan-level flag only when
+	// matching produced no modes (empty map), so a dhcp/none override still wins.
+	// DHCP is also mapped on Linux so virt-v2v can write udev naming rules.
+	shouldPreserve := planbase.HasPreserveMode(modeByMAC) ||
+		(r.Plan.Spec.PreserveStaticIPs && len(modeByMAC) == 0)
+	if shouldPreserve || planbase.HasDHCPMode(modeByMAC) {
 		macsToIps, err = r.mapMacStaticIps(vm, modeByMAC)
 		if err != nil {
 			return
 		}
-
-		env = append(env, core.EnvVar{
-			Name:  "V2V_preserveStaticIPs",
-			Value: "true",
-		})
 	}
 
 	useLegacyDrivers := false
@@ -303,12 +317,100 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		},
 	)
 	if macsToIps != "" {
+		if shouldPreserve {
+			env = append(env, core.EnvVar{Name: "V2V_preserveStaticIPs", Value: "true"})
+		}
+		env = append(env, core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps})
+	}
+
+	// Only collect Pod-network MACs for masquerade interfaces on IPv6-enabled
+	// clusters. UDN namespaces use l2bridge (not masquerade) and IPv4-only
+	// clusters need no special Pod network config.
+	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
+	if !hasUDN {
+		hasIPv6, detectErr := planbase.PodNetworkHasIPv6(context.TODO(), r.Destination.Client)
+		if detectErr != nil {
+			err = liberr.Wrap(detectErr, "podNetworkHasIPv6")
+			return
+		}
+		if hasIPv6 {
+			if nicKeys, pairsBySource, resolverErr := r.buildNICResolver(vm.NICs); resolverErr == nil {
+				podMacs := planbase.CollectPodNetworkMACs(nicKeys, pairsBySource, vm.NICs, func(nic vsphere.NIC) string {
+					return nic.MAC
+				})
+				if len(podMacs) > 0 {
+					env = append(env, core.EnvVar{
+						Name:  "V2V_podNetworkIPv6MACs",
+						Value: strings.Join(podMacs, ","),
+					})
+				}
+			}
+		}
+	}
+
+	nbdURIs, nbdErr := r.nbdDiskURIsForVM(vmRef, vm)
+	if nbdErr != nil {
+		err = nbdErr
+		return
+	}
+	if len(nbdURIs) > 0 {
 		env = append(env, core.EnvVar{
-			Name:  "V2V_staticIPs",
-			Value: macsToIps,
+			Name:  "V2V_nbdDisks",
+			Value: strings.Join(nbdURIs, ","),
 		})
 	}
 	return
+}
+
+// nbdDiskURIsForVM returns ordered nbd:// URIs for virt-v2v when a copy appliance
+// is exporting the VM's disks. Empty when CDI already transferred (!useV2vForTransfer),
+// when the plan uses VDDK instead of a copy appliance, or when there is no appliance —
+// conversion must not require NBD after release.
+func (r *Builder) nbdDiskURIsForVM(vmRef ref.Ref, vm *model.VM) ([]string, error) {
+	if r.Migration == nil || r.Migration.UID == "" {
+		return nil, nil
+	}
+	if !settings.Settings.EnabledForPlan(r.Plan) {
+		return nil, nil
+	}
+	useV2vForTransfer, err := r.Plan.ShouldUseV2vForTransfer(vmRef)
+	if err != nil {
+		return nil, err
+	}
+	if !useV2vForTransfer {
+		return nil, nil
+	}
+	connections, err := r.nbdConnectionsForVM(vmRef)
+	if err != nil {
+		notFound := k8serr.IsNotFound(err) || k8serr.IsNotFound(liberr.Unwrap(err))
+		if notFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	// Shared disks are already dropped by RemoveSharedDisks when they should
+	// not be migrated; do not skip Shared here or migrateSharedDisks plans
+	// produce empty NBD input.
+	var uris []string
+	for _, disk := range vm.SortedDisksAsVmware() {
+		if disk.RDM || disk.File == "" {
+			continue
+		}
+		uri, ok := connections[disk.File]
+		if !ok {
+			uri, ok = connections[baseVolume(disk.File, r.Plan.IsWarm())]
+		}
+		if !ok {
+			return nil, liberr.New("no NBD export for disk", "backing", disk.File)
+		}
+		uris = append(uris, uri)
+	}
+	if len(uris) == 0 {
+		return nil, liberr.New(
+			"copy appliance has exports but no migratable disks mapped for NBD input",
+			"vm", vmRef.String())
+	}
+	return uris, nil
 }
 
 // isNonGlobalIPv6 returns true for link-local (fe80::/10) and ULA (fc00::/7) IPv6 addresses.
@@ -419,25 +521,24 @@ func formatNetworkConfig(network vsphere.GuestNetwork, gateway string) string {
 	return strings.TrimSuffix(config, ",")
 }
 
-func nicRefsFromVM(vm *model.VM) []planbase.NICRef {
-	return planbase.NICRefsFrom(vm.NICs, func(n vsphere.NIC) planbase.NICRef {
-		return planbase.NICRef{MAC: n.MAC, NetworkID: n.Network.ID}
-	})
-}
-
 func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) (ipMap string, err error) {
-	isWindowsFlag := isWindows(vm)
+	isWin := isWindows(vm)
 	sortedNetworks := planbase.SortedIPv4First(vm.GuestNetworks, func(gn vsphere.GuestNetwork) string { return gn.IP })
 
 	var configurations []string
 	for _, guestNetwork := range sortedNetworks {
-		if mode, ok := modeByMAC[guestNetwork.MAC]; ok && mode != string(api.NetworkIPModePreserve) {
+		if mode, ok := modeByMAC[guestNetwork.MAC]; ok {
+			// For Windows: skip DHCP (works natively)
+			// For Linux: include DHCP (needed for udev rules)
+			if mode != string(api.NetworkIPModePreserve) && (mode != string(api.NetworkIPModeDHCP) || isWin) {
+				continue
+			}
+		}
+
+		if !shouldIncludeNetwork(guestNetwork, isWin) {
 			continue
 		}
-		if !shouldIncludeNetwork(guestNetwork, isWindowsFlag) {
-			continue
-		}
-		gateway := selectGateway(guestNetwork.IP, guestNetwork.Device, vm.GuestIpStacks, isWindowsFlag)
+		gateway := selectGateway(guestNetwork.IP, guestNetwork.Device, vm.GuestIpStacks, isWin)
 		configurations = append(configurations, formatNetworkConfig(guestNetwork, gateway))
 	}
 	return strings.Join(configurations, "_"), nil
@@ -566,6 +667,25 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	if cacert, ok := util.GetCACert(in); ok {
 		object.Data["cacert"] = cacert
 	}
+	if r.Source.Provider.CopyApplianceNbdSsl() {
+		name := r.Source.Provider.Status.CopyApplianceSSHPrivateSecret
+		if name == "" {
+			return fmt.Errorf("provider has no copyApplianceTemplate SSH private secret for NBD TLS")
+		}
+		copyApplianceTemplateSecret := &core.Secret{}
+		if err = r.Get(context.Background(), client.ObjectKey{
+			Name: name, Namespace: r.Source.Provider.Namespace,
+		}, copyApplianceTemplateSecret); err != nil {
+			return fmt.Errorf("failed to get copyApplianceTemplate secret %s for NBD TLS: %w", name, err)
+		}
+		for _, key := range []string{announce.CACert, announce.ClientCert, announce.ClientKey} {
+			data, found := copyApplianceTemplateSecret.Data[key]
+			if !found || len(data) == 0 {
+				return fmt.Errorf("copyApplianceTemplate secret %s missing %s for NBD TLS", name, key)
+			}
+			object.Data[key] = data
+		}
+	}
 	return
 }
 
@@ -685,6 +805,16 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	// Important: need to match order in mapDisks method
 	disks := vm.SortedDisksAsVmware()
 
+	var nbdConnections map[string]string
+	if settings.Settings.EnabledForPlan(r.Plan) {
+		// Copy-appliance itineraries create the appliance before DataVolumes so
+		// NBD URIs are present at DV creation (no direct-VDDK interim window).
+		nbdConnections, err = r.nbdConnectionsForVM(vmRef)
+		if err != nil {
+			return
+		}
+	}
+
 	for diskIndex, disk := range disks {
 		mapped, found := dsMap[disk.Datastore.ID]
 		if !found {
@@ -781,10 +911,38 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		if !useV2vForTransfer && vddkConfigMap != nil {
 			dv.Annotations[planbase.AnnVddkExtraArgs] = vddkConfigMap.Name
 		}
+		if nbdConnections != nil && !useV2vForTransfer {
+			backing := baseVolume(disk.File, r.Plan.IsWarm())
+			uri, present := nbdConnections[backing]
+			if !present {
+				err = liberr.New("no NBD export for disk", "backing", backing)
+				return
+			}
+			dv.Annotations[planbase.AnnVddkNbdConnection] = uri
+			if r.Source.Provider.CopyApplianceNbdSsl() && secret != nil {
+				dv.Annotations[planbase.AnnVddkNbdTlsSecret] = secret.Name
+			}
+		}
 		dvs = append(dvs, *dv)
 	}
 
 	return
+}
+
+func (r *Builder) nbdConnectionsForVM(vmRef ref.Ref) (map[string]string, error) {
+	provider := r.Source.Provider
+	ensure := appliancectrl.Ensurer{Client: r.Client, Log: r.Log}
+	appliance, err := ensure.Find(context.TODO(),
+		provider.Namespace,
+		ensure.Labeler.ApplianceLabels(provider, r.Migration.UID, vmRef.ID),
+		true)
+	if err != nil {
+		return nil, err
+	}
+	if appliance == nil {
+		return nil, liberr.New("copy appliance is gone", "vm", vmRef.ID)
+	}
+	return appliancectrl.ExportNbdConnections(appliance, provider.CopyApplianceNbdSsl())
 }
 
 func (r *Builder) applyHostsConfig(vmRef ref.Ref, url, thumbprint string) (string, string, error) {
@@ -973,8 +1131,9 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 				kInterface.Masquerade = &cnv.InterfaceMasquerade{}
 			}
 		case Multus:
+			networkName := planbase.QualifiedMultusNetworkName(mapped.Destination.Namespace, mapped.Destination.Name, r.Plan.Spec.TargetNamespace)
 			kNetwork.Multus = &cnv.MultusNetwork{
-				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+				NetworkName: networkName,
 			}
 			kInterface.Bridge = &cnv.InterfaceBridge{}
 		}
@@ -1002,15 +1161,17 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 
 func (r *Builder) buildNICResolver(nics []vsphere.NIC) ([]string, map[string][]api.NetworkPair, error) {
 	pairsBySource := map[string][]api.NetworkPair{}
-	for _, pair := range r.Map.Network.Spec.Map {
-		network := &model.Network{}
-		if err := r.Source.Inventory.Find(network, pair.Source.Ref); err != nil {
-			return nil, nil, liberr.Wrap(err, "buildNICResolver, source", pair.Source.String())
+	if r.Map.Network != nil {
+		for _, pair := range r.Map.Network.Spec.Map {
+			network := &model.Network{}
+			if err := r.Source.Inventory.Find(network, pair.Source.Ref); err != nil {
+				return nil, nil, liberr.Wrap(err, "buildNICResolver, source", pair.Source.String())
+			}
+			if network.Variant == vsphere.NetDvPortGroup || network.Variant == vsphere.OpaqueNetwork {
+				pairsBySource[network.Key] = append(pairsBySource[network.Key], pair)
+			}
+			pairsBySource[network.ID] = append(pairsBySource[network.ID], pair)
 		}
-		if network.Variant == vsphere.NetDvPortGroup || network.Variant == vsphere.OpaqueNetwork {
-			pairsBySource[network.Key] = append(pairsBySource[network.Key], pair)
-		}
-		pairsBySource[network.ID] = append(pairsBySource[network.ID], pair)
 	}
 	nicKeys := make([]string, len(nics))
 	for i, nic := range nics {
@@ -3002,4 +3163,8 @@ func sanitizeForK8sMetadata(s string) string {
 		sanitized = strings.TrimRight(sanitized, "_.-")
 	}
 	return sanitized
+}
+
+func (r *Builder) DomainXML(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (string, error) {
+	return "", nil
 }

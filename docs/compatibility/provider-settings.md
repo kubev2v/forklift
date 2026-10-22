@@ -173,17 +173,28 @@ kubectl get nodes -o jsonpath='{.items[*].metadata.labels.topology\.kubernetes\.
 
 ---
 
+## Nutanix
+
+| Setting | Required | Values | Default | Description |
+|---------|----------|--------|---------|-------------|
+| `prismType` | No | "central" or "element" | Probe endpoint | Prism Central or Prism Element, if not specified forklift probes the endpoint |
+| `clusterUuid` | No | UUID | None | If Prism Central is managing multiple clusters, inventory targets only the given cluster |
+
+---
+
 ## Summary Table
 
-| Setting | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV |
-|---------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|
-| `vddkInitImage` | Yes | - | - | - | - | - | - |
-| `sdkEndpoint` | Yes | - | - | - | - | - | - |
-| `useVddkAioOptimization` | Yes | - | - | - | - | - | - |
-| `vddkConfig` | Yes | - | - | - | - | - | - |
-| `esxiCloneMethod` | Yes | - | - | - | - | - | - |
-| `target-az` | - | - | - | - | - | **Req** | - |
-| `target-region` | - | - | - | - | - | Opt | - |
-| `winrmPort` | - | - | - | - | - | - | Opt |
+| Setting | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV | Nutanix |
+|---------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|:-------:|
+| `vddkInitImage` | Yes | - | - | - | - | - | - | - |
+| `sdkEndpoint` | Yes | - | - | - | - | - | - | - |
+| `useVddkAioOptimization` | Yes | - | - | - | - | - | - | - |
+| `vddkConfig` | Yes | - | - | - | - | - | - | - |
+| `esxiCloneMethod` | Yes | - | - | - | - | - | - | - |
+| `target-az` | - | - | - | - | - | **Req** | - | - |
+| `target-region` | - | - | - | - | - | Opt | - | - |
+| `winrmPort` | - | - | - | - | - | - | Opt | - |
+| `prismType` | - | - | - | - | - | - | - | Opt |
+| `clusterUuid` | - | - | - | - | - | - | - | Opt |
 
 **Legend:** Yes = Supported, Opt = Optional, **Req** = Required, - = Not applicable

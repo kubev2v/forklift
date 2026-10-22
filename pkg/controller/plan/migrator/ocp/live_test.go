@@ -56,13 +56,15 @@ var _ = Describe("Builder", func() {
 		It("Remaps an unqualified network", func() {
 			target = makeVM("net-attach-def")
 			builder.mapNetworks("source", target)
-			Expect(target.Spec.Template.Spec.Networks[0].Multus.NetworkName).To(Equal("target/net-attach-target"))
+			// NAD and VM are in same namespace "target", so use unqualified name
+			Expect(target.Spec.Template.Spec.Networks[0].Multus.NetworkName).To(Equal("net-attach-target"))
 		})
 
 		It("Remaps a namespace-qualified network", func() {
 			target = makeVM("source/net-attach-def")
 			builder.mapNetworks("source", target)
-			Expect(target.Spec.Template.Spec.Networks[0].Multus.NetworkName).To(Equal("target/net-attach-target"))
+			// NAD and VM are in same namespace "target", so use unqualified name
+			Expect(target.Spec.Template.Spec.Networks[0].Multus.NetworkName).To(Equal("net-attach-target"))
 		})
 	})
 
@@ -97,13 +99,38 @@ var _ = Describe("Builder", func() {
 		It("Remaps an unqualified network", func() {
 			target = makeVM("net-attach-def")
 			builder.mapNetworks("source", target)
-			Expect(target.Spec.Template.Spec.Networks[0].Multus.NetworkName).To(Equal("target/net-attach-target"))
+			// NAD and VM are in same namespace "target", so use unqualified name
+			Expect(target.Spec.Template.Spec.Networks[0].Multus.NetworkName).To(Equal("net-attach-target"))
 		})
 
 		It("Remaps a namespace-qualified network", func() {
 			target = makeVM("source/net-attach-def")
 			builder.mapNetworks("source", target)
-			Expect(target.Spec.Template.Spec.Networks[0].Multus.NetworkName).To(Equal("target/net-attach-target"))
+			// NAD and VM are in same namespace "target", so use unqualified name
+			Expect(target.Spec.Template.Spec.Networks[0].Multus.NetworkName).To(Equal("net-attach-target"))
+		})
+	})
+
+	Context("mapNetworks with different namespaces", func() {
+		BeforeEach(func() {
+			source := api.NetworkPair{
+				Source: api.NetworkSourceRef{Ref: ref.Ref{
+					Namespace: "source",
+					Name:      "net-attach-def",
+				}},
+				Destination: api.DestinationNetwork{
+					Namespace: "different", // NAD in different namespace than target VM
+					Name:      "net-attach-target",
+				},
+			}
+			builder = makeBuilder(source)
+		})
+
+		It("Uses qualified name when NAD and VM are in different namespaces", func() {
+			target = makeVM("net-attach-def")
+			builder.mapNetworks("source", target)
+			// NAD is in "different" namespace, VM is in "target" - use qualified name
+			Expect(target.Spec.Template.Spec.Networks[0].Multus.NetworkName).To(Equal("different/net-attach-target"))
 		})
 	})
 })
@@ -202,12 +229,47 @@ var _ = Describe("requestSize", func() {
 	})
 })
 
+var _ = Describe("target PVC", func() {
+	var builder *Builder
+	var sourcePvc *model.PersistentVolumeClaim
+	var storage api.DestinationStorage
+
+	BeforeEach(func() {
+		builder = &Builder{}
+		builder.Context = &plancontext.Context{}
+		builder.Plan = &api.Plan{}
+		builder.Plan.Spec = api.PlanSpec{}
+		builder.Plan.Spec.TargetNamespace = "test"
+		sourcePvc = &model.PersistentVolumeClaim{}
+		storage = api.DestinationStorage{}
+	})
+
+	It("should set the access mode from the storage map if available", func() {
+		storage.AccessMode = core.ReadWriteOnce
+		pvc := builder.targetPvc(sourcePvc, storage)
+		Expect(pvc.Spec.AccessModes[0]).To(Equal(core.ReadWriteOnce))
+	})
+
+	It("should copy the accessmode from the source PVC if not in the storage map", func() {
+		sourcePvc.Object.Spec.AccessModes = []core.PersistentVolumeAccessMode{core.ReadWriteMany}
+		pvc := builder.targetPvc(sourcePvc, storage)
+		Expect(pvc.Spec.AccessModes[0]).To(Equal(core.ReadWriteMany))
+	})
+
+})
+
 func makeBuilder(networkPairs ...api.NetworkPair) *Builder {
 	b := &Builder{}
 	b.Context = &plancontext.Context{}
 	b.Map.Network = &api.NetworkMap{
 		Spec: api.NetworkMapSpec{
 			Map: networkPairs,
+		},
+	}
+	// Set up a Plan with target namespace for testing
+	b.Plan = &api.Plan{
+		Spec: api.PlanSpec{
+			TargetNamespace: "target",
 		},
 	}
 	return b

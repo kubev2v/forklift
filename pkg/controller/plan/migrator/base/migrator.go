@@ -72,8 +72,11 @@ func (r *BaseMigrator) Reset(vm *plan.VMStatus, pipeline []*plan.Step) {
 
 func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 	itinerary := r.Itinerary(vm)
-	step, _ := itinerary.First()
-	for {
+	steps, err := itinerary.List()
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	for _, step := range steps {
 		switch step.Name {
 		case api.PhaseStarted:
 			pipeline = append(
@@ -232,12 +235,28 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Progress:    libitr.Progress{Total: 1},
 					},
 				})
-		}
-		next, done, _ := itinerary.Next(step.Name)
-		if !done {
-			step = next
-		} else {
-			break
+		case api.PhaseCreateCopyAppliance:
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        ApplianceDeployment,
+						Description: "Deploy copy appliance.",
+						Progress:    libitr.Progress{Total: 1},
+						Phase:       api.StepPending,
+					},
+				})
+		case api.PhaseTeardownCopyAppliance:
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        ApplianceTeardown,
+						Description: "Tear down copy appliance.",
+						Progress:    libitr.Progress{Total: 1},
+						Phase:       api.StepPending,
+					},
+				})
 		}
 	}
 
@@ -260,7 +279,11 @@ func (r *BaseMigrator) Itinerary(vm plan.VM) (itinerary *libitr.Itinerary) {
 	case r.Plan.Spec.Type == api.MigrationOnlyConversion:
 		itinerary = r.onlyConversionItinerary()
 	case r.Plan.IsWarm():
-		itinerary = r.warmItinerary()
+		if settings.Settings.EnabledForPlan(r.Plan) {
+			itinerary = r.warmCopyApplianceItinerary()
+		} else {
+			itinerary = r.warmItinerary()
+		}
 	default:
 		itinerary = r.coldItinerary()
 	}
@@ -283,18 +306,28 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		step = DiskAllocation
 	case api.PhaseCopyDisks, api.PhaseCopyingPaused, api.PhaseRemovePreviousSnapshot,
 		api.PhaseWaitForPreviousSnapshotRemoval, api.PhaseCreateSnapshot, api.PhaseWaitForSnapshot,
-		api.PhaseStoreSnapshotDeltas, api.PhaseAddCheckpoint, api.PhaseConvertOpenstackSnapshot:
+		api.PhaseStoreSnapshotDeltas, api.PhaseAddCheckpoint, api.PhaseConvertOpenstackSnapshot,
+		api.PhaseReleaseCopyAppliance, api.PhaseWaitForCopyApplianceReleased,
+		api.PhaseRefreshCopyAppliance, api.PhaseWaitForRefreshedCopyAppliance:
 		step = DiskTransfer
 	case api.PhaseCreateDataVolumes:
-		// This phase should be present in DiskTransfer step only when executing Preflight Inspection to avoid UI pipeline artifacts.
-		// If not executing Preflight Inspection, keep the Initialize step.
+		// When executing Preflight Inspection, this phase maps to the appropriate
+		// disk step to avoid UI pipeline artifacts. For CDI flow it maps to DiskTransfer,
+		// for virt-v2v flow it maps to DiskAllocation.
 		if r.Plan.ShouldRunPreflightInspection() {
-			step = DiskTransfer
+			if _, found := status.FindStep(DiskTransfer); found {
+				step = DiskTransfer
+			} else {
+				step = DiskAllocation
+			}
 		} else {
 			step = Initialize
 		}
 	case api.PhaseRemovePenultimateSnapshot, api.PhaseWaitForPenultimateSnapshotRemoval, api.PhaseCreateFinalSnapshot,
-		api.PhaseWaitForFinalSnapshot, api.PhaseAddFinalCheckpoint, api.PhaseFinalize, api.PhaseRemoveFinalSnapshot:
+		api.PhaseWaitForFinalSnapshot, api.PhaseAddFinalCheckpoint, api.PhaseFinalize, api.PhaseRemoveFinalSnapshot,
+		api.PhaseReleaseCopyApplianceBeforeCutover, api.PhaseWaitForCopyApplianceReleasedBeforeCutover,
+		api.PhaseRefreshCopyApplianceBeforeFinalize, api.PhaseWaitForRefreshedCopyApplianceBeforeFinalize,
+		api.PhaseReleaseCopyApplianceBeforeFinalSnap, api.PhaseWaitForCopyApplianceReleasedBeforeFinalSnap:
 		step = Cutover
 	case api.PhaseCreateGuestConversionPod, api.PhaseConvertGuest:
 		step = ImageConversion
@@ -316,10 +349,70 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		step = PreflightInspection
 	case api.PhaseWaitForFinalSnapshotRemoval:
 		step = WaitForSnapshotConsolidation
+	case api.PhaseCreateCopyAppliance, api.PhaseWaitForCopyAppliance:
+		step = ApplianceDeployment
+	case api.PhaseTeardownCopyAppliance:
+		step = ApplianceTeardown
 	default:
 		step = Unknown
 	}
 	return
+}
+
+func (r *BaseMigrator) warmCopyApplianceItinerary() *libitr.Itinerary {
+	return &libitr.Itinerary{
+		Name: "WarmCopyAppliance",
+		Pipeline: libitr.Pipeline{
+			{Name: api.PhaseStarted},
+			{Name: api.PhasePreHook, All: HasPreHook},
+			{Name: api.PhaseCreateInitialSnapshot},
+			{Name: api.PhaseWaitForInitialSnapshot},
+			{Name: api.PhaseStoreInitialSnapshotDeltas, All: VSphere},
+			{Name: api.PhaseCreateCopyAppliance},
+			{Name: api.PhaseWaitForCopyAppliance},
+			{Name: api.PhasePreflightInspection, All: RunInspection},
+			{Name: api.PhaseCreateDataVolumes},
+			// Precopy loop start
+			{Name: api.PhaseCopyDisks},
+			{Name: api.PhaseCopyingPaused},
+			{Name: api.PhaseReleaseCopyAppliance},
+			{Name: api.PhaseWaitForCopyApplianceReleased},
+			{Name: api.PhaseRemovePreviousSnapshot, All: VSphere},
+			{Name: api.PhaseWaitForPreviousSnapshotRemoval, All: VSphere},
+			{Name: api.PhaseRefreshCopyAppliance},
+			{Name: api.PhaseWaitForRefreshedCopyAppliance},
+			{Name: api.PhaseCreateSnapshot},
+			{Name: api.PhaseWaitForSnapshot},
+			{Name: api.PhaseStoreSnapshotDeltas, All: VSphere},
+			{Name: api.PhaseAddCheckpoint},
+			// Precopy loop end
+			{Name: api.PhaseStorePowerState},
+			{Name: api.PhasePowerOffSource},
+			{Name: api.PhaseWaitForPowerOff},
+			// Detach before snapshot remove so the base VMDK is not locked for consolidation.
+			{Name: api.PhaseReleaseCopyApplianceBeforeCutover},
+			{Name: api.PhaseWaitForCopyApplianceReleasedBeforeCutover},
+			{Name: api.PhaseRemovePenultimateSnapshot, All: VSphere},
+			{Name: api.PhaseWaitForPenultimateSnapshotRemoval, All: VSphere},
+			{Name: api.PhaseCreateFinalSnapshot},
+			{Name: api.PhaseWaitForFinalSnapshot},
+			{Name: api.PhaseRefreshCopyApplianceBeforeFinalize},
+			{Name: api.PhaseWaitForRefreshedCopyApplianceBeforeFinalize},
+			{Name: api.PhaseAddFinalCheckpoint},
+			{Name: api.PhaseFinalize},
+			{Name: api.PhaseReleaseCopyApplianceBeforeFinalSnap},
+			{Name: api.PhaseWaitForCopyApplianceReleasedBeforeFinalSnap},
+			{Name: api.PhaseRemoveFinalSnapshot, All: VSphere},
+			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
+			{Name: api.PhaseConvertGuest, All: RequiresConversion},
+			{Name: api.PhaseCreateVM},
+			{Name: api.PhaseWaitForGuestReboots, All: WindowsWaitForGuestReboot},
+			{Name: api.PhasePostHook, All: HasPostHook},
+			{Name: api.PhaseWaitForFinalSnapshotRemoval, All: VSphere | WaitForFinalSnapshotConsolidation},
+			{Name: api.PhaseTeardownCopyAppliance},
+			{Name: api.PhaseCompleted},
+		},
+	}
 }
 
 func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
@@ -373,6 +466,9 @@ func (r *BaseMigrator) coldItinerary() *libitr.Itinerary {
 			{Name: api.PhaseStorePowerState},
 			{Name: api.PhasePowerOffSource},
 			{Name: api.PhaseWaitForPowerOff},
+			{Name: api.PhasePreflightInspection, All: RunInspection},
+			{Name: api.PhaseCreateCopyAppliance, All: CopyAppliance},
+			{Name: api.PhaseWaitForCopyAppliance, All: CopyAppliance},
 			{Name: api.PhaseCreateDataVolumes},
 			{Name: api.PhaseCopyDisks, All: CDIDiskCopy},
 			{Name: api.PhaseAllocateDisks, All: VirtV2vDiskCopy},
@@ -383,6 +479,7 @@ func (r *BaseMigrator) coldItinerary() *libitr.Itinerary {
 			{Name: api.PhaseCreateVM},
 			{Name: api.PhaseWaitForGuestReboots, All: WindowsWaitForGuestReboot},
 			{Name: api.PhasePostHook, All: HasPostHook},
+			{Name: api.PhaseTeardownCopyAppliance, All: CopyAppliance},
 			{Name: api.PhaseCompleted},
 		},
 	}
@@ -502,6 +599,8 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		allowed = r.context.Source.Provider.RequiresConversion() && !r.context.Plan.Spec.SkipGuestConversion
 	case WaitForFinalSnapshotConsolidation:
 		allowed = settings.Settings.WaitForFinalSnapshotConsolidation
+	case CopyAppliance:
+		allowed = settings.Settings.EnabledForPlan(r.context.Plan)
 	}
 
 	return

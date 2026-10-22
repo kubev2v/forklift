@@ -50,20 +50,13 @@ func RecordPlanMetrics(c client.Client) {
 
 				isLocal := destProvider.Spec.URL == ""
 
-				var target, mode, key string
+				var target, key string
 				if isLocal {
 					target = Local
 				} else {
 					target = Remote
 				}
-				switch m.Spec.Type {
-				case api.MigrationWarm:
-					mode = Warm
-				case api.MigrationLive:
-					mode = Live
-				default:
-					mode = Cold
-				}
+				mode := modeForType(m.Spec.Type)
 
 				provider := sourceProvider.Type().String()
 				planUID := string(m.UID)

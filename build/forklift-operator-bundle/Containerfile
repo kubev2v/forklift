@@ -14,7 +14,7 @@ ARG DEFAULT_CHANNEL
 ARG CONTROLLER_IMAGE="quay.io/kubev2v/forklift-controller:latest"
 ARG API_IMAGE="quay.io/kubev2v/forklift-api:latest"
 ARG VIRT_V2V_IMAGE="quay.io/kubev2v/forklift-virt-v2v:latest"
-ARG VIRT_V2V_IMAGE_RHEL9="quay.io/kubev2v/forklift-virt-v2v-xfs:latest"
+ARG VIRT_V2V_IMAGE_RHEL9="quay.io/kubev2v/forklift-virt-v2v:latest"
 ARG OPERATOR_IMAGE="quay.io/kubev2v/forklift-operator:latest"
 ARG POPULATOR_CONTROLLER_IMAGE="quay.io/kubev2v/populator-controller:latest"
 ARG OVIRT_POPULATOR_IMAGE="quay.io/kubev2v/ovirt-populator:latest"
@@ -27,6 +27,8 @@ ARG OVA_PROVIDER_SERVER_IMAGE="quay.io/kubev2v/forklift-ova-provider-server:late
 ARG HYPERV_PROVIDER_SERVER_IMAGE="quay.io/kubev2v/forklift-hyperv-provider-server:latest"
 ARG VALIDATION_IMAGE="quay.io/kubev2v/forklift-validation:latest"
 ARG OVA_PROXY_IMAGE="quay.io/kubev2v/forklift-ova-proxy:latest"
+ARG COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE="quay.io/kubev2v/copy-appliance-template-builder:latest"
+ARG NBD_CONTAINER_IMAGE="quay.io/kubev2v/nbd-container:latest"
 
 COPY ./operator /repo
 WORKDIR /repo

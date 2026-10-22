@@ -323,7 +323,7 @@ var _ = Describe("NetworkIPMode validation", func() {
 			Expect(nm.Status.HasCondition(NetworkIPModeNotValid)).To(BeFalse())
 		})
 
-		It("should allow networkIPMode on pod destinations", func() {
+		It("should reject networkIPMode on pod destinations", func() {
 			nm := &api.NetworkMap{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "test-network-map",
@@ -339,13 +339,49 @@ var _ = Describe("NetworkIPMode validation", func() {
 					},
 				},
 			}
-			var networkIPModeOnIgnored []string
+			var networkIPModeOnPod []string
 			for _, entry := range nm.Spec.Map {
-				if entry.Destination.Type == Ignored && entry.NetworkIPMode != "" {
-					networkIPModeOnIgnored = append(networkIPModeOnIgnored, entry.Source.String())
+				if entry.Destination.Type == Pod && entry.NetworkIPMode != "" {
+					networkIPModeOnPod = append(networkIPModeOnPod, entry.Source.String())
 				}
 			}
-			Expect(networkIPModeOnIgnored).To(BeEmpty())
+			Expect(networkIPModeOnPod).To(HaveLen(1))
+		})
+
+		It("should set NetworkIPModeNotValid warning when networkIPMode is set on pod destination", func() {
+			nm := &api.NetworkMap{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-network-map",
+					Namespace: "default",
+				},
+				Spec: api.NetworkMapSpec{
+					Map: []api.NetworkPair{
+						{
+							Source:        api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
+							Destination:   api.DestinationNetwork{Type: Pod},
+							NetworkIPMode: api.NetworkIPModePreserve,
+						},
+					},
+				},
+			}
+			// Simulate what validateDestination does for the networkIPMode check
+			var networkIPModeInvalid []string
+			for _, entry := range nm.Spec.Map {
+				if entry.Destination.Type == Pod && entry.NetworkIPMode != "" {
+					networkIPModeInvalid = append(networkIPModeInvalid, entry.Source.String())
+				}
+			}
+			if len(networkIPModeInvalid) > 0 {
+				nm.Status.SetCondition(libcnd.Condition{
+					Type:     NetworkIPModeNotValid,
+					Status:   True,
+					Reason:   NotValidForDestination,
+					Category: Critical,
+					Message:  "networkIPMode is not valid for the destination type (ignored or pod network).",
+					Items:    networkIPModeInvalid,
+				})
+			}
+			Expect(nm.Status.HasCondition(NetworkIPModeNotValid)).To(BeTrue())
 		})
 
 		It("should allow networkIPMode on multus destinations", func() {

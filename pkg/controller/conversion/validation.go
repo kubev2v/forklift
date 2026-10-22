@@ -86,6 +86,10 @@ func (r *Reconciler) validateVDDKImage(conversion *api.Conversion) (err error) {
 	if conversion.Spec.Type != api.DeepInspection {
 		return
 	}
+	// Hyper-V uses local disks; copy-appliance NBD skips VDDK.
+	if conversion.Spec.IsHyperV() || conversion.Spec.Settings[api.SpecSettingsNbdDisksKey] != "" {
+		return
+	}
 	if conversion.Spec.VDDKImage == "" {
 		conversion.Status.SetCondition(libcnd.Condition{
 			Type:     VDDKImageNotSet,

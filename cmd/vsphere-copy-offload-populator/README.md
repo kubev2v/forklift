@@ -470,7 +470,8 @@ spec:
 - **VVol and RDM disks only** — VMDK disks are not supported. VMs with VMDK disks on a
   datastore configured for CSI import only (no XCOPY) will be blocked by plan validation.
 - **No warm migration** — CSI import only supports cold migration. The source VM must be
-  powered off before the copy begins.
+  powered off before the copy begins. Forklift's cold pipeline powers it off automatically
+  (works whether the VM starts on or off), so no manual pre-shutdown is required.
 - **Binary progress** — unlike XCOPY (which reports copy percentage), CSI import progress
   is either 0% (PVC not yet bound) or 100% (PVC bound). There is no intermediate progress.
 - **Tech Preview** — the API surface (`csiVolumeImport` in StorageMap) may change in future

@@ -13,7 +13,7 @@ After the user configures the provider, network and storage CR-they can create a
 
 There are different types of migrations (cold, warm, live, conversion). All migration types support RCM or RawCopyMode. RawCopyMode shows up in the plan CR as "skipGuestConversion: true" meaning it will not use virtv2v to install virtio drivers. VDDK is required for RCM. VDDK is VMware's library that gives access to the the VM disk files or VDMK.  
 
-  - cold migration is the default migration where the VM is turned off before the migration. This has a longer downtime. Cold migration to a remote cluster will create a VDDK DataVolume, and use CDI to transfer disks before passing them to virt-v2v. If the cold migration is to the same cluster it creates a blank DataVolume so virt-v2v can manage the data transfer itself.
+  - cold migration is the default migration. The source VM may be on or off when the migration starts. If it is on, the Forklift controller turns it off before disk copy begins. This has a longer downtime. Cold migration to a remote cluster will create a VDDK DataVolume, and use CDI to transfer disks before passing them to virt-v2v. If the cold migration is to the same cluster it creates a blank DataVolume so virt-v2v can manage the data transfer itself.
 
  - warm migration can have shorter downtime because the VM stays on during the migration. There is one snapshot taken that is copied, then a series of snapshots where only the changes between snapshots are copied. Then finally the VM is turned off for the cutover phase and the final changes are copied-target VM is made and the guest conversion moves this copy to the target VM. This is supported for vSphere, oVirt and Red Hat virtualization.
 

@@ -1,9 +1,9 @@
 package hyperv
 
 import (
+	"context"
 	"fmt"
 	"net"
-	"path"
 	"strconv"
 	"strings"
 
@@ -126,7 +126,9 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	r.mapFirmware(vm, object)
 	r.mapInput(object)
 	r.mapTpm(vm, object)
-	r.mapNetworks(vm, object)
+	if err := r.mapNetworks(vm, object); err != nil {
+		return err
+	}
 	r.mapCPU(vmRef, vm, object, usesInstanceType)
 	r.mapMemory(vm, object, usesInstanceType)
 
@@ -222,13 +224,16 @@ func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 	}
 }
 
-func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) error {
 	var kNetworks []cnv.Network
 	var kInterfaces []cnv.Interface
 
 	numNetworks := 0
 	pool := planbase.NewNADPool()
-	nicKeys, pairsBySource := r.buildNICResolver(vm.NICs)
+	nicKeys, pairsBySource, err := r.buildNICResolver(vm.NICs)
+	if err != nil {
+		return err
+	}
 
 	for i, nic := range vm.NICs {
 		pair, allocated := planbase.AllocateNetwork(pool, pairsBySource[nicKeys[i]])
@@ -253,8 +258,9 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) {
 
 		switch mapped.Destination.Type {
 		case Multus:
+			networkName := planbase.QualifiedMultusNetworkName(mapped.Destination.Namespace, mapped.Destination.Name, r.Plan.Spec.TargetNamespace)
 			kNetwork.Multus = &cnv.MultusNetwork{
-				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+				NetworkName: networkName,
 			}
 			kInterface.Bridge = &cnv.InterfaceBridge{}
 		case Pod:
@@ -270,9 +276,10 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) {
 
 	object.Template.Spec.Networks = kNetworks
 	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
+	return nil
 }
 
-func (r *Builder) buildNICResolver(nics []hyperv.NIC) ([]string, map[string][]api.NetworkPair) {
+func (r *Builder) buildNICResolver(nics []hyperv.NIC) ([]string, map[string][]api.NetworkPair, error) {
 	networkCount := nicNetworkCount(nics)
 
 	pairsBySource := map[string][]api.NetworkPair{}
@@ -281,7 +288,7 @@ func (r *Builder) buildNICResolver(nics []hyperv.NIC) ([]string, map[string][]ap
 		for _, pair := range r.Map.Network.Spec.Map {
 			network := &model.Network{}
 			if err := r.Source.Inventory.Find(network, pair.Source.Ref); err != nil {
-				continue
+				return nil, nil, liberr.Wrap(err, "buildNICResolver, source", pair.Source.String())
 			}
 			key := buildPairKey(network.ID, pair.Source.Vlan, networkCount)
 			pairsBySource[key] = append(pairsBySource[key], pair)
@@ -291,7 +298,7 @@ func (r *Builder) buildNICResolver(nics []hyperv.NIC) ([]string, map[string][]ap
 		}
 	}
 
-	return buildNICKeys(nics, networkCount, vlanQualifiedNetworks), pairsBySource
+	return buildNICKeys(nics, networkCount, vlanQualifiedNetworks), pairsBySource, nil
 }
 
 // nicNetworkCount returns a map of network ID → number of NICs attached to it.
@@ -381,16 +388,21 @@ func (r *Builder) mapDataVolume(vm *model.VM, disk hyperv.Disk, diskIndex int, d
 	dvSource := cdi.DataVolumeSource{
 		Blank: &cdi.DataVolumeBlankImage{},
 	}
-	dvSpec := cdi.DataVolumeSpec{
-		Source: &dvSource,
-		Storage: &cdi.StorageSpec{
-			Resources: core.VolumeResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
-				},
+	storageSpec := &cdi.StorageSpec{
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
 			},
-			StorageClassName: &storageClass,
 		},
+		StorageClassName: &storageClass,
+	}
+	if r.Plan.Spec.PreCopySourceDisks {
+		blockMode := core.PersistentVolumeBlock
+		storageSpec.VolumeMode = &blockMode
+	}
+	dvSpec := cdi.DataVolumeSpec{
+		Source:  &dvSource,
+		Storage: storageSpec,
 	}
 
 	dv := dvTemplate.DeepCopy()
@@ -400,9 +412,11 @@ func (r *Builder) mapDataVolume(vm *model.VM, disk hyperv.Disk, diskIndex int, d
 	}
 	dv.Annotations[planbase.AnnDiskSource] = disk.ID
 
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vm.ID, vm.Name)
+
 	templateData := &api.PVCNameTemplateData{
 		VmName:       vm.Name,
-		TargetVmName: planbase.ResolveTargetVmName(r.Plan, vm.ID, vm.Name),
+		TargetVmName: targetVmName,
 		PlanName:     r.Plan.Name,
 		DiskIndex:    diskIndex,
 		VmId:         vm.ID,
@@ -560,12 +574,6 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 	return pvc.Name
 }
 
-func nicRefsFromVM(vm *model.VM) []planbase.NICRef {
-	return planbase.NICRefsFrom(vm.NICs, func(n hyperv.NIC) planbase.NICRef {
-		return planbase.NICRef{MAC: n.MAC, NetworkID: n.Network.ID}
-	})
-}
-
 func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
@@ -587,15 +595,38 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		core.EnvVar{Name: "V2V_diskPath", Value: strings.Join(diskPaths, ",")},
 	)
 
-	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
-	if planbase.HasPreserveMode(modeByMAC) {
-		macsToIps := r.mapMacStaticIps(vm, modeByMAC)
-		if macsToIps != "" {
-			env = append(env,
-				core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps},
-			)
+	nicKeys, pairsBySource, err := r.buildNICResolver(vm.NICs)
+	if err != nil {
+		return
+	}
+	macs := make([]string, len(vm.NICs))
+	for i, nic := range vm.NICs {
+		macs[i] = nic.MAC
+	}
+	nicRefs, err := planbase.NICRefsFromKeys(macs, nicKeys)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	modeByMAC := planbase.ResolveNICModes(nicRefs, pairsBySource, r.Plan.Spec.PreserveStaticIPs)
+	// Honor resolved preserve modes. Fall back to the plan-level flag only when
+	// matching produced no modes (empty map), so a dhcp/none override still wins.
+	// DHCP is also mapped on Linux so virt-v2v can write udev naming rules.
+	shouldPreserve := planbase.HasPreserveMode(modeByMAC) ||
+		(r.Plan.Spec.PreserveStaticIPs && len(modeByMAC) == 0)
+	if shouldPreserve || planbase.HasDHCPMode(modeByMAC) {
+		macsToIps, mapErr := r.mapMacStaticIps(vm, modeByMAC)
+		if mapErr != nil {
+			err = mapErr
+			return
 		}
-		if hasMultipleStaticIPsPerNIC(vm, modeByMAC) {
+		if macsToIps != "" {
+			if shouldPreserve {
+				env = append(env, core.EnvVar{Name: "V2V_preserveStaticIPs", Value: "true"})
+			}
+			env = append(env, core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps})
+		}
+		if shouldPreserve && hasMultipleStaticIPsPerNIC(vm, modeByMAC) {
 			env = append(env, core.EnvVar{
 				Name:  "V2V_multipleIPsPerNic",
 				Value: "true",
@@ -605,6 +636,32 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 
 	if vm.Firmware == UEFI {
 		env = append(env, core.EnvVar{Name: "V2V_firmware", Value: "uefi"})
+	}
+
+	// Only collect Pod-network MACs for masquerade interfaces on IPv6-enabled
+	// clusters. UDN namespaces use l2bridge (not masquerade) and IPv4-only
+	// clusters need no special Pod network config.
+	if r.Destination.Client != nil {
+		hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
+		if !hasUDN {
+			hasIPv6, detectErr := planbase.PodNetworkHasIPv6(context.TODO(), r.Destination.Client)
+			if detectErr != nil {
+				err = liberr.Wrap(detectErr, "podNetworkHasIPv6")
+				return
+			}
+			if !hasIPv6 {
+				return
+			}
+			podMacs := planbase.CollectPodNetworkMACs(nicKeys, pairsBySource, vm.NICs, func(nic hyperv.NIC) string {
+				return nic.MAC
+			})
+			if len(podMacs) > 0 {
+				env = append(env, core.EnvVar{
+					Name:  "V2V_podNetworkIPv6MACs",
+					Value: strings.Join(podMacs, ","),
+				})
+			}
+		}
 	}
 
 	return
@@ -626,14 +683,18 @@ func hasMultipleStaticIPsPerNIC(vm *model.VM, modeByMAC map[string]string) bool 
 	return planbase.HasMultipleIPsPerMAC(manualMACs)
 }
 
-func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) string {
+func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) (string, error) {
 	isWin := isWindows(vm)
 	networks := planbase.SortedIPv4First(vm.GuestNetworks, func(gn hyperv.GuestNetwork) string { return gn.IP })
 
 	var configurations []string
 	for _, gn := range networks {
-		if mode, ok := modeByMAC[gn.MAC]; ok && mode != string(api.NetworkIPModePreserve) {
-			continue
+		if mode, ok := modeByMAC[gn.MAC]; ok {
+			// For Windows: skip DHCP (works natively)
+			// For Linux: include DHCP (needed for udev rules)
+			if mode != string(api.NetworkIPModePreserve) && (mode != string(api.NetworkIPModeDHCP) || isWin) {
+				continue
+			}
 		}
 		if !isWin || gn.Origin == hyperv.OriginManual {
 			ip := net.ParseIP(gn.IP)
@@ -652,7 +713,7 @@ func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) str
 			configurations = append(configurations, strings.TrimSuffix(configurationString, ","))
 		}
 	}
-	return strings.Join(configurations, "_")
+	return strings.Join(configurations, "_"), nil
 }
 
 func isWindows(vm *model.VM) bool {
@@ -736,4 +797,8 @@ func (r *Builder) RefreshImportCredentials(_ *cdi.DataVolume) (bool, error) {
 
 func (r *Builder) SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *api.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error) {
 	return
+}
+
+func (r *Builder) DomainXML(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (string, error) {
+	return "", nil
 }

@@ -63,6 +63,12 @@ const (
 	// Related to https://github.com/kubevirt/containerized-data-importer/pull/3572
 	AnnVddkExtraArgs = "cdi.kubevirt.io/storage.pod.vddk.extraargs"
 
+	// TCP NBD URI for VDDK import via a copy appliance export.
+	AnnVddkNbdConnection = "cdi.kubevirt.io/storage.import.vddk.nbdConnection"
+
+	// Secret with ca-cert.pem / client-cert.pem / client-key.pem for nbds://.
+	AnnVddkNbdTlsSecret = "cdi.kubevirt.io/storage.import.vddk.nbdTlsSecret"
+
 	// CDI import backing file annotation on PVC
 	AnnImportBackingFile = "cdi.kubevirt.io/storage.import.backingFile"
 
@@ -222,6 +228,8 @@ type Builder interface {
 	// SourceVMLabelsAndAnnotations returns provider-specific labels and annotations
 	// derived from source VM metadata (e.g. vSphere tags and custom attributes).
 	SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *api.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error)
+	// DomainXML generates a libvirt domain xml definition for the given vm and pvcs
+	DomainXML(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (string, error)
 }
 
 // Client API.

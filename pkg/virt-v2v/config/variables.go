@@ -26,17 +26,20 @@ const (
 	EnvStaticIPsName                    = "V2V_staticIPs"
 	EnvSourceName                       = "V2V_source"
 	EnvDiskPathName                     = "V2V_diskPath"
+	EnvNbdDisksName                     = "V2V_nbdDisks"
 	EnvSecretKeyName                    = "V2V_secretKey"
 	EnvLocalMigrationName               = "LOCAL_MIGRATION"
 	EnvVirtIoWinLegacyDriversName       = "VIRTIO_WIN"
 	EnvHostName                         = "V2V_HOSTNAME"
 	EnvNbdeClevis                       = "V2V_NBDE_CLEVIS"
 	EnvMultipleIpsPerNicName            = "V2V_multipleIPsPerNic"
+	EnvPodNetworkIPv6MACsName           = "V2V_podNetworkIPv6MACs"
 	EnvRemoteInspection                 = "V2V_remoteInspection"
 	EnvRemoteInspectionDisk             = "V2V_remoteInspectDisk_"
 	EnvMemSizeName                      = "V2V_memSize"
 	EnvSmpName                          = "V2V_smp"
 	EnvVsphereVmwareDriverRemovalName   = "V2V_vsphereVmwareDriverRemoval"
+	EnvNutanixDriverRemovalName         = "V2V_nutanixDriverRemoval"
 	EnvWindowsRegistryNetworkConfigName = "V2V_windowsRegistryNetworkConfig"
 	EnvWaitForGuestRebootName           = "V2V_waitForGuestReboot"
 	EnvSelinuxRelabelAtBootName         = "V2V_selinuxRelabelAtBoot"
@@ -101,6 +104,8 @@ type AppConfig struct {
 	Source string
 	// V2V_diskPath
 	DiskPath string
+	// V2V_nbdDisks — comma-separated nbd://host:port URIs for copy-appliance input
+	NbdDisks []string
 	// V2V_secretKey
 	SecretKey string
 	// V2V_AccessKeyId
@@ -120,6 +125,8 @@ type AppConfig struct {
 	Smp int
 	// V2V_vsphereVmwareDriverRemoval
 	VsphereVmwareDriverRemoval bool
+	// V2V_nutanixDriverRemoval
+	NutanixDriverRemoval bool
 	// V2V_windowsRegistryNetworkConfig
 	WindowsRegistryNetworkConfig bool
 	// V2V_waitForGuestReboot — upload first-boot script signaling CONVERSION_DONE on COM1
@@ -138,6 +145,8 @@ type AppConfig struct {
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
+	// V2V_podNetworkIPv6MACs
+	PodNetworkIPv6MACs string
 	// Paths
 	VddkConfFile         string
 	InspectionOutputFile string
@@ -178,10 +187,12 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.VirtIoWinLegacyDrivers, "virtio-win-legacy-drivers", os.Getenv(EnvVirtIoWinLegacyDriversName), "Path to the virtio-win legacy drivers ISO")
 	flag.StringVar(&s.HostName, "hostname", os.Getenv(EnvHostName), "Hostname of the vm")
 	flag.StringVar(&s.MultipleIpsPerNicName, "multiple-ips-per-nic", os.Getenv(EnvMultipleIpsPerNicName), "Multiple IPs per NIC")
+	flag.StringVar(&s.PodNetworkIPv6MACs, "pod-network-ipv6-macs", os.Getenv(EnvPodNetworkIPv6MACsName), "Comma-separated MAC addresses for Pod network interfaces needing IPv6 masquerade config")
 	flag.BoolVar(&s.IsRemoteInspection, "remote-inspection", s.getEnvBool(EnvRemoteInspection, false), "Run virt-v2v-inspection on remote disks")
 	flag.IntVar(&s.MemSize, "memsize", s.getEnvInt(EnvMemSizeName, 0), "Amount of memory (in MB) allocated for the conversion appliance")
 	flag.IntVar(&s.Smp, "smp", s.getEnvInt(EnvSmpName, 0), "Number of virtual CPUs used for the conversion appliance")
 	flag.BoolVar(&s.VsphereVmwareDriverRemoval, "vsphere-vmware-driver-removal", s.getEnvBool(EnvVsphereVmwareDriverRemovalName, false), "Run VMware driver removal scripts during Windows vSphere conversion")
+	flag.BoolVar(&s.NutanixDriverRemoval, "nutanix-driver-removal", s.getEnvBool(EnvNutanixDriverRemovalName, false), "Run Nutanix driver removal scripts during Windows Nutanix conversion")
 	flag.BoolVar(&s.WindowsRegistryNetworkConfig, "windows-registry-network-config", s.getEnvBool(EnvWindowsRegistryNetworkConfigName, false), "Use registry-based network configuration scripts for Windows static IP setup")
 	flag.BoolVar(&s.WaitForGuestReboot, "wait-for-guest-reboot", s.getEnvBool(EnvWaitForGuestRebootName, false), "Inject first-boot script to signal conversion completion on guest serial (COM1)")
 	flag.BoolVar(&s.SelinuxRelabelAtBoot, "selinux-relabel-at-boot", s.getEnvBool(EnvSelinuxRelabelAtBootName, false), "Defer SELinux relabeling until the guest's first boot after conversion")
@@ -189,6 +200,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.Var(&excludeDirs, "selinux-relabel-exclude", "Exclude guest directory from SELinux relabeling (repeatable)")
 	flag.BoolVar(&s.XfsCompatibility, "xfs-compatibility", s.getEnvBool(EnvXfsCompatibilityName, false), "XFS compatibility mode: do not pass --no-fstrim to virt-v2v")
 	s.RemoteInspectionDisks = s.getRemoteInspectionDisks()
+	s.NbdDisks = s.getNbdDisks()
 	flag.Parse()
 	s.SelinuxRelabelExclude = []string(excludeDirs)
 
@@ -273,6 +285,21 @@ func (s *AppConfig) getRemoteInspectionDisks() []string {
 	disks := make([]string, len(keys))
 	for i, key := range keys {
 		disks[i] = os.Getenv(key)
+	}
+	return disks
+}
+
+func (s *AppConfig) getNbdDisks() []string {
+	raw := os.Getenv(EnvNbdDisksName)
+	if raw == "" {
+		return nil
+	}
+	var disks []string
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			disks = append(disks, part)
+		}
 	}
 	return disks
 }
