@@ -1,0 +1,29 @@
+# Network policies for validation service
+# Note: VDDK validation pods don't need a network policy - they only check file existence
+# and have no network communication requirements
+#
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forklift-validation-service-policy
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+spec:
+  podSelector:
+    matchLabels:
+      service: {{ validation_service_name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow controller-manager to communicate with validation service
+    - from:
+        - podSelector:
+            matchLabels:
+              control-plane: controller-manager
+      ports:
+        - protocol: TCP
+          port: 8181
+  # No egress restrictions - validation service doesn't need outbound connections
+
