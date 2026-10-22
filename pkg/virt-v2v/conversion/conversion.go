@@ -546,7 +546,35 @@ func updateDiskSource(disk *libvirtxml.DomainDisk, path string) bool {
 	return true
 }
 
-// modify the domain XML to use the local disk paths for in-place conversions
+// diskBusAddress returns the bus address (e.g. "scsi0:1") from domain XML disk attributes, or "" if incomplete.
+func diskBusAddress(disk libvirtxml.DomainDisk) string {
+	if disk.Target == nil || disk.Target.Bus == "" {
+		return ""
+	}
+	if disk.Address == nil || disk.Address.Drive == nil {
+		return ""
+	}
+	drive := disk.Address.Drive
+	if drive.Controller == nil || drive.Unit == nil {
+		return ""
+	}
+	return strings.ToLower(fmt.Sprintf("%s%d:%d", disk.Target.Bus, *drive.Controller, *drive.Unit))
+}
+
+// parseExcludeDiskBusAddresses turns the comma-separated ExcludeDiskBusAddresses
+// config value into a lookup set.
+func parseExcludeDiskBusAddresses(raw string) map[string]struct{} {
+	excluded := map[string]struct{}{}
+	for _, bus := range strings.Split(raw, ",") {
+		bus = strings.ToLower(strings.TrimSpace(bus))
+		if bus != "" {
+			excluded[bus] = struct{}{}
+		}
+	}
+	return excluded
+}
+
+// modify the domain XML to use the local disk paths for in-place conversions.
 func (c *Conversion) UpdateDiskPaths(domainXML string) (string, error) {
 	fmt.Printf("Updating disk paths: found %d disks\n", len(c.Disks))
 	domain := &libvirtxml.Domain{}
@@ -554,15 +582,24 @@ func (c *Conversion) UpdateDiskPaths(domainXML string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to parse domain XML: %w", err)
 	}
+	excludedBuses := parseExcludeDiskBusAddresses(c.ExcludeDiskBusAddresses)
 	updatedDisks := []libvirtxml.DomainDisk{}
 	diskIdx := 0
 	for _, disk := range domain.Devices.Disks {
+		if disk.Device == "cdrom" {
+			continue
+		}
+		if bus := diskBusAddress(disk); bus != "" {
+			if _, isExcluded := excludedBuses[bus]; isExcluded {
+				fmt.Printf("Skipping excluded disk %s from domain XML\n", bus)
+				continue
+			}
+		} else if len(excludedBuses) > 0 {
+			fmt.Println("WARNING: cannot determine bus address for disk. cannot verify exclusion")
+		}
 		if diskIdx >= len(c.Disks) {
 			fmt.Printf("WARNING: disk %d in domain XML but only %d disks available\n", diskIdx, len(c.Disks))
 			break
-		}
-		if disk.Device == "cdrom" {
-			continue
 		}
 		newPath := c.Disks[diskIdx].Link
 		if updated := updateDiskSource(&disk, newPath); updated {

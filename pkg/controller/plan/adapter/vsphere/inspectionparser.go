@@ -73,8 +73,14 @@ type InspectionOS struct {
 	Arch   string `xml:"arch"`
 }
 
+type InspectionDisk struct {
+	Index     int `xml:"index,attr"`
+	BootOrder int `xml:"boot-order"`
+}
+
 type InspectionV2V struct {
-	OS InspectionOS `xml:"operatingsystem"`
+	OS    InspectionOS     `xml:"operatingsystem"`
+	Disks []InspectionDisk `xml:"disks>disk"`
 }
 
 func ParseInspectionFromString(xmlData string) (InspectionV2V, error) {
@@ -110,4 +116,18 @@ func GetOperationSystemFromConfig(vmConfigXML string) (string, error) {
 		return "genericLinuxGuest", nil
 	}
 	return "otherGuest64", nil
+}
+
+func GetBootDiskIndexFromInspection(vmConfigXML string) (int, error) {
+	inspection, err := ParseInspectionFromString(vmConfigXML)
+	if err != nil {
+		return -1, err
+	}
+
+	for _, disk := range inspection.Disks {
+		if disk.BootOrder == 1 {
+			return disk.Index, nil
+		}
+	}
+	return -1, nil
 }

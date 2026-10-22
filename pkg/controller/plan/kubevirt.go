@@ -2838,6 +2838,12 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 			} else {
 				r.Log.Info("Setting the vm OS from inspection", "os", vm.OperatingSystem, "vmId", vm.ID)
 			}
+			if bootDiskIndex, err := inspectionparser.GetBootDiskIndexFromInspection(inspectionXML); err != nil {
+				r.Log.Error(err, "Failed to extract boot disk from inspection XML", "vmId", vm.ID)
+			} else if bootDiskIndex >= 0 {
+				vm.DetectedBootDisk = &bootDiskIndex
+				r.Log.Info("Detected boot disk from inspection XML", "bootDiskIndex", bootDiskIndex, "vmId", vm.ID)
+			}
 		}
 	case api.VSphere:
 		inspectionXML, err := r.getInspectionXml(pod)
@@ -2848,11 +2854,17 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 			return liberr.Wrap(err)
 		}
 		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
+		if bootDiskIndex, err := inspectionparser.GetBootDiskIndexFromInspection(inspectionXML); err != nil {
+			r.Log.Error(err, "Failed to extract boot disk from inspection XML", "vmId", vm.ID)
+		} else if bootDiskIndex >= 0 {
+			vm.DetectedBootDisk = &bootDiskIndex
+			r.Log.Info("Detected boot disk from inspection XML", "bootDiskIndex", bootDiskIndex, "vmId", vm.ID)
+		}
 	}
 
 	if bootDiskIndex, bootOrderErr := util.GetDiskBootOrderFromYaml(vmConf); bootOrderErr != nil {
 		r.Log.Error(bootOrderErr, "Failed to extract boot order from virt-v2v output", "vmId", vm.ID)
-	} else if bootDiskIndex >= 0 {
+	} else if bootDiskIndex >= 0 && vm.DetectedBootDisk == nil {
 		vm.DetectedBootDisk = &bootDiskIndex
 		r.Log.Info("Detected boot disk from virt-v2v output", "bootDiskIndex", bootDiskIndex, "vmId", vm.ID)
 	}

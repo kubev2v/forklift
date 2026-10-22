@@ -281,6 +281,12 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Value: "true",
 		})
 	}
+	if planVM != nil && len(planVM.ExcludeDisks) > 0 {
+		env = append(env, core.EnvVar{
+			Name:  "V2V_excludeDiskBusAddresses",
+			Value: strings.Join(planVM.ExcludeDisks, ","),
+		})
+	}
 
 	libvirtURL, fingerprint, err := r.getSourceDetails(vm, sourceSecret)
 	if err != nil {
