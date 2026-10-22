@@ -80,7 +80,7 @@ func logResponse(
 		if !scanner.Scan() {
 			break
 		}
-		fmt.Fprintln(w, scanner.Text())
+		fmt.Fprintln(w, scanner.Text()) // #nosec G705 -- server-side debug logging, not browser output
 	}
 
 	log.Debug(w.String())
@@ -99,7 +99,7 @@ func WriteIndentedN(w io.Writer, b []byte, n int) error {
 				return err
 			}
 		}
-		if _, err := fmt.Fprint(w, l); err != nil {
+		if _, err := fmt.Fprint(w, l); err != nil { // #nosec G705 -- server-side debug logging, not browser output
 			return err
 		}
 		if !s.Scan() {
@@ -191,7 +191,7 @@ func dumpRequest(req *http.Request, body bool) ([]byte, error) {
 		method = req.Method
 	}
 
-	fmt.Fprintf(&b, "%s %s HTTP/%d.%d\r\n", method, reqURI, req.ProtoMajor, req.ProtoMinor)
+	fmt.Fprintf(&b, "%s %s HTTP/%d.%d\r\n", method, reqURI, req.ProtoMajor, req.ProtoMinor) // #nosec G705 -- server-side debug logging, not browser output
 
 	absRequestURI := strings.HasPrefix(req.RequestURI, "http://") || strings.HasPrefix(req.RequestURI, "https://")
 	if !absRequestURI {
@@ -200,13 +200,13 @@ func dumpRequest(req *http.Request, body bool) ([]byte, error) {
 			host = req.URL.Host
 		}
 		if host != "" {
-			fmt.Fprintf(&b, "Host: %s\r\n", host)
+			fmt.Fprintf(&b, "Host: %s\r\n", host) // #nosec G705 -- server-side debug logging, not browser output
 		}
 	}
 
 	chunked := len(req.TransferEncoding) > 0 && req.TransferEncoding[0] == "chunked"
 	if len(req.TransferEncoding) > 0 {
-		fmt.Fprintf(&b, "Transfer-Encoding: %s\r\n", strings.Join(req.TransferEncoding, ","))
+		fmt.Fprintf(&b, "Transfer-Encoding: %s\r\n", strings.Join(req.TransferEncoding, ",")) // #nosec G705 -- server-side debug logging, not browser output
 	}
 	if req.Close {
 		fmt.Fprintf(&b, "Connection: close\r\n")

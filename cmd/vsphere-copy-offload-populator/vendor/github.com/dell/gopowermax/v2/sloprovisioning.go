@@ -1,5 +1,5 @@
 /*
- Copyright © 2020 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -31,26 +31,56 @@ import (
 
 // The follow constants are for internal use within the pmax library.
 const (
-	SLOProvisioningX       = "sloprovisioning/"
-	SnapshotPolicy         = "/snapshot_policy"
-	SymmetrixX             = "symmetrix/"
-	IteratorX              = "common/Iterator/"
-	XPage                  = "/page"
-	XVolume                = "/volume"
-	XStorageGroup          = "/storagegroup"
-	XPortGroup             = "/portgroup"
-	XInitiator             = "/initiator"
-	XHost                  = "/host"
-	XHostGroup             = "/hostgroup"
-	XMaskingView           = "/maskingview"
-	Emulation              = "FBA"
-	MaxVolIdentifierLength = 64
-	Migration              = "migration/"
+	SLOProvisioningX           = "sloprovisioning/"
+	SnapshotPolicy             = "/snapshot_policy"
+	SymmetrixX                 = "symmetrix/"
+	IteratorX                  = "common/Iterator/"
+	XPage                      = "/page"
+	XVolume                    = "/volume"
+	XVolumeV1                  = "/volumes"
+	XStorageGroup              = "/storagegroup"
+	XStorageGroups             = "/storage-groups"
+	XPortGroup                 = "/portgroup"
+	XPort                      = "/port"
+	XInitiator                 = "/initiator"
+	XHost                      = "/host"
+	XHostGroup                 = "/hostgroup"
+	XClone                     = "/clone"
+	XMaskingView               = "/maskingview"
+	Emulation                  = "FBA"
+	MaxVolIdentifierLength     = 64
+	Migration                  = "migration/"
+	SelectQuery                = "?select="
+	SelectType                 = "type,"
+	SelectSystem               = "system,"
+	SelectIdentifier           = "identifier,"
+	SelectStorageGroup         = "storage_groups,"
+	SelectCapCyl               = "cap_cyl,"
+	SelectCapGB                = "cap_gb,"
+	SelectEffectiveUsedCapGB   = "effective_used_capacity_gb,"
+	SelectStorageGroupID       = "storage_groups.id,"
+	SelectSRPID                = "srp.id,"
+	SelectMaskingViews         = "masking_views,"
+	SelectVolHostPaths         = "volume_host_paths,"
+	SelectSRP                  = "srp,"
+	SelectNumberOfMaskingViews = "num_of_masking_views"
+	FilterIdentifier           = "&filter=identifier EQ "
+	XPortGroupEnhance          = "/port-groups"
+	SelectID                   = "id,"
+	SelectPortID               = "ports.id,"
+	SelectPortType             = "ports.type,"
+	SelectPortDirector         = "ports.director,"
+	XPortsEnhance              = "/ports"
+	SelectResourceType         = "resource_type,"
+	SelectPortNumber           = "port_number,"
+	SelectPortIdentifier       = "port_identifier,"
+	SelectDirector             = "director"
+	SelectProtocol             = "protocol"
 )
 
 // TimeSpent - Calculates and prints time spent for a caller function
 func (c *Client) TimeSpent(functionName string, startTime time.Time) {
-	if logResponseTimes {
+	if c.opts.logResponseTimes {
 		if functionName == "" {
 			pc, _, _, ok := runtime.Caller(1)
 			details := runtime.FuncForPC(pc)
@@ -306,6 +336,153 @@ func (c *Client) GetVolumeByID(ctx context.Context, symID string, volumeID strin
 		return nil, err
 	}
 	return volume, nil
+}
+
+// GetVolumesByIdentifier returns a Volume structure given the symmetrix ID and volume identifier.
+func (c *Client) GetVolumesByIdentifier(ctx context.Context, symID string, identifier string) (*types.Volumev1, error) {
+	defer c.TimeSpent("GetVolumesByIdentifier", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+	URL := c.urlPrefixV1() + symID + XVolumeV1 + SelectQuery + SelectType + SelectSystem + SelectIdentifier +
+		SelectStorageGroup + SelectMaskingViews + SelectCapCyl + SelectVolHostPaths + SelectSRP + SelectNumberOfMaskingViews
+
+	query := "&filter=identifier%20EQ%20" + identifier
+
+	URL = URL + query
+
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	resp, err := c.api.DoAndGetResponseBody(
+		ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
+	if err != nil {
+		log.Error("GetVolume info failed: " + err.Error())
+		return nil, err
+	}
+	if err = c.checkResponse(resp); err != nil {
+		return nil, err
+	}
+	volume := &types.Volumev1{}
+	decoder := json.NewDecoder(resp.Body)
+	if err = decoder.Decode(volume); err != nil {
+		return nil, err
+	}
+
+	// Ensure Volumes is not nil
+	if volume.Volumes == nil {
+		volume.Volumes = make([]types.VolumeEnhanced, 0)
+	}
+
+	defer resp.Body.Close()
+
+	return volume, nil
+}
+
+// GetVolumesByIdentifierMatch returns a Volume structure given the symmetrix ID and volume identifier that matches the regex - Feasible only for 10.1 and above
+func (c *Client) GetVolumesByIdentifierMatch(ctx context.Context, symID string, identifierMatcher string) (*types.Volumev1, error) {
+	defer c.TimeSpent("GetVolumesByIdentifierMatch", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+	baseURL := c.urlPrefixV1() + symID + XVolumeV1 + SelectQuery + SelectType + SelectID + SelectIdentifier +
+		SelectStorageGroup + SelectMaskingViews + SelectCapCyl +
+		"&filter=identifier%20like%20" + identifierMatcher +
+		"&limit=100&expiration_delay_secs=30"
+
+	allVolumes := make([]types.VolumeEnhanced, 0)
+	requestURL := baseURL
+
+	for {
+		ctx, cancel := c.GetTimeoutContext(ctx)
+		resp, err := c.api.DoAndGetResponseBody(
+			ctx, http.MethodGet, requestURL, c.getDefaultHeaders(), nil)
+		if err != nil {
+			cancel()
+			log.Error("GetVolume info failed: " + err.Error())
+			return nil, err
+		}
+		if err = c.checkResponse(resp); err != nil {
+			cancel()
+			return nil, err
+		}
+		page := &types.Volumev1{}
+		decoder := json.NewDecoder(resp.Body)
+		if err = decoder.Decode(page); err != nil {
+			resp.Body.Close()
+			cancel()
+			return nil, err
+		}
+
+		resp.Body.Close()
+		cancel()
+
+		log.Debugf("Page remaining %d, out of total %d", page.VolumePaging.RemainingInstances, page.VolumePaging.TotalInstances)
+		if page.Volumes != nil {
+			allVolumes = append(allVolumes, page.Volumes...)
+		}
+		if page.VolumePaging.RemainingInstances == 0 {
+			break
+		}
+		requestURL = baseURL + "&resume_token=" + page.VolumePaging.ResumeToken
+	}
+
+	return &types.Volumev1{Volumes: allVolumes}, nil
+}
+
+// GetVolumesCapacityBulk returns capacity information for all volumes on the array in a single
+// bulk operation using the v1 enhanced volumes endpoint. Only the capacity-related fields
+// (cap_gb, effective_used_capacity_gb), the storage group ids and the srp id are selected to
+// keep the payload small. Results are aggregated across all pages.
+//
+// This requires Unisphere 10.1 or above. Callers targeting older arrays should fall back to
+// per-volume GetVolumeByID calls.
+func (c *Client) GetVolumesCapacityBulk(ctx context.Context, symID string) (*types.Volumev1, error) {
+	defer c.TimeSpent("GetVolumesCapacityBulk", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+	baseURL := c.urlPrefixV1() + symID + XVolumeV1 + SelectQuery + SelectID + SelectCapGB +
+		SelectEffectiveUsedCapGB + SelectStorageGroupID + SelectSRPID +
+		"&limit=1000&expiration_delay_secs=30"
+
+	allVolumes := make([]types.VolumeEnhanced, 0)
+	requestURL := baseURL
+
+	for {
+		ctx, cancel := c.GetTimeoutContext(ctx)
+		resp, err := c.api.DoAndGetResponseBody(
+			ctx, http.MethodGet, requestURL, c.getDefaultHeaders(), nil)
+		if err != nil {
+			cancel()
+			log.Errorf("GetVolumesCapacityBulk failed: %s", err.Error())
+			return nil, err
+		}
+		if err = c.checkResponse(resp); err != nil {
+			cancel()
+			return nil, err
+		}
+		page := &types.Volumev1{}
+		decoder := json.NewDecoder(resp.Body)
+		if err = decoder.Decode(page); err != nil {
+			resp.Body.Close()
+			cancel()
+			return nil, err
+		}
+
+		resp.Body.Close()
+		cancel()
+
+		log.Debugf("GetVolumesCapacityBulk page remaining %d, out of total %d", page.VolumePaging.RemainingInstances, page.VolumePaging.TotalInstances)
+		if page.Volumes != nil {
+			allVolumes = append(allVolumes, page.Volumes...)
+		}
+		if page.VolumePaging.RemainingInstances == 0 {
+			break
+		}
+		requestURL = baseURL + "&resume_token=" + page.VolumePaging.ResumeToken
+	}
+
+	return &types.Volumev1{Volumes: allVolumes}, nil
 }
 
 // GetStorageGroupIDList returns a list of StorageGroupIds in a StorageGroupIDList type.
@@ -968,9 +1145,9 @@ func (c *Client) GetCreateVolInSGPayload(volumeSize interface{}, capUnit string,
 			log.Println("warning: gopowermax.UpdateStorageGroupPayload: no SetMetaData method exists, consider updating gopowermax library.")
 		}
 	}
-	if payload != nil {
-		ifDebugLogPayload(payload)
-	}
+
+	ifDebugLogPayload(payload)
+
 	return payload
 }
 
@@ -1000,9 +1177,9 @@ func (c *Client) GetAddVolumeToSGPayload(isSync, force bool, remoteSymID, remote
 		},
 		ExecutionOption: executionOption,
 	}
-	if payload != nil {
-		ifDebugLogPayload(payload)
-	}
+
+	ifDebugLogPayload(payload)
+
 	return payload
 }
 
@@ -1024,9 +1201,9 @@ func (c *Client) GetRemoveVolumeFromSGPayload(force bool, remoteSymID, remoteSto
 		},
 		ExecutionOption: types.ExecutionOptionSynchronous,
 	}
-	if payload != nil {
-		ifDebugLogPayload(payload)
-	}
+
+	ifDebugLogPayload(payload)
+
 	return payload
 }
 
@@ -1303,7 +1480,6 @@ func (c *Client) CreateHost(ctx context.Context, symID string, hostID string, in
 		ExecutionOption: types.ExecutionOptionSynchronous,
 	}
 	host := &types.Host{}
-	Debug = true
 	ifDebugLogPayload(hostParam)
 	URL := c.urlPrefix() + SLOProvisioningX + SymmetrixX + symID + XHost
 	ctx, cancel := c.GetTimeoutContext(ctx)
@@ -2050,4 +2226,181 @@ func (c *Client) UpdateHostGroupHosts(ctx context.Context, symID string, hostGro
 		}
 	}
 	return updatedHostGroup, nil
+}
+
+// GetPortListByProtocol returns a list of ports associated with a given protocol for a specified Symmetrix array.
+func (c *Client) GetPortListByProtocol(ctx context.Context, symID string, protocol string) (*types.PortList, error) {
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+	portList := &types.PortList{}
+	URL := c.urlPrefix() + SLOProvisioningX + SymmetrixX + symID + XPort
+	if protocol != "" {
+		URL = URL + "?enabled_protocol=" + protocol
+	}
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	err := c.api.Get(ctx, URL, c.getDefaultHeaders(), portList)
+	if err != nil {
+		log.Error("GetSymmetrixPortList failed: " + err.Error())
+		return nil, err
+	}
+
+	return portList, nil
+}
+
+// GetPortGroupListByType returns a PortGroupList object, which contains a list of the Port Groups
+// which can be optionally filtered based on type
+func (c *Client) GetPortGroupListByType(ctx context.Context, symID string, portGroupType string) (*types.PortGroupListResult, error) {
+	defer c.TimeSpent("GetPortGroupListByType", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+	filter := ""
+	if strings.EqualFold(portGroupType, "fibre") {
+		filter += "SCSI_FC"
+	} else if strings.EqualFold(portGroupType, "iscsi") {
+		filter += "iSCSI"
+	}
+	URL := c.urlPrefixV1() + symID + XPortGroupEnhance + SelectQuery + SelectID + SelectPortID + SelectPortType + SelectPortDirector + SelectProtocol
+
+	query := "&filter=protocol%20EQ%20"
+
+	if len(filter) > 1 {
+		URL = URL + query + filter
+	}
+
+	pgList := &types.PortGroupListResult{}
+
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	err := c.api.Get(ctx, URL, c.getDefaultHeaders(), pgList)
+	if err != nil {
+		log.Error("GetPortGrouplList failed: " + err.Error())
+		return nil, err
+	}
+	return pgList, nil
+}
+
+// GetStorageGroupVolumeCounts returns a StorageGroupVolumeCounts object, which contains a list of storage groups with their respective volume counts
+func (c *Client) GetStorageGroupVolumeCounts(ctx context.Context, symID string, prefix string) (*types.StorageGroupVolumeCounts, error) {
+	defer c.TimeSpent("GetStorageGroupVolumeCounts", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+
+	URL := c.urlPrefixV1() + symID + XStorageGroups
+	query := "?select=id,num_of_volumes"
+	URL = fmt.Sprintf("%s%s", URL, query)
+
+	if prefix != "" {
+		URL = URL + "&filter=id%20like%20" + prefix
+	}
+
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	resp, err := c.api.DoAndGetResponseBody(
+		ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
+	if err != nil {
+		log.Error("GetStorageGroupVolumeCounts failed: " + err.Error())
+		return nil, err
+	}
+	if err = c.checkResponse(resp); err != nil {
+		return nil, err
+	}
+	sgVolCounts := &types.StorageGroupVolumeCounts{}
+	decoder := json.NewDecoder(resp.Body)
+	if err = decoder.Decode(sgVolCounts); err != nil {
+		return nil, err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	return sgVolCounts, nil
+}
+
+// PublishMaskingViews publishes masking views with optional storage group, host, and port group configurations
+// This API creates or updates masking views and their associated components in a single operation
+// POST /univmax/rest/private/v1/systems/{systemId}/masking-views
+func (c *Client) PublishMaskingViews(ctx context.Context, symID string, param *types.PublishMaskingViewsParam) (*types.PublishMaskingViewResponse, error) {
+	defer c.TimeSpent("PublishMaskingViews", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+	URL := RESTPrivateV1 + "systems/" + symID + "/masking-views"
+	ifDebugLogPayload(param)
+	result := &types.PublishMaskingViewResponse{}
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	err := c.api.Post(ctx, URL, c.getDefaultHeaders(), param, result)
+	if err != nil {
+		log.Error("PublishMaskingViews failed: " + err.Error())
+		return nil, err
+	}
+	if result.Summary.Succeeded == 0 {
+		log.Errorf("PublishMaskingViews failed: http_status_code=%d, failed=%d", result.HTTPStatusCode, result.Summary.Failed)
+		return result, fmt.Errorf("PublishMaskingViews: none succeeded (total=%d, failed=%d)", result.Summary.Total, result.Summary.Failed)
+	}
+	log.Info(fmt.Sprintf("Successfully published %d masking view(s)", len(param.MaskingViews)))
+	return result, nil
+}
+
+func (c *Client) CreateVolume(ctx context.Context, systemID string, req types.CreateVolumesRequest, opts ...http.Header) (*types.CreateVolumesResponse, error) {
+	defer c.TimeSpent("CreateVolume", time.Now())
+	if _, err := c.IsAllowedArray(systemID); err != nil {
+		return nil, err
+	}
+
+	if len(req.Volumes) == 0 {
+		return nil, fmt.Errorf("create volumes request cannot be empty")
+	}
+
+	URL := RESTPrivateV1 + "systems/" + systemID + "/volumes"
+	ifDebugLogPayload(req)
+	log.Info(fmt.Sprintf("CreateVolume API URL: POST %s", URL))
+	result := &types.CreateVolumesResponse{}
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	headers := c.getDefaultHeaders()
+	// Merge optional authorization metadata headers if provided.
+	if len(opts) > 0 {
+		for k, vals := range opts[0] {
+			if len(vals) > 0 {
+				headers[k] = vals[0]
+			}
+		}
+	}
+	err := c.api.Post(ctx, URL, headers, req, result)
+	if err != nil {
+		log.Error("CreateVolume failed: " + err.Error())
+		return nil, err
+	}
+	if result.Summary.Failed > 0 || result.Summary.Rejected > 0 {
+		errMsg := createVolumesErrorMessage(result)
+		log.Errorf("CreateVolume failed: http_status_code=%d, failed=%d, rejected=%d", result.HTTPStatusCode, result.Summary.Failed, result.Summary.Rejected)
+		return result, fmt.Errorf("create volumes failed: %s", errMsg)
+	}
+	if result.Summary.Succeeded == 0 {
+		log.Errorf("CreateVolume failed: http_status_code=%d, no volumes succeeded (total=%d)", result.HTTPStatusCode, result.Summary.Total)
+		return result, fmt.Errorf("create volumes failed: none succeeded (total=%d)", result.Summary.Total)
+	}
+	log.Info(fmt.Sprintf("Successfully created %d volume(s)", result.Summary.Succeeded))
+	return result, nil
+}
+
+func createVolumesErrorMessage(resp *types.CreateVolumesResponse) string {
+	if resp == nil {
+		return "create volumes failed"
+	}
+	for _, r := range resp.Results.Result {
+		if r.Messages != nil && len(r.Messages.Message) > 0 {
+			m := r.Messages.Message[0]
+			if m.Code == "" {
+				return m.Message
+			}
+			return m.Code + ": " + m.Message
+		}
+	}
+	return "create volumes failed"
 }

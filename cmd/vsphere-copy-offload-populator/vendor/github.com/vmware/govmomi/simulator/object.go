@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -7,8 +7,7 @@ package simulator
 import (
 	"bytes"
 
-	"github.com/google/uuid"
-
+	"github.com/vmware/govmomi/internal"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
@@ -42,14 +41,25 @@ func SetCustomValue(ctx *Context, req *types.SetCustomValue) soap.HasFault {
 	return body
 }
 
-// newUUID returns a stable UUID string based on input s
-func newUUID(s string) string {
-	return sha1UUID(s).String()
+func GetCustomFieldsAvailable(ctx *Context, ref *types.ManagedObjectReference) []types.CustomFieldDef {
+	// CustomFieldsManager is not available in ESX
+	if ctx.Map.IsESX() {
+		return nil
+	}
+
+	cfm := ctx.Map.CustomFieldsManager()
+	var filtered []types.CustomFieldDef
+	for _, f := range cfm.Field {
+		if f.ManagedObjectType == "" || f.ManagedObjectType == ref.Type {
+			filtered = append(filtered, f)
+		}
+	}
+	return filtered
 }
 
-// sha1UUID returns a stable UUID based on input s
-func sha1UUID(s string) uuid.UUID {
-	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(s))
+// newUUID returns a stable UUID string based on input s
+func newUUID(s string) string {
+	return internal.OID(s).String()
 }
 
 // deepCopy uses xml encode/decode to copy src to dst

@@ -21,18 +21,20 @@ import (
 	"time"
 
 	types "github.com/dell/gopowermax/v2/types/v100"
+	log "github.com/sirupsen/logrus"
 )
 
 // The following constants are for the query of performance metrics for pmax
 const (
-	Average      = "Average"
-	Performance  = "performance"
-	StorageGroup = "/StorageGroup"
-	Volume       = "/Volume"
-	FileSystem   = "/file/filesystem"
-	Metrics      = "/metrics"
-	Keys         = "/keys"
-	Array        = "/Array"
+	Average               = "Average"
+	Performance           = "performance"
+	StorageGroup          = "/StorageGroup"
+	Volume                = "/Volume"
+	FileSystem            = "/file/filesystem"
+	Metrics               = "/metrics"
+	Keys                  = "/keys"
+	Array                 = "/Array"
+	PerformanceCategories = "/performance-categories"
 )
 
 // GetStorageGroupPerfKeys returns the available timestamp for the storage group performance
@@ -48,16 +50,17 @@ func (c *Client) GetStorageGroupPerfKeys(ctx context.Context, symID string) (*ty
 		SymmetrixID: symID,
 	}
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodPost, URL, c.getDefaultHeaders(), params)
+	if err != nil {
+		log.Errorf("GetStorageGroupPerfKeys failed: %s", err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close()
 	if err = c.checkResponse(resp); err != nil {
 		return nil, err
 	}
 	storageGroupInfo := &types.StorageGroupKeysResult{}
 	decoder := json.NewDecoder(resp.Body)
 	if err = decoder.Decode(storageGroupInfo); err != nil {
-		return nil, err
-	}
-	err = resp.Body.Close()
-	if err != nil {
 		return nil, err
 	}
 	return storageGroupInfo, nil
@@ -70,16 +73,17 @@ func (c *Client) GetArrayPerfKeys(ctx context.Context) (*types.ArrayKeysResult, 
 	ctx, cancel := c.GetTimeoutContext(ctx)
 	defer cancel()
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
+	if err != nil {
+		log.Errorf("GetArrayPerfKeys failed: %s", err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close()
 	if err = c.checkResponse(resp); err != nil {
 		return nil, err
 	}
 	ArrayInfo := &types.ArrayKeysResult{}
 	decoder := json.NewDecoder(resp.Body)
 	if err = decoder.Decode(ArrayInfo); err != nil {
-		return nil, err
-	}
-	err = resp.Body.Close()
-	if err != nil {
 		return nil, err
 	}
 	return ArrayInfo, nil
@@ -103,6 +107,11 @@ func (c *Client) GetStorageGroupMetrics(ctx context.Context, symID string, stora
 		Metrics:        metricsQuery,
 	}
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodPost, URL, c.getDefaultHeaders(), params)
+	if err != nil {
+		log.Errorf("GetStorageGroupMetrics failed: %s", err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close()
 	if err = c.checkResponse(resp); err != nil {
 		return nil, err
 	}
@@ -111,11 +120,34 @@ func (c *Client) GetStorageGroupMetrics(ctx context.Context, symID string, stora
 	if err = decoder.Decode(metricsList); err != nil {
 		return nil, err
 	}
-	err = resp.Body.Close()
-	if err != nil {
+	return metricsList, nil
+}
+
+// GetStorageGroupMetricsBulk returns all Storage Group performance metrics
+// in a single GET call using the performance-categories endpoint.
+func (c *Client) GetStorageGroupMetricsBulk(ctx context.Context, symID string) (*types.StorageGroupPerfCategoryResult, error) {
+	defer c.TimeSpent("GetStorageGroupMetricsBulk", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
 		return nil, err
 	}
-	return metricsList, nil
+	URL := c.urlPrefixV1() + symID + PerformanceCategories + StorageGroup
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
+	if err != nil {
+		log.Errorf("GetStorageGroupMetricsBulk failed: %s", err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if err = c.checkResponse(resp); err != nil {
+		return nil, err
+	}
+	result := &types.StorageGroupPerfCategoryResult{}
+	decoder := json.NewDecoder(resp.Body)
+	if err = decoder.Decode(result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // GetVolumesMetrics returns a list of Volume performance metrics
@@ -136,16 +168,17 @@ func (c *Client) GetVolumesMetrics(ctx context.Context, symID string, storageGro
 		Metrics:                        metricsQuery,
 	}
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodPost, URL, c.getDefaultHeaders(), params)
+	if err != nil {
+		log.Errorf("GetVolumesMetrics failed: %s", err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close()
 	if err = c.checkResponse(resp); err != nil {
 		return nil, err
 	}
 	metricsList := &types.VolumeMetricsIterator{}
 	decoder := json.NewDecoder(resp.Body)
 	if err = decoder.Decode(metricsList); err != nil {
-		return nil, err
-	}
-	err = resp.Body.Close()
-	if err != nil {
 		return nil, err
 	}
 	return metricsList, nil
@@ -170,16 +203,17 @@ func (c *Client) GetVolumesMetricsByID(ctx context.Context, symID string, volID 
 		Metrics:          metricsQuery,
 	}
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodPost, URL, c.getDefaultHeaders(), params)
+	if err != nil {
+		log.Errorf("GetVolumesMetricsByID failed: %s", err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close()
 	if err = c.checkResponse(resp); err != nil {
 		return nil, err
 	}
 	metricsList := &types.VolumeMetricsIterator{}
 	decoder := json.NewDecoder(resp.Body)
 	if err = decoder.Decode(metricsList); err != nil {
-		return nil, err
-	}
-	err = resp.Body.Close()
-	if err != nil {
 		return nil, err
 	}
 	return metricsList, nil
@@ -203,16 +237,17 @@ func (c *Client) GetFileSystemMetricsByID(ctx context.Context, symID string, fsI
 		Metrics:      metricsQuery,
 	}
 	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodPost, URL, c.getDefaultHeaders(), params)
+	if err != nil {
+		log.Errorf("GetFileSystemMetricsByID failed: %s", err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close()
 	if err = c.checkResponse(resp); err != nil {
 		return nil, err
 	}
 	metricsList := &types.FileSystemMetricsIterator{}
 	decoder := json.NewDecoder(resp.Body)
 	if err = decoder.Decode(metricsList); err != nil {
-		return nil, err
-	}
-	err = resp.Body.Close()
-	if err != nil {
 		return nil, err
 	}
 	return metricsList, nil

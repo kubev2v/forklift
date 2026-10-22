@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -95,10 +95,10 @@ func (b *EnvironmentBrowser) initDescriptorReturnVal(
 		cod := types.VirtualMachineConfigOptionDescriptor{
 			Key:                 hv.String(),
 			Description:         hv.String(),
-			DefaultConfigOption: types.NewBool(dco),
-			CreateSupported:     types.NewBool(true),
-			RunSupported:        types.NewBool(true),
-			UpgradeSupported:    types.NewBool(true),
+			DefaultConfigOption: dco,
+			CreateSupported:     true,
+			RunSupported:        true,
+			UpgradeSupported:    true,
 		}
 		for hostRef, hostVer := range maxHardwareVersionForHost {
 			if hostVer >= hv {
@@ -232,7 +232,7 @@ func (b *EnvironmentBrowser) QueryConfigTarget(ctx *Context, req *types.QueryCon
 	}
 
 	target := &types.ConfigTarget{
-		SmcPresent: types.NewBool(false),
+		SmcPresent: false,
 	}
 	body.Res.Returnval = target
 
@@ -244,6 +244,7 @@ func (b *EnvironmentBrowser) QueryConfigTarget(ctx *Context, req *types.QueryCon
 	}
 
 	seen := make(map[types.ManagedObjectReference]bool)
+	seenSubnets := make(map[string]bool)
 
 	for i := range hosts {
 		host := ctx.Map.Get(hosts[i]).(*HostSystem)
@@ -294,7 +295,24 @@ func (b *EnvironmentBrowser) QueryConfigTarget(ctx *Context, req *types.QueryCon
 					UplinkPortgroup:             false,
 					Portgroup:                   n.Self,
 					NetworkReservationSupported: types.NewBool(false),
+					SubnetId:                    n.Config.SubnetId,
 				})
+
+				if n.Config.SubnetId != "" && !seenSubnets[n.Config.SubnetId] {
+					seenSubnets[n.Config.SubnetId] = true
+					target.SubnetInfo = append(target.SubnetInfo, types.SubnetInfo{
+						Id: n.Config.SubnetId,
+						SubnetFolderInfo: types.SubnetInfoFolderInfo{
+							Name: "Subnet Folder",
+						},
+						VpcFolderInfo: types.SubnetInfoFolderInfo{
+							Name: "VPC Folder",
+						},
+						RootFolderInfo: types.SubnetInfoFolderInfo{
+							Name: "Root Folder",
+						},
+					})
+				}
 			case *DistributedVirtualSwitch:
 				target.DistributedVirtualSwitch = append(target.DistributedVirtualSwitch, types.DistributedVirtualSwitchInfo{
 					SwitchName:                  n.Name,

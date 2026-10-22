@@ -1,4 +1,4 @@
-// Copyright © 2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2024 - 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ func (gc *GatewayClient) UploadCompliance(uploadComplianceParam *types.UploadCom
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &uploadResponse, httpRespError
 	}
@@ -100,7 +100,7 @@ func (gc *GatewayClient) GetUploadComplianceDetails(id string, newToken bool) (*
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &getUploadCompResponse, httpRespError
 	}
@@ -148,7 +148,7 @@ func (gc *GatewayClient) ApproveUnsignedFile(id string) error {
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return httpRespError
 	}
@@ -181,7 +181,7 @@ func (gc *GatewayClient) GetAllUploadComplianceDetails() (*[]types.UploadComplia
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &getUploadCompResponse, httpRespError
 	}
@@ -252,7 +252,7 @@ func (gc *GatewayClient) GetUploadComplianceDetailsUsingID(id string) (*types.Fi
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return &frResponse, httpRespError
 	}
@@ -314,7 +314,7 @@ func (gc *GatewayClient) DeleteFirmwareRepository(id string) error {
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return httpRespError
 	}
@@ -351,7 +351,7 @@ func (gc *GatewayClient) TestConnection(uploadComplianceParam *types.UploadCompl
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return httpRespError
 	}

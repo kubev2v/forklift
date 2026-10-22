@@ -103,6 +103,36 @@ func (c *ClientIMPL) GetVolumes(ctx context.Context) ([]Volume, error) {
 	return result, err
 }
 
+// GetVolumesWithFilter returns a list of volumes filtered by the specified criteria
+// filters example:
+//
+//	filters := map[string]string{
+//			"name": "in.(vol1,vol2,vol3)",
+//			"id": "in.(id1,id2,id3)",
+//			"select": "id,name,type,volume_groups(id,name)"
+//		}
+func (c *ClientIMPL) GetVolumesWithFilter(ctx context.Context, filters map[string]string) ([]Volume, error) {
+	var result []Volume
+	qp := getVolumeDefaultQueryParams(c)
+	qp.RawArg("type", fmt.Sprintf("not.eq.%s", VolumeTypeEnumSnapshot))
+	qp.Order("name")
+
+	// Apply filters
+	for key, value := range filters {
+		qp.RawArg(key, value)
+	}
+
+	_, err := c.APIClient().Query(
+		ctx,
+		RequestConfig{
+			Method:      "GET",
+			Endpoint:    volumeURL,
+			QueryParams: qp,
+		},
+		&result)
+	return result, WrapErr(err)
+}
+
 // GetSnapshot query and return specific snapshot by it's id
 func (c *ClientIMPL) GetSnapshot(ctx context.Context, snapID string) (resVol Volume, err error) {
 	qp := getVolumeDefaultQueryParams(c)

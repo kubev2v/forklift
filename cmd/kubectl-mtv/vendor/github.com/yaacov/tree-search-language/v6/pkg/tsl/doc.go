@@ -13,9 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package tsl describe and parse the Tree Search Language (TSL),
-// TSL is a wonderful search language, With similar grammar to SQL's
-// where part.
+// Package tsl describes and parses the Tree Search Language (TSL),
+// a human-readable search language with grammar similar to SQL's
+// WHERE clause.
 //
 // TSL grammar examples:
 //

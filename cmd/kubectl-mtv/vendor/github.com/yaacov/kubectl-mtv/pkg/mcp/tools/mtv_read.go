@@ -14,7 +14,7 @@ import (
 type MTVReadInput struct {
 	Command string `json:"command" jsonschema:"Command path (e.g. get plan, get inventory vm, describe mapping)"`
 
-	Flags map[string]any `json:"flags,omitempty" jsonschema:"All parameters including positional args and options (e.g. name: \"my-plan\", provider: \"my-vsphere\", output: \"json\", namespace: \"ns\", query: \"where cpuCount > 4\")"`
+	Flags map[string]any `json:"flags,omitempty" jsonschema:"All parameters including positional args and options (e.g. name: \"my-plan\", provider: \"my-vsphere\", output: \"json\", namespace: \"ns\", query: \"where name in ['vm1','vm2'] and cpuCount > 4\")"`
 
 	ShowCLI bool `json:"show_cli,omitempty" jsonschema:"If true, does not execute. Returns the equivalent CLI command in the output field instead"`
 

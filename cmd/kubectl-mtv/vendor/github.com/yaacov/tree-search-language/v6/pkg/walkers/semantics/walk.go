@@ -295,8 +295,22 @@ func evaluateCompareExpressions(operator tsl.Operator, leftVal, rightVal interfa
 		case tsl.OpGE:
 			return leftDate.After(rightDate) || leftDate.Equal(rightDate), nil
 		}
+	} else if leftStr, leftIsStr := leftVal.(string); leftIsStr {
+		if rightStr, rightIsStr := rightVal.(string); rightIsStr {
+			switch operator {
+			case tsl.OpLT:
+				return leftStr < rightStr, nil
+			case tsl.OpLE:
+				return leftStr <= rightStr, nil
+			case tsl.OpGT:
+				return leftStr > rightStr, nil
+			case tsl.OpGE:
+				return leftStr >= rightStr, nil
+			}
+		}
+		return nil, tsl.TypeMismatchError{Expected: "matching types", Got: fmt.Sprintf("%T and %T", leftVal, rightVal)}
 	} else {
-		return nil, tsl.TypeMismatchError{Expected: "number or date", Got: fmt.Sprintf("%T and %T", leftVal, rightVal)}
+		return nil, tsl.TypeMismatchError{Expected: "number, date, or string", Got: fmt.Sprintf("%T and %T", leftVal, rightVal)}
 	}
 	return nil, nil
 }
