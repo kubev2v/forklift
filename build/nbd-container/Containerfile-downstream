@@ -1,0 +1,34 @@
+FROM registry.redhat.io/ubi10:10.2-1791893534
+
+# The `nbdkit` metapackage pulls
+# in the server plus a useful subset of plugins, including the `file` plugin used
+# here to export a block device.
+RUN dnf install -y nbdkit && dnf clean all
+
+# Default NBD port.
+EXPOSE 10809
+
+COPY build/nbd-container/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+ARG MTV_VERSION
+ARG REGISTRY
+ARG REVISION
+ARG CPE
+
+LABEL \
+    com.redhat.component="mtv-copy-appliance-nbd-container" \
+    name="${REGISTRY}/mtv-copy-appliance-nbd-container-rhel10" \
+    license="Apache License 2.0" \
+    io.k8s.display-name="Migration Toolkit for Virtualization" \
+    io.k8s.description="Migration Toolkit for Virtualization - Copy Appliance NBD Container" \
+    io.openshift.tags="migration,mtv,forklift" \
+    description="Migration Toolkit for Virtualization - Copy Appliance NBD Container" \
+    summary="Migration Toolkit for Virtualization - Copy Appliance NBD Container" \
+    vendor="Red Hat, Inc." \
+    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    version="$MTV_VERSION" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el10" \
+    revision="$REVISION"

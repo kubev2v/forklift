@@ -16,8 +16,6 @@ dnf install -y \
   --nodocs \
   --nogpgcheck \
   --setopt=install_weak_deps=False \
-  --repofrompath=cs9-baseos,"https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/" \
-  --repofrompath=cs9-appstream,"https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/" \
   open-vm-tools \
   podman \
   containernetworking-plugins
