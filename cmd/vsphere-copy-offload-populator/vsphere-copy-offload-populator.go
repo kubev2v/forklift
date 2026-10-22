@@ -63,6 +63,9 @@ var (
 	vsphereUsername            string
 	vspherePassword            string
 	esxiCloneMethod            string
+	esxiHostAddress            string
+	esxiHostUsername           string
+	esxiHostPassword           string
 	storageAPITimeoutSeconds   string
 	migrationHost              string
 
@@ -161,20 +164,38 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	// Prepare SSH config if needed
-	var sshConfig *populator.SSHConfig
+	// Select the clone transport.
+	var cloneConfig populator.CloneConfig
 	methodStr := strings.ToLower(strings.TrimSpace(esxiCloneMethod))
-	if methodStr == string(populator.CloneMethodSSH) {
+	switch methodStr {
+	case string(populator.CloneMethodSSH):
 		sshPrivateKey, sshPublicKey, err := getSSHKeysFromEnvironment()
 		if err != nil {
 			klog.Fatalf("Failed to get SSH keys from environment: %s", err)
 		}
 		klog.Infof("SSH keys retrieved, private key length: %d, public key length: %d", len(sshPrivateKey), len(sshPublicKey))
-		sshConfig = &populator.SSHConfig{
+		cloneConfig.SSH = &populator.SSHConfig{
 			UseSSH:     true,
 			PrivateKey: sshPrivateKey,
 			PublicKey:  sshPublicKey,
 		}
+	case string(populator.CloneMethodAPI):
+		// The controller injects these from the Host CR of the ESXi host it
+		// pinned for this disk. Their absence is a configuration error the plan
+		// validation should already have caught.
+		if esxiHostAddress == "" || esxiHostUsername == "" || esxiHostPassword == "" {
+			klog.Fatalf(
+				"esxiCloneMethod is 'api' but ESXi host credentials are missing; " +
+					"a Ready Host CR with spec.ipAddress and a secret holding user and password " +
+					"is required for the host performing the copy")
+		}
+		cloneConfig.API = &populator.APIConfig{
+			HostAddress:    esxiHostAddress,
+			Username:       esxiHostUsername,
+			Password:       esxiHostPassword,
+			DescriptorName: crName,
+		}
+		klog.Infof("using API clone method against ESXi host %s", esxiHostAddress)
 	}
 
 	// Select the appropriate populator based on disk type
@@ -185,7 +206,7 @@ func main() {
 		vspherePassword,
 		sourceVmId,
 		sourceVMDKFile,
-		sshConfig,
+		cloneConfig,
 	)
 	if err != nil {
 		klog.Fatalf("Failed to initialize populator: %s", err)
@@ -382,7 +403,10 @@ func handleArgs() {
 	flag.StringVar(&vsphereHostname, "vsphere-hostname", os.Getenv("GOVMOMI_HOSTNAME"), "vSphere's API hostname")
 	flag.StringVar(&vsphereUsername, "vsphere-username", os.Getenv("GOVMOMI_USERNAME"), "vSphere's API username")
 	flag.StringVar(&vspherePassword, "vsphere-password", os.Getenv("GOVMOMI_PASSWORD"), "vSphere's API password")
-	flag.StringVar(&esxiCloneMethod, "esxi-clone-method", os.Getenv("ESXI_CLONE_METHOD"), "ESXi clone method: 'vib' (default) or 'ssh'")
+	flag.StringVar(&esxiCloneMethod, "esxi-clone-method", os.Getenv("ESXI_CLONE_METHOD"), "ESXi clone method: 'vib' (default), 'ssh' or 'api'")
+	flag.StringVar(&esxiHostAddress, "esxi-host-address", os.Getenv("ESXI_HOST_ADDRESS"), "SDK address of the ESXi host performing the copy. Only used by the 'api' clone method")
+	flag.StringVar(&esxiHostUsername, "esxi-host-username", os.Getenv("ESXI_HOST_USERNAME"), "Username for the ESXi host SDK. Only used by the 'api' clone method")
+	flag.StringVar(&esxiHostPassword, "esxi-host-password", os.Getenv("ESXI_HOST_PASSWORD"), "Password for the ESXi host SDK. Only used by the 'api' clone method")
 	flag.StringVar(&storageAPITimeoutSeconds, "storage-http-timeout-seconds", os.Getenv("STORAGE_HTTP_TIMEOUT_SECONDS"), "HTTP client timeout in seconds for storage API requests (default: 30)")
 	flag.StringVar(&migrationHost, "migration-host", "", "the ESXi host ID to use for the XCOPY operation")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
