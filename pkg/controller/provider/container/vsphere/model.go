@@ -841,6 +841,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.Firmware = s
 				}
+			case fAnnotation:
+				if s, cast := p.Val.(string); cast {
+					v.model.Annotation = s
+				}
 			case fPowerState:
 				if s, cast := p.Val.(types.VirtualMachinePowerState); cast {
 					v.model.PowerState = string(s)
@@ -852,10 +856,6 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 			case fIsTemplate:
 				if b, cast := p.Val.(bool); cast {
 					v.model.IsTemplate = b
-				}
-			case fAnnotation:
-				if s, cast := p.Val.(string); cast {
-					v.model.Annotation = s
 				}
 			case fSnapshot:
 				if snapshot, cast := p.Val.(types.VirtualMachineSnapshotInfo); cast {
@@ -1149,6 +1149,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if b, cast := p.Val.(bool); cast {
 					v.model.ConsolidationNeeded = b
 				}
+			}
+		case types.PropertyChangeOpRemove:
+			if p.Name == fAnnotation {
+				v.model.Annotation = ""
 			}
 		}
 	}

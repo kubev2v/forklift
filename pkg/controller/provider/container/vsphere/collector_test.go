@@ -41,6 +41,7 @@ var _ = Describe("vSphere collector", func() {
 	table.DescribeTable("should", func(version string, matchTpm gtypes.GomegaMatcher) {
 		collector.client.ServiceContent.About.ApiVersion = version
 		Expect(collector.vmPathSet()).Should(matchTpm)
+		Expect(collector.vmPathSet()).To(ContainElement(fAnnotation))
 	},
 		table.Entry("not collect TPM from vSphere < 6.7", "6.5", Not(ContainElements(fTpmPresent))),
 		table.Entry("collect TPM from vSphere 6.7", "6.7", ContainElements(fTpmPresent)),
@@ -120,6 +121,60 @@ var _ = Describe("apply", func() {
 		err = db.Get(vm)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(vm.Revision).To(BeNumerically(">", 1))
+	})
+
+	It("should persist VM Notes across Enter and Modify events", func() {
+		const vmID = "vm-annotations"
+		customValues := []model.CustomFieldValue{{Key: 7, Value: "production"}}
+
+		applyUpdate := func(kind types.ObjectUpdateKind, changes ...types.PropertyChange) *model.VM {
+			tx, err := db.Begin()
+			Expect(err).NotTo(HaveOccurred())
+			err = collector.apply(ctx, tx, []types.ObjectUpdate{{
+				Kind:      kind,
+				Obj:       types.ManagedObjectReference{Type: VirtualMachine, Value: vmID},
+				ChangeSet: changes,
+			}})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tx.Commit()).To(Succeed())
+
+			vm := &model.VM{Base: model.Base{ID: vmID}}
+			Expect(db.Get(vm)).To(Succeed())
+			return vm
+		}
+
+		vm := applyUpdate(types.ObjectUpdateKindEnter,
+			types.PropertyChange{Op: Assign, Name: fUUID, Val: "uuid-1"},
+			types.PropertyChange{Op: Assign, Name: fAnnotation, Val: "First line\nSecond line"},
+			types.PropertyChange{Op: Assign, Name: fCustomValue, Val: types.ArrayOfCustomFieldValue{
+				CustomFieldValue: []types.BaseCustomFieldValue{
+					&types.CustomFieldStringValue{
+						CustomFieldValue: types.CustomFieldValue{Key: 7},
+						Value:            "production",
+					},
+				},
+			}},
+		)
+		Expect(vm.Annotation).To(Equal("First line\nSecond line"))
+		Expect(vm.CustomValues).To(Equal(customValues))
+
+		vm = applyUpdate(types.ObjectUpdateKindModify,
+			types.PropertyChange{Op: Assign, Name: fAnnotation, Val: "Updated Notes"},
+		)
+		Expect(vm.Annotation).To(Equal("Updated Notes"))
+		Expect(vm.UUID).To(Equal("uuid-1"))
+		Expect(vm.CustomValues).To(Equal(customValues))
+
+		vm = applyUpdate(types.ObjectUpdateKindModify,
+			types.PropertyChange{Op: Assign, Name: fFirmware, Val: "efi"},
+		)
+		Expect(vm.Annotation).To(Equal("Updated Notes"))
+
+		vm = applyUpdate(types.ObjectUpdateKindModify,
+			types.PropertyChange{Op: Assign, Name: fAnnotation, Val: ""},
+		)
+		Expect(vm.Annotation).To(BeEmpty())
+		Expect(vm.CustomValues).To(Equal(customValues))
 	})
 
 	It("should delete a VM on Leave event", func() {
