@@ -9,7 +9,11 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "release-5.0"
+      == "release-5.0" && (".tekton/copy-appliance-builder-5-0-*.yaml".pathChanged()
+      || "build/copy-appliance-template/***".pathChanged()
+      || "cmd/copy-appliance*/***".pathChanged()
+      || "cmd/nbd-orchestrator/***".pathChanged()
+      || ".konflux/copy-appliance-template/*/rpms.lock.yaml".pathChanged())
   labels:
     appstudio.openshift.io/application: forklift-operator-5-0
     appstudio.openshift.io/component: copy-appliance-builder-5-0
@@ -30,6 +34,15 @@ spec:
     value: build/copy-appliance-template/Containerfile-downstream
   - name: path-context
     value: .
+  - name: build-source-image
+    value: "true"
+  - name: prefetch-input
+    value: '[{"type": "rpm", "path": ".konflux/copy-appliance-template/appliance"}, {"type": "rpm", "path": ".konflux/copy-appliance-template/runtime"}]'
+  - name: build-args-file
+    value: build/release.conf
+  - name: build-args
+    value:
+      - "REVISION={{revision}}"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -61,7 +74,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string
@@ -190,6 +203,10 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
+      - name: dev-package-managers
+        value: "true"
+      - name: ACTIVATION_KEY
+        value: activation-key-rhel9
       runAfter:
       - clone-repository
       taskRef:

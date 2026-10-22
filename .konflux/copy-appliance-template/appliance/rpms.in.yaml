@@ -1,0 +1,13 @@
+packages:
+  - qemu-img
+  - libguestfs
+  - libguestfs-xfs
+  - supermin
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+context:
+  containerfile:
+    file: ../../../build/copy-appliance-template/Containerfile-downstream
+    stageName: appliance
+arches: [x86_64]

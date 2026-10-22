@@ -1,0 +1,9 @@
+packages:
+  - nbdkit
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+context:
+  containerfile:
+    file: ../../build/nbd-container/Containerfile-downstream
+arches: [x86_64]
