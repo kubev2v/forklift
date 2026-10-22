@@ -61,6 +61,12 @@ func NewPopulator(
 			log.Info("using RDM populator")
 			return createRDMPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
 		}
+
+	case resolver.DiskTypeNFS:
+		if canUse(storageApi, resolver.DiskTypeNFS) {
+			log.Info("using NFS populator")
+			return createNFSPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
+		}
 	}
 
 	log.Info("using VMDK/Xcopy populator")
@@ -113,6 +119,17 @@ func createRDMPopulator(storageApi StorageApi, vmwareClient vmware.Client, sourc
 	return NewRDMPopulator(rdmApi, vmwareClient, copyCtx)
 }
 
+// createNFSPopulator creates the NFS file-copy populator
+func createNFSPopulator(storageApi StorageApi, vmwareClient vmware.Client, sourceDiskCap, sourceDatastoreAlloc int64) (Populator, error) {
+	nfsApi, ok := storageApi.(NFSCapable)
+	if !ok {
+		return nil, fmt.Errorf("storage API does not implement NFSCapable")
+	}
+
+	copyCtx := CopyContext{CloneMethod: "nfs", SourceDiskCapacityBytes: sourceDiskCap, SourceDiskDatastoreAllocatedBytes: sourceDatastoreAlloc}
+	return NewNFSPopulator(nfsApi, vmwareClient, copyCtx)
+}
+
 // createVMDKPopulator creates VMDK/Xcopy populator (default/fallback)
 func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshConfig *SSHConfig, sourceDiskCap, sourceDatastoreAlloc int64) (Populator, error) {
 	vmdkApi, ok := storageApi.(VMDKCapable)
@@ -160,6 +177,10 @@ func canUse(storageApi StorageApi, diskType resolver.DiskType) bool {
 			return false
 		}
 		_, ok := storageApi.(RDMCapable)
+		return ok
+
+	case resolver.DiskTypeNFS:
+		_, ok := storageApi.(NFSCapable)
 		return ok
 
 	default:

@@ -13,6 +13,7 @@ type DiskType string
 const (
 	DiskTypeVVol DiskType = "vvol"
 	DiskTypeRDM  DiskType = "rdm"
+	DiskTypeNFS  DiskType = "nfs"
 	DiskTypeVMDK DiskType = "vmdk"
 )
 
@@ -26,6 +27,14 @@ type DiskBacking struct {
 	DeviceName string
 	// LunUuid is the unique LUN identifier (SCSI 83h / NAA). Used for storage resolution; required for RDM.
 	LunUuid string
+	// IsNAS is true when the datastore holding the disk is NFS-backed.
+	IsNAS bool
+	// NasRemotePath is the export path the NFS datastore mounts, e.g. "/px_1a2b3c4d-pvc-x".
+	// Set only when IsNAS.
+	NasRemotePath string
+	// NasRemoteHost is the NFS server the datastore mounts from. Used to confirm the
+	// source is served by the same array as the destination. Set only when IsNAS.
+	NasRemoteHost string
 }
 
 // DetectDiskType returns the DiskType for this backing.
@@ -35,6 +44,8 @@ func DetectDiskType(b *DiskBacking) DiskType {
 		return DiskTypeVVol
 	case b.IsRDM:
 		return DiskTypeRDM
+	case b.IsNAS:
+		return DiskTypeNFS
 	default:
 		return DiskTypeVMDK
 	}
