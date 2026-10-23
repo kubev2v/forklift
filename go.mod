@@ -29,7 +29,7 @@ require (
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0
 	github.com/kubev2v/vm-migration-detective v0.0.0-20261006023354-140bc9526c2c
 	github.com/masterzen/winrm v0.0.0-20250927112105-5f8e6c707321
-	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/ginkgo/v2 v2.33.1
 	github.com/onsi/ginkgo/v2 v2.27.4
 	github.com/onsi/gomega v1.38.2
 	github.com/openshift/api v0.0.0-20230613151523-ba04973d3ed1
