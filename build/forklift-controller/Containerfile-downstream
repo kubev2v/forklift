@@ -8,6 +8,10 @@ ENV GOEXPERIMENT=strictfipsruntime
 ENV GOCACHE=/go-build/cache
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o manager github.com/kubev2v/forklift/cmd/forklift-controller
 
+# The setup pod runs this image with copy-appliance-setup in place of the entry
+# point, so it has to be in the image the controller runs from.
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o copy-appliance-setup github.com/kubev2v/forklift/cmd/copy-appliance-setup
+
 # The orchestrator runs on the copy appliance VM, not here. The controller image only
 # carries it so the deploy can ship it over, so it is built unlike everything else here:
 #
@@ -27,6 +31,7 @@ RUN microdnf -y install tar && microdnf clean all
 
 COPY --from=builder /app/manager /usr/local/bin/forklift-controller
 COPY --from=builder /app/nbd-orchestrator /usr/local/bin/nbd-orchestrator
+COPY --from=builder /app/copy-appliance-setup /usr/local/bin/copy-appliance-setup
 ENTRYPOINT ["/usr/local/bin/forklift-controller"]
 
 ARG MTV_VERSION
