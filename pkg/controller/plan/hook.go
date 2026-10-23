@@ -15,7 +15,7 @@ import (
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/settings"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
