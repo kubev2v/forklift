@@ -1,0 +1,744 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.5
+  name: virtualizationvalidations.validation.kubevirt.io
+spec:
+  group: validation.kubevirt.io
+  names:
+    kind: VirtualizationValidation
+    listKind: VirtualizationValidationList
+    plural: virtualizationvalidations
+    shortNames:
+    - vcv
+    singular: virtualizationvalidation
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Target API endpoint
+      jsonPath: .spec.target.url
+      name: Target
+      type: string
+    - description: Validation profile
+      jsonPath: .spec.run.profile
+      name: Profile
+      type: string
+    - description: Validation phase
+      jsonPath: .status.phase
+      name: Phase
+      type: string
+    - description: Validation verdict
+      jsonPath: .status.verdict
+      name: Verdict
+      type: string
+    - description: Checks passed
+      jsonPath: .status.summary.passed
+      name: Passed
+      type: integer
+    - description: Checks failed
+      jsonPath: .status.summary.failed
+      name: Failed
+      type: integer
+    - description: Time since validation was created
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          VirtualizationValidation requests one immutable remote-cluster validation.
+          Invalid configuration enters Error and must be deleted and recreated after it is corrected.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              run:
+                description: Run configures this immutable validation execution.
+                properties:
+                  cancel:
+                    default: false
+                    description: |-
+                      Cancel requests one-way cancellation of this validation. A cancelled
+                      validation cannot be resumed; create a new resource to run it again.
+                    type: boolean
+                  cleanupPolicy:
+                    default: Always
+                    description: |-
+                      CleanupPolicy controls retention of target workload resources created by
+                      validation checks. Controller-owned Job and report resources are unaffected.
+                    enum:
+                    - Always
+                    - OnFailure
+                    - Never
+                    type: string
+                  executionTimeoutSeconds:
+                    default: 180
+                    description: |-
+                      ExecutionTimeoutSeconds limits one profile execution, such as one canary
+                      VM on one target node.
+                    format: int64
+                    maximum: 3600
+                    minimum: 1
+                    type: integer
+                  id:
+                    default: initial
+                    description: |-
+                      ID is an optional caller-chosen execution identity. Changing it starts a
+                      new run without deleting and recreating this resource.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                  maxConcurrentExecutions:
+                    description: |-
+                      MaxConcurrentExecutions limits concurrent profile execution units. When
+                      omitted, the executor uses its own default.
+                    format: int32
+                    maximum: 64
+                    minimum: 1
+                    type: integer
+                  profile:
+                    description: |-
+                      Profile is a versioned validation suite. The current controller supports
+                      basic-v1 and basic-all-nodes-v1, which verify authentication, CNV
+                      installation, validation namespace quota, and canary VM workflows.
+                    pattern: ^[a-z][a-z0-9-]*-v[0-9]+$
+                    type: string
+                  queueTimeoutSeconds:
+                    default: 0
+                    description: |-
+                      QueueTimeoutSeconds limits how long this request may wait for the
+                      target-scoped lease. Zero uses the suite timeout.
+                    format: int64
+                    maximum: 86400
+                    minimum: 0
+                    type: integer
+                  suiteTimeoutSeconds:
+                    default: 900
+                    description: |-
+                      SuiteTimeoutSeconds limits the entire validation Job, including all
+                      profile executions.
+                    format: int64
+                    maximum: 86400
+                    minimum: 1
+                    type: integer
+                required:
+                - profile
+                type: object
+                x-kubernetes-validations:
+                - message: executionTimeoutSeconds must not exceed suiteTimeoutSeconds
+                  rule: self.executionTimeoutSeconds <= self.suiteTimeoutSeconds
+              target:
+                description: Target is the remote cluster connection request.
+                properties:
+                  credentialsSecret:
+                    description: CredentialsSecret supplies target authentication
+                      and optional CA data.
+                    properties:
+                      caKey:
+                        description: |-
+                          CAKey identifies the CA entry in the Secret. Omit it or set it to an empty
+                          string to use the container system trust store instead.
+                        type: string
+                      name:
+                        description: Name is the same-namespace Secret name.
+                        minLength: 1
+                        type: string
+                      tokenKey:
+                        default: token
+                        description: TokenKey identifies the bearer-token entry in
+                          the Secret.
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  identity:
+                    description: Identity is descriptive metadata for users and consumers.
+                    properties:
+                      displayName:
+                        description: DisplayName is a human-readable target name.
+                        type: string
+                      id:
+                        description: ID is a caller-provided stable target identifier.
+                        type: string
+                    type: object
+                  insecureSkipTLS:
+                    description: |-
+                      InsecureSkipTLS disables target certificate verification. Use only for
+                      short-lived troubleshooting; prefer CAKey or system trust.
+                    type: boolean
+                  toolDownloads:
+                    description: ToolDownloads optionally overrides target CLI discovery.
+                    properties:
+                      clusterDomain:
+                        description: |-
+                          ClusterDomain is the target ingress domain used only when an explicit
+                          download URL is not supplied.
+                        maxLength: 253
+                        type: string
+                      ocURL:
+                        description: OCURL is the HTTPS archive URL for the target-compatible
+                          oc client.
+                        maxLength: 2048
+                        pattern: ^https://
+                        type: string
+                      virtctlURL:
+                        description: VirtctlURL is the HTTPS archive URL for target-compatible
+                          virtctl.
+                        maxLength: 2048
+                        pattern: ^https://
+                        type: string
+                    type: object
+                  url:
+                    description: URL is the absolute HTTPS API endpoint for the target
+                      cluster.
+                    maxLength: 2048
+                    minLength: 1
+                    pattern: ^https://
+                    type: string
+                required:
+                - credentialsSecret
+                - url
+                type: object
+              workload:
+                description: Workload defines target resources required by the selected
+                  profile.
+                properties:
+                  dataSource:
+                    description: DataSource is used to create the validation canary
+                      VM.
+                    properties:
+                      apiGroup:
+                        default: cdi.kubevirt.io
+                        description: APIGroup is the API group of the referenced data
+                          source.
+                        type: string
+                      kind:
+                        default: DataSource
+                        description: Kind is the kind of the referenced data source.
+                        type: string
+                      name:
+                        description: Name is the data source name.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                        type: string
+                      namespace:
+                        description: Namespace contains the data source.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                        type: string
+                    required:
+                    - name
+                    - namespace
+                    type: object
+                  namespace:
+                    description: Namespace is where validation canary resources are
+                      created on the target.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                required:
+                - dataSource
+                - namespace
+                type: object
+            required:
+            - run
+            - target
+            - workload
+            type: object
+            x-kubernetes-validations:
+            - message: VirtualizationValidation spec is immutable except that run.id
+                may change or run.cancel may be set to true
+              rule: self == oldSelf || (self.target == oldSelf.target && self.workload
+                == oldSelf.workload && self.run.profile == oldSelf.run.profile &&
+                self.run.suiteTimeoutSeconds == oldSelf.run.suiteTimeoutSeconds &&
+                self.run.executionTimeoutSeconds == oldSelf.run.executionTimeoutSeconds
+                && self.run.cleanupPolicy == oldSelf.run.cleanupPolicy && has(self.run.maxConcurrentExecutions)
+                == has(oldSelf.run.maxConcurrentExecutions) && (!has(self.run.maxConcurrentExecutions)
+                || self.run.maxConcurrentExecutions == oldSelf.run.maxConcurrentExecutions)
+                && has(self.run.queueTimeoutSeconds) == has(oldSelf.run.queueTimeoutSeconds)
+                && (!has(self.run.queueTimeoutSeconds) || self.run.queueTimeoutSeconds
+                == oldSelf.run.queueTimeoutSeconds) && ((has(self.run.id) != has(oldSelf.run.id))
+                || (has(self.run.id) && self.run.id != oldSelf.run.id) || ((!has(oldSelf.run.cancel)
+                || !oldSelf.run.cancel) && self.run.cancel)))
+          status:
+            description: VirtualizationValidationStatus is the controller-owned observed
+              state.
+            properties:
+              artifact:
+                description: Artifact locates the retained CTRF document.
+                properties:
+                  apiVersion:
+                    description: APIVersion is the artifact API version.
+                    type: string
+                  key:
+                    description: Key is the ConfigMap data key containing the CTRF
+                      document.
+                    type: string
+                  kind:
+                    description: Kind is the artifact resource kind.
+                    type: string
+                  name:
+                    description: Name is the artifact resource name.
+                    type: string
+                  namespace:
+                    description: Namespace is the artifact resource namespace.
+                    type: string
+                  truncated:
+                    description: Truncated reports whether the retained artifact was
+                      reduced.
+                    type: boolean
+                required:
+                - apiVersion
+                - key
+                - kind
+                - name
+                - namespace
+                type: object
+              completedAt:
+                description: CompletedAt is when the lifecycle entered a terminal
+                  phase.
+                format: date-time
+                type: string
+              conditions:
+                description: Conditions contains standard controller conditions keyed
+                  by type.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              executions:
+                description: Executions is the bounded projection of CTRF check executions.
+                items:
+                  description: |-
+                    VirtualizationValidationExecution is one observed execution of a logical
+                    validation check. Consumers group related executions by CheckID.
+                  properties:
+                    checkId:
+                      description: CheckID is a stable, profile-independent identifier
+                        defined by VCV.
+                      maxLength: 128
+                      type: string
+                    completedAt:
+                      description: CompletedAt is when this execution completed, when
+                        reported by CTRF.
+                      format: date-time
+                      type: string
+                    durationMilliseconds:
+                      description: DurationMilliseconds is the execution duration
+                        reported by CTRF.
+                      format: int64
+                      type: integer
+                    executionId:
+                      description: ExecutionID distinguishes repeated executions of
+                        the same check.
+                      maxLength: 128
+                      type: string
+                    flaky:
+                      description: Flaky is reported by CTRF when retries produced
+                        different outcomes.
+                      type: boolean
+                    message:
+                      description: Message is a bounded human-readable execution result.
+                      maxLength: 512
+                      type: string
+                    name:
+                      description: Name is a human-readable check name.
+                      maxLength: 256
+                      type: string
+                    outcome:
+                      description: Outcome is the observed result state.
+                      enum:
+                      - Pending
+                      - Running
+                      - Passed
+                      - Failed
+                      - TimedOut
+                      - Error
+                      - Skipped
+                      - Cancelled
+                      type: string
+                    parameters:
+                      additionalProperties:
+                        type: string
+                      description: Parameters contains bounded execution inputs and
+                        observed properties.
+                      maxProperties: 16
+                      type: object
+                    parametersTruncated:
+                      description: ParametersTruncated reports that some parameter
+                        information was omitted.
+                      type: boolean
+                    reason:
+                      description: |-
+                        Reason is a stable machine-readable outcome reason, such as
+                        ExecutionTimedOut or SnapshotTimedOut.
+                      maxLength: 128
+                      type: string
+                    representative:
+                      description: |-
+                        Representative reports that this execution is retained as an exemplar for
+                        otherwise collapsed executions.
+                      type: boolean
+                    retryCount:
+                      description: RetryCount is the number of retries reported by
+                        CTRF.
+                      format: int32
+                      type: integer
+                    severity:
+                      description: Severity controls this execution's contribution
+                        to the verdict.
+                      enum:
+                      - Required
+                      - Advisory
+                      type: string
+                    startedAt:
+                      description: StartedAt is when this execution started, when
+                        reported by CTRF.
+                      format: date-time
+                      type: string
+                    steps:
+                      description: Steps is the bounded workflow-step projection.
+                      items:
+                        description: ValidationStep is one bounded CTRF step observed
+                          within an execution.
+                        properties:
+                          extra:
+                            additionalProperties:
+                              type: string
+                            description: Extra contains bounded runner-provided step
+                              metadata.
+                            maxProperties: 16
+                            type: object
+                          extraTruncated:
+                            description: ExtraTruncated reports that some metadata
+                              was omitted.
+                            type: boolean
+                          name:
+                            description: Name is the human-readable workflow step
+                              name.
+                            maxLength: 256
+                            type: string
+                          outcome:
+                            description: Outcome is the observed step state.
+                            enum:
+                            - Pending
+                            - Running
+                            - Passed
+                            - Failed
+                            - TimedOut
+                            - Error
+                            - Skipped
+                            - Cancelled
+                            type: string
+                          reason:
+                            description: Reason is a machine-readable step outcome
+                              reason.
+                            maxLength: 128
+                            type: string
+                        required:
+                        - name
+                        - outcome
+                        type: object
+                      maxItems: 16
+                      type: array
+                    stepsTruncated:
+                      description: StepsTruncated reports that some workflow steps
+                        were omitted.
+                      type: boolean
+                    subject:
+                      description: Subject identifies the target scope of this execution.
+                      properties:
+                        apiGroup:
+                          description: APIGroup is the subject API group when applicable.
+                          type: string
+                        kind:
+                          description: Kind is the subject kind.
+                          type: string
+                        name:
+                          description: Name is the subject name.
+                          type: string
+                        namespace:
+                          description: Namespace is the subject namespace when applicable.
+                          type: string
+                      required:
+                      - kind
+                      - name
+                      type: object
+                  required:
+                  - checkId
+                  - name
+                  - outcome
+                  - severity
+                  type: object
+                maxItems: 128
+                type: array
+              image:
+                description: Image is the validator image used for the run.
+                type: string
+              jobName:
+                description: JobName is the controller-owned validator Job.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the generation used to calculate
+                  this status.
+                format: int64
+                type: integer
+              observedInputHash:
+                description: ObservedInputHash identifies the immutable run inputs.
+                type: string
+              observedReportResourceVersion:
+                description: ObservedReportResourceVersion is the last consumed report
+                  snapshot.
+                type: string
+              phase:
+                description: Phase is the controller lifecycle state.
+                enum:
+                - Pending
+                - Running
+                - Completed
+                - Cancelled
+                - Error
+                type: string
+              queuedAt:
+                description: QueuedAt is when the request first began waiting for
+                  the target lease.
+                format: date-time
+                type: string
+              reduction:
+                description: Reduction describes information removed from the status
+                  projection.
+                properties:
+                  advisoryFailuresOmitted:
+                    description: AdvisoryFailuresOmitted is the number of advisory
+                      failures omitted from detail.
+                    format: int32
+                    type: integer
+                  advisoryInconclusiveOmitted:
+                    description: |-
+                      AdvisoryInconclusiveOmitted is the number of advisory timed out, skipped,
+                      cancelled, or errored executions omitted from detail.
+                    format: int32
+                    type: integer
+                  level:
+                    description: |-
+                      Level is the highest reduction rung applied, from 0 (none) through 7
+                      (summary only).
+                    format: int32
+                    maximum: 7
+                    minimum: 0
+                    type: integer
+                  passedCollapsed:
+                    description: PassedCollapsed is the number of passed executions
+                      omitted from detail.
+                    format: int32
+                    type: integer
+                  pendingCollapsed:
+                    description: PendingCollapsed is the number of pending executions
+                      omitted from detail.
+                    format: int32
+                    type: integer
+                  requiredFailuresOmitted:
+                    description: RequiredFailuresOmitted is the number of required
+                      failures omitted from detail.
+                    format: int32
+                    type: integer
+                  requiredInconclusiveOmitted:
+                    description: |-
+                      RequiredInconclusiveOmitted is the number of required timed out, skipped,
+                      cancelled, or errored executions omitted from detail.
+                    format: int32
+                    type: integer
+                  totalExecutions:
+                    description: TotalExecutions is the total number of executions
+                      before reduction.
+                    format: int32
+                    type: integer
+                type: object
+              report:
+                description: Report identifies the observed CTRF document.
+                properties:
+                  digest:
+                    description: Digest is the SHA-256 digest of the observed artifact
+                      content.
+                    type: string
+                  reduction:
+                    description: Reduction describes information removed from the
+                      retained CTRF artifact.
+                    properties:
+                      advisoryFailuresOmitted:
+                        description: AdvisoryFailuresOmitted is the number of advisory
+                          failures omitted from detail.
+                        format: int32
+                        type: integer
+                      advisoryInconclusiveOmitted:
+                        description: |-
+                          AdvisoryInconclusiveOmitted is the number of advisory timed out, skipped,
+                          cancelled, or errored executions omitted from detail.
+                        format: int32
+                        type: integer
+                      level:
+                        description: |-
+                          Level is the highest reduction rung applied, from 0 (none) through 7
+                          (summary only).
+                        format: int32
+                        maximum: 7
+                        minimum: 0
+                        type: integer
+                      passedCollapsed:
+                        description: PassedCollapsed is the number of passed executions
+                          omitted from detail.
+                        format: int32
+                        type: integer
+                      pendingCollapsed:
+                        description: PendingCollapsed is the number of pending executions
+                          omitted from detail.
+                        format: int32
+                        type: integer
+                      requiredFailuresOmitted:
+                        description: RequiredFailuresOmitted is the number of required
+                          failures omitted from detail.
+                        format: int32
+                        type: integer
+                      requiredInconclusiveOmitted:
+                        description: |-
+                          RequiredInconclusiveOmitted is the number of required timed out, skipped,
+                          cancelled, or errored executions omitted from detail.
+                        format: int32
+                        type: integer
+                      totalExecutions:
+                        description: TotalExecutions is the total number of executions
+                          before reduction.
+                        format: int32
+                        type: integer
+                    type: object
+                  specVersion:
+                    description: SpecVersion is the CTRF specification version.
+                    type: string
+                type: object
+              reportComplete:
+                description: ReportComplete reports whether CTRF has no pending executions.
+                type: boolean
+              startedAt:
+                description: StartedAt is when the controller created the validator
+                  Job.
+                format: date-time
+                type: string
+              summary:
+                description: Summary contains aggregate CTRF counters.
+                properties:
+                  failed:
+                    description: Failed is the number of failed executions.
+                    format: int32
+                    type: integer
+                  other:
+                    description: Other is the number of CTRF executions with an unclassified
+                      result.
+                    format: int32
+                    type: integer
+                  passed:
+                    description: Passed is the number of passed executions.
+                    format: int32
+                    type: integer
+                  pending:
+                    description: Pending is the number of executions not yet complete.
+                    format: int32
+                    type: integer
+                  skipped:
+                    description: Skipped is the number of skipped executions.
+                    format: int32
+                    type: integer
+                  total:
+                    description: Total is the number of executions in the report.
+                    format: int32
+                    type: integer
+                type: object
+              verdict:
+                description: Verdict is the aggregate validation interpretation.
+                enum:
+                - Unknown
+                - Valid
+                - ValidWithWarnings
+                - Invalid
+                - Inconclusive
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
