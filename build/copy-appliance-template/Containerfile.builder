@@ -1,4 +1,4 @@
-FROM registry.fedoraproject.org/fedora:44 AS appliance
+FROM registry.fedoraproject.org/fedora:46 AS appliance
 
 RUN dnf install -y --setopt=install_weak_deps=False \
         qemu-img \
@@ -20,7 +20,7 @@ COPY . .
 ENV GOFLAGS="-mod=vendor"
 RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -ldflags="-w -s" -o /copy-appliance-template-uploader ./cmd/copy-appliance-template-uploader
 
-FROM registry.fedoraproject.org/fedora:44
+FROM registry.fedoraproject.org/fedora:46
 
 RUN dnf install -y --setopt=install_weak_deps=False \
         qemu-img \
