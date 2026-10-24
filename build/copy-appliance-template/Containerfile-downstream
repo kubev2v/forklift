@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9:9.8-1791810986 AS appliance
+FROM registry.redhat.io/ubi9:9.8-1792742206 AS appliance
 
 RUN dnf install -y --setopt=install_weak_deps=False \
         qemu-img \
@@ -13,14 +13,14 @@ RUN mkdir -p /usr/lib64/guestfs/appliance && \
     qemu-img convert -c -O qcow2 root root.qcow2 && \
     mv -vf root.qcow2 root
 
-FROM registry.redhat.io/ubi9/go-toolset:1.25.9-1778604137 AS gobuild
+FROM registry.redhat.io/ubi9/go-toolset:1.26.10-1792671270 AS gobuild
 USER 0
 WORKDIR /build
 COPY . .
 ENV GOFLAGS="-mod=vendor"
 RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -ldflags="-w -s" -o /copy-appliance-template-uploader ./cmd/copy-appliance-template-uploader
 
-FROM registry.redhat.io/ubi9:9.8-1791810986 as runtime
+FROM registry.redhat.io/ubi9:9.8-1792742206 as runtime
 
 RUN dnf install -y --setopt=install_weak_deps=False \
         qemu-img \
