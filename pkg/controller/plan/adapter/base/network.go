@@ -95,10 +95,6 @@ func ResolveNICModes(nics []NICRef, pairsBySource map[string][]api.NetworkPair, 
 		}
 		pair, allocated := AllocateNetwork(pool, pairs)
 		if !allocated {
-			// Example: net-1 is mapped to [nad-a, nad-b] but the VM has 3 NICs on net-1.
-			// The first two NICs claim nad-a and nad-b, the third NIC has no NAD left.
-			// It won't appear in the mode map, so mapMacStaticIps includes it in static
-			// IPs by default (backward compat). ValidateNetworkDuplicates warns about this.
 			continue
 		}
 		mode := string(pair.NetworkIPMode)
@@ -158,8 +154,8 @@ func FindAllMappingsForNICRef(nicRef ref.Ref, networkMap *api.NetworkMap) []api.
 	return nil
 }
 
-// NADPool tracks NAD assignments within a single VM to ensure no NAD
-// is used twice. Create one per VM via NewNADPool().
+// NADPool tracks NAD assignments within a single VM. It prefers unused
+// NADs, then reuses when all are taken. Create one per VM via NewNADPool().
 type NADPool struct {
 	used map[string]bool
 }
@@ -178,7 +174,8 @@ func nadKey(dest api.DestinationNetwork) string {
 	return dest.Namespace + "/" + dest.Name
 }
 
-// Allocate picks the first Multus NAD not yet used on this VM.
+// Allocate prefers an unused Multus NAD for this VM, when all NADs for
+// the source network are taken it reuses the first pair.
 // pairsForSource are pre-filtered by source network (matched by ID or
 // name), so every pair shares the same source. Only pass Multus pairs;
 // for mixed-type routing use AllocateNetwork.
@@ -190,17 +187,21 @@ func (p *NADPool) Allocate(pairsForSource []api.NetworkPair) (api.NetworkPair, b
 			return pair, true
 		}
 	}
+
+	if len(pairsForSource) > 0 {
+		return pairsForSource[0], true
+	}
 	return api.NetworkPair{}, false
 }
 
 // AllocateNetwork picks a destination for one NIC from pre-filtered
 // pairs (already matched to the NIC's source network by ID or name).
 // Non-Multus destinations pass through directly; Multus destinations go
-// through the NADPool for deduplication.
+// through the NADPool which prefers unused NADs, then reuses.
 func AllocateNetwork(pool *NADPool, pairsForSource []api.NetworkPair) (api.NetworkPair, bool) {
 	var nadPairs []api.NetworkPair
 	for _, pair := range pairsForSource {
-		// Only Multus NADs need deduplication via the pool.
+		// Non-Multus destinations (pod, ignored) pass through directly.
 		if pair.Destination.Type != Multus {
 			return pair, true
 		}
@@ -210,9 +211,8 @@ func AllocateNetwork(pool *NADPool, pairsForSource []api.NetworkPair) (api.Netwo
 }
 
 // ValidateNetworkDuplicates checks whether more than one NIC resolves to the
-// pod network or more than one NIC resolves to the same Multus NAD name.
-// With NAD pool mapping, duplicate NADs are only flagged when the pool for a
-// source network is exhausted (NIC count exceeds available NADs).
+// pod network. Multiple NICs sharing the same Multus NAD are allowed (the pool
+// reuses NADs when exhausted).
 func ValidateNetworkDuplicates(nicRefs []ref.Ref, networkMap *api.NetworkMap) (foundNadDup bool, foundPodDup bool) {
 	if networkMap == nil {
 		return
