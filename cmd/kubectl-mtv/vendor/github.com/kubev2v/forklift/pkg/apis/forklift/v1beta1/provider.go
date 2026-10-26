@@ -47,6 +47,8 @@ const (
 	HyperV ProviderType = "hyperv"
 	// Nutanix
 	Nutanix ProviderType = "nutanix"
+	// Azure
+	Azure ProviderType = "azure"
 )
 
 var ProviderTypes = []ProviderType{
@@ -58,6 +60,7 @@ var ProviderTypes = []ProviderType{
 	EC2,
 	HyperV,
 	Nutanix,
+	Azure,
 }
 
 func (t ProviderType) String() string {
@@ -84,6 +87,16 @@ const (
 	// Nutanix Prism endpoint settings.
 	NutanixPrismType   = "prismType"
 	NutanixClusterUUID = "clusterUuid"
+	AzureSnapshotSku   = "snapshotSku"
+	AzureSnapshotRG    = "snapshotResourceGroup"
+	AzureTargetRegion  = "targetRegion"
+	AzureSnapshotClass = "volumeSnapshotClassName"
+	// vSphere copyApplianceTemplate / copy-appliance placement (per provider).
+	CopyApplianceDatastore    = "copyApplianceDatastore"
+	CopyApplianceFolder       = "copyApplianceFolder"
+	CopyApplianceNetwork      = "copyApplianceNetwork"
+	CopyApplianceNbdSsl       = "copyApplianceNbdSsl"
+	CopyApplianceResourcePool = "copyApplianceResourcePool"
 )
 
 // Nutanix Prism endpoint types.
@@ -107,6 +120,7 @@ const (
 
 const OvaProviderFinalizer = "forklift/ova-provider"
 const HyperVProviderFinalizer = "forklift/hyperv-provider"
+const VSphereProviderFinalizer = "forklift/vsphere-provider"
 
 // Defines the desired state of Provider.
 type ProviderSpec struct {
@@ -142,6 +156,12 @@ type ProviderStatus struct {
 	// Used to detect when credentials have been rotated.
 	// +optional
 	SecretResourceVersion string `json:"secretResourceVersion,omitempty"`
+	// Name of the secret with the copyApplianceTemplate SSH private key and TLS material.
+	// +optional
+	CopyApplianceSSHPrivateSecret string `json:"copyApplianceSSHPrivateSecret,omitempty"`
+	// Name of the secret with the copyApplianceTemplate SSH public key.
+	// +optional
+	CopyApplianceSSHPublicSecret string `json:"copyApplianceSSHPublicSecret,omitempty"`
 }
 
 // +genclient
@@ -182,7 +202,7 @@ func (p *Provider) Type() ProviderType {
 }
 
 func (p *Provider) SupportsPreserveStaticIps() bool {
-	return p.Type() == VSphere || p.Type() == HyperV
+	return p.Type() == VSphere || p.Type() == HyperV || p.Type() == Nutanix
 }
 
 // This provider is the `host` cluster.
@@ -204,7 +224,7 @@ func (p *Provider) HasReconciled() bool {
 
 // This provider requires VM guest conversion.
 func (p *Provider) RequiresConversion() bool {
-	return p.Type() == VSphere || p.Type() == Ova || p.Type() == HyperV || p.Type() == EC2
+	return p.Type() == VSphere || p.Type() == Ova || p.Type() == HyperV || p.Type() == EC2 || p.Type() == Azure || p.Type() == Nutanix
 }
 
 // This provider support the vddk aio parameters.
@@ -223,4 +243,25 @@ func (p *Provider) UseVddkAioOptimization() bool {
 // Whether this Hyper-V provider is configured for Failover Cluster mode.
 func (p *Provider) IsHyperVCluster() bool {
 	return p.Type() == HyperV && p.Spec.Settings[ManagementType] == HyperVCluster
+}
+
+// Setting returns a provider settings value, or empty if unset.
+func (p *Provider) Setting(key string) string {
+	if p == nil || p.Spec.Settings == nil {
+		return ""
+	}
+	return p.Spec.Settings[key]
+}
+
+// CopyApplianceNbdSsl reports whether mutual TLS is required for copy-appliance NBD exports.
+// Enabled by default; set provider setting copyApplianceNbdSsl to "false" to disable.
+func (p *Provider) CopyApplianceNbdSsl() bool {
+	return p.Setting(CopyApplianceNbdSsl) != "false"
+}
+
+// CopyApplianceTemplateName is the name of this provider's copy appliance template. The
+// provider controller, the appliance check, the plan and the console create all
+// have to agree on it.
+func (p *Provider) CopyApplianceTemplateName() string {
+	return p.Name + "-copy-appliance-template"
 }

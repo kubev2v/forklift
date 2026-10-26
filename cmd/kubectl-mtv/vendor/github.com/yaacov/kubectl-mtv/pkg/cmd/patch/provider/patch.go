@@ -72,6 +72,7 @@ type PatchProviderOptions struct {
 	AzureTargetRegion          string
 	AzureSnapshotSku           string
 	AzureSnapshotResourceGroup string
+	AzureVolumeSnapshotClass   string
 	// Nutanix settings
 	NutanixPrismType   string
 	NutanixClusterUUID string
@@ -228,6 +229,11 @@ func PatchProvider(opts PatchProviderOptions) error {
 		if opts.AzureSnapshotResourceGroup != "" {
 			klog.V(2).Infof("Updating Azure snapshotResourceGroup to '%s'", opts.AzureSnapshotResourceGroup)
 			currentSettings["snapshotResourceGroup"] = opts.AzureSnapshotResourceGroup
+			providerUpdated = true
+		}
+		if opts.AzureVolumeSnapshotClass != "" {
+			klog.V(2).Infof("Updating Azure volumeSnapshotClassName to '%s'", opts.AzureVolumeSnapshotClass)
+			currentSettings["volumeSnapshotClassName"] = opts.AzureVolumeSnapshotClass
 			providerUpdated = true
 		}
 	}

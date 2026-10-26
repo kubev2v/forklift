@@ -39,9 +39,10 @@ func ExtractProviderConditionStatuses(obj map[string]interface{}) ProviderCondit
 
 		// Convert status to a simpler display
 		displayStatus := "Unknown"
-		if condStatus == "True" {
+		switch condStatus {
+		case "True":
 			displayStatus = "True"
-		} else if condStatus == "False" {
+		case "False":
 			displayStatus = "False"
 		}
 

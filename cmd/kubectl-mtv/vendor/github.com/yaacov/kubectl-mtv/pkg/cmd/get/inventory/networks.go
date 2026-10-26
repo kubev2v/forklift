@@ -95,6 +95,13 @@ func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 			{Title: "STATE", Key: "State", ColorFunc: output.ColorizeStatus},
 			{Title: "DEFAULT", Key: "IsDefault", ColorFunc: output.ColorizeBooleanString},
 		}
+	case "azure":
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "VARIANT", Key: "variant"},
+			{Title: "ADDRESS-PREFIX", Key: "addressPrefix"},
+		}
 	default:
 		defaultHeaders = []output.Column{
 			{Title: "NAME", Key: "name"},

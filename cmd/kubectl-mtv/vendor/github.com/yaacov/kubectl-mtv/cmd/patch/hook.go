@@ -38,6 +38,9 @@ Examples:
   # Switch an AAP hook back to a local hook
   kubectl-mtv patch hook --name my-hook --clear-aap --image quay.io/kubev2v/hook-runner
 
+  # Update playbook from file
+  kubectl-mtv patch hook --name my-hook --playbook @playbook.yaml
+
   # Update the deadline
   kubectl-mtv patch hook --name my-hook --deadline 600`,
 		Args:         cobra.MaximumNArgs(1),
@@ -80,7 +83,7 @@ Examples:
 
 	cmd.Flags().StringVar(&opts.Image, "image", "", "Container image URL")
 	cmd.Flags().StringVar(&opts.ServiceAccount, "service-account", "", "Service account")
-	cmd.Flags().StringVar(&opts.Playbook, "playbook", "", "Ansible playbook content, or use @filename to read from file")
+	cmd.Flags().StringVar(&opts.Playbook, "playbook", "", "Ansible playbook as plain YAML or @file (stored base64 in CR)")
 	cmd.Flags().Int64Var(&opts.Deadline, "deadline", 0, "Hook deadline in seconds")
 	cmd.Flags().IntVar(&opts.AAPJobTemplateID, "aap-job-template-id", 0, "AAP job template ID")
 	cmd.Flags().StringVar(&opts.AAPURL, "aap-url", "", "Per-hook AAP base URL (overrides controller default)")
