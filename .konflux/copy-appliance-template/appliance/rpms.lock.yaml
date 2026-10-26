@@ -389,27 +389,27 @@ arches:
     name: python3-policycoreutils
     evr: 3.6-5.el9
     sourcerpm: policycoreutils-3.6-5.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/q/qemu-img-10.1.0-17.el9_8.5.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/q/qemu-img-10.1.0-17.el9_8.9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 2682565
-    checksum: sha256:7c0583b09a32a2b67df6278000e23422cbaf99b5d9f29846f3736eb35804685b
+    size: 2635194
+    checksum: sha256:975d039623c709554214a2d9f4096897ae8e45f06d0ecc4fb0ba7812305c3723
     name: qemu-img
-    evr: 17:10.1.0-17.el9_8.5
-    sourcerpm: qemu-kvm-10.1.0-17.el9_8.5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/q/qemu-kvm-common-10.1.0-17.el9_8.5.x86_64.rpm
+    evr: 17:10.1.0-17.el9_8.9
+    sourcerpm: qemu-kvm-10.1.0-17.el9_8.9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/q/qemu-kvm-common-10.1.0-17.el9_8.9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 720690
-    checksum: sha256:f401c070f689f2e969944452bf4af2392c3a9d24c6970f13f0b16228c7a2465d
+    size: 666848
+    checksum: sha256:446de2e53ec1d689eb72ae7436f5092e3e3550ff5dfc1eaa415e28ae8a0c1eba
     name: qemu-kvm-common
-    evr: 17:10.1.0-17.el9_8.5
-    sourcerpm: qemu-kvm-10.1.0-17.el9_8.5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/q/qemu-kvm-core-10.1.0-17.el9_8.5.x86_64.rpm
+    evr: 17:10.1.0-17.el9_8.9
+    sourcerpm: qemu-kvm-10.1.0-17.el9_8.9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/q/qemu-kvm-core-10.1.0-17.el9_8.9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 5361239
-    checksum: sha256:17883113e78fbcbee84cca7dd54ee661e96ae3e5c4881f5dc4ad2d87fc4b6f62
+    size: 5316635
+    checksum: sha256:6d1cab629a1ac6551cc34a293bd9d7a7a04c99391db2a16c6001882dc19f8859
     name: qemu-kvm-core
-    evr: 17:10.1.0-17.el9_8.5
-    sourcerpm: qemu-kvm-10.1.0-17.el9_8.5.src.rpm
+    evr: 17:10.1.0-17.el9_8.9
+    sourcerpm: qemu-kvm-10.1.0-17.el9_8.9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/s/scrub-2.6.1-4.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 48350
@@ -753,20 +753,20 @@ arches:
     name: kbd-misc
     evr: 2.4.0-12.el9_8
     sourcerpm: kbd-2.4.0-12.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kernel-core-5.14.0-687.57.1.el9_8.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kernel-core-5.14.0-687.60.1.el9_8.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 18218229
-    checksum: sha256:8004d65b4175d992528289aebc70918352109d4ff2cc1f295c7f93295d85b64c
+    size: 18226717
+    checksum: sha256:2fb2c5193539ff44c657eaca8bd09d5b1e6c30f7f9a7487faf0c9d0bab39c088
     name: kernel-core
-    evr: 5.14.0-687.57.1.el9_8
-    sourcerpm: kernel-5.14.0-687.57.1.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kernel-modules-core-5.14.0-687.57.1.el9_8.x86_64.rpm
+    evr: 5.14.0-687.60.1.el9_8
+    sourcerpm: kernel-5.14.0-687.60.1.el9_8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kernel-modules-core-5.14.0-687.60.1.el9_8.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 32783585
-    checksum: sha256:1c9fd7785ffba70419c2d4ee2c3ac391f09c7a4bad02cdda15374c0a1c47cbe0
+    size: 32784445
+    checksum: sha256:289a2616a434536cc289384f6aa3542f0f0c86941c740d40e63fdc3bbc5e4c9e
     name: kernel-modules-core
-    evr: 5.14.0-687.57.1.el9_8
-    sourcerpm: kernel-5.14.0-687.57.1.el9_8.src.rpm
+    evr: 5.14.0-687.60.1.el9_8
+    sourcerpm: kernel-5.14.0-687.60.1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kmod-28-11.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 127775
@@ -1173,13 +1173,13 @@ arches:
     name: quota-nls
     evr: 1:4.09-4.el9
     sourcerpm: quota-4.09-4.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/r/rpcbind-1.2.6-7.el9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/r/rpcbind-1.2.6-7.el9_8.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 63366
-    checksum: sha256:da6368abd485c9c8a3643947ce11bece4775232d10bd8ec68e23a0bdf4275330
+    size: 64686
+    checksum: sha256:20baa841c1b66aadfad00f60381f6c2411efde80842b1a70d39180bb536e61a0
     name: rpcbind
-    evr: 1.2.6-7.el9
-    sourcerpm: rpcbind-1.2.6-7.el9.src.rpm
+    evr: 1.2.6-7.el9_8.1
+    sourcerpm: rpcbind-1.2.6-7.el9_8.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/r/rpm-plugin-selinux-4.16.1.3-40.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 15732
@@ -1278,13 +1278,13 @@ arches:
     name: xfsprogs
     evr: 6.4.0-7.el9
     sourcerpm: xfsprogs-6.4.0-7.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/x/xz-5.2.5-8.el9_0.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/x/xz-5.2.5-8.el9_8.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 235693
-    checksum: sha256:f16d17c26a241400586ddc3d734ce863e3f19d433881ec640a47bedf0dafd07b
+    size: 237249
+    checksum: sha256:642e46f7fcc460ee7ec0984a63e9f68ecefbea115c9724c0bab53e885e07bf11
     name: xz
-    evr: 5.2.5-8.el9_0
-    sourcerpm: xz-5.2.5-8.el9_0.src.rpm
+    evr: 5.2.5-8.el9_8.1
+    sourcerpm: xz-5.2.5-8.el9_8.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/z/zstd-1.5.5-1.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 479423
