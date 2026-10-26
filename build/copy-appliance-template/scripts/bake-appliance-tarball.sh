@@ -27,9 +27,23 @@ sed -i 's/^driver = "overlay"/driver = "vfs"/' "${conf}/storage.conf"
 cat > "${conf}/containers.conf" <<EOF
 [engine]
 signature_policy = "/opt/copy-appliance-template/appliance-root/etc/containers/policy.json"
+
+[engine.runtimes]
+crun = ["/opt/copy-appliance-template/appliance-root/usr/bin/crun"]
 EOF
 [[ -f "${root}/etc/vmware-tools/tools.conf" ]] || \
   cp "${root}/etc/vmware-tools/tools.conf.example" "${root}/etc/vmware-tools/tools.conf"
+
+# Podman calls installroot crun by absolute path without LD_LIBRARY_PATH.
+mv "${root}/usr/bin/crun" "${root}/usr/bin/crun.bin"
+cat > "${root}/usr/bin/crun" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+root=/opt/copy-appliance-template/appliance-root
+exec env LD_LIBRARY_PATH="${root}/usr/lib64:${root}/usr/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" \
+  "${root}/usr/bin/crun.bin" "$@"
+EOF
+chmod 755 "${root}/usr/bin/crun"
 
 mkdir -p \
   "${staging}/etc/containers" \
