@@ -58,10 +58,6 @@ const (
 	HyperVContainerLimitsMemory            = "HYPERV_CONTAINER_LIMITS_MEMORY"
 	HyperVContainerRequestsCpu             = "HYPERV_CONTAINER_REQUESTS_CPU"
 	HyperVContainerRequestsMemory          = "HYPERV_CONTAINER_REQUESTS_MEMORY"
-	PopulatorContainerLimitsCpu            = "POPULATOR_CONTAINER_LIMITS_CPU"
-	PopulatorContainerLimitsMemory         = "POPULATOR_CONTAINER_LIMITS_MEMORY"
-	PopulatorContainerRequestsCpu          = "POPULATOR_CONTAINER_REQUESTS_CPU"
-	PopulatorContainerRequestsMemory       = "POPULATOR_CONTAINER_REQUESTS_MEMORY"
 	TlsConnectionTimeout                   = "TLS_CONNECTION_TIMEOUT"
 	ControllerWindowsRebootTimeout         = "CONTROLLER_WINDOWS_REBOOT_TIMEOUT"
 	MaxConcurrentReconciles                = "MAX_CONCURRENT_RECONCILES"
@@ -80,14 +76,6 @@ const (
 	AAPCASecretName                        = "AAP_CA_SECRET_NAME"
 	WaitForFinalSnapshotConsolidation      = "WAIT_FOR_FINAL_SNAPSHOT_CONSOLIDATION"
 	ConversionPodPendingTimeout            = "CONVERSION_POD_PENDING_TIMEOUT"
-)
-
-// Default values for populator container resources
-var (
-	DefaultPopulatorContainerLimitsCpu      = resource.NewQuantity(1000, resource.DecimalSI)
-	DefaultPopulatorContainerLimitsMemory   = resource.NewQuantity(1024, resource.BinarySI)
-	DefaultPopulatorContainerRequestsCpu    = resource.NewQuantity(100, resource.DecimalSI)
-	DefaultPopulatorContainerRequestsMemory = resource.NewQuantity(512, resource.BinarySI)
 )
 
 // DefaultPendingPodTimeoutMinutes is the default number of minutes a
@@ -149,23 +137,19 @@ type Migration struct {
 	// Memory (in MB) allocated for the virt-v2v conversion appliance
 	VirtV2vMemSize int
 	// Number of virtual CPUs used for the virt-v2v conversion appliance
-	VirtV2vSmp                       int
-	VirtV2vContainerLimitsCpu        string
-	VirtV2vContainerLimitsMemory     string
-	VirtV2vContainerRequestsCpu      string
-	VirtV2vContainerRequestsMemory   string
-	HooksContainerLimitsCpu          string
-	HooksContainerLimitsMemory       string
-	HooksContainerRequestsCpu        string
-	HooksContainerRequestsMemory     string
-	OvaContainerLimitsCpu            string
-	OvaContainerLimitsMemory         string
-	OvaContainerRequestsCpu          string
-	OvaContainerRequestsMemory       string
-	PopulatorContainerLimitsCpu      resource.Quantity
-	PopulatorContainerLimitsMemory   resource.Quantity
-	PopulatorContainerRequestsCpu    resource.Quantity
-	PopulatorContainerRequestsMemory resource.Quantity
+	VirtV2vSmp                     int
+	VirtV2vContainerLimitsCpu      string
+	VirtV2vContainerLimitsMemory   string
+	VirtV2vContainerRequestsCpu    string
+	VirtV2vContainerRequestsMemory string
+	HooksContainerLimitsCpu        string
+	HooksContainerLimitsMemory     string
+	HooksContainerRequestsCpu      string
+	HooksContainerRequestsMemory   string
+	OvaContainerLimitsCpu          string
+	OvaContainerLimitsMemory       string
+	OvaContainerRequestsCpu        string
+	OvaContainerRequestsMemory     string
 	// VDDK image for guest conversion
 	VddkImage string
 	// TlsConnectionTimeout is the timeout for TLS connections in seconds
@@ -379,38 +363,6 @@ func (r *Migration) Load() (err error) {
 		r.OvaContainerRequestsMemory = val
 	} else {
 		r.OvaContainerRequestsMemory = "512Mi"
-	}
-	if val, found := os.LookupEnv(PopulatorContainerLimitsCpu); found {
-		r.PopulatorContainerLimitsCpu, err = resource.ParseQuantity(val)
-		if err != nil {
-			return fmt.Errorf("invalid Populator CPU limit %q: %w", val, err)
-		}
-	} else {
-		r.PopulatorContainerLimitsCpu = *DefaultPopulatorContainerLimitsCpu
-	}
-	if val, found := os.LookupEnv(PopulatorContainerLimitsMemory); found {
-		r.PopulatorContainerLimitsMemory, err = resource.ParseQuantity(val)
-		if err != nil {
-			return fmt.Errorf("invalid Populator memory limit %q: %w", val, err)
-		}
-	} else {
-		r.PopulatorContainerLimitsMemory = *DefaultPopulatorContainerLimitsMemory
-	}
-	if val, found := os.LookupEnv(PopulatorContainerRequestsCpu); found {
-		r.PopulatorContainerRequestsCpu, err = resource.ParseQuantity(val)
-		if err != nil {
-			return fmt.Errorf("invalid Populator CPU request %q: %w", val, err)
-		}
-	} else {
-		r.PopulatorContainerRequestsCpu = *DefaultPopulatorContainerRequestsCpu
-	}
-	if val, found := os.LookupEnv(PopulatorContainerRequestsMemory); found {
-		r.PopulatorContainerRequestsMemory, err = resource.ParseQuantity(val)
-		if err != nil {
-			return fmt.Errorf("invalid Populator memory request %q: %w", val, err)
-		}
-	} else {
-		r.PopulatorContainerRequestsMemory = *DefaultPopulatorContainerRequestsMemory
 	}
 	r.MaxConcurrentReconciles, err = getPositiveEnvLimit(MaxConcurrentReconciles, 10)
 	if err != nil {
