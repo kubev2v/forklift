@@ -11,6 +11,13 @@ arches:
     name: abattis-cantarell-fonts
     evr: 0.301-4.el9
     sourcerpm: abattis-cantarell-fonts-0.301-4.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/a/adobe-source-code-pro-fonts-2.030.1.050-12.el9.1.noarch.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 856543
+    checksum: sha256:cfb5e8fddaed92b1b22c957183d0ea626a4468f42a46dae4e68a795cb8c20393
+    name: adobe-source-code-pro-fonts
+    evr: 2.030.1.050-12.el9.1
+    sourcerpm: adobe-source-code-pro-fonts-2.030.1.050-12.el9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/a/augeas-libs-1.14.1-3.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 433743
@@ -1131,13 +1138,6 @@ arches:
     name: webkit2gtk3-jsc
     evr: 2.54.1-1.el9_8
     sourcerpm: webkit2gtk3-2.54.1-1.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/a/adobe-source-code-pro-fonts-2.030.1.050-12.el9.1.noarch.rpm
-    repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 856543
-    checksum: sha256:cfb5e8fddaed92b1b22c957183d0ea626a4468f42a46dae4e68a795cb8c20393
-    name: adobe-source-code-pro-fonts
-    evr: 2.030.1.050-12.el9.1
-    sourcerpm: adobe-source-code-pro-fonts-2.030.1.050-12.el9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/b/binutils-2.35.2-72.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 4821853
