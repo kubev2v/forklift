@@ -39,6 +39,10 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var virtV2vImage string
 	var xfsCompatibility bool
 	var rdmAsLun bool
+	var scsiReservation bool
+	var preCopySourceDisks bool
+	var selinuxRelabelAtBoot bool
+	var selinuxRelabelExclude []string
 	var serviceAccount string
 
 	// Tag mapping flags (vSphere only)
@@ -51,6 +55,10 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var installLegacyDriversChanged bool
 	var enableNestedVirtualizationChanged bool
 	var rdmAsLunChanged bool
+	var scsiReservationChanged bool
+	var preCopySourceDisksChanged bool
+	var selinuxRelabelAtBootChanged bool
+	var selinuxRelabelExcludeChanged bool
 	var serviceAccountChanged bool
 	var tagMappingDisabledChanged bool
 	var tagMappingLabelTagsChanged bool
@@ -95,6 +103,9 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 Use this to update plan settings like migration type, transfer network,
 target labels, node selectors, or convertor pod configuration.
 
+Migration type 'conversion' is guest conversion only and must not be combined
+with storage mapping flags (same validation as create plan).
+
 Affinity Syntax (KARL):
   The --target-affinity and --convertor-affinity flags use KARL syntax:
     --target-affinity "REQUIRE pods(app=database) on node"
@@ -104,14 +115,24 @@ Affinity Syntax (KARL):
 		Example: `  # Change migration type to warm
   kubectl-mtv patch plan --plan-name my-migration --migration-type warm
 
+  # Warm migration: disable VMware preflight inspection (warm vSphere only)
+  kubectl-mtv patch plan --plan-name my-migration \
+    --migration-type warm \
+    --run-preflight-inspection false
+
   # Update transfer network
   kubectl-mtv patch plan --plan-name my-migration --transfer-network my-namespace/migration-net
 
-  # Disable static IP preservation
+  # Disable static IP preservation (vSphere/Hyper-V only)
   kubectl-mtv patch plan --plan-name my-migration --preserve-static-ips false
 
-  # Enable raw disk copy mode (skip guest conversion)
-  kubectl-mtv patch plan --plan-name my-migration --skip-guest-conversion true
+  # Enable raw disk copy with VirtIO devices (skip guest conversion)
+  kubectl-mtv patch plan --plan-name my-migration \
+    --skip-guest-conversion true \
+    --use-compatibility-mode false
+
+  # Attach virt-customize scripts ConfigMap for guest conversion
+  kubectl-mtv patch plan --plan-name my-migration --customization-scripts my-scripts
 
   # Configure convertor pod scheduling
   kubectl-mtv patch plan --plan-name my-migration --convertor-node-selector node-role=worker`,
@@ -143,6 +164,10 @@ Affinity Syntax (KARL):
 			installLegacyDriversChanged = cmd.Flags().Changed("install-legacy-drivers")
 			enableNestedVirtualizationChanged = cmd.Flags().Changed("enable-nested-virtualization")
 			rdmAsLunChanged = cmd.Flags().Changed("rdm-as-lun")
+			scsiReservationChanged = cmd.Flags().Changed("scsi-reservation")
+			preCopySourceDisksChanged = cmd.Flags().Changed("pre-copy-source-disks")
+			selinuxRelabelAtBootChanged = cmd.Flags().Changed("selinux-relabel-at-boot")
+			selinuxRelabelExcludeChanged = cmd.Flags().Changed("selinux-relabel-exclude")
 			serviceAccountChanged = cmd.Flags().Changed("service-account")
 			tagMappingDisabledChanged = cmd.Flags().Changed("tag-mapping-disabled")
 			tagMappingLabelTagsChanged = cmd.Flags().Changed("tag-mapping-label-tags")
@@ -193,6 +218,10 @@ Affinity Syntax (KARL):
 				Warm:                           warm,
 				RunPreflightInspection:         runPreflightInspection,
 				RDMAsLun:                       rdmAsLun,
+				SCSIReservation:                scsiReservation,
+				PreCopySourceDisks:             preCopySourceDisks,
+				SelinuxRelabelAtBoot:           selinuxRelabelAtBoot,
+				SelinuxRelabelExclude:          selinuxRelabelExclude,
 				ServiceAccount:                 serviceAccount,
 				TagMappingDisabled:             tagMappingDisabled,
 				TagMappingLabelTags:            tagMappingLabelTags,
@@ -214,6 +243,10 @@ Affinity Syntax (KARL):
 				InstallLegacyDriversChanged:           installLegacyDriversChanged,
 				EnableNestedVirtualizationChanged:     enableNestedVirtualizationChanged,
 				RDMAsLunChanged:                       rdmAsLunChanged,
+				SCSIReservationChanged:                scsiReservationChanged,
+				PreCopySourceDisksChanged:             preCopySourceDisksChanged,
+				SelinuxRelabelAtBootChanged:           selinuxRelabelAtBootChanged,
+				SelinuxRelabelExcludeChanged:          selinuxRelabelExcludeChanged,
 				ServiceAccountChanged:                 serviceAccountChanged,
 				TagMappingDisabledChanged:             tagMappingDisabledChanged,
 				TagMappingLabelTagsChanged:            tagMappingLabelTagsChanged,
@@ -223,9 +256,9 @@ Affinity Syntax (KARL):
 
 	cmd.Flags().StringVar(&planName, "plan-name", "", "Plan name")
 	_ = cmd.MarkFlagRequired("plan-name")
-	cmd.Flags().StringVar(&transferNetwork, "transfer-network", "", "Network to use for transferring VM data. Supports 'namespace/network-name' or just 'network-name' (uses plan namespace)")
+	cmd.Flags().StringVar(&transferNetwork, "transfer-network", "", "NAD (NetworkAttachmentDefinition) for disk transfer; namespace/name or name in plan namespace")
 	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "", "Install legacy Windows drivers (true/false/auto)")
-	cmd.Flags().Var(migrationTypeFlag, "migration-type", "Migration type: cold, warm, live, or conversion")
+	cmd.Flags().Var(migrationTypeFlag, "migration-type", "Migration type: cold, warm, live, or conversion (default: cold)")
 	cmd.Flags().StringSliceVar(&targetLabels, "target-labels", []string{}, "Target VM labels in format key=value (can be specified multiple times)")
 	cmd.Flags().StringSliceVar(&targetNodeSelector, "target-node-selector", []string{}, "Target node selector in format key=value (can be specified multiple times)")
 	flags.ExplicitBoolVar(cmd.Flags(), &useCompatibilityMode, "use-compatibility-mode", false, "Use compatibility devices (SATA bus, E1000E NIC) when skipGuestConversion is true (true/false)")
@@ -242,18 +275,18 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&conversionTempStorageClass, "conversion-temp-storage-class", "", "Storage class for temporary conversion PVCs (useful for large VM migrations where node ephemeral storage is insufficient)")
 	cmd.Flags().StringVar(&conversionTempStorageSize, "conversion-temp-storage-size", "", "Size of temporary conversion PVC, e.g. '30Gi' or '1Ti' (only used when --conversion-temp-storage-class is set)")
 	flags.ExplicitBoolVar(cmd.Flags(), &skipZoneNodeSelector, "skip-zone-node-selector", false, "Skip adding zone-based node selector to migrated VMs (EC2 only) (true/false)")
-	cmd.Flags().StringVar(&customizationScripts, "customization-scripts", "", "ConfigMap containing customization scripts for guest conversion. Supports 'namespace/name' or 'name'")
+	cmd.Flags().StringVar(&customizationScripts, "customization-scripts", "", "ConfigMap (namespace/name or name); script keys: N_win_firstboot_*.ps1, N_linux_run_*.sh, N_linux_firstboot_*.sh")
 	cmd.Flags().StringVar(&virtV2vImage, "virt-v2v-image", "", "Override global virt-v2v container image for this plan")
 	cmd.Flags().StringVar(&enableNestedVirtualization, "enable-nested-virtualization", "", "Enable nested virtualization on target VMs (true/false/auto)")
-	flags.ExplicitBoolVar(cmd.Flags(), &xfsCompatibility, "xfs-compatibility", false, "Use XFS-compatible virt-v2v image for this plan (true/false)")
+	flags.ExplicitBoolVar(cmd.Flags(), &xfsCompatibility, "xfs-compatibility", false, "Use XFS-compatible virt-v2v image for this plan (disables BTRFS support for this plan) (true/false)")
 
 	// Plan metadata and configuration flags
 	cmd.Flags().StringVar(&description, "description", "", "Plan description")
-	flags.ExplicitBoolVar(cmd.Flags(), &preserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its cluster (true/false)")
-	flags.ExplicitBoolVar(cmd.Flags(), &preserveStaticIPs, "preserve-static-ips", false, "Preserve static IP configurations during migration (true/false)")
-	cmd.Flags().StringVar(&pvcNameTemplate, "pvc-name-template", "", "Template for generating PVC names for VM disks. Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
-	cmd.Flags().StringVar(&volumeNameTemplate, "volume-name-template", "", "Template for generating volume interface names in the target VM. Variables: {{.PVCName}}, {{.VolumeIndex}}")
-	cmd.Flags().StringVar(&networkNameTemplate, "network-name-template", "", "Template for generating network interface names in the target VM. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
+	flags.ExplicitBoolVar(cmd.Flags(), &preserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its oVirt/RHV cluster (oVirt/RHV only) (true/false)")
+	flags.ExplicitBoolVar(cmd.Flags(), &preserveStaticIPs, "preserve-static-ips", false, "Preserve static IP configurations during migration (vSphere/Hyper-V only) (true/false)")
+	cmd.Flags().StringVar(&pvcNameTemplate, "pvc-name-template", "", "Go template for PVC names (keep rendered name ≤40 chars). Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
+	cmd.Flags().StringVar(&volumeNameTemplate, "volume-name-template", "", "Go template for volume interface names (vSphere only). Variables: {{.PVCName}}, {{.VolumeIndex}}")
+	cmd.Flags().StringVar(&networkNameTemplate, "network-name-template", "", "Go template for network interface names (vSphere only). Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
 	flags.ExplicitBoolVar(cmd.Flags(), &migrateSharedDisks, "migrate-shared-disks", true, "Migrate disks shared between multiple VMs (true/false)")
 	flags.ExplicitBoolVar(cmd.Flags(), &archived, "archived", false, "Whether this plan should be archived (true/false)")
 	cmd.Flags().StringVar(&pvcNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", "", "Use generateName instead of name for PVC name template (true/false/auto)")
@@ -261,9 +294,13 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&deleteVmOnFailMigration, "delete-vm-on-fail-migration", "", "Delete target VM when migration fails (true/false)")
 	flags.ExplicitBoolVar(cmd.Flags(), &skipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process (raw disk copy mode) (true/false)")
 	flags.ExplicitBoolVar(cmd.Flags(), &warm, "warm", false, "Enable warm migration (use --migration-type=warm instead) (true/false)")
-	flags.ExplicitBoolVar(cmd.Flags(), &runPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer (true/false)")
+	flags.ExplicitBoolVar(cmd.Flags(), &runPreflightInspection, "run-preflight-inspection", true, "Run preflight on VM base disks before disk transfer (warm vSphere only; default true) (true/false)")
 	flags.ExplicitBoolVar(cmd.Flags(), &rdmAsLun, "rdm-as-lun", false, "Map VMware RDM disks as LUN devices (SCSI passthrough) in the target VM (vSphere only) (true/false)")
-	cmd.Flags().StringVar(&serviceAccount, "service-account", "", "ServiceAccount for migration pods in the target namespace (overrides global setting)")
+	flags.ExplicitBoolVar(cmd.Flags(), &scsiReservation, "scsi-reservation", false, "Enable SCSI persistent reservation for shared RDM LUN disks (requires --rdm-as-lun, vSphere only) (true/false)")
+	flags.ExplicitBoolVar(cmd.Flags(), &preCopySourceDisks, "pre-copy-source-disks", false, "Enable two-phase disk transfer for Hyper-V (Hyper-V only) (true/false)")
+	flags.ExplicitBoolVar(cmd.Flags(), &selinuxRelabelAtBoot, "selinux-relabel-at-boot", false, "Defer SELinux relabeling until the guest's first boot after conversion (true/false)")
+	cmd.Flags().StringSliceVar(&selinuxRelabelExclude, "selinux-relabel-exclude", nil, "Guest directories excluded from SELinux relabeling during conversion (repeatable)")
+	cmd.Flags().StringVar(&serviceAccount, "service-account", "", "DNS-1123 subdomain name of ServiceAccount for migration pods in target namespace (overrides global setting)")
 	flags.ExplicitBoolVar(cmd.Flags(), &tagMappingDisabled, "tag-mapping-disabled", false, "Disable vSphere tag-to-label conversion entirely (vSphere only) (true/false)")
 	cmd.Flags().StringSliceVar(&tagMappingLabelTags, "tag-mapping-label-tags", nil, "Only convert these vSphere tag categories to labels (comma-separated, vSphere only)")
 
@@ -344,13 +381,42 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 	var migrateSharedDisksChanged bool
 	var rdmAsLunVM string
 	var rdmAsLunVMChanged bool
+	var scsiReservationVM string
+	var scsiReservationVMChanged bool
 	var excludeDisks string
 	var excludeDisksChanged bool
+	var selinuxRelabelAtBootVM string
+	var selinuxRelabelAtBootVMChanged bool
+	var selinuxRelabelExcludeVM string
+	var selinuxRelabelExcludeVMChanged bool
 
 	cmd := &cobra.Command{
-		Use:          "planvm",
-		Short:        "Patch a specific VM within a migration plan",
-		Long:         `Patch VM-specific fields for a VM within a migration plan's VM list.`,
+		Use:   "planvm",
+		Short: "Patch a specific VM within a migration plan",
+		Long:  `Patch VM-specific fields for a VM within a migration plan's VM list.`,
+		Example: `  # Rename VM on the target cluster
+  kubectl-mtv patch planvm --plan-name my-migration --vm-name legacy-vm \
+    --target-name migrated-vm
+
+  # Skip a vSphere disk by bus address
+  kubectl-mtv patch planvm --plan-name my-migration --vm-name app-vm \
+    --exclude-disks scsi0:1,scsi0:2
+
+  # Add a pre-migration hook to one VM
+  kubectl-mtv patch planvm --plan-name my-migration --vm-name db-vm \
+    --add-pre-hook my-pre-hook
+
+  # LUKS decryption secret for encrypted disks
+  kubectl-mtv patch planvm --plan-name my-migration --vm-name encrypted-vm \
+    --luks-secret vm-luks-keys
+
+  # NBDE/Clevis unlocking (takes precedence over --luks-secret)
+  kubectl-mtv patch planvm --plan-name my-migration --vm-name encrypted-vm \
+    --nbde-clevis true
+
+  # Clear VM-level shared-disk override (inherit plan setting)
+  kubectl-mtv patch planvm --plan-name my-migration --vm-name shared-vm \
+    --migrate-shared-disks auto`,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -371,14 +437,20 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 			enableNestedVirtualizationChanged = cmd.Flags().Changed("enable-nested-virtualization")
 			migrateSharedDisksChanged = cmd.Flags().Changed("migrate-shared-disks")
 			rdmAsLunVMChanged = cmd.Flags().Changed("rdm-as-lun")
+			scsiReservationVMChanged = cmd.Flags().Changed("scsi-reservation")
 			excludeDisksChanged = cmd.Flags().Changed("exclude-disks")
+			selinuxRelabelAtBootVMChanged = cmd.Flags().Changed("selinux-relabel-at-boot")
+			selinuxRelabelExcludeVMChanged = cmd.Flags().Changed("selinux-relabel-exclude")
 
 			return plan.PatchPlanVM(kubeConfigFlags, planName, vmName, namespace,
 				targetName, rootDisk, instanceType, pvcNameTemplate, volumeNameTemplate, networkNameTemplate, luksSecret, targetPowerState,
 				addPreHook, addPostHook, removeHook, clearHooks, deleteVmOnFailMigration, deleteVmOnFailMigrationChanged,
 				nbdeClevis, nbdeClevisChanged, enableNestedVirtualization, enableNestedVirtualizationChanged,
 				migrateSharedDisks, migrateSharedDisksChanged, rdmAsLunVM, rdmAsLunVMChanged,
-				excludeDisks, excludeDisksChanged)
+				scsiReservationVM, scsiReservationVMChanged,
+				excludeDisks, excludeDisksChanged,
+				selinuxRelabelAtBootVM, selinuxRelabelAtBootVMChanged,
+				selinuxRelabelExcludeVM, selinuxRelabelExcludeVMChanged)
 		},
 	}
 
@@ -390,26 +462,29 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 	// VM-specific flags
 	cmd.Flags().StringVar(&targetName, "target-name", "", "Custom name for the VM in the target cluster")
 	cmd.Flags().StringVar(&rootDisk, "root-disk", "", "The primary disk to boot from")
-	cmd.Flags().StringVar(&instanceType, "instance-type", "", "Override the VM's instance type in the target")
-	cmd.Flags().StringVar(&pvcNameTemplate, "pvc-name-template", "", "Go template for naming PVCs for this VM's disks. Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
-	cmd.Flags().StringVar(&volumeNameTemplate, "volume-name-template", "", "Go template for naming volume interfaces. Variables: {{.PVCName}}, {{.VolumeIndex}}")
-	cmd.Flags().StringVar(&networkNameTemplate, "network-name-template", "", "Go template for naming network interfaces. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
+	cmd.Flags().StringVar(&instanceType, "instance-type", "", "Override the VM instance type on the target (EC2)")
+	cmd.Flags().StringVar(&pvcNameTemplate, "pvc-name-template", "", "Go template for PVC names for this VM (keep rendered name ≤40 chars). Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
+	cmd.Flags().StringVar(&volumeNameTemplate, "volume-name-template", "", "Go template for volume interface names (vSphere only). Variables: {{.PVCName}}, {{.VolumeIndex}}")
+	cmd.Flags().StringVar(&networkNameTemplate, "network-name-template", "", "Go template for network interface names (vSphere only). Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
 	cmd.Flags().StringVar(&luksSecret, "luks-secret", "", "Kubernetes Secret name containing LUKS disk decryption keys")
 	cmd.Flags().StringVar(&targetPowerState, "target-power-state", "", "Target power state for this VM after migration: 'on', 'off', or 'auto' (default: match source VM power state)")
 
 	// Hook-related flags
-	cmd.Flags().StringVar(&addPreHook, "add-pre-hook", "", "Add a pre-migration hook to this VM")
-	cmd.Flags().StringVar(&addPostHook, "add-post-hook", "", "Add a post-migration hook to this VM")
+	cmd.Flags().StringVar(&addPreHook, "add-pre-hook", "", "Existing Hook resource name in plan namespace to run before migration on this VM")
+	cmd.Flags().StringVar(&addPostHook, "add-post-hook", "", "Existing Hook resource name in plan namespace to run after migration on this VM")
 	cmd.Flags().StringVar(&removeHook, "remove-hook", "", "Remove a hook from this VM by hook name")
 	cmd.Flags().BoolVar(&clearHooks, "clear-hooks", false, "Remove all hooks from this VM")
 
 	// Additional VM flags
-	cmd.Flags().StringVar(&deleteVmOnFailMigration, "delete-vm-on-fail-migration", "", "Delete target VM when migration fails (true/false, overrides plan-level setting)")
+	cmd.Flags().StringVar(&deleteVmOnFailMigration, "delete-vm-on-fail-migration", "", "Delete target VM when migration fails (true/false; ignored when plan-level is true)")
 	flags.ExplicitBoolVar(cmd.Flags(), &nbdeClevis, "nbde-clevis", false, "Enable passphrase-less NBDE/Clevis disk unlocking via TANG server (takes precedence over --luks-secret) (true/false)")
-	cmd.Flags().StringVar(&enableNestedVirtualization, "enable-nested-virtualization", "", "Enable nested virtualization for this VM (true/false/auto)")
-	cmd.Flags().StringVar(&migrateSharedDisks, "migrate-shared-disks", "", "Migrate shared disks for this VM, overrides plan-level setting (true/false/auto)")
+	cmd.Flags().StringVar(&enableNestedVirtualization, "enable-nested-virtualization", "", "Enable nested virtualization for this VM (true/false/auto; auto clears VM override)")
+	cmd.Flags().StringVar(&migrateSharedDisks, "migrate-shared-disks", "", "Migrate shared disks for this VM (true/false/auto; auto clears VM override to inherit plan setting)")
 	cmd.Flags().StringVar(&rdmAsLunVM, "rdm-as-lun", "", "Map VMware RDM disks as LUN devices for this VM, overrides plan-level setting (vSphere only, true/false/auto)")
+	cmd.Flags().StringVar(&scsiReservationVM, "scsi-reservation", "", "Enable SCSI persistent reservation for shared RDM LUN disks for this VM, overrides plan-level setting (vSphere only, true/false/auto)")
 	cmd.Flags().StringVar(&excludeDisks, "exclude-disks", "", "vSphere bus addresses to skip during migration (comma-separated, e.g. scsi0:1,scsi0:2). Empty value clears the list. vSphere only.")
+	cmd.Flags().StringVar(&selinuxRelabelAtBootVM, "selinux-relabel-at-boot", "", "Defer SELinux relabeling until first boot for this VM, overrides plan-level setting (true/false/auto)")
+	cmd.Flags().StringVar(&selinuxRelabelExcludeVM, "selinux-relabel-exclude", "", "Directories excluded from SELinux relabeling for this VM (comma-separated). Empty value clears the list.")
 
 	// Add completion for hook flags
 	if err := cmd.RegisterFlagCompletionFunc("add-pre-hook", completion.HookResourceNameCompletion(kubeConfigFlags)); err != nil {
@@ -444,6 +519,18 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 	}
 
 	if err := cmd.RegisterFlagCompletionFunc("rdm-as-lun", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		panic(err)
+	}
+
+	if err := cmd.RegisterFlagCompletionFunc("scsi-reservation", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		panic(err)
+	}
+
+	if err := cmd.RegisterFlagCompletionFunc("selinux-relabel-at-boot", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		panic(err)

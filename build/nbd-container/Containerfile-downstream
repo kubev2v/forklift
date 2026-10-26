@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi10:10.2-1791893534
+FROM registry.redhat.io/ubi10:10.2-1792744468
 
 # The `nbdkit` metapackage pulls
 # in the server plus a useful subset of plugins, including the `file` plugin used

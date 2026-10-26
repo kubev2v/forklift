@@ -191,14 +191,14 @@ func (r *Registry) GenerateReadOnlyDescription() string {
 			continue
 		}
 		cmd := r.ReadOnly[key]
-		sb.WriteString(fmt.Sprintf("  %s - %s\n", cmd.CommandPath(), cmd.Description))
+		_, _ = fmt.Fprintf(&sb, "  %s - %s\n", cmd.CommandPath(), cmd.Description)
 	}
 
 	// Write compacted sibling groups
 	for _, group := range groups {
 		parentDisplay := strings.ReplaceAll(group.parentPath, "/", " ")
-		sb.WriteString(fmt.Sprintf("  %s RESOURCE - %s\n", parentDisplay, group.description))
-		sb.WriteString(fmt.Sprintf("    Resources: %s\n", strings.Join(group.children, ", ")))
+		_, _ = fmt.Fprintf(&sb, "  %s RESOURCE - %s\n", parentDisplay, group.description)
+		_, _ = fmt.Fprintf(&sb, "    Resources: %s\n", strings.Join(group.children, ", "))
 	}
 
 	// Examples: first example from each command in order, capped at N
@@ -206,7 +206,7 @@ func (r *Registry) GenerateReadOnlyDescription() string {
 	if len(examples) > 0 {
 		sb.WriteString("\nExamples:\n")
 		for _, ex := range examples {
-			sb.WriteString(fmt.Sprintf("  %s\n", ex))
+			_, _ = fmt.Fprintf(&sb, "  %s\n", ex)
 		}
 	}
 
@@ -246,14 +246,14 @@ func (r *Registry) GenerateReadWriteDescription() string {
 			continue
 		}
 		cmd := r.ReadWrite[key]
-		sb.WriteString(fmt.Sprintf("  %s - %s\n", cmd.CommandPath(), cmd.Description))
+		_, _ = fmt.Fprintf(&sb, "  %s - %s\n", cmd.CommandPath(), cmd.Description)
 	}
 
 	examples := r.collectOrderedExamples(r.ReadWrite, r.ReadWriteOrder, 10)
 	if len(examples) > 0 {
 		sb.WriteString("\nExamples:\n")
 		for _, ex := range examples {
-			sb.WriteString(fmt.Sprintf("  %s\n", ex))
+			_, _ = fmt.Fprintf(&sb, "  %s\n", ex)
 		}
 	}
 
@@ -502,7 +502,7 @@ func FormatCommandHelp(cmd *Command) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("--- Help for \"%s\" ---\n", cmd.CommandPath()))
+	_, _ = fmt.Fprintf(&sb, "--- Help for \"%s\" ---\n", cmd.CommandPath())
 
 	var required, optional []Flag
 	for _, f := range cmd.Flags {
@@ -530,11 +530,11 @@ func FormatCommandHelp(cmd *Command) string {
 	mcpExamples := convertCLIToMCPExamples(cmd, len(cmd.Examples), inject)
 	if len(mcpExamples) > 0 {
 		if len(mcpExamples) == 1 {
-			sb.WriteString(fmt.Sprintf("Example: %s\n", mcpExamples[0]))
+			_, _ = fmt.Fprintf(&sb, "Example: %s\n", mcpExamples[0])
 		} else {
 			sb.WriteString("Examples:\n")
 			for _, ex := range mcpExamples {
-				sb.WriteString(fmt.Sprintf("  %s\n", ex))
+				_, _ = fmt.Fprintf(&sb, "  %s\n", ex)
 			}
 		}
 	}
@@ -578,7 +578,7 @@ func (r *Registry) formatGlobalFlags(extraNames ...string) string {
 		}
 		found = true
 		displayName := strings.ReplaceAll(f.Name, "-", "_")
-		sb.WriteString(fmt.Sprintf("- %s: %s\n", displayName, f.Description))
+		_, _ = fmt.Fprintf(&sb, "- %s: %s\n", displayName, f.Description)
 	}
 
 	if !found {

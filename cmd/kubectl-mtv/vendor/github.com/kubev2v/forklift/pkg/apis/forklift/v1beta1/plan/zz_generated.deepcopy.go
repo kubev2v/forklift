@@ -335,6 +335,16 @@ func (in *VM) DeepCopyInto(out *VM) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.SelinuxRelabelAtBoot != nil {
+		in, out := &in.SelinuxRelabelAtBoot, &out.SelinuxRelabelAtBoot
+		*out = new(bool)
+		**out = **in
+	}
+	if in.SelinuxRelabelExclude != nil {
+		in, out := &in.SelinuxRelabelExclude, &out.SelinuxRelabelExclude
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.ExcludeDisks != nil {
 		in, out := &in.ExcludeDisks, &out.ExcludeDisks
 		*out = make([]string, len(*in))

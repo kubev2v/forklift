@@ -182,9 +182,9 @@ func GetAuthenticatedTransportWithInsecure(ctx context.Context, configFlags *gen
 
 	// If insecure skip TLS is enabled, modify the REST config before creating transport
 	if insecureSkipTLS {
-		config.TLSClientConfig.Insecure = true
-		config.TLSClientConfig.CAFile = ""
-		config.TLSClientConfig.CAData = nil
+		config.Insecure = true
+		config.CAFile = ""
+		config.CAData = nil
 		klog.V(5).Infof("TLS certificate verification disabled (insecure mode)")
 	}
 
@@ -422,7 +422,7 @@ func (c *HTTPClient) GetWithContext(ctx context.Context, path string) ([]byte, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check for non-success status codes
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

@@ -137,7 +137,7 @@ Examples:
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Hook name")
 	cmd.Flags().StringVar(&image, "image", "", "Container image URL to run (default: quay.io/kubev2v/hook-runner for local hooks)")
 	cmd.Flags().StringVar(&serviceAccount, "service-account", "", "Service account to use for the hook (optional)")
-	cmd.Flags().StringVar(&playbook, "playbook", "", "Ansible playbook content, or use @filename to read from file (optional)")
+	cmd.Flags().StringVar(&playbook, "playbook", "", "Ansible playbook as plain YAML or @file (stored base64 in CR; optional for local hooks)")
 	cmd.Flags().Int64Var(&deadline, "deadline", 0, "Hook deadline in seconds (optional)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output Hook CR to stdout instead of creating it")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format for dry-run (json, yaml). Defaults to yaml when --dry-run is used")

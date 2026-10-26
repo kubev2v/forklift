@@ -65,6 +65,10 @@ type PatchPlanOptions struct {
 	Warm                           bool
 	RunPreflightInspection         bool
 	RDMAsLun                       bool
+	SCSIReservation                bool
+	PreCopySourceDisks             bool
+	SelinuxRelabelAtBoot           bool
+	SelinuxRelabelExclude          []string
 	ServiceAccount                 string
 	TagMappingDisabled             bool
 	TagMappingLabelTags            []string
@@ -86,6 +90,10 @@ type PatchPlanOptions struct {
 	InstallLegacyDriversChanged           bool
 	EnableNestedVirtualizationChanged     bool
 	RDMAsLunChanged                       bool
+	SCSIReservationChanged                bool
+	PreCopySourceDisksChanged             bool
+	SelinuxRelabelAtBootChanged           bool
+	SelinuxRelabelExcludeChanged          bool
 	ServiceAccountChanged                 bool
 	TagMappingDisabledChanged             bool
 	TagMappingLabelTagsChanged            bool
@@ -545,6 +553,30 @@ func PatchPlan(opts PatchPlanOptions) error {
 		planUpdated = true
 	}
 
+	if opts.SCSIReservationChanged {
+		patchSpec["scsiReservation"] = opts.SCSIReservation
+		klog.V(2).Infof("Updated SCSI reservation to %t", opts.SCSIReservation)
+		planUpdated = true
+	}
+
+	if opts.PreCopySourceDisksChanged {
+		patchSpec["preCopySourceDisks"] = opts.PreCopySourceDisks
+		klog.V(2).Infof("Updated preCopySourceDisks to %t", opts.PreCopySourceDisks)
+		planUpdated = true
+	}
+
+	if opts.SelinuxRelabelAtBootChanged {
+		patchSpec["selinuxRelabelAtBoot"] = opts.SelinuxRelabelAtBoot
+		klog.V(2).Infof("Updated SELinux relabel at boot to %t", opts.SelinuxRelabelAtBoot)
+		planUpdated = true
+	}
+
+	if opts.SelinuxRelabelExcludeChanged {
+		patchSpec["selinuxRelabelExclude"] = opts.SelinuxRelabelExclude
+		klog.V(2).Infof("Updated SELinux relabel exclude to %v", opts.SelinuxRelabelExclude)
+		planUpdated = true
+	}
+
 	// Update service account if flag was changed
 	if opts.ServiceAccountChanged {
 		if opts.ServiceAccount != "" {
@@ -618,7 +650,10 @@ func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, n
 	addPreHook, addPostHook, removeHook string, clearHooks bool, deleteVmOnFailMigration string, deleteVmOnFailMigrationChanged bool,
 	nbdeClevis bool, nbdeClevisChanged bool, enableNestedVirtualization string, enableNestedVirtualizationChanged bool,
 	migrateSharedDisks string, migrateSharedDisksChanged bool, rdmAsLun string, rdmAsLunChanged bool,
-	excludeDisks string, excludeDisksChanged bool) error {
+	scsiReservation string, scsiReservationChanged bool,
+	excludeDisks string, excludeDisksChanged bool,
+	selinuxRelabelAtBoot string, selinuxRelabelAtBootChanged bool,
+	selinuxRelabelExclude string, selinuxRelabelExcludeChanged bool) error {
 
 	klog.V(2).Infof("Patching VM '%s' in plan '%s'", vmName, planName)
 
@@ -874,6 +909,31 @@ func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, n
 		}
 	}
 
+	if scsiReservationChanged {
+		switch strings.ToLower(scsiReservation) {
+		case "true":
+			err = unstructured.SetNestedField(vmCopy, true, "scsiReservation")
+			if err != nil {
+				return fmt.Errorf("failed to set SCSI reservation: %v", err)
+			}
+			klog.V(2).Infof("Updated VM SCSI reservation to true")
+			vmUpdated = true
+		case "false":
+			err = unstructured.SetNestedField(vmCopy, false, "scsiReservation")
+			if err != nil {
+				return fmt.Errorf("failed to set SCSI reservation: %v", err)
+			}
+			klog.V(2).Infof("Updated VM SCSI reservation to false")
+			vmUpdated = true
+		case "auto", "":
+			unstructured.RemoveNestedField(vmCopy, "scsiReservation")
+			klog.V(2).Infof("Cleared VM SCSI reservation override")
+			vmUpdated = true
+		default:
+			return fmt.Errorf("invalid value for scsi-reservation: %s (must be 'true', 'false', or 'auto')", scsiReservation)
+		}
+	}
+
 	if excludeDisksChanged {
 		disks := parseCommaSeparated(excludeDisks)
 		if len(disks) == 0 {
@@ -885,6 +945,46 @@ func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, n
 				return fmt.Errorf("failed to set excludeDisks: %v", err)
 			}
 			klog.V(2).Infof("Updated VM excludeDisks to %v", disks)
+		}
+		vmUpdated = true
+	}
+
+	if selinuxRelabelAtBootChanged {
+		switch strings.ToLower(selinuxRelabelAtBoot) {
+		case "true":
+			err = unstructured.SetNestedField(vmCopy, true, "selinuxRelabelAtBoot")
+			if err != nil {
+				return fmt.Errorf("failed to set selinuxRelabelAtBoot: %v", err)
+			}
+			klog.V(2).Infof("Updated VM selinuxRelabelAtBoot to true")
+			vmUpdated = true
+		case "false":
+			err = unstructured.SetNestedField(vmCopy, false, "selinuxRelabelAtBoot")
+			if err != nil {
+				return fmt.Errorf("failed to set selinuxRelabelAtBoot: %v", err)
+			}
+			klog.V(2).Infof("Updated VM selinuxRelabelAtBoot to false")
+			vmUpdated = true
+		case "auto", "":
+			unstructured.RemoveNestedField(vmCopy, "selinuxRelabelAtBoot")
+			klog.V(2).Infof("Cleared VM selinuxRelabelAtBoot override")
+			vmUpdated = true
+		default:
+			return fmt.Errorf("invalid value for selinux-relabel-at-boot: %s (must be 'true', 'false', or 'auto')", selinuxRelabelAtBoot)
+		}
+	}
+
+	if selinuxRelabelExcludeChanged {
+		dirs := parseCommaSeparated(selinuxRelabelExclude)
+		if len(dirs) == 0 {
+			unstructured.RemoveNestedField(vmCopy, "selinuxRelabelExclude")
+			klog.V(2).Infof("Cleared VM selinuxRelabelExclude")
+		} else {
+			err = unstructured.SetNestedStringSlice(vmCopy, dirs, "selinuxRelabelExclude")
+			if err != nil {
+				return fmt.Errorf("failed to set selinuxRelabelExclude: %v", err)
+			}
+			klog.V(2).Infof("Updated VM selinuxRelabelExclude to %v", dirs)
 		}
 		vmUpdated = true
 	}

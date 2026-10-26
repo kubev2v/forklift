@@ -54,6 +54,14 @@ func listStorageOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 			{Title: "MAX-IOPS", Key: "maxIOPS"},
 			{Title: "MAX-THROUGHPUT", Key: "maxThroughput"},
 		}
+	case "azure":
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "SKU", Key: "object.sku"},
+			{Title: "DESCRIPTION", Key: "object.description"},
+			{Title: "MAX-IOPS", Key: "object.maxIOPS"},
+			{Title: "MAX-MBPS", Key: "object.maxMBps"},
+		}
 	default:
 		defaultHeaders = []output.Column{
 			{Title: "NAME", Key: "name"},

@@ -44,7 +44,7 @@ func CollectControllerLogs(ctx context.Context, configFlags *genericclioptions.C
 	if err != nil {
 		return nil
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	var relevantLines []string
 	var rootCauseLines []string

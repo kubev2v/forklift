@@ -199,11 +199,35 @@ Affinity Syntax (KARL):
     --default-target-network default \
     --default-target-storage-class standard
 
+  # Warm migration: disable VMware preflight inspection (warm vSphere only)
+  kubectl-mtv create plan --name warm-no-preflight \
+    --source vsphere-prod \
+    --vms "critical-vm" \
+    --migration-type warm \
+    --run-preflight-inspection false
+
+  # Conversion-only plan (no storage mapping; guest conversion without disk import)
+  kubectl-mtv create plan --name convert-only \
+    --source vsphere-prod \
+    --vms "legacy-vm" \
+    --migration-type conversion
+
+  # Guest conversion with virt-customize scripts ConfigMap
+  kubectl-mtv create plan --name with-scripts \
+    --source vsphere-prod \
+    --vms "app-vm" \
+    --customization-scripts my-scripts
+
+  # vSphere-only volume interface naming template
+  kubectl-mtv create plan --name vol-names \
+    --source vsphere-prod \
+    --vms "db-vm" \
+    --volume-name-template "disk-{{.VolumeIndex}}"
+
   # Disable default-true boolean flags with explicit false
-  kubectl-mtv create plan --name no-preflight \
+  kubectl-mtv create plan --name no-static-ips \
     --source vsphere-prod \
     --vms "quick-vm" \
-    --run-preflight-inspection false \
     --preserve-static-ips false`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
@@ -564,7 +588,7 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&networkMapping, "network-mapping", "", "Network mapping name (auto-generated when omitted)")
 	cmd.Flags().StringVar(&storageMapping, "storage-mapping", "", "Storage mapping name (auto-generated when omitted)")
 	cmd.Flags().StringVar(&networkPairs, "network-pairs", "", "Inline network mapping pairs (auto-generated when omitted). Format: 'source:target' (comma-separated)")
-	cmd.Flags().StringVar(&storagePairs, "storage-pairs", "", "Inline storage mapping pairs (auto-generated when omitted). Format: 'source:storage-class[;param=value]' (comma-separated)")
+	cmd.Flags().StringVar(&storagePairs, "storage-pairs", "", "Inline storage mapping pairs (auto-generated when omitted). Format: 'source:storage-class[;param=value]' (comma-separated). With offloadPlugin=csiVolumeImport, offloadVendor is primera3par|ontap only")
 
 	// Storage enhancement flags
 	cmd.Flags().StringVar(&defaultVolumeMode, "default-volume-mode", "", "Default volume mode for storage pairs (Filesystem|Block)")
@@ -588,25 +612,25 @@ Affinity Syntax (KARL):
 	_ = cmd.MarkFlagRequired("source")
 	cmd.Flags().StringVar(&vmNamesQuaryOrFile, "vms", "", "List of VM names (comma-separated), path to YAML/JSON file (prefix with @), or query string (prefix with 'where ')")
 	_ = cmd.MarkFlagRequired("vms")
-	cmd.Flags().StringVar(&preHook, "pre-hook", "", "Pre-migration hook to add to all VMs in the plan")
-	cmd.Flags().StringVar(&postHook, "post-hook", "", "Post-migration hook to add to all VMs in the plan")
+	cmd.Flags().StringVar(&preHook, "pre-hook", "", "Existing Hook resource name in plan namespace to run before migration on all VMs")
+	cmd.Flags().StringVar(&postHook, "post-hook", "", "Existing Hook resource name in plan namespace to run after migration on all VMs")
 
 	// PlanSpec flags
 	cmd.Flags().StringVar(&planSpec.Description, "description", "", "Plan description")
 	cmd.Flags().StringVar(&planSpec.TargetNamespace, "target-namespace", "", "Target namespace (defaults to plan namespace)")
-	cmd.Flags().StringVar(&transferNetwork, "transfer-network", "", "Network attachment definition for disk transfer. Supports 'namespace/network-name' or 'network-name'")
-	cmd.Flags().BoolVar(&planSpec.PreserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its cluster")
-	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.PreserveStaticIPs, "preserve-static-ips", true, "Preserve static IP configurations during migration (true/false)")
-	cmd.Flags().StringVar(&planSpec.PVCNameTemplate, "pvc-name-template", "", "Template for generating PVC names. Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
-	cmd.Flags().StringVar(&planSpec.VolumeNameTemplate, "volume-name-template", "", "Template for generating volume interface names in the target VM. Variables: {{.PVCName}}, {{.VolumeIndex}}")
-	cmd.Flags().StringVar(&planSpec.NetworkNameTemplate, "network-name-template", "", "Template for generating network interface names in the target VM. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
+	cmd.Flags().StringVar(&transferNetwork, "transfer-network", "", "NAD (NetworkAttachmentDefinition) for disk transfer; namespace/name or name in plan namespace")
+	cmd.Flags().BoolVar(&planSpec.PreserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its oVirt/RHV cluster (oVirt/RHV only)")
+	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.PreserveStaticIPs, "preserve-static-ips", true, "Preserve static IP configurations during migration (vSphere/Hyper-V only; default true) (true/false)")
+	cmd.Flags().StringVar(&planSpec.PVCNameTemplate, "pvc-name-template", "", "Go template for PVC names (keep rendered name ≤40 chars). Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
+	cmd.Flags().StringVar(&planSpec.VolumeNameTemplate, "volume-name-template", "", "Go template for volume interface names (vSphere only). Variables: {{.PVCName}}, {{.VolumeIndex}}")
+	cmd.Flags().StringVar(&planSpec.NetworkNameTemplate, "network-name-template", "", "Go template for network interface names (vSphere only). Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
 	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.MigrateSharedDisks, "migrate-shared-disks", true, "Migrate disks shared between multiple VMs (true/false)")
 	cmd.Flags().BoolVar(&planSpec.Archived, "archived", false, "Whether this plan should be archived")
 	cmd.Flags().StringVar(&pvcNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", "auto", "Use generateName instead of name for PVC name template (true/false/auto)")
 	cmd.Flags().BoolVar(&planSpec.DeleteGuestConversionPod, "delete-guest-conversion-pod", false, "Delete guest conversion pod after successful migration")
 	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.DeleteVmOnFailMigration, "delete-vm-on-fail-migration", true, "Delete target VM when migration fails (true/false)")
 	cmd.Flags().BoolVar(&planSpec.SkipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process (raw disk copy mode)")
-	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.RunPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer (true/false)")
+	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.RunPreflightInspection, "run-preflight-inspection", true, "Run preflight on VM base disks before disk transfer (warm vSphere only; default true) (true/false)")
 	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "auto", "Install legacy Windows drivers (true/false/auto)")
 	cmd.Flags().VarP(migrationTypeFlag, "migration-type", "m", "Migration type: cold, warm, live, or conversion (default: cold)")
 	cmd.Flags().StringVarP(&defaultTargetNetwork, "default-target-network", "N", "", "Default target network for auto-generated mapping. Use 'default' for pod networking, 'namespace/network-name', or 'network-name'")
@@ -629,14 +653,18 @@ Affinity Syntax (KARL):
 
 	// Provider-specific flags
 	cmd.Flags().BoolVar(&planSpec.SkipZoneNodeSelector, "skip-zone-node-selector", false, "Skip adding zone-based node selector to migrated VMs (EC2 only)")
-	cmd.Flags().StringVar(&customizationScripts, "customization-scripts", "", "ConfigMap containing customization scripts for guest conversion. Supports 'namespace/name' or 'name'")
+	cmd.Flags().StringVar(&customizationScripts, "customization-scripts", "", "ConfigMap (namespace/name or name); script keys: N_win_firstboot_*.ps1, N_linux_run_*.sh, N_linux_firstboot_*.sh")
 	cmd.Flags().StringVar(&planSpec.VirtV2vImage, "virt-v2v-image", "", "Override global virt-v2v container image for this plan")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output Plan CR(s) to stdout instead of creating them")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format for dry-run (json, yaml). Defaults to yaml when --dry-run is used")
 	cmd.Flags().StringVar(&enableNestedVirtualization, "enable-nested-virtualization", "auto", "Enable nested virtualization on target VMs (true/false/auto)")
-	cmd.Flags().BoolVar(&planSpec.XfsCompatibility, "xfs-compatibility", false, "Use XFS-compatible virt-v2v image for this plan")
+	cmd.Flags().BoolVar(&planSpec.XfsCompatibility, "xfs-compatibility", false, "Use XFS-compatible virt-v2v image for this plan (disables BTRFS support for this plan)")
 	cmd.Flags().BoolVar(&planSpec.RDMAsLun, "rdm-as-lun", false, "Map VMware RDM disks as LUN devices (SCSI passthrough) in the target VM (vSphere only)")
-	cmd.Flags().StringVar(&planSpec.ServiceAccount, "service-account", "", "ServiceAccount for migration pods in the target namespace (overrides global setting)")
+	cmd.Flags().BoolVar(&planSpec.SCSIReservation, "scsi-reservation", false, "Enable SCSI persistent reservation for shared RDM LUN disks (requires --rdm-as-lun, vSphere only)")
+	cmd.Flags().BoolVar(&planSpec.PreCopySourceDisks, "pre-copy-source-disks", false, "Enable two-phase disk transfer for Hyper-V: init container converts VHDX to raw via qemu-img, then virt-v2v does in-place guest customization (Hyper-V only)")
+	cmd.Flags().BoolVar(&planSpec.SelinuxRelabelAtBoot, "selinux-relabel-at-boot", false, "Defer SELinux relabeling until the guest's first boot after conversion (virt-v2v --selinux-relabel-at-boot)")
+	cmd.Flags().StringSliceVar(&planSpec.SelinuxRelabelExclude, "selinux-relabel-exclude", nil, "Guest directories excluded from SELinux relabeling during conversion (virt-v2v --selinux-relabel-exclude, repeatable)")
+	cmd.Flags().StringVar(&planSpec.ServiceAccount, "service-account", "", "DNS-1123 subdomain name of ServiceAccount for migration pods in target namespace (overrides global setting)")
 	cmd.Flags().BoolVar(&tagMappingDisabled, "tag-mapping-disabled", false, "Disable vSphere tag-to-label conversion entirely (vSphere only)")
 	cmd.Flags().StringSliceVar(&tagMappingLabelTags, "tag-mapping-label-tags", nil, "Only convert these vSphere tag categories to labels (comma-separated, vSphere only)")
 
