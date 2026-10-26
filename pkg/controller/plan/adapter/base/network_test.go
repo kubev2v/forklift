@@ -162,42 +162,42 @@ func TestNADPool_Allocate_DistinctNADs(t *testing.T) {
 	}
 }
 
-func TestNADPool_Allocate_SingleNADExhausted(t *testing.T) {
+func TestNADPool_Allocate_SingleNADReused(t *testing.T) {
 	pairsForSource := []api.NetworkPair{
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
 	}
 	pool := NewNADPool()
 
 	pair1, allocated1 := pool.Allocate(pairsForSource)
-	_, allocated2 := pool.Allocate(pairsForSource)
+	pair2, allocated2 := pool.Allocate(pairsForSource)
 
-	if !allocated1 {
-		t.Fatal("first allocation should succeed")
+	if !allocated1 || !allocated2 {
+		t.Fatal("both allocations should succeed (reuse when exhausted)")
 	}
-	if pair1.Destination.Name != "nad-a" {
-		t.Errorf("expected nad-a, got %s", pair1.Destination.Name)
-	}
-	if allocated2 {
-		t.Error("second allocation should fail when the single NAD is already used")
+	if pair1.Destination.Name != "nad-a" || pair2.Destination.Name != "nad-a" {
+		t.Errorf("both should get nad-a, got %s and %s", pair1.Destination.Name, pair2.Destination.Name)
 	}
 }
 
-func TestNADPool_Allocate_PoolDistinctThenExhausted(t *testing.T) {
+func TestNADPool_Allocate_PoolDistinctThenReused(t *testing.T) {
 	pairsForSource := []api.NetworkPair{
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
 	}
 	pool := NewNADPool()
 
-	_, allocated1 := pool.Allocate(pairsForSource)
-	_, allocated2 := pool.Allocate(pairsForSource)
-	_, allocated3 := pool.Allocate(pairsForSource)
+	pair1, allocated1 := pool.Allocate(pairsForSource)
+	pair2, allocated2 := pool.Allocate(pairsForSource)
+	pair3, allocated3 := pool.Allocate(pairsForSource)
 
-	if !allocated1 || !allocated2 {
-		t.Fatal("first two allocations should succeed")
+	if !allocated1 || !allocated2 || !allocated3 {
+		t.Fatal("all three allocations should succeed (reuse when exhausted)")
 	}
-	if allocated3 {
-		t.Error("third allocation should fail when pool is exhausted")
+	if pair1.Destination.Name != "nad-a" || pair2.Destination.Name != "nad-b" {
+		t.Errorf("first two should be distinct: got %s, %s", pair1.Destination.Name, pair2.Destination.Name)
+	}
+	if pair3.Destination.Name != "nad-a" {
+		t.Errorf("third should reuse first NAD, got %s", pair3.Destination.Name)
 	}
 }
 
@@ -278,15 +278,15 @@ func TestValidateNetworkDuplicates_1toN_NoDuplicate(t *testing.T) {
 	}
 }
 
-func TestValidateNetworkDuplicates_1toN_PoolExhausted(t *testing.T) {
+func TestValidateNetworkDuplicates_1toN_PoolExhaustedReuses(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
 	}}}
 	nicRefs := []ref.Ref{{ID: "net-1"}, {ID: "net-1"}, {ID: "net-1"}}
 	foundNadDup, _ := ValidateNetworkDuplicates(nicRefs, nm)
-	if !foundNadDup {
-		t.Error("3 NICs with only 2 NADs should flag duplicate")
+	if foundNadDup {
+		t.Error("3 NICs with 2 NADs should reuse, not flag duplicate")
 	}
 }
 
@@ -480,8 +480,8 @@ func TestResolveNICModes_1toN_DifferentNetworkIPMode(t *testing.T) {
 	}
 }
 
-func TestResolveNICModes_1toN_PoolExhausted(t *testing.T) {
-	// 3 NICs on the same source network but only 2 NAD rows — third NIC should be skipped.
+func TestResolveNICModes_1toN_PoolExhaustedReuses(t *testing.T) {
+	// 3 NICs on the same source network but only 2 NAD rows, third NIC reuses the first pair.
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}, NetworkIPMode: api.NetworkIPModePreserve},
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}, NetworkIPMode: api.NetworkIPModeDHCP},
@@ -498,8 +498,8 @@ func TestResolveNICModes_1toN_PoolExhausted(t *testing.T) {
 	if modes["mac-2"] != "dhcp" {
 		t.Errorf("mac-2: expected 'dhcp', got %q", modes["mac-2"])
 	}
-	if _, exists := modes["mac-3"]; exists {
-		t.Errorf("mac-3: expected not allocated (pool exhausted), got %q", modes["mac-3"])
+	if modes["mac-3"] != "preserve" {
+		t.Errorf("mac-3: expected 'preserve' (reused first pair), got %q", modes["mac-3"])
 	}
 }
 
@@ -583,13 +583,50 @@ func TestQualifiedMultusNetworkName(t *testing.T) {
 	}
 }
 
-func TestValidateNetworkDuplicates_BackwardCompat_SingleRow(t *testing.T) {
+// Two NICs on the same source network, one destination NAD.
+// Both NICs must be allocated and both must receive an IP mode.
+func TestAllocateNetwork_TwoNICsSamePortgroupOneBridge(t *testing.T) {
+	pairsBySource := map[string][]api.NetworkPair{
+		"pg-123": {{
+			Source:      api.NetworkSourceRef{Ref: ref.Ref{ID: "pg-123"}},
+			Destination: api.DestinationNetwork{Type: Multus, Namespace: "default", Name: "br-vlan80"},
+		}},
+	}
+	nics := []NICRef{
+		{MAC: "00:50:56:ab:08:22", NetworkID: "pg-123"},
+		{MAC: "00:50:56:ab:aa:17", NetworkID: "pg-123"},
+	}
+
+	// Both NICs must allocate successfully to the same NAD.
+	pool := NewNADPool()
+	for _, nic := range nics {
+		pair, ok := AllocateNetwork(pool, pairsBySource[nic.NetworkID])
+		if !ok {
+			t.Fatalf("NIC %s: allocation failed", nic.MAC)
+		}
+		if pair.Destination.Name != "br-vlan80" {
+			t.Errorf("NIC %s: expected br-vlan80, got %s", nic.MAC, pair.Destination.Name)
+		}
+	}
+
+	// Both NICs must appear in the mode map (prevents wrong static IP target).
+	modes := ResolveNICModes(nics, pairsBySource, true)
+	for _, nic := range nics {
+		if mode, ok := modes[nic.MAC]; !ok {
+			t.Errorf("NIC %s: missing from mode map", nic.MAC)
+		} else if mode != "preserve" {
+			t.Errorf("NIC %s: expected 'preserve', got %q", nic.MAC, mode)
+		}
+	}
+}
+
+func TestValidateNetworkDuplicates_SingleRowReuses(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
 	}}}
 	nicRefs := []ref.Ref{{ID: "net-1"}, {ID: "net-1"}}
 	foundNadDup, _ := ValidateNetworkDuplicates(nicRefs, nm)
-	if !foundNadDup {
-		t.Error("single-row map with 2 NICs should still flag duplicate (backward compatible)")
+	if foundNadDup {
+		t.Error("2 NICs sharing 1 NAD should reuse, not flag duplicate (MTV-7174)")
 	}
 }
