@@ -53,8 +53,8 @@ func (r *DeployRunner) setupPod(ctx context.Context) (pod *core.Pod, err error) 
 // appliance's podman store under tag, and installs the supervisor that runs it.
 // pullSpec is pinned to a digest by the caller.
 //
-// The pod reads the image with no credential and reaches no API server, so it
-// gets no service account token.
+// The pod gets no SA token unless pullSpec is the OpenShift internal registry
+// (any SA in the namespace can pull ImageStreams).
 func (r *DeployRunner) createSetupPod(ctx context.Context, pullSpec, tag string) (err error) {
 	appliance := r.context.Appliance
 	address, ok := appliance.Address()
@@ -79,7 +79,7 @@ func (r *DeployRunner) createSetupPod(ctx context.Context, pullSpec, tag string)
 	// login to the appliance has already been dropped by the deadline the
 	// worker set on it. The margin covers the image pull and the exit.
 	activeDeadline := int64(SSHFileTransferTimeout.Seconds()) + 600
-	automount := false
+	automount := isOpenShiftInternalRegistry(pullSpec) && appliance.Namespace == Settings.Namespace
 	nonRoot := true
 	allowPrivilegeEscalation := false
 
