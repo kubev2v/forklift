@@ -770,6 +770,13 @@ type CopyFileRequest struct {
 }
 
 // DirectoryExportsResponse represents the response from the directory-exports API
+type DirectoriesResponse struct {
+	Items []struct {
+		Name string `json:"name"`
+		ID   string `json:"id"`
+	} `json:"items"`
+}
+
 type DirectoryExportsResponse struct {
 	Items []struct {
 		ExportName string `json:"export_name"`
@@ -780,6 +787,43 @@ type DirectoryExportsResponse struct {
 	} `json:"items"`
 }
 
+// FindDirectoryById returns the managed directory with this id. A pure_fa_file
+// PV's volume handle holds that id, so this resolves a destination without
+// relying on the CSI export naming convention.
+func (c *RestClient) FindDirectoryById(id string) (string, error) {
+	baseURL := fmt.Sprintf("https://%s/api/%s/directories", c.hostname, c.apiV2)
+
+	params := url.Values{}
+	params.Set("ids", id)
+
+	req, err := http.NewRequest("GET", baseURL+"?"+params.Encode(), nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create directory request: %w", err)
+	}
+
+	resp, body, err := c.doWithReauth(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to send directory request: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("directory request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var dirsResponse DirectoriesResponse
+	if err := json.Unmarshal(body, &dirsResponse); err != nil {
+		return "", fmt.Errorf("failed to parse directory response: %w", err)
+	}
+
+	if len(dirsResponse.Items) == 0 {
+		return "", fmt.Errorf("no directory found with id %s", id)
+	}
+
+	directory := dirsResponse.Items[0].Name
+	klog.Infof("Pure REST Client: Directory id %s is %s", id, directory)
+	return directory, nil
+}
+
 // FindDirectoryByExportName returns the managed directory backing an NFS export.
 // NFS clients mount <array>:/<export name>, so this is how a mounted export path
 // is translated into the directory name the file API works with.
@@ -787,7 +831,8 @@ func (c *RestClient) FindDirectoryByExportName(exportName string) (string, error
 	baseURL := fmt.Sprintf("https://%s/api/%s/directory-exports", c.hostname, c.apiV2)
 
 	params := url.Values{}
-	params.Set("filter", fmt.Sprintf("export_name='%s'", exportName))
+	// destroyed exports linger until eradication and must not match
+	params.Set("filter", fmt.Sprintf("export_name='%s' and destroyed='false'", exportName))
 
 	req, err := http.NewRequest("GET", baseURL+"?"+params.Encode(), nil)
 	if err != nil {

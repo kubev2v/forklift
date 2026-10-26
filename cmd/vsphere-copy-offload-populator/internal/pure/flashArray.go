@@ -323,6 +323,12 @@ func (f *FlashArrayClonner) NFSCopy(vsphereClient vmware.Client, vmId string, so
 		return fmt.Errorf("disk %s is not on an NFS datastore", sourceVMDKFile)
 	}
 
+	// The remote path names the source export; without it the lookup below fails.
+	if backing.NasRemotePath == "" {
+		return fmt.Errorf("disk %s is on an NFS datastore but vSphere reported no export path for it",
+			sourceVMDKFile)
+	}
+
 	f.log.Info("found NFS backing", "remote_path", backing.NasRemotePath, "remote_host", backing.NasRemoteHost)
 
 	if err := f.verifyNFSDestination(persistentVolume); err != nil {
@@ -338,12 +344,9 @@ func (f *FlashArrayClonner) NFSCopy(vsphereClient vmware.Client, vmId string, so
 		return fmt.Errorf("failed to resolve source datastore export: %w", err)
 	}
 
-	// The CSI driver names each PVC's export "<cluster prefix>-<pv name>", the same
-	// convention block volumes follow
-	targetExport := fmt.Sprintf("%s-%s", f.clusterPrefix, persistentVolume.Name)
-	targetDirectory, err := f.restClient.FindDirectoryByExportName(targetExport)
+	targetDirectory, err := f.resolveTargetDirectory(persistentVolume)
 	if err != nil {
-		return fmt.Errorf("failed to resolve target PV export %s: %w", targetExport, err)
+		return err
 	}
 
 	sourcePath, err := nfsSourcePath(backing.DeviceName)
@@ -383,6 +386,28 @@ func (f *FlashArrayClonner) verifyNFSDestination(pv populator.PersistentVolume) 
 			pv.Name, backend, nfsBackend)
 	}
 	return nil
+}
+
+// resolveTargetDirectory finds the PV's managed directory on the array. A
+// pure_fa_file PV's volume handle is that directory's id, which is what CSI
+// recorded; the export name "<cluster prefix>-<pv name>" is only a convention,
+// so it serves as the fallback.
+func (f *FlashArrayClonner) resolveTargetDirectory(pv populator.PersistentVolume) (string, error) {
+	if pv.VolumeHandle != "" {
+		directory, err := f.restClient.FindDirectoryById(pv.VolumeHandle)
+		if err == nil {
+			return directory, nil
+		}
+		f.log.Info("target PV not found by volume handle, trying the export name",
+			"volume_handle", pv.VolumeHandle, "err", err)
+	}
+
+	targetExport := fmt.Sprintf("%s-%s", f.clusterPrefix, pv.Name)
+	directory, err := f.restClient.FindDirectoryByExportName(targetExport)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve target PV export %s: %w", targetExport, err)
+	}
+	return directory, nil
 }
 
 // verifySameArray rejects a source served by a different array than the destination.
