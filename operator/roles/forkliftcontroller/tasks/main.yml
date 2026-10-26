@@ -188,6 +188,34 @@
             when: transfer_network_default_route | length == 0
 
       # After processing, controller_transfer_network will be in structured list format
+
+  - when: not k8s_cluster|bool and feature_copy_appliance|bool and (copy_appliance_container_image_fqin | length > 0)
+    block:
+    - name: "Create copy appliance NBD ImageStream"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'controller/imagestream-copy-appliance-nbd.yml.j2') }}"
+
+    - name: "Wait for copy appliance NBD ImageStream import"
+      k8s_info:
+        api_version: image.openshift.io/v1
+        kind: ImageStreamTag
+        name: "copy-appliance-nbd:latest"
+        namespace: "{{ app_namespace }}"
+      register: copy_appliance_nbd_istag
+      until: >
+        copy_appliance_nbd_istag.resources | length > 0
+        and (copy_appliance_nbd_istag.resources[0].tag.from.name | default(''))
+           == copy_appliance_container_image_fqin
+        and (copy_appliance_nbd_istag.resources[0].generation | default(0))
+           == (copy_appliance_nbd_istag.resources[0].tag.generation | default(-1))
+      retries: 36
+      delay: 5
+
+    - name: "Point controller at internal copy appliance NBD image"
+      set_fact:
+        copy_appliance_container_image_fqin: "image-registry.openshift-image-registry.svc:5000/{{ app_namespace }}/copy-appliance-nbd:latest"
+
   - name: "Setup controller deployment"
     k8s:
       state : present
