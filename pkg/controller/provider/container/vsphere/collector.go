@@ -125,6 +125,7 @@ const (
 	fUUID                     = "config.uuid"
 	fInstanceUUID             = "config.instanceUuid"
 	fFirmware                 = "config.firmware"
+	fAnnotation               = "config.annotation"
 	fFtInfo                   = "config.ftInfo"
 	fBootOptions              = "config.bootOptions"
 	fCpuAffinity              = "config.cpuAffinity"
@@ -151,7 +152,6 @@ const (
 	fConsolidationNeeded      = "runtime.consolidationNeeded"
 	fSnapshot                 = "snapshot"
 	fIsTemplate               = "config.template"
-	fAnnotation               = "config.annotation"
 	fGuestNet                 = "guest.net"
 	fGuestDisk                = "guest.disk"
 	fGuestIpStack             = "guest.ipStack"
@@ -1083,6 +1083,7 @@ func (r *Collector) vmPathSet() []string {
 		fUUID,
 		fInstanceUUID,
 		fFirmware,
+		fAnnotation,
 		fFtInfo,
 		fCpuAffinity,
 		fBootOptions,
