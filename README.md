@@ -134,6 +134,8 @@ For comprehensive information about commit message formatting, supported issue t
 | MUST_GATHER_IMAGE          | quay.io/kubev2v/forklift-must-gather:latest    | The forklift must gather an image.                                     |
 | UI_PLUGIN_IMAGE            | quay.io/kubev2v/forklift-console-plugin:latest | The forklift OKD/OpenShift UI plugin image.                            |
 | VALIDATION_IMAGE           | quay.io/kubev2v/forklift-validation:latest     | The forklift validation image.                                         |
+| VIRT_VALIDATION_CONTROLLER_IMAGE | quay.io/openshift-cnv/virt-validation-controller:latest | The virtualization validation controller image. |
+| VIRT_CLUSTER_VALIDATE_IMAGE | quay.io/openshift-cnv/virt-cluster-validate:latest | The virtualization validation worker image. |
 | VIRT_V2V_IMAGE             | quay.io/kubev2v/forklift-virt-v2v:latest       | The forklift virt v2v image for cold migration.                        |
 | VDDK_IMAGE                 |                                                | The default Virtual Disk Development Kit (VDDK) image, default empty.  |
 | POPULATOR_CONTROLLER_IMAGE | quay.io/kubev2v/populator-controller:latest    | The forklift volume-populator controller image.                        |
