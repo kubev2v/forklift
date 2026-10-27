@@ -654,12 +654,17 @@ func (r *Collector) vmLookupMaps() (storageNames, networkNames, clusterNames, ho
 	if err != nil {
 		return
 	}
+	for _, cluster := range clusterList {
+		clusterNames[cluster.ID] = cluster.Name
+	}
 
 	hostList := []model.Host{}
 	err = r.db.List(&hostList, libmodel.ListOptions{Detail: model.MaxDetail})
 	if err != nil {
 		return
 	}
-
+	for _, host := range hostList {
+		hostNames[host.ID] = host.Name
+	}
 	return
 }

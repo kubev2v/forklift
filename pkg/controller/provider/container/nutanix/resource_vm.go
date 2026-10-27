@@ -53,6 +53,8 @@ func (e *vmEntity) ApplyTo(m *model.VM) {
 	m.Categories = e.Metadata.Categories
 	m.Cluster = e.Spec.ClusterReference.UUID
 	m.Host = e.Status.Resources.HostReference.UUID
+	m.ClusterName = e.Spec.ClusterReference.Name
+	m.HostName = e.Status.Resources.HostReference.Name
 	m.Description = e.Spec.Description
 	m.PowerState = resources.PowerState
 	m.NumSockets = resources.NumSockets
@@ -183,11 +185,11 @@ func mergeGuestTools(spec, status libclient.VMGuestTools, m *model.VM) {
 
 func enrichVM(m *model.VM, storageNames, networkNames, clusterNames, hostNames map[string]string) {
 
-	if m.Cluster == "" && m.Cluster != "" {
-		m.Cluster = clusterNames[m.Cluster]
+	if m.ClusterName == "" && m.Cluster != "" {
+		m.ClusterName = clusterNames[m.Cluster]
 	}
-	if m.Host == "" && m.Host != "" {
-		m.Host = hostNames[m.Host]
+	if m.HostName == "" && m.Host != "" {
+		m.HostName = hostNames[m.Host]
 	}
 
 	for i := range m.Disks {
