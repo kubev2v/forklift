@@ -17,7 +17,7 @@ ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-
 
 ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:9b1932f76adab8f4b693a72b8ffcb170f1d3f1b43d4bf288ee5476258ddfef81"
 
-ARG COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-copy-appliance-builder-rhel9@sha256:44b6ba1efea80957147a3343839a45d0608488911c9ca3ed33d8edf86ac34095"
+ARG COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-copy-appliance-builder-rhel9@sha256:b59d7bc9a4f5959e87477395f15a48612dc8655bd69ea9ce2310cbd1fa3b77f4"
 
 ARG DEEP_INSPECTION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-deep-inspection-rhel10@sha256:f721cc541ecf8527bce97e08108a92cbd6d42c03aa50440456db9c35239878e2"
 
