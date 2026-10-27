@@ -4,39 +4,33 @@ lockfileVendor: redhat
 arches:
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-1.46.2-3.el10_2.x86_64.rpm
-    repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 13977
-    checksum: sha256:2ac502b0c10f3f1a3df3019697d797876aaa7e5ed7614a162b6c1104f4e400da
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nbdkit-1.38.5-12.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 5789
+    checksum: sha256:b783d877ce799e7234349af11509d2599ccf053fddb44b9da3bef69e89e5b1fb
     name: nbdkit
-    evr: 1.46.2-3.el10_2
-    sourcerpm: nbdkit-1.46.2-3.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-basic-filters-1.46.2-3.el10_2.x86_64.rpm
-    repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 407747
-    checksum: sha256:7eccf9b39f8cb46187e75ebceb3e69fe2cd230aee41565d5a451dbfbfcae51ea
+    evr: 1.38.5-12.el9
+    sourcerpm: nbdkit-1.38.5-12.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nbdkit-basic-filters-1.38.5-12.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 346711
+    checksum: sha256:136d332e13e485752bc5253e43a240cf10424f0cd42a42bb858b7cae88823115
     name: nbdkit-basic-filters
-    evr: 1.46.2-3.el10_2
-    sourcerpm: nbdkit-1.46.2-3.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-basic-plugins-1.46.2-3.el10_2.x86_64.rpm
-    repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 223315
-    checksum: sha256:8347475e75c03f387130dc2154b441fc5ab43c4d802ebe2bb2a6638691b269cc
+    evr: 1.38.5-12.el9
+    sourcerpm: nbdkit-1.38.5-12.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nbdkit-basic-plugins-1.38.5-12.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 224972
+    checksum: sha256:3477226c5f453fad558a2fb6767b688e33be3eb0f061019baeec636ad36f5c0a
     name: nbdkit-basic-plugins
-    evr: 1.46.2-3.el10_2
-    sourcerpm: nbdkit-1.46.2-3.el10_2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-server-1.46.2-3.el10_2.x86_64.rpm
-    repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 149842
-    checksum: sha256:a19e8a5784148fb4f6b2a0576e841fdf129923a1855c949be9ea3f0f406bf164
+    evr: 1.38.5-12.el9
+    sourcerpm: nbdkit-1.38.5-12.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nbdkit-server-1.38.5-12.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 133057
+    checksum: sha256:3f2bce1f1c26b43535993540896305f0799c7280db80c301aea1405416a2aeaf
     name: nbdkit-server
-    evr: 1.46.2-3.el10_2
-    sourcerpm: nbdkit-1.46.2-3.el10_2.src.rpm
-  source:
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/n/nbdkit-1.46.2-3.el10_2.src.rpm
-    repoid: rhel-10-for-x86_64-appstream-source-rpms
-    size: 2961700
-    checksum: sha256:92ded48c05420daaee5903f77c5c797e04586b950109633f19607a70ba677d07
-    name: nbdkit
-    evr: 1.46.2-3.el10_2
+    evr: 1.38.5-12.el9
+    sourcerpm: nbdkit-1.38.5-12.el9.src.rpm
+  source: []
   module_metadata: []
