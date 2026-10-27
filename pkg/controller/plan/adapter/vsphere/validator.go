@@ -331,17 +331,33 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 
 	// Check existing PVCs
 	if !r.shouldMigrateSharedDisks(vm) {
-		_, missingDiskPVCs, err := findSharedPVCs(client, vm, r.Plan.Spec.TargetNamespace)
+		allPvcs, err := listShareablePVCs(client, r.Plan.Spec.TargetNamespace)
 		if err != nil {
 			return false, "", "", liberr.Wrap(err, "vm", vm)
 		}
-		if missingDiskPVCs != nil {
-			var missingDiskNames []string
-			for _, disk := range missingDiskPVCs {
-				missingDiskNames = append(missingDiskNames, disk.File)
+		var missing []string
+		for _, disk := range vm.Disks {
+			if !disk.Shared {
+				continue
 			}
+			src, n := baseVolume(disk.File, false), 0
+			for _, pvc := range allPvcs {
+				if pvc.Annotations[planbase.AnnDiskSource] == src {
+					n++
+				}
+			}
+			if n > 1 {
+				msg = fmt.Sprintf("Multiple shared disks PVCs '%s' in namespace '%s', remove the extras so the correct PVC can be attached",
+					src, r.Plan.Spec.TargetNamespace)
+				return false, msg, validation.Critical, nil
+			}
+			if n == 0 {
+				missing = append(missing, disk.File)
+			}
+		}
+		if len(missing) > 0 {
 			msg = fmt.Sprintf("Missing shared disks PVC %s in namespace '%s', the VMs can be migrated but the disk will not be attached",
-				stringifyWithQuotes(missingDiskNames), r.Plan.Spec.TargetNamespace)
+				stringifyWithQuotes(missing), r.Plan.Spec.TargetNamespace)
 			return false, msg, validation.Warn, nil
 		}
 	} else {
