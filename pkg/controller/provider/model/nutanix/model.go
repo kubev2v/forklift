@@ -137,6 +137,8 @@ type VM struct {
 	Base
 	Cluster             string            `sql:"d0,index(cluster)"`
 	Host                string            `sql:"d0,index(host)"`
+	ClusterName         string            `sql:"d0,index(clusterName)"`
+	HostName            string            `sql:"d0,index(hostName)"`
 	RevisionValidated   int64             `sql:"d0,index(revisionValidated)"`
 	PolicyVersion       int               `sql:"d0,index(policyVersion)"`
 	UUID                string            `sql:"d0"`

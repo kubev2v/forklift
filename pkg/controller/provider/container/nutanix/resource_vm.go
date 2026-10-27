@@ -181,7 +181,15 @@ func mergeGuestTools(spec, status libclient.VMGuestTools, m *model.VM) {
 	}
 }
 
-func enrichVM(m *model.VM, storageNames, networkNames map[string]string) {
+func enrichVM(m *model.VM, storageNames, networkNames, clusterNames, hostNames map[string]string) {
+
+	if m.Cluster == "" && m.Cluster != "" {
+		m.Cluster = clusterNames[m.Cluster]
+	}
+	if m.Host == "" && m.Host != "" {
+		m.Host = hostNames[m.Host]
+	}
+
 	for i := range m.Disks {
 		if m.Disks[i].StorageContainerName == "" && m.Disks[i].StorageContainerUUID != "" {
 			m.Disks[i].StorageContainerName = storageNames[m.Disks[i].StorageContainerUUID]

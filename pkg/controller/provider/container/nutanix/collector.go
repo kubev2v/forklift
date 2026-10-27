@@ -571,7 +571,7 @@ func (r *Collector) vms() (err error) {
 		return
 	}
 
-	storageNames, networkNames, err := r.vmLookupMaps()
+	storageNames, networkNames, clusterNames, hostNames, err := r.vmLookupMaps()
 	if err != nil {
 		return
 	}
@@ -591,7 +591,7 @@ func (r *Collector) vms() (err error) {
 		}
 		m := &model.VM{}
 		entity.ApplyTo(m)
-		enrichVM(m, storageNames, networkNames)
+		enrichVM(m, storageNames, networkNames, clusterNames, hostNames)
 		current[m.ID] = true
 		err = tx.Insert(m)
 		if err != nil {
@@ -625,9 +625,11 @@ func (r *Collector) vms() (err error) {
 	return
 }
 
-func (r *Collector) vmLookupMaps() (storageNames, networkNames map[string]string, err error) {
+func (r *Collector) vmLookupMaps() (storageNames, networkNames, clusterNames, hostNames map[string]string, err error) {
 	storageNames = map[string]string{}
 	networkNames = map[string]string{}
+	clusterNames = map[string]string{}
+	hostNames = map[string]string{}
 
 	storageList := []model.StorageContainer{}
 	err = r.db.List(&storageList, libmodel.ListOptions{Detail: model.MaxDetail})
@@ -645,6 +647,18 @@ func (r *Collector) vmLookupMaps() (storageNames, networkNames map[string]string
 	}
 	for _, network := range networkList {
 		networkNames[network.ID] = network.Name
+	}
+
+	clusterList := []model.Cluster{}
+	err = r.db.List(&clusterList, libmodel.ListOptions{Detail: model.MaxDetail})
+	if err != nil {
+		return
+	}
+
+	hostList := []model.Host{}
+	err = r.db.List(&hostList, libmodel.ListOptions{Detail: model.MaxDetail})
+	if err != nil {
+		return
 	}
 
 	return
