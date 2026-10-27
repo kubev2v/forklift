@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
+	cnv "kubevirt.io/api/core/v1"
 	export "kubevirt.io/api/export/v1beta1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -389,6 +390,180 @@ func TestCreateDataVolumeSpec_OmitsCertConfigMap(t *testing.T) {
 	if spec.Source.HTTP.CertConfigMap != "ca-cm" {
 		t.Fatalf("expected CertConfigMap ca-cm, got %q", spec.Source.HTTP.CertConfigMap)
 	}
+}
+
+func TestSanitizeDataVolumeTemplates(t *testing.T) {
+	const ns = "src-ns"
+	scheme := runtime.NewScheme()
+	_ = core.AddToScheme(scheme)
+	_ = cdi.AddToScheme(scheme)
+
+	newBuilder := func(objs ...runtime.Object) *Builder {
+		return &Builder{
+			Context: &plancontext.Context{
+				Log: logging.WithName("ocp-builder-sanitize-test"),
+			},
+			sourceClient: fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build(),
+		}
+	}
+
+	httpSource := &cdi.DataVolumeSource{
+		HTTP: &cdi.DataVolumeSourceHTTP{URL: "https://export.example/disk.gz"},
+	}
+
+	t.Run("renames template and volume to destination PVC", func(t *testing.T) {
+		sourceVm := &cnv.VirtualMachine{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-vm", Namespace: ns},
+			Spec: cnv.VirtualMachineSpec{
+				Template: &cnv.VirtualMachineInstanceTemplateSpec{
+					Spec: cnv.VirtualMachineInstanceSpec{
+						Volumes: []cnv.Volume{{
+							Name: "disk0",
+							VolumeSource: cnv.VolumeSource{
+								DataVolume: &cnv.DataVolumeSource{Name: "old-dv"},
+							},
+						}},
+					},
+				},
+			},
+		}
+		object := &cnv.VirtualMachineSpec{
+			Template: sourceVm.Spec.Template.DeepCopy(),
+			DataVolumeTemplates: []cnv.DataVolumeTemplateSpec{{
+				ObjectMeta: metav1.ObjectMeta{Name: "old-dv", Namespace: ns, GenerateName: "old-dv-"},
+				Spec: cdi.DataVolumeSpec{
+					Source:  httpSource.DeepCopy(),
+					Storage: &cdi.StorageSpec{},
+				},
+			}},
+		}
+		destPVC := &core.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "dest-pvc",
+				Annotations: map[string]string{
+					planbase.AnnDiskSource: ns + "/old-dv",
+				},
+			},
+		}
+
+		newBuilder().sanitizeDataVolumeTemplates(sourceVm, object.DataVolumeTemplates, object, []*core.PersistentVolumeClaim{destPVC})
+
+		tmpl := object.DataVolumeTemplates[0]
+		if tmpl.Name != "dest-pvc" {
+			t.Fatalf("expected template name dest-pvc, got %q", tmpl.Name)
+		}
+		if tmpl.GenerateName != "" {
+			t.Fatalf("expected GenerateName cleared, got %q", tmpl.GenerateName)
+		}
+		if tmpl.Namespace != "" {
+			t.Fatalf("expected empty namespace, got %q", tmpl.Namespace)
+		}
+		if tmpl.Spec.Source != nil {
+			t.Fatalf("expected source cleared, got %#v", tmpl.Spec.Source)
+		}
+		ds := tmpl.Spec.Storage.DataSource
+		if ds == nil || ds.Name != "dest-pvc" || ds.Kind != "PersistentVolumeClaim" {
+			t.Fatalf("expected Storage.DataSource PVC dest-pvc, got %#v", ds)
+		}
+		if ds.APIGroup == nil || *ds.APIGroup != "" {
+			t.Fatalf("expected empty apiGroup, got %#v", ds.APIGroup)
+		}
+		if object.Template.Spec.Volumes[0].DataVolume.Name != "dest-pvc" {
+			t.Fatalf("expected volume DataVolume name dest-pvc, got %q", object.Template.Spec.Volumes[0].DataVolume.Name)
+		}
+	})
+
+	t.Run("resolves source PVC via DataVolume ClaimName", func(t *testing.T) {
+		sourceDV := &cdi.DataVolume{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-dv", Namespace: ns},
+			Status:     cdi.DataVolumeStatus{ClaimName: "actual-pvc"},
+		}
+		sourceVm := &cnv.VirtualMachine{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-vm", Namespace: ns},
+			Spec: cnv.VirtualMachineSpec{
+				Template: &cnv.VirtualMachineInstanceTemplateSpec{
+					Spec: cnv.VirtualMachineInstanceSpec{
+						Volumes: []cnv.Volume{{
+							Name: "disk0",
+							VolumeSource: cnv.VolumeSource{
+								DataVolume: &cnv.DataVolumeSource{Name: "my-dv"},
+							},
+						}},
+					},
+				},
+			},
+		}
+		object := &cnv.VirtualMachineSpec{
+			Template: sourceVm.Spec.Template.DeepCopy(),
+			DataVolumeTemplates: []cnv.DataVolumeTemplateSpec{{
+				ObjectMeta: metav1.ObjectMeta{Name: "my-dv"},
+				Spec: cdi.DataVolumeSpec{
+					Source: httpSource.DeepCopy(),
+					PVC:    &core.PersistentVolumeClaimSpec{},
+				},
+			}},
+		}
+		destPVC := &core.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "dest-from-claim",
+				Annotations: map[string]string{
+					planbase.AnnDiskSource: ns + "/actual-pvc",
+				},
+			},
+		}
+
+		newBuilder(sourceDV).sanitizeDataVolumeTemplates(sourceVm, object.DataVolumeTemplates, object, []*core.PersistentVolumeClaim{destPVC})
+
+		tmpl := object.DataVolumeTemplates[0]
+		if tmpl.Name != "dest-from-claim" {
+			t.Fatalf("expected template name dest-from-claim, got %q", tmpl.Name)
+		}
+		ds := tmpl.Spec.PVC.DataSource
+		if ds == nil || ds.Name != "dest-from-claim" {
+			t.Fatalf("expected PVC.DataSource dest-from-claim, got %#v", ds)
+		}
+		if object.Template.Spec.Volumes[0].DataVolume.Name != "dest-from-claim" {
+			t.Fatalf("expected volume renamed to dest-from-claim, got %q", object.Template.Spec.Volumes[0].DataVolume.Name)
+		}
+	})
+
+	t.Run("clears GenerateName when no matching volume", func(t *testing.T) {
+		sourceVm := &cnv.VirtualMachine{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-vm", Namespace: ns},
+			Spec: cnv.VirtualMachineSpec{
+				Template: &cnv.VirtualMachineInstanceTemplateSpec{
+					Spec: cnv.VirtualMachineInstanceSpec{},
+				},
+			},
+		}
+		object := &cnv.VirtualMachineSpec{
+			Template: sourceVm.Spec.Template.DeepCopy(),
+			DataVolumeTemplates: []cnv.DataVolumeTemplateSpec{{
+				ObjectMeta: metav1.ObjectMeta{Name: "orphan-dv", GenerateName: "orphan-"},
+				Spec: cdi.DataVolumeSpec{
+					Source:  httpSource.DeepCopy(),
+					Storage: &cdi.StorageSpec{},
+				},
+			}},
+		}
+
+		newBuilder().sanitizeDataVolumeTemplates(sourceVm, object.DataVolumeTemplates, object, nil)
+
+		tmpl := object.DataVolumeTemplates[0]
+		if tmpl.Name != "orphan-dv" {
+			t.Fatalf("expected template name unchanged, got %q", tmpl.Name)
+		}
+		if tmpl.GenerateName != "" {
+			t.Fatalf("expected GenerateName cleared, got %q", tmpl.GenerateName)
+		}
+		if tmpl.Spec.Source != nil {
+			t.Fatalf("expected source cleared, got %#v", tmpl.Spec.Source)
+		}
+		ds := tmpl.Spec.Storage.DataSource
+		if ds == nil || ds.Name != "orphan-dv" {
+			t.Fatalf("expected Storage.DataSource orphan-dv, got %#v", ds)
+		}
+	})
 }
 
 func newTestTLSCredentials(t *testing.T) (caPEM []byte, serverCert tls.Certificate, serverKey *ecdsa.PrivateKey) {
