@@ -18,7 +18,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -158,10 +160,16 @@ func loadProviderCredentials() (vmdetect.Credentials, error) {
 	if err != nil {
 		return vmdetect.Credentials{}, err
 	}
+
+	fingerprint, err := readSecretDataFile("fingerprint")
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return vmdetect.Credentials{}, err
+	}
 	return vmdetect.Credentials{
-		VCenterURL: url,
-		Username:   user,
-		Password:   password,
+		VCenterURL:    url,
+		Username:      user,
+		Password:      password,
+		TLSThumbprint: fingerprint,
 	}, nil
 }
 
