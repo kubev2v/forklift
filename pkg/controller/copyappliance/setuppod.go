@@ -79,7 +79,7 @@ func (r *DeployRunner) createSetupPod(ctx context.Context, pullSpec, tag string)
 	// login to the appliance has already been dropped by the deadline the
 	// worker set on it. The margin covers the image pull and the exit.
 	activeDeadline := int64(SSHFileTransferTimeout.Seconds()) + 600
-	automount := isOpenShiftInternalRegistry(pullSpec) && appliance.Namespace == Settings.Namespace
+	automount := isOpenShiftInternalRegistry(pullSpec)
 	nonRoot := true
 	allowPrivilegeEscalation := false
 
