@@ -184,6 +184,7 @@ type Host struct {
 	CpuCores           int16               `json:"cpuCores"`
 	NetworkAttachments []NetworkAttachment `json:"networkAttachments"`
 	NICs               []hNIC              `json:"nics"`
+	DNSServers         []string            `json:"dnsServers,omitempty"`
 }
 
 type NetworkAttachment = model.NetworkAttachment
@@ -201,6 +202,7 @@ func (r *Host) With(m *model.Host) {
 	r.CpuCores = m.CpuCores
 	r.NetworkAttachments = m.NetworkAttachments
 	r.NICs = m.NICs
+	r.DNSServers = m.DNSServers
 }
 
 // Build self link (URI).

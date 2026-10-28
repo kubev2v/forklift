@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -291,6 +293,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	if err != nil {
 		return
 	}
+	r.mapCloudInit(vm, object)
 
 	return
 }
@@ -353,6 +356,137 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 	object.Template.Spec.Networks = kNetworks
 	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
 	return
+}
+
+// mapCloudInit injects a cloud-init volume that pins HWADDR/udev rules for
+// each NIC when preserveStaticIPs is enabled.
+func (r *Builder) mapCloudInit(vm *model.Workload, object *cnv.VirtualMachineSpec) {
+	if !r.Plan.Spec.PreserveStaticIPs || len(vm.NICs) == 0 {
+		return
+	}
+	// NIC pinning relies on the source MAC being preserved on the destination.
+	// When UDN is active and doesn't support MAC passthrough, the destination
+	// gets a new MAC and our source-MAC-based rules would be wrong.
+	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
+	if hasUDN && !settings.Settings.UdnSupportsMac {
+		return
+	}
+	userData := BuildNICPinningUserData(vm.NICs)
+	if userData == "" {
+		return
+	}
+
+	volumeName := "cloudinit-nic-fix"
+	object.Template.Spec.Volumes = append(object.Template.Spec.Volumes, cnv.Volume{
+		Name: volumeName,
+		VolumeSource: cnv.VolumeSource{
+			CloudInitNoCloud: &cnv.CloudInitNoCloudSource{
+				UserData: userData,
+				// Disable cloud-init network config so the original ifcfg/NM
+				// settings from the source VM are preserved.
+				NetworkData: "config: disabled\n",
+			},
+		},
+	})
+	object.Template.Spec.Domain.Devices.Disks = append(object.Template.Spec.Domain.Devices.Disks, cnv.Disk{
+		Name: volumeName,
+		DiskDevice: cnv.DiskDevice{
+			Disk: &cnv.DiskTarget{
+				Bus: "virtio",
+			},
+		},
+	})
+}
+
+var validMAC = regexp.MustCompile(`^([0-9a-f]{2}:){5}[0-9a-f]{2}$`)
+
+var validDevName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
+
+// BuildNICPinningUserData generates cloud-init user-data that creates udev rules
+// and pins HWADDR in ifcfg files to preserve NIC-to-MAC mapping after migration.
+func BuildNICPinningUserData(nics []model.XNIC) string {
+	type nicPin struct {
+		mac, dev string
+		ip       string
+	}
+	var pins []nicPin
+	for _, nic := range nics {
+		if nic.MAC == "" {
+			continue
+		}
+		mac := strings.ToLower(nic.MAC)
+		if !validMAC.MatchString(mac) {
+			continue
+		}
+		dev := nic.DeviceName
+		if dev != "" && !validDevName.MatchString(dev) {
+			dev = ""
+		}
+		var firstIP string
+		for _, ip := range nic.IpAddress {
+			if ip.Address != "" && ip.Version == "v4" && net.ParseIP(ip.Address) != nil {
+				firstIP = ip.Address
+				break
+			}
+		}
+		pins = append(pins, nicPin{mac: mac, dev: dev, ip: firstIP})
+	}
+	if len(pins) == 0 {
+		return ""
+	}
+
+	// Network config is disabled via NetworkData in the CloudInitNoCloud volume,
+	// so cloud-init won't overwrite the original ifcfg/NM settings.
+
+	//   1. First boot (runcmd): update ifcfg DEVICE= and HWADDR to match the
+	//      current device for each MAC, reload NM, and bring up the connection.
+	//   2. Subsequent boots: udev rules and .link files rename the NIC to the
+	//      source name so profiles match without patching.
+	var cmds []string
+
+	// For each NIC, find the current device name by MAC, patch the ifcfg
+	// profile to match, and activate the connection. This makes the static
+	// IP work on the first boot even if the device was renamed.
+	for _, p := range pins {
+		if p.ip == "" {
+			continue
+		}
+
+		cmds = append(cmds, fmt.Sprintf(
+			"|\n    for f in $(grep -rl 'IPADDR=%s$' /etc/sysconfig/network-scripts/ifcfg-* 2>/dev/null); do\n"+
+				"      grep -qi HWADDR \"$f\" || echo 'HWADDR=%s' >> \"$f\"\n"+
+				"      sed -i '/^DEVICE=/d' \"$f\"\n"+
+				"    done",
+			p.ip, p.mac))
+	}
+	if len(cmds) > 0 {
+		// Reload NM profiles and bring up any disconnected devices.
+		cmds = append(cmds, "nmcli connection reload 2>/dev/null || true")
+		cmds = append(cmds, "|\n    nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep ':disconnected' | cut -d: -f1 | while read d; do nmcli device connect \"$d\" 2>/dev/null || true; done")
+	}
+
+	// Create udev rules and .link files (take effect on subsequent boots).
+	for _, p := range pins {
+		if p.dev == "" {
+			continue
+		}
+		cmds = append(cmds, "mkdir -p /etc/systemd/network")
+		cmds = append(cmds, fmt.Sprintf(
+			"printf '[Match]\\nMACAddress=%s\\n\\n[Link]\\nName=%s\\n' > /etc/systemd/network/10-forklift-%s.link",
+			p.mac, p.dev, p.dev))
+		cmds = append(cmds, fmt.Sprintf(
+			"grep -q '%s' /etc/udev/rules.d/70-persistent-net.rules 2>/dev/null || echo 'SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"?*\", ATTR{address}==\"%s\", NAME=\"%s\"' >> /etc/udev/rules.d/70-persistent-net.rules",
+			p.mac, p.mac, p.dev))
+	}
+
+	if len(cmds) == 0 {
+		return ""
+	}
+	userData := "#cloud-config\nruncmd:\n"
+	for _, cmd := range cmds {
+		userData += "  - " + cmd + "\n"
+	}
+	return userData
 }
 
 func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {

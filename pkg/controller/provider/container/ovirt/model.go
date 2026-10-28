@@ -1009,7 +1009,7 @@ func (r *VMAdapter) follow() libweb.Param {
 		"snapshots",
 		"watchdogs",
 		"cdroms",
-		"nics",
+		"nics.reported_devices",
 	)
 }
 
