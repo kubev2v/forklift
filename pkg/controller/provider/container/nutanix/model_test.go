@@ -432,9 +432,14 @@ func TestEnrichVM(t *testing.T) {
 		NICs: []model.NIC{
 			{SubnetUUID: "net-1"},
 		},
+		Cluster: "cluster-1",
+		Host:    "host-1",
 	}
 
-	enrichVM(m, map[string]string{"sc-1": "default-container"}, map[string]string{"net-1": "Production-VLAN"})
+	clusterNames := map[string]string{"cluster-1": "cluster-1"}
+	hostNames := map[string]string{"host-1": "host-1"}
+
+	enrichVM(m, map[string]string{"sc-1": "default-container"}, map[string]string{"net-1": "Production-VLAN"}, clusterNames, hostNames)
 
 	if m.Disks[0].StorageContainerName != "default-container" {
 		t.Errorf("Expected storage container name to be enriched, got %s", m.Disks[0].StorageContainerName)
@@ -442,6 +447,7 @@ func TestEnrichVM(t *testing.T) {
 	if m.NICs[0].SubnetName != "Production-VLAN" {
 		t.Errorf("Expected subnet name to be enriched, got %s", m.NICs[0].SubnetName)
 	}
+
 }
 
 func TestApplyGuestTools_Disabled(t *testing.T) {
