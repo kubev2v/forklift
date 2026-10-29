@@ -236,10 +236,26 @@ func (r *Validator) MaintenanceMode(_ ref.Ref) (ok bool, err error) {
 	return
 }
 
-// NO-OP
 func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
-	// the guest operating system is not modified during the migration so static IPs should be preserved
-	return true, nil
+	if !r.Plan.Spec.PreserveStaticIPs {
+		return true, nil
+	}
+	vm := &model.Workload{}
+	err := r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef.String())
+	}
+	if len(vm.NICs) == 0 {
+		return true, nil
+	}
+	for _, nic := range vm.NICs {
+		for _, ip := range nic.IpAddress {
+			if ip.Address != "" {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 // NO-OP

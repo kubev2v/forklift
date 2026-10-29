@@ -123,6 +123,7 @@ type Host struct {
 	CpuCores           int16               `sql:""`
 	NetworkAttachments []NetworkAttachment `sql:""`
 	NICs               []HostNIC           `sql:""`
+	DNSServers         []string            `sql:""`
 }
 
 type NetworkAttachment struct {
@@ -131,11 +132,17 @@ type NetworkAttachment struct {
 }
 
 type HostNIC struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	LinkSpeed int64  `json:"linkSpeed"`
-	MTU       int64  `json:"mtu"`
-	VLan      string `json:"vlan"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	LinkSpeed   int64  `json:"linkSpeed"`
+	MTU         int64  `json:"mtu"`
+	VLan        string `json:"vlan"`
+	IP          string `json:"ip"`
+	Gateway     string `json:"gateway"`
+	Netmask     string `json:"netmask"`
+	IPv6        string `json:"ipv6,omitempty"`
+	IPv6Gateway string `json:"ipv6Gateway,omitempty"`
+	IPv6Prefix  string `json:"ipv6Prefix,omitempty"`
 }
 
 type VM struct {
@@ -202,18 +209,21 @@ type DiskAttachment struct {
 }
 
 type NIC struct {
-	ID        string      `json:"id"`
-	Name      string      `json:"name"`
-	Interface string      `json:"interface"`
-	Plugged   bool        `json:"plugged"`
-	IpAddress []IpAddress `json:"ipAddress"`
-	Profile   string      `json:"profile"`
-	MAC       string      `json:"mac"`
+	ID         string      `json:"id"`
+	Name       string      `json:"name"`
+	Interface  string      `json:"interface"`
+	Plugged    bool        `json:"plugged"`
+	IpAddress  []IpAddress `json:"ipAddress"`
+	Profile    string      `json:"profile"`
+	MAC        string      `json:"mac"`
+	DeviceName string      `json:"deviceName,omitempty"` // guest OS interface name from reported_devices
 }
 
 type IpAddress struct {
 	Address string `json:"address"`
 	Version string `json:"version"`
+	Gateway string `json:"gateway,omitempty"`
+	Netmask string `json:"netmask,omitempty"`
 }
 
 type CpuPinning struct {
