@@ -9,12 +9,14 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"testing"
 
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	gtypes "github.com/onsi/gomega/types"
 	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vim25"
@@ -25,6 +27,52 @@ import (
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
+
+func TestStorageCollectorRequestsMetadata(t *testing.T) {
+	c := Collector{client: &govmomi.Client{Client: &vim25.Client{ServiceContent: types.ServiceContent{About: types.AboutInfo{ApiVersion: "8.0"}}}}}
+	filter := c.filter(property.DefaultCollector(c.client.Client))
+	if filter.PartialUpdates {
+		t.Fatal("storage adapters require whole-property updates, including collection replacements")
+	}
+	var hostPaths []string
+	for _, spec := range filter.Spec.PropSet {
+		if spec.Type == Host {
+			hostPaths = spec.PathSet
+		}
+	}
+	for _, required := range []string{"hardware.pciDevice", "config.storageDevice.multipathInfo", "config.storageDevice.nvmeTopology.adapter"} {
+		found := false
+		for _, path := range hostPaths {
+			if path == required {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("host collection does not request %s", required)
+		}
+	}
+}
+
+func TestStorageCollectorAPIVersions(t *testing.T) {
+	for _, version := range []string{"6.5", "6.7", "7.0", "8.0", "9.0"} {
+		t.Run(version, func(t *testing.T) {
+			c := Collector{client: &govmomi.Client{Client: &vim25.Client{ServiceContent: types.ServiceContent{About: types.AboutInfo{ApiVersion: version}}}}}
+			nvme := false
+			for _, spec := range c.propertySpec() {
+				if spec.Type == Host {
+					for _, path := range spec.PathSet {
+						if path == "config.storageDevice.nvmeTopology.adapter" {
+							nvme = true
+						}
+					}
+				}
+			}
+			if want := version[0] >= '7'; nvme != want {
+				t.Errorf("NVMe property requested=%v for API %s; want %v", nvme, version, want)
+			}
+		})
+	}
+}
 
 var _ = Describe("vSphere collector", func() {
 	collector := Collector{}

@@ -96,6 +96,9 @@ const (
 	fScsiLun                 = "config.storageDevice.scsiLun"
 	fHostBusAdapter          = "config.storageDevice.hostBusAdapter"
 	fScsiTopology            = "config.storageDevice.scsiTopology.adapter"
+	fPciDevice               = "hardware.pciDevice"
+	fMultipathInfo           = "config.storageDevice.multipathInfo"
+	fNvmeTopology            = "config.storageDevice.nvmeTopology.adapter"
 	fAdvancedOption          = "configManager.advancedOption"
 	fmodel                   = "hardware.systemInfo.model"
 	fvendor                  = "hardware.systemInfo.vendor"
@@ -905,7 +908,10 @@ func (r *Collector) thumbprint() string {
 func (r *Collector) filter(pc *property.Collector) *property.WaitFilter {
 	return &property.WaitFilter{
 		CreateFilter: types.CreateFilter{
-			This: pc.Reference(),
+			// Adapters replace complete property values, including collections.
+			// Keep nested changes as whole-property updates rather than element deltas.
+			PartialUpdates: false,
+			This:           pc.Reference(),
 			Spec: types.PropertyFilterSpec{
 				ObjectSet: []types.ObjectSpec{
 					r.objectSpec(),
@@ -930,7 +936,7 @@ func (r *Collector) objectSpec() types.ObjectSpec {
 
 // Build the property Spec.
 func (r *Collector) propertySpec() []types.PropertySpec {
-	return []types.PropertySpec{
+	specs := []types.PropertySpec{
 		{ // Folder
 			Type: Folder,
 			PathSet: []string{
@@ -999,6 +1005,8 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fAdvancedOption,
 				fHostBusAdapter,
 				fScsiTopology,
+				fPciDevice,
+				fMultipathInfo,
 				fmodel,
 				fvendor,
 				fVMotionSupported,
@@ -1075,6 +1083,16 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 			PathSet: r.vmPathSet(),
 		},
 	}
+	// HostStorageDeviceInfo.nvmeTopology was introduced in vSphere API 7.0.
+	major, _, _ := strings.Cut(r.client.ServiceContent.About.ApiVersion, ".")
+	if version, err := strconv.Atoi(major); err == nil && version >= 7 {
+		for i := range specs {
+			if specs[i].Type == Host {
+				specs[i].PathSet = append(specs[i].PathSet, fNvmeTopology)
+			}
+		}
+	}
+	return specs
 }
 
 func (r *Collector) vmPathSet() []string {
