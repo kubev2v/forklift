@@ -1572,6 +1572,89 @@ func (r *Builder) hostID(vmRef ref.Ref) (hostID string, err error) {
 	return
 }
 
+// esxiCloneMethod returns the copy-offload clone method configured on the
+// source provider, defaulting to the VIB method when unset.
+func (r *Builder) esxiCloneMethod() string {
+	if method, ok := r.Source.Provider.Spec.Settings[api.ESXiCloneMethod]; ok && method != "" {
+		return method
+	}
+	return api.ESXiCloneMethodVIB
+}
+
+// HostCredentialsError reports that the api clone method was selected but the
+// credentials of the ESXi host performing the copy could not be resolved.
+type HostCredentialsError struct {
+	HostID string
+	Reason string
+}
+
+func (e *HostCredentialsError) Error() string {
+	return fmt.Sprintf(
+		"esxiCloneMethod is %q, which requires credentials for the ESXi host performing the copy, but %s",
+		api.ESXiCloneMethodAPI, e.Reason)
+}
+
+// resolveHostCredentials looks up the Host CR for hostID and returns the SDK
+// address and credentials the api clone method logs in with.
+func (r *Builder) resolveHostCredentials(hostID string) (address string, user, password []byte, err error) {
+	if hostID == "" {
+		err = &HostCredentialsError{Reason: "the ESXi host for this disk could not be determined"}
+		return
+	}
+	hostDef, found := r.hosts[hostID]
+	if !found {
+		err = &HostCredentialsError{
+			HostID: hostID,
+			Reason: fmt.Sprintf(
+				"no Ready Host CR for ESXi host %q exists in namespace %q. Create a Host CR for that host with spec.ipAddress and a secret holding 'user' and 'password'",
+				hostID, r.Source.Provider.Namespace),
+		}
+		return
+	}
+	if hostDef.Spec.IpAddress == "" {
+		err = &HostCredentialsError{
+			HostID: hostID,
+			Reason: fmt.Sprintf("Host CR %q for ESXi host %q has an empty spec.ipAddress", hostDef.Name, hostID),
+		}
+		return
+	}
+
+	hostSecret, sErr := r.hostSecret(hostDef)
+	if sErr != nil {
+		err = &HostCredentialsError{
+			HostID: hostID,
+			Reason: fmt.Sprintf("secret %q referenced by Host CR %q could not be read: %s",
+				hostDef.Spec.Secret.Name, hostDef.Name, sErr),
+		}
+		return
+	}
+	user, password = hostSecret.Data["user"], hostSecret.Data["password"]
+	if len(user) == 0 || len(password) == 0 {
+		err = &HostCredentialsError{
+			HostID: hostID,
+			Reason: fmt.Sprintf("secret %q referenced by Host CR %q is missing 'user' or 'password'",
+				hostDef.Spec.Secret.Name, hostDef.Name),
+		}
+		return
+	}
+
+	address = hostDef.Spec.IpAddress
+	return
+}
+
+// addHostCredentialsToSecret injects the ESXi host SDK credentials the api
+// clone method needs into the per-disk populator secret.
+func (r *Builder) addHostCredentialsToSecret(secret *core.Secret, hostID string) error {
+	address, user, password, err := r.resolveHostCredentials(hostID)
+	if err != nil {
+		return err
+	}
+	secret.Data["ESXI_HOST_ADDRESS"] = []byte(address)
+	secret.Data["ESXI_HOST_USERNAME"] = user
+	secret.Data["ESXI_HOST_PASSWORD"] = password
+	return nil
+}
+
 // Find host CR secret.
 func (r *Builder) hostSecret(host *api.Host) (secret *core.Secret, err error) {
 	ref := host.Spec.Secret
@@ -1900,6 +1983,14 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					i := rand.Intn(len(migrationHosts))
 					migrationHost = migrationHosts[i]
 				}
+				// The api clone method logs in to the host that runs the copy, so
+				// the secret below has to carry that one host's credentials. Pin
+				// the host here rather than letting the populator resolve it at
+				// run time: a vMotion in between would leave the populator
+				// holding credentials for a host it is not using.
+				if r.esxiCloneMethod() == api.ESXiCloneMethodAPI && migrationHost == "" {
+					migrationHost = vm.Host
+				}
 				vp := api.VSphereXcopyVolumePopulator{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
@@ -1945,7 +2036,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				}
 
 				vp.OwnerReferences[0].UID = createdPVC.UID
-				err = r.mergeSecrets(secretName, namespace, storageVendorSecretRef, r.Source.Provider.Namespace, diskSecretName, createdPVC)
+				err = r.mergeSecrets(secretName, namespace, storageVendorSecretRef, r.Source.Provider.Namespace, diskSecretName, createdPVC, migrationHost)
 				if err != nil {
 					return nil, fmt.Errorf("failed to merge secrets for populators %w", err)
 				}
@@ -2423,7 +2514,7 @@ func (r *Builder) getNetworkNameTemplate(vm *model.VM) string {
 }
 
 // MergeSecrets merges the storage vendor secret into the migration secret
-func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendorSecret, storageVendorSecretNS, diskSecretName string, pvc *core.PersistentVolumeClaim) error {
+func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendorSecret, storageVendorSecretNS, diskSecretName string, pvc *core.PersistentVolumeClaim, migrationHostID string) error {
 	baseMigrationSecret := &core.Secret{}
 	if err := r.Destination.Get(context.Background(), client.ObjectKey{
 		Name:      migrationSecret,
@@ -2518,6 +2609,17 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 	// Add provider settings to the secret
 	if esxiCloneMethod, ok := r.Source.Provider.Spec.Settings[api.ESXiCloneMethod]; ok {
 		dst.Data["ESXI_CLONE_METHOD"] = []byte(esxiCloneMethod)
+	}
+
+	// The api clone method issues CopyVirtualDisk against the ESXi host itself,
+	// so it needs that host's credentials; the vCenter credentials above are not
+	// enough. Plan validation reports the same problem as a Critical condition
+	// before the migration starts, so reaching this error means the Host CR went
+	// away after the plan was validated.
+	if r.esxiCloneMethod() == api.ESXiCloneMethodAPI {
+		if err := r.addHostCredentialsToSecret(dst, migrationHostID); err != nil {
+			return err
+		}
 	}
 
 	// Add controller-level settings for host leases (copy offload)
