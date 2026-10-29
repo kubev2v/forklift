@@ -50,7 +50,7 @@ func ConnectProvider(ctx context.Context, rawURL, user, password, thumbprint str
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
-		cert, err := util.GetTlsCertificate(u, secret)
+		cert, err := util.GetTlsCertificateContext(ctx, u, secret)
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}

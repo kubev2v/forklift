@@ -37,6 +37,8 @@ const (
 	MaxObjectUpdates = 10000
 	// Connection timeout for provider operations.
 	ConnectionTimeout = 30 * time.Second
+	// TestConnectionTimeout caps Test() well under the ~13s admission webhook budget.
+	TestConnectionTimeout = 10 * time.Second
 )
 
 // Types
@@ -413,15 +415,15 @@ func (r *Collector) Follow(moRef interface{}, p []string, dst interface{}) error
 }
 
 // Test connect/logout.
+// The full call chain (TLS cert fetch, dial, login) now honours the context,
+// so a single context.WithTimeout bounds the entire operation (MTV-6167).
 func (r *Collector) Test() (status int, err error) {
-	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, ConnectionTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), TestConnectionTimeout)
 	defer cancel()
 	status, err = r.connect(ctx)
 	if err == nil {
 		r.close()
 	}
-
 	return
 }
 
