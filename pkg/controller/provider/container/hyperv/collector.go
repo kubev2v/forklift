@@ -608,7 +608,9 @@ func (r *Collector) refreshClusterOptimized(ctx *Context) error {
 	// disk capacity/RCT, security settings, guest OS, and guest networks.
 	const fullRefreshInterval = 10
 	r.refreshCount++
-	fullCycle := r.refreshCount%fullRefreshInterval == 0
+	// The first optimized cycle (refreshCount==1) is always full to
+	// populate guest networks deferred from the LightMode initial load.
+	fullCycle := r.refreshCount%fullRefreshInterval == 0 || r.refreshCount == 1
 	if fullCycle {
 		err := r.refreshSerial(ctx)
 		r.log.Info("Refresh finished (full).", "duration", time.Since(mark))
