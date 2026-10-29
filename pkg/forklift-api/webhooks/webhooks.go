@@ -16,6 +16,7 @@ const PlanValidatePath = "/plan-validate"
 const PlanMutatorPath = "/plan-mutate"
 const ProviderValidatePath = "/provider-validate"
 const ProviderMutatorPath = "/provider-mutate"
+const HookMutatorPath = "/hook-mutate"
 const MigrationValidatePath = "/migration-validate"
 
 // AddToManagerFuncs is a list of functions to add all Controllers to the Manager
@@ -57,5 +58,8 @@ func RegisterMutatingWebhooks(mux *http.ServeMux, client client.Client) {
 	})
 	mux.HandleFunc(ProviderMutatorPath, func(w http.ResponseWriter, r *http.Request) {
 		ServeProviderMutator(w, r, client)
+	})
+	mux.HandleFunc(HookMutatorPath, func(w http.ResponseWriter, r *http.Request) {
+		ServeHookMutator(w, r, client)
 	})
 }
