@@ -377,6 +377,7 @@ type VM struct {
 	ToolsStatus              string             `sql:""`
 	ToolsRunningStatus       string             `sql:""`
 	ToolsVersionStatus       string             `sql:""`
+	Timezone                 string             `sql:""`
 	DiskEnableUuid           bool               `sql:""`
 	NestedHVEnabled          bool               `sql:""`
 	CustomValues             []CustomFieldValue `sql:""`
