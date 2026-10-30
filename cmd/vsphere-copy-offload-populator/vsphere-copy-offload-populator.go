@@ -65,6 +65,7 @@ var (
 	esxiCloneMethod            string
 	storageAPITimeoutSeconds   string
 	migrationHost              string
+	nfsCopy                    bool
 
 	// kube args
 	httpEndpoint string
@@ -186,6 +187,7 @@ func main() {
 		sourceVmId,
 		sourceVMDKFile,
 		sshConfig,
+		nfsCopy,
 	)
 	if err != nil {
 		klog.Fatalf("Failed to initialize populator: %s", err)
@@ -385,6 +387,7 @@ func handleArgs() {
 	flag.StringVar(&esxiCloneMethod, "esxi-clone-method", os.Getenv("ESXI_CLONE_METHOD"), "ESXi clone method: 'vib' (default) or 'ssh'")
 	flag.StringVar(&storageAPITimeoutSeconds, "storage-http-timeout-seconds", os.Getenv("STORAGE_HTTP_TIMEOUT_SECONDS"), "HTTP client timeout in seconds for storage API requests (default: 30)")
 	flag.StringVar(&migrationHost, "migration-host", "", "the ESXi host ID to use for the XCOPY operation")
+	flag.BoolVar(&nfsCopy, "nfs-copy", false, "copy a disk on an NFS datastore with the array's file API (NFS offload plugin)")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	// Metrics args

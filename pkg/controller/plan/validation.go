@@ -120,7 +120,10 @@ const (
 	// NetAppShiftDatastoreNASMissing (Critical) blocks when a disk maps to NetApp Shift but the source
 	// datastore lacks NAS export details in inventory (required for MTV annotations).
 	NetAppShiftDatastoreNASMissing = "NetAppShiftDatastoreNASMissing"
-	ConversionResumable            = "ConversionResumable"
+	// NfsOffloadDiskNotNFS (Critical) blocks when a disk maps to the NFS offload plugin
+	// but its source datastore is not NFS.
+	NfsOffloadDiskNotNFS = "NfsOffloadDiskNotNFS"
+	ConversionResumable  = "ConversionResumable"
 )
 
 // Categories
@@ -432,6 +435,33 @@ func hasShiftDiskMissingNAS(vm *vsphere.VM, storageMap *api.StorageMap, inventor
 			nfsServer = ds.NasRemoteHostNames[hn-1]
 		}
 		if ds.NasRemotePath == "" || nfsServer == "" {
+			label := ds.Name
+			if label == "" {
+				label = disk.Datastore.ID
+			}
+			return label, nil
+		}
+	}
+	return "", nil
+}
+
+// hasNfsOffloadDiskNotNFS returns the label of the first datastore mapped to the NFS
+// offload plugin that is not NFS. The array file copy cannot read any other datastore.
+func hasNfsOffloadDiskNotNFS(vm *vsphere.VM, storageMap *api.StorageMap, inventory web.Client) (string, error) {
+	for _, disk := range vm.SortedDisksAsVmware() {
+		pair, found := storageMap.FindStorage(disk.Datastore.ID)
+		if !found {
+			continue
+		}
+		if pair.OffloadPlugin == nil || pair.OffloadPlugin.VSphereNfsCopyPluginConfig == nil {
+			continue
+		}
+		ds := &vsphere.Datastore{}
+		if err := inventory.Find(ds, refapi.Ref{ID: disk.Datastore.ID}); err != nil {
+			return "", liberr.Wrap(err, "datastore", disk.Datastore.ID)
+		}
+		// Only a NAS datastore carries an export, so these are empty for VMFS and VVol.
+		if ds.NasRemotePath == "" && ds.NasRemoteHost == "" && len(ds.NasRemoteHostNames) == 0 {
 			label := ds.Name
 			if label == "" {
 				label = disk.Datastore.ID
@@ -997,6 +1027,14 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		Message:  "Copy offload is enabled. MTV does not support mixed copy methods. Each migration plan can use one migration strategy, either VDDK or copy offload. Check your storage map and VMs to ensure they are using the same migration strategy.",
 		Items:    []string{},
 	}
+	nfsOffloadDiskNotNFS := libcnd.Condition{
+		Type:     NfsOffloadDiskNotNFS,
+		Status:   True,
+		Reason:   NotSupported,
+		Category: api.CategoryCritical,
+		Message:  "The NFS offload plugin is mapped to a datastore that is not NFS. The storage array copies the disk file between its own NFS exports, so the source datastore must be NFS. Map these datastores to the vSphere XCOPY plugin instead.",
+		Items:    []string{},
+	}
 	vmCriticalConcerns := libcnd.Condition{
 		Type:     VMCriticalConcerns,
 		Status:   True,
@@ -1160,6 +1198,11 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			if vsphereVM, ok := v.(*vsphere.VM); ok {
 				storageMap := plan.Map.Storage
 				if storageMap != nil {
+					if label, nErr := hasNfsOffloadDiskNotNFS(vsphereVM, storageMap, ctx.Source.Inventory); nErr != nil {
+						return nErr
+					} else if label != "" {
+						nfsOffloadDiskNotNFS.Items = append(nfsOffloadDiskNotNFS.Items, label)
+					}
 					curVMHasVddk, err := r.vmUsesVddk(storageMap, vsphereVM, vm.Name)
 					if err != nil {
 						return err
@@ -1522,6 +1565,9 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	// Set the condition if any VMs with VDDK disks were found when plan uses offload
 	if len(vddkAndOffloadMixedUsage.Items) > 0 {
 		plan.Status.SetCondition(vddkAndOffloadMixedUsage)
+	}
+	if len(nfsOffloadDiskNotNFS.Items) > 0 {
+		plan.Status.SetCondition(nfsOffloadDiskNotNFS)
 	}
 	if len(vmCriticalConcerns.Items) > 0 {
 		plan.Status.SetCondition(vmCriticalConcerns)
@@ -2578,7 +2624,7 @@ func (r *Reconciler) validateVirtV2vImage(plan *api.Plan) error {
 }
 
 // vmUsesVddk checks if the VM requires VDDK for migration (i.e., if any disk doesn't use storage offload).
-// Both xcopy and CSI import are considered valid offload methods.
+// Xcopy, NFS copy and CSI import are considered valid offload methods.
 func (r *Reconciler) vmUsesVddk(storageMap *api.StorageMap, vsphereVM *vsphere.VM, vmName string) (bool, error) {
 	for _, disk := range vsphereVM.Disks {
 		mapping, found := storageMap.FindStorage(disk.Datastore.ID)
@@ -2589,6 +2635,9 @@ func (r *Reconciler) vmUsesVddk(storageMap *api.StorageMap, vsphereVM *vsphere.V
 			return true, nil
 		}
 		if mapping.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+			continue
+		}
+		if mapping.OffloadPlugin.VSphereNfsCopyPluginConfig != nil {
 			continue
 		}
 		if mapping.OffloadPlugin.CsiVolumeImport != nil {

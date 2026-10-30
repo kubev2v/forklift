@@ -33,6 +33,7 @@ func NewPopulator(
 	vmId string,
 	vmdkPath string,
 	sshConfig *SSHConfig,
+	nfsCopy bool,
 ) (Populator, error) {
 	// Create vSphere client for type detection
 	vsphereClient, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
@@ -49,6 +50,19 @@ func NewPopulator(
 	diskType := resolver.DetectDiskType(backing)
 	log.Info("disk type detected", "type", diskType)
 
+	// The NFS offload plugin asks for the array file copy; refuse rather than fall
+	// back to a different copy when the disk or the vendor cannot do it.
+	if nfsCopy {
+		if diskType != resolver.DiskTypeNFS {
+			return nil, fmt.Errorf("the NFS offload plugin is set for disk %s, which is not on an NFS datastore (type %s)", vmdkPath, diskType)
+		}
+		if !canUse(storageApi, resolver.DiskTypeNFS) {
+			return nil, fmt.Errorf("the NFS offload plugin is set for disk %s, but the storage vendor does not support NFS copy", vmdkPath)
+		}
+		log.Info("using NFS populator")
+		return createNFSPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
+	}
+
 	switch diskType {
 	case resolver.DiskTypeVVol:
 		if canUse(storageApi, resolver.DiskTypeVVol) {
@@ -60,12 +74,6 @@ func NewPopulator(
 		if canUse(storageApi, resolver.DiskTypeRDM) {
 			log.Info("using RDM populator")
 			return createRDMPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
-		}
-
-	case resolver.DiskTypeNFS:
-		if canUse(storageApi, resolver.DiskTypeNFS) {
-			log.Info("using NFS populator")
-			return createNFSPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
 		}
 	}
 

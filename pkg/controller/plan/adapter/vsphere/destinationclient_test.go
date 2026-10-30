@@ -166,10 +166,10 @@ var _ = Describe("DestinationClient", func() {
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
-			Expect(populatorList.Items).To(HaveLen(2))
-			for _, pop := range populatorList.Items {
-				Expect(pop.Labels["migration"]).To(Equal("123"))
-				Expect(pop.Labels["vmID"]).To(Equal("vm-1"))
+			Expect(populatorList).To(HaveLen(2))
+			for _, pop := range populatorList {
+				Expect(pop.object.GetLabels()["migration"]).To(Equal("123"))
+				Expect(pop.object.GetLabels()["vmID"]).To(Equal("vm-1"))
 			}
 		})
 
@@ -182,7 +182,87 @@ var _ = Describe("DestinationClient", func() {
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
-			Expect(populatorList.Items).To(BeEmpty())
+			Expect(populatorList).To(BeEmpty())
+		})
+
+		It("should return populator CRs of both offload kinds", func() {
+			// Setup
+			xcopyPopulator := &v1beta1.VSphereXcopyVolumePopulator{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "populator-xcopy",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "123",
+						"vmID":      "vm-1",
+					},
+				},
+				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+					VmdkPath: "/vmdk/block.vmdk",
+				},
+			}
+			nfsPopulator := &v1beta1.VSphereNfsCopyVolumePopulator{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "populator-nfscopy",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "123",
+						"vmID":      "vm-1",
+					},
+				},
+				Spec: v1beta1.VSphereNfsCopyVolumePopulatorSpec{
+					VmdkPath: "/vmdk/file.vmdk",
+				},
+			}
+
+			destClient := createDestinationClient(xcopyPopulator, nfsPopulator)
+
+			// Execute
+			populatorList, err := destClient.getPopulatorCrList("vm-1")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(populatorList).To(HaveLen(2))
+			kinds := map[string]string{}
+			for _, pop := range populatorList {
+				kinds[pop.kind] = pop.object.GetName()
+			}
+			Expect(kinds).To(HaveKeyWithValue(v1beta1.VSphereXcopyVolumePopulatorKind, "populator-xcopy"))
+			Expect(kinds).To(HaveKeyWithValue(v1beta1.VSphereNfsCopyVolumePopulatorKind, "populator-nfscopy"))
+		})
+
+		It("should delete populator CRs of both offload kinds", func() {
+			// Setup
+			xcopyPopulator := &v1beta1.VSphereXcopyVolumePopulator{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "populator-xcopy",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "123",
+						"vmID":      "vm-1",
+					},
+				},
+			}
+			nfsPopulator := &v1beta1.VSphereNfsCopyVolumePopulator{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "populator-nfscopy",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "123",
+						"vmID":      "vm-1",
+					},
+				},
+			}
+
+			destClient := createDestinationClient(xcopyPopulator, nfsPopulator)
+
+			// Execute
+			err := destClient.DeletePopulatorDataSource(&planapi.VMStatus{VM: planapi.VM{Ref: ref.Ref{ID: "vm-1"}}})
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			remaining, err := destClient.getPopulatorCrList("vm-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(remaining).To(BeEmpty())
 		})
 	})
 

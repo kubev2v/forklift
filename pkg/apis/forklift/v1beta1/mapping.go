@@ -83,8 +83,9 @@ type NetworkPair struct {
 // phase of the migration. There can be more than one available but currently only
 // one will be supported
 type OffloadPlugin struct {
-	VSphereXcopyPluginConfig *VSphereXcopyPluginConfig `json:"vsphereXcopyConfig,omitempty"`
-	CsiVolumeImport          *CsiVolumeImport          `json:"csiVolumeImport,omitempty"`
+	VSphereXcopyPluginConfig   *VSphereXcopyPluginConfig   `json:"vsphereXcopyConfig,omitempty"`
+	VSphereNfsCopyPluginConfig *VSphereNfsCopyPluginConfig `json:"vsphereNfsCopyConfig,omitempty"`
+	CsiVolumeImport            *CsiVolumeImport            `json:"csiVolumeImport,omitempty"`
 }
 
 // CsiVolumeImport uses the CSI driver's native import capability to migrate VVol/RDM disks.
@@ -141,6 +142,18 @@ type VSphereXcopyPluginConfig struct {
 	// XCOPY migrations instead of the VM's registered host.
 	// +optional
 	DedicatedMigrationHosts []string `json:"dedicatedMigrationHosts,omitempty"`
+}
+
+// VSphereNfsCopyPluginConfig offloads the copy of a disk on a vSphere NFS datastore
+// to the storage array, which copies the disk file into the destination NFS export.
+// The source datastore and the destination StorageClass must be served by the same array.
+type VSphereNfsCopyPluginConfig struct {
+	// SecretRef is the name of the secret with the storage credentials for the plugin.
+	// The secret should reside in the same namespace where the source provider is.
+	SecretRef string `json:"secretRef"`
+	// StorageVendorProduct the string identifier of the storage vendor product
+	// +kubebuilder:validation:Enum=pureFlashArray
+	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
 }
 
 // Mapped storage.

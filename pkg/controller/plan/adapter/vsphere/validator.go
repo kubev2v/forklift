@@ -715,10 +715,7 @@ func (r *Validator) coldOffloadRejectsSnapshot(vmRef ref.Ref) bool {
 		return false
 	}
 	for _, m := range r.Map.Storage.Spec.Map {
-		if m.OffloadPlugin == nil || m.OffloadPlugin.VSphereXcopyPluginConfig == nil {
-			continue
-		}
-		if !nfsOffloadCapable(m.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct) {
+		if m.OffloadPlugin == nil || m.OffloadPlugin.VSphereNfsCopyPluginConfig == nil {
 			continue
 		}
 		ds := &model.Datastore{}
@@ -737,12 +734,6 @@ func (r *Validator) coldOffloadRejectsSnapshot(vmRef ref.Ref) bool {
 		}
 	}
 	return false
-}
-
-// nfsOffloadCapable reports whether the vendor's populator copies an NFS disk
-// with the array's file API. Others fall through to VMDK/Xcopy.
-func nfsOffloadCapable(product api.StorageVendorProduct) bool {
-	return product == api.StorageVendorProductPureFlashArray
 }
 
 func (r *Validator) PowerState(vmRef ref.Ref) (ok bool, err error) {

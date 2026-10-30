@@ -1631,7 +1631,8 @@ func (r *Builder) SupportsVolumePopulators() bool {
 			return false
 		}
 
-		if m.OffloadPlugin != nil && (m.OffloadPlugin.VSphereXcopyPluginConfig != nil || m.OffloadPlugin.CsiVolumeImport != nil) {
+		if m.OffloadPlugin != nil && (m.OffloadPlugin.VSphereXcopyPluginConfig != nil ||
+			m.OffloadPlugin.VSphereNfsCopyPluginConfig != nil || m.OffloadPlugin.CsiVolumeImport != nil) {
 			klog.V(2).Infof("found offload plugin on ds map %+v", dsMapIn)
 			return true
 		}
@@ -1760,7 +1761,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				continue
 			}
 
-			if effectiveMapped.OffloadPlugin == nil || effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+			if effectiveMapped.OffloadPlugin == nil ||
+				(effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig == nil &&
+					effectiveMapped.OffloadPlugin.VSphereNfsCopyPluginConfig == nil) {
 				continue
 			}
 
@@ -1779,9 +1782,23 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				storageClass := effectiveMapped.Destination.StorageClass
 				r.Log.Info(fmt.Sprintf("getting storage mapping by storage class %q and datastore %v datastore name %s datastore", storageClass, disk.Datastore, disk.Datastore))
 				vsphereInstance := r.Plan.Provider.Source.GetName()
-				migrationHosts := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.DedicatedMigrationHosts
-				storageVendorProduct := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct
-				storageVendorSecretRef := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.SecretRef
+				// The NFS plugin copies on the array alone, so it has no migration hosts
+				var migrationHosts []string
+				var storageVendorProduct api.StorageVendorProduct
+				var storageVendorSecretRef string
+				nfsCopy := false
+				populatorKind := api.VSphereXcopyVolumePopulatorKind
+				if nfs := effectiveMapped.OffloadPlugin.VSphereNfsCopyPluginConfig; nfs != nil {
+					nfsCopy = true
+					populatorKind = api.VSphereNfsCopyVolumePopulatorKind
+					storageVendorProduct = nfs.StorageVendorProduct
+					storageVendorSecretRef = nfs.SecretRef
+				} else {
+					xcopy := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig
+					migrationHosts = xcopy.DedicatedMigrationHosts
+					storageVendorProduct = xcopy.StorageVendorProduct
+					storageVendorSecretRef = xcopy.SecretRef
+				}
 
 				r.Log.Info(fmt.Sprintf("vsphere provider %v storage vendor product %v storage secret name %v ", vsphereInstance, storageVendorProduct, storageVendorSecretRef))
 
@@ -1810,11 +1827,10 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					labels[Shareable] = "true"
 				}
 				r.Log.Info("target namespace for migration", "namespace", namespace)
-				// An NFS source disk is offloaded by an array file copy into an NFS
-				// destination export, which is a Filesystem volume. Block offload
-				// (XCOPY) targets stay Block.
+				// The NFS plugin copies into an NFS destination export, which is a
+				// Filesystem volume. Block offload (XCOPY) targets stay Block.
 				volumeMode := pvblock
-				if !disk.RDM && strings.HasPrefix(ds.Type, "NFS") {
+				if nfsCopy {
 					volumeMode = core.PersistentVolumeFilesystem
 				}
 				pvc := core.PersistentVolumeClaim{
@@ -1833,7 +1849,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						},
 						DataSourceRef: &core.TypedObjectReference{
 							APIGroup: &api.SchemeGroupVersion.Group,
-							Kind:     api.VSphereXcopyVolumePopulatorKind,
+							Kind:     populatorKind,
 						},
 					},
 				}
@@ -1907,27 +1923,43 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					i := rand.Intn(len(migrationHosts))
 					migrationHost = migrationHosts[i]
 				}
-				vp := api.VSphereXcopyVolumePopulator{
-					ObjectMeta: metav1.ObjectMeta{
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: "v1",
-								Kind:       "PersistentVolumeClaim",
-								Name:       pvc.Name,
-								UID:        pvc.UID,
-							},
+				populatorMeta := metav1.ObjectMeta{
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
+							Name:       pvc.Name,
+							UID:        pvc.UID,
 						},
-						Name:      populatorName,
-						Namespace: namespace,
-						Labels:    labels,
 					},
-					Spec: api.VSphereXcopyVolumePopulatorSpec{
-						VmId:                 vmRef.ID,
-						VmdkPath:             baseVolume(disk.File, r.Plan.IsWarm()),
-						SecretName:           diskSecretName,
-						StorageVendorProduct: string(storageVendorProduct),
-						MigrationHost:        migrationHost,
-					},
+					Name:      populatorName,
+					Namespace: namespace,
+					Labels:    labels,
+				}
+				// Each offload plugin owns its populator resource: the NFS copy runs
+				// on the array and has no migration host, the XCOPY copy needs one.
+				var vp client.Object
+				if nfsCopy {
+					vp = &api.VSphereNfsCopyVolumePopulator{
+						ObjectMeta: populatorMeta,
+						Spec: api.VSphereNfsCopyVolumePopulatorSpec{
+							VmId:                 vmRef.ID,
+							VmdkPath:             baseVolume(disk.File, r.Plan.IsWarm()),
+							SecretName:           diskSecretName,
+							StorageVendorProduct: string(storageVendorProduct),
+						},
+					}
+				} else {
+					vp = &api.VSphereXcopyVolumePopulator{
+						ObjectMeta: populatorMeta,
+						Spec: api.VSphereXcopyVolumePopulatorSpec{
+							VmId:                 vmRef.ID,
+							VmdkPath:             baseVolume(disk.File, r.Plan.IsWarm()),
+							SecretName:           diskSecretName,
+							StorageVendorProduct: string(storageVendorProduct),
+							MigrationHost:        migrationHost,
+						},
+					}
 				}
 				createdPVC := &core.PersistentVolumeClaim{}
 				// Check if a PVC was created for the current disk
@@ -1951,7 +1983,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					return nil, err
 				}
 
-				vp.OwnerReferences[0].UID = createdPVC.UID
+				ownerRefs := vp.GetOwnerReferences()
+				ownerRefs[0].UID = createdPVC.UID
+				vp.SetOwnerReferences(ownerRefs)
 				err = r.mergeSecrets(secretName, namespace, storageVendorSecretRef, r.Source.Provider.Namespace, diskSecretName, createdPVC)
 				if err != nil {
 					return nil, fmt.Errorf("failed to merge secrets for populators %w", err)
@@ -1962,7 +1996,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				if err != nil {
 					return nil, err
 				}
-				err = r.ensureXCopyVolumePopulator(&vp)
+				err = r.ensureVolumePopulator(vp, populatorKind)
 				if err != nil {
 					return nil, err
 				}
@@ -2144,10 +2178,27 @@ func (r *Builder) PrePopulateActions(c planbase.Client, vmRef ref.Ref) (ready bo
 	return
 }
 
-func (r *Builder) getPopulatorForPVC(pvc *core.PersistentVolumeClaim) (api.VSphereXcopyVolumePopulator, error) {
+// Status of either copy-offload populator, read for progress and offload reporting.
+type copyOffloadStatus struct {
+	progress            string
+	xcopyUsed           string
+	copyDurationSeconds string
+	result              string
+	storageVendor       string
+	cloneMethod         string
+	storageProtocol     string
+	provisionedBytes    string
+	allocatedBytes      string
+}
+
+func (r *Builder) getPopulatorForPVC(pvc *core.PersistentVolumeClaim) (copyOffloadStatus, error) {
 	vmdkKey := pvc.Labels["vmdkKey"]
 	vmId := pvc.Labels["vmID"]
-	return r.getVolumePopulator(vmId, vmdkKey)
+	kind := api.VSphereXcopyVolumePopulatorKind
+	if pvc.Spec.DataSourceRef != nil && pvc.Spec.DataSourceRef.Kind != "" {
+		kind = pvc.Spec.DataSourceRef.Kind
+	}
+	return r.getVolumePopulator(vmId, vmdkKey, kind)
 }
 
 func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
@@ -2166,12 +2217,12 @@ func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (tr
 		return 0, err
 	}
 
-	if populatorCr.Status.Progress == "" {
+	if populatorCr.progress == "" {
 		transferredBytes = 0
 		return
 	}
 
-	progressPercentage, err := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
+	progressPercentage, err := strconv.ParseInt(populatorCr.progress, 10, 64)
 	if err != nil {
 		r.Log.Error(err, "Couldn't parse the progress percentage.", "pvcName", pvc.Name, "progressPercentage", progressPercentage)
 		return 0, nil
@@ -2188,14 +2239,14 @@ func (r *Builder) PopulatorOffloadInfo(pvc *core.PersistentVolumeClaim) (map[str
 	}
 	info := make(map[string]string)
 	for key, value := range map[string]string{
-		"xcopyUsed":           populatorCr.Status.XcopyUsed,
-		"copyDurationSeconds": populatorCr.Status.CopyDurationSeconds,
-		"result":              populatorCr.Status.Result,
-		"storageVendor":       populatorCr.Status.StorageVendor,
-		"cloneMethod":         populatorCr.Status.CloneMethod,
-		"storageProtocol":     populatorCr.Status.StorageProtocol,
-		"provisionedBytes":    populatorCr.Status.ProvisionedBytes,
-		"allocatedBytes":      populatorCr.Status.AllocatedBytes,
+		"xcopyUsed":           populatorCr.xcopyUsed,
+		"copyDurationSeconds": populatorCr.copyDurationSeconds,
+		"result":              populatorCr.result,
+		"storageVendor":       populatorCr.storageVendor,
+		"cloneMethod":         populatorCr.cloneMethod,
+		"storageProtocol":     populatorCr.storageProtocol,
+		"provisionedBytes":    populatorCr.provisionedBytes,
+		"allocatedBytes":      populatorCr.allocatedBytes,
 	} {
 		if value != "" {
 			info[key] = value
@@ -2204,43 +2255,81 @@ func (r *Builder) PopulatorOffloadInfo(pvc *core.PersistentVolumeClaim) (map[str
 	return info, nil
 }
 
-func (r *Builder) getVolumePopulator(vmId, vmdkKey string) (api.VSphereXcopyVolumePopulator, error) {
-	list := api.VSphereXcopyVolumePopulatorList{}
-	err := r.Destination.List(context.TODO(), &list, &client.ListOptions{
+func (r *Builder) getVolumePopulator(vmId, vmdkKey, kind string) (copyOffloadStatus, error) {
+	options := &client.ListOptions{
 		Namespace: r.Plan.Spec.TargetNamespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"migration": string(r.Migration.UID),
 			"vmdkKey":   vmdkKey,
 			"vmID":      vmId,
 		}),
-	})
-	if err != nil {
-		return api.VSphereXcopyVolumePopulator{}, liberr.Wrap(err)
 	}
-	if len(list.Items) == 0 {
-		return api.VSphereXcopyVolumePopulator{},
+	var names []string
+	var status copyOffloadStatus
+	if kind == api.VSphereNfsCopyVolumePopulatorKind {
+		list := api.VSphereNfsCopyVolumePopulatorList{}
+		if err := r.Destination.List(context.TODO(), &list, options); err != nil {
+			return copyOffloadStatus{}, liberr.Wrap(err)
+		}
+		for _, item := range list.Items {
+			names = append(names, item.Name)
+		}
+		if len(list.Items) == 1 {
+			s := list.Items[0].Status
+			status = copyOffloadStatus{
+				progress:            s.Progress,
+				copyDurationSeconds: s.CopyDurationSeconds,
+				result:              s.Result,
+				storageVendor:       s.StorageVendor,
+				cloneMethod:         s.CloneMethod,
+				storageProtocol:     s.StorageProtocol,
+				provisionedBytes:    s.ProvisionedBytes,
+				allocatedBytes:      s.AllocatedBytes,
+			}
+		}
+	} else {
+		list := api.VSphereXcopyVolumePopulatorList{}
+		if err := r.Destination.List(context.TODO(), &list, options); err != nil {
+			return copyOffloadStatus{}, liberr.Wrap(err)
+		}
+		for _, item := range list.Items {
+			names = append(names, item.Name)
+		}
+		if len(list.Items) == 1 {
+			s := list.Items[0].Status
+			status = copyOffloadStatus{
+				progress:            s.Progress,
+				xcopyUsed:           s.XcopyUsed,
+				copyDurationSeconds: s.CopyDurationSeconds,
+				result:              s.Result,
+				storageVendor:       s.StorageVendor,
+				cloneMethod:         s.CloneMethod,
+				storageProtocol:     s.StorageProtocol,
+				provisionedBytes:    s.ProvisionedBytes,
+				allocatedBytes:      s.AllocatedBytes,
+			}
+		}
+	}
+	if len(names) == 0 {
+		return copyOffloadStatus{},
 			liberr.New(
-				"No VSphereXcopyVolumePopulator CR found - populator may not have been created or was deleted",
+				"No "+kind+" CR found - populator may not have been created or was deleted",
 				"namespace", r.Plan.Spec.TargetNamespace,
 				"migration", string(r.Migration.UID),
 				"vmID", vmId,
 				"vmdkKey", vmdkKey)
 	}
-	if len(list.Items) > 1 {
-		names := make([]string, len(list.Items))
-		for i, item := range list.Items {
-			names[i] = item.Name
-		}
-		return api.VSphereXcopyVolumePopulator{},
+	if len(names) > 1 {
+		return copyOffloadStatus{},
 			liberr.New(
-				"Multiple VSphereXcopyVolumePopulator CRs found for the same VMDK disk",
+				"Multiple "+kind+" CRs found for the same VMDK disk",
 				"namespace", r.Plan.Spec.TargetNamespace,
 				"migration", string(r.Migration.UID),
 				"vmID", vmId,
 				"vmdkKey", vmdkKey,
 				"populators", strings.Join(names, ", "))
 	}
-	return list.Items[0], nil
+	return status, nil
 }
 
 func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error) {
@@ -2860,15 +2949,19 @@ func (r *Builder) generatePopulatorSuffix(migrationUID, vmID string, diskKey int
 	return hex.EncodeToString(hash[:])[:8]
 }
 
-func (r *Builder) ensureXCopyVolumePopulator(vp *api.VSphereXcopyVolumePopulator) error {
-	existingPopulator := &api.VSphereXcopyVolumePopulator{}
+// Create the copy-offload populator resource unless it already exists.
+func (r *Builder) ensureVolumePopulator(vp client.Object, kind string) error {
+	existingPopulator, ok := vp.DeepCopyObject().(client.Object)
+	if !ok {
+		return liberr.New("populator object is not a client.Object", "kind", kind)
+	}
 	err := r.Destination.Get(context.TODO(), client.ObjectKey{
-		Namespace: vp.Namespace,
-		Name:      vp.Name,
+		Namespace: vp.GetNamespace(),
+		Name:      vp.GetName(),
 	}, existingPopulator)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			r.Log.Info("Creating the populator resource", "VSphereXcopyVolumePopulator", vp.Name, "namespace", vp.Namespace)
+			r.Log.Info("Creating the populator resource", kind, vp.GetName(), "namespace", vp.GetNamespace())
 			err = r.Destination.Create(context.TODO(), vp, &client.CreateOptions{})
 			if err != nil {
 				return err
@@ -2877,7 +2970,7 @@ func (r *Builder) ensureXCopyVolumePopulator(vp *api.VSphereXcopyVolumePopulator
 			return err
 		}
 	} else {
-		r.Log.Info("Populator already exists", "populator", vp.Name, "namespace", vp.Namespace)
+		r.Log.Info("Populator already exists", "populator", vp.GetName(), "namespace", vp.GetNamespace())
 	}
 	return nil
 }

@@ -802,6 +802,11 @@ spec:
         kind: VSphereXcopyVolumePopulator
         name: vspherexcopyvolumepopulators.forklift.konveyor.io
         version: v1beta1
+      - description: VSphere NFS Copy Volume Populator
+        displayName: VSphereNfsCopyVolumePopulator
+        kind: VSphereNfsCopyVolumePopulator
+        name: vspherenfscopyvolumepopulators.forklift.konveyor.io
+        version: v1beta1
       - description: VM conversion and inspection lifecycle manager
         displayName: Conversion
         kind: Conversion
