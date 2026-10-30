@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9/go-toolset:1.25.9-1778675823 AS builder
+FROM registry.redhat.io/ubi9/go-toolset:9.8-1793294290 AS builder
 
 USER 0
 WORKDIR /app

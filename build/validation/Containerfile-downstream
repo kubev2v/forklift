@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9/go-toolset:1.26.10-1792906297 AS mtv-opa
+FROM registry.redhat.io/ubi9/go-toolset:9.8-1793294290 AS mtv-opa
 USER 0
 WORKDIR /app/opa
 ENV GOFLAGS="-tags=strictfipsruntime"
