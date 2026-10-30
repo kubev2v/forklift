@@ -13,7 +13,7 @@ RUN mkdir -p /usr/lib64/guestfs/appliance && \
     qemu-img convert -c -O qcow2 root root.qcow2 && \
     mv -vf root.qcow2 root
 
-FROM registry.access.redhat.com/ubi9/go-toolset:1.25.9-1778604137 AS gobuild
+FROM registry.access.redhat.com/ubi9/go-toolset:1.26.10-1793294290 AS gobuild
 USER 0
 WORKDIR /build
 COPY . .
