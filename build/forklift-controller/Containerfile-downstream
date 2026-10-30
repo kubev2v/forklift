@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9/go-toolset:9.8-1788409979 AS builder
+FROM registry.redhat.io/ubi9/go-toolset:9.8-1793294290 AS builder
 
 USER 0
 WORKDIR /app
@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=${GOCACHE},uid=1001 \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOEXPERIMENT=none GOFLAGS="-mod=vendor" \
     go build -buildvcs=false -trimpath -ldflags="-w -s" -o nbd-orchestrator github.com/kubev2v/forklift/cmd/nbd-orchestrator
 
-FROM registry.redhat.io/ubi9-minimal:9.7-1778562320
+FROM registry.redhat.io/ubi9-minimal:9.8-1793253163
 
 # RUN microdnf -y update && microdnf -y clean all
 # Required to be able to get files from within the pod
