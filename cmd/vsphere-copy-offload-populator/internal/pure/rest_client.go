@@ -91,6 +91,7 @@ type Host struct {
 	Name string   `json:"name"`
 	Iqn  []string `json:"iqns"`
 	Wwn  []string `json:"wwns"`
+	Nqn  []string `json:"nqns"`
 }
 
 // Volume represents a Pure FlashArray volume
@@ -114,6 +115,23 @@ type VolumesResponse struct {
 type HostConnectionRequest struct {
 	HostNames   string `json:"host_names"`
 	VolumeNames string `json:"volume_names"`
+}
+
+// HostConnection represents a single host-to-volume connection on the FlashArray.
+type HostConnection struct {
+	// Host is the Pure host object reference.
+	Host struct {
+		Name string `json:"name"`
+	} `json:"host"`
+	// Volume is the Pure volume object reference.
+	Volume struct {
+		Name string `json:"name"`
+	} `json:"volume"`
+}
+
+// HostConnectionsResponse represents the response from the connections list API.
+type HostConnectionsResponse struct {
+	Items []HostConnection `json:"items"`
 }
 
 // NewRestClient creates a new REST client for Pure FlashArray
@@ -493,6 +511,33 @@ func (c *RestClient) DisconnectHost(hostName, volumeName string) error {
 	}
 
 	return nil
+}
+
+// ListVolumeConnections returns all host connections for the given volume name.
+func (c *RestClient) ListVolumeConnections(volumeName string) ([]HostConnection, error) {
+	reqURL := fmt.Sprintf("https://%s/api/%s/connections?volume_names=%s",
+		c.hostname, c.apiV2, url.QueryEscape(volumeName))
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create list connections request: %w", err)
+	}
+
+	resp, body, err := c.doWithReauth(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send list connections request: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("list connections request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result HostConnectionsResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse list connections response: %w", err)
+	}
+
+	return result.Items, nil
 }
 
 // GetVolume gets information about a specific volume
