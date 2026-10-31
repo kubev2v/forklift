@@ -11,8 +11,10 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/base"
 	vspheremodel "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -1729,5 +1731,120 @@ var _ = ginkgo.Describe("checkConversionResumable", func() {
 		cnd := p.Status.FindCondition(ConversionResumable)
 		gomega.Expect(cnd.Message).To(gomega.ContainSubstring("failed-vm"))
 		gomega.Expect(cnd.Message).NotTo(gomega.ContainSubstring("succeeded-vm"))
+	})
+})
+
+// nfsDatastoreStub is a web.Client that only implements Find(), used to supply
+// datastore NAS details for hasNfsOffloadDiskNotNFS tests.
+type nfsDatastoreStub struct {
+	web.Client
+	datastores map[string]*vsphere.Datastore
+}
+
+func (s *nfsDatastoreStub) Find(resource interface{}, r ref.Ref) error {
+	ds, found := s.datastores[r.ID]
+	if !found {
+		return liberr.New("datastore not found", "id", r.ID)
+	}
+	out, ok := resource.(*vsphere.Datastore)
+	if !ok {
+		return liberr.New("unexpected resource type")
+	}
+	*out = *ds
+	return nil
+}
+
+var _ = ginkgo.Describe("hasNfsOffloadDiskNotNFS", func() {
+	nfsPlugin := &api.OffloadPlugin{
+		VSphereNfsCopyPluginConfig: &api.VSphereNfsCopyPluginConfig{
+			StorageVendorProduct: "pureFlashArray",
+			SecretRef:            "test-secret",
+		},
+	}
+	xcopyPlugin := &api.OffloadPlugin{
+		VSphereXcopyPluginConfig: &api.VSphereXcopyPluginConfig{
+			StorageVendorProduct: "pureFlashArray",
+			SecretRef:            "test-secret",
+		},
+	}
+
+	vmOnDatastore := func(dsID string) *vsphere.VM {
+		return &vsphere.VM{
+			VM1: vsphere.VM1{
+				VM0:   vsphere.VM0{ID: "vm-1", Path: "vm-1"},
+				Disks: []vspheremodel.Disk{{Key: 2000, Bus: vspheremodel.SCSI, Datastore: vspheremodel.Ref{ID: dsID}}},
+			},
+		}
+	}
+	storageMapWith := func(dsID string, plugin *api.OffloadPlugin) *api.StorageMap {
+		return &api.StorageMap{
+			Spec: api.StorageMapSpec{
+				Map: []api.StoragePair{{
+					Source:        ref.Ref{ID: dsID},
+					Destination:   api.DestinationStorage{StorageClass: "test-sc"},
+					OffloadPlugin: plugin,
+				}},
+			},
+		}
+	}
+	inventoryWith := func(ds *vsphere.Datastore) *nfsDatastoreStub {
+		return &nfsDatastoreStub{datastores: map[string]*vsphere.Datastore{ds.ID: ds}}
+	}
+
+	nfsDS := &vsphere.Datastore{
+		Resource:      vsphere.Resource{ID: "ds-nfs", Name: "Pure-NFS"},
+		Type:          "NFS41",
+		NasRemotePath: "/export-1",
+		NasRemoteHost: "192.168.28.180",
+	}
+	vmfsDS := &vsphere.Datastore{
+		Resource: vsphere.Resource{ID: "ds-vmfs", Name: "Pure-VMFS"},
+		Type:     "VMFS",
+	}
+	vvolDS := &vsphere.Datastore{
+		Resource: vsphere.Resource{ID: "ds-vvol", Name: "Pure-vVol"},
+		Type:     "VVOL",
+	}
+
+	ginkgo.It("accepts an NFS datastore", func() {
+		label, err := hasNfsOffloadDiskNotNFS(
+			vmOnDatastore("ds-nfs"), storageMapWith("ds-nfs", nfsPlugin), inventoryWith(nfsDS))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(label).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("rejects a VMFS datastore", func() {
+		label, err := hasNfsOffloadDiskNotNFS(
+			vmOnDatastore("ds-vmfs"), storageMapWith("ds-vmfs", nfsPlugin), inventoryWith(vmfsDS))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(label).To(gomega.Equal("Pure-VMFS"))
+	})
+
+	ginkgo.It("rejects a VVol datastore", func() {
+		label, err := hasNfsOffloadDiskNotNFS(
+			vmOnDatastore("ds-vvol"), storageMapWith("ds-vvol", nfsPlugin), inventoryWith(vvolDS))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(label).To(gomega.Equal("Pure-vVol"))
+	})
+
+	ginkgo.It("ignores the xcopy plugin on a VMFS datastore", func() {
+		label, err := hasNfsOffloadDiskNotNFS(
+			vmOnDatastore("ds-vmfs"), storageMapWith("ds-vmfs", xcopyPlugin), inventoryWith(vmfsDS))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(label).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("ignores the xcopy plugin on an NFS datastore", func() {
+		label, err := hasNfsOffloadDiskNotNFS(
+			vmOnDatastore("ds-nfs"), storageMapWith("ds-nfs", xcopyPlugin), inventoryWith(nfsDS))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(label).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("ignores a datastore with no offload plugin", func() {
+		label, err := hasNfsOffloadDiskNotNFS(
+			vmOnDatastore("ds-vmfs"), storageMapWith("ds-vmfs", nil), inventoryWith(vmfsDS))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(label).To(gomega.BeEmpty())
 	})
 })

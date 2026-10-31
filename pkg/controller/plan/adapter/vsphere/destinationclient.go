@@ -28,23 +28,23 @@ func (d *DestinationClient) DeletePopulatorDataSource(vm *plan.VMStatus) error {
 		return liberr.Wrap(err)
 	}
 
-	d.Log.Info("Found populator CRs to delete", "count", len(populatorCrList.Items))
+	d.Log.Info("Found populator CRs to delete", "count", len(populatorCrList))
 
-	for i, populatorCr := range populatorCrList.Items {
+	for i, populatorCr := range populatorCrList {
 		d.Log.Info("Deleting populator CR",
 			"index", i+1,
-			"total", len(populatorCrList.Items),
-			"name", populatorCr.Name,
-			"namespace", populatorCr.Namespace,
-			"vmdkPath", populatorCr.Spec.VmdkPath)
+			"total", len(populatorCrList),
+			"name", populatorCr.object.GetName(),
+			"namespace", populatorCr.object.GetNamespace(),
+			"vmdkPath", populatorCr.vmdkPath)
 
-		err = d.DeleteObject(&populatorCr, vm, "Deleted VSphereXcopyPopulator CR.", "VSphereXcopyVolumePopulator")
+		err = d.DeleteObject(populatorCr.object, vm, "Deleted "+populatorCr.kind+" CR.", populatorCr.kind)
 		if err != nil {
-			d.Log.Error(err, "Failed to delete populator CR", "name", populatorCr.Name)
+			d.Log.Error(err, "Failed to delete populator CR", "name", populatorCr.object.GetName())
 			return liberr.Wrap(err)
 		}
 
-		d.Log.Info("Successfully deleted populator CR", "name", populatorCr.Name)
+		d.Log.Info("Successfully deleted populator CR", "name", populatorCr.object.GetName())
 	}
 
 	d.Log.Info("Completed DeletePopulatorDataSource", "vm", vm.String())
@@ -58,13 +58,20 @@ func (r *DestinationClient) SetPopulatorCrOwnership() (err error) {
 	return nil
 }
 
-// Get the VSphereXcopyVolumePopulator CustomResource List filtered by migration and VM.
-func (r *DestinationClient) getPopulatorCrList(vmID string) (populatorCrList v1beta1.VSphereXcopyVolumePopulatorList, err error) {
+// A copy-offload populator CR of either kind, with the fields used for logging.
+type populatorCr struct {
+	object   client.Object
+	kind     string
+	vmdkPath string
+}
+
+// Get the copy-offload populator CustomResources filtered by migration and VM.
+func (r *DestinationClient) getPopulatorCrList(vmID string) (populatorCrs []populatorCr, err error) {
 	snap := r.Plan.Status.Migration.ActiveSnapshot()
 	if snap.Migration.UID == "" {
 		err = liberr.New("no active migration snapshot", "plan", r.Plan.Name)
 		r.Log.Error(err, "Cannot list populator CRs")
-		return v1beta1.VSphereXcopyVolumePopulatorList{}, err
+		return nil, err
 	}
 	migUID := string(snap.Migration.UID)
 	r.Log.Info("Getting populator CR list",
@@ -72,22 +79,39 @@ func (r *DestinationClient) getPopulatorCrList(vmID string) (populatorCrList v1b
 		"migrationUID", migUID,
 		"vmID", vmID)
 
-	populatorCrList = v1beta1.VSphereXcopyVolumePopulatorList{}
-	err = r.Destination.List(
-		context.TODO(),
-		&populatorCrList,
-		&client.ListOptions{
-			Namespace:     r.Plan.Spec.TargetNamespace,
-			LabelSelector: labels.SelectorFromSet(map[string]string{"migration": migUID, "vmID": vmID}),
-		})
-
-	if err != nil {
-		r.Log.Error(err, "Failed to list populator CRs")
-	} else {
-		r.Log.Info("Successfully listed populator CRs", "count", len(populatorCrList.Items))
+	options := &client.ListOptions{
+		Namespace:     r.Plan.Spec.TargetNamespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{"migration": migUID, "vmID": vmID}),
 	}
 
-	return populatorCrList, err
+	xcopyList := v1beta1.VSphereXcopyVolumePopulatorList{}
+	if err = r.Destination.List(context.TODO(), &xcopyList, options); err != nil {
+		r.Log.Error(err, "Failed to list populator CRs")
+		return nil, err
+	}
+	for i := range xcopyList.Items {
+		populatorCrs = append(populatorCrs, populatorCr{
+			object:   &xcopyList.Items[i],
+			kind:     v1beta1.VSphereXcopyVolumePopulatorKind,
+			vmdkPath: xcopyList.Items[i].Spec.VmdkPath,
+		})
+	}
+
+	nfsList := v1beta1.VSphereNfsCopyVolumePopulatorList{}
+	if err = r.Destination.List(context.TODO(), &nfsList, options); err != nil {
+		r.Log.Error(err, "Failed to list populator CRs")
+		return nil, err
+	}
+	for i := range nfsList.Items {
+		populatorCrs = append(populatorCrs, populatorCr{
+			object:   &nfsList.Items[i],
+			kind:     v1beta1.VSphereNfsCopyVolumePopulatorKind,
+			vmdkPath: nfsList.Items[i].Spec.VmdkPath,
+		})
+	}
+
+	r.Log.Info("Successfully listed populator CRs", "count", len(populatorCrs))
+	return populatorCrs, nil
 }
 
 // Deletes an object from destination cluster associated with the VM.

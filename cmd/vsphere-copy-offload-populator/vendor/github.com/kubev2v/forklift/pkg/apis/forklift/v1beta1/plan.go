@@ -613,7 +613,8 @@ func (r *Plan) IsUsingOffloadPlugin() bool {
 	}
 	dsMapIn := r.Map.Storage.Spec.Map
 	for _, m := range dsMapIn {
-		if m.OffloadPlugin != nil && (m.OffloadPlugin.VSphereXcopyPluginConfig != nil || m.OffloadPlugin.CsiVolumeImport != nil) {
+		if m.OffloadPlugin != nil && (m.OffloadPlugin.VSphereXcopyPluginConfig != nil ||
+			m.OffloadPlugin.VSphereNfsCopyPluginConfig != nil || m.OffloadPlugin.CsiVolumeImport != nil) {
 			return true
 		}
 	}

@@ -33,6 +33,7 @@ func NewPopulator(
 	vmId string,
 	vmdkPath string,
 	sshConfig *SSHConfig,
+	nfsCopy bool,
 ) (Populator, error) {
 	// Create vSphere client for type detection
 	vsphereClient, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
@@ -48,6 +49,19 @@ func NewPopulator(
 
 	diskType := resolver.DetectDiskType(backing)
 	log.Info("disk type detected", "type", diskType)
+
+	// The NFS offload plugin asks for the array file copy; refuse rather than fall
+	// back to a different copy when the disk or the vendor cannot do it.
+	if nfsCopy {
+		if diskType != resolver.DiskTypeNFS {
+			return nil, fmt.Errorf("the NFS offload plugin is set for disk %s, which is not on an NFS datastore (type %s)", vmdkPath, diskType)
+		}
+		if !canUse(storageApi, resolver.DiskTypeNFS) {
+			return nil, fmt.Errorf("the NFS offload plugin is set for disk %s, but the storage vendor does not support NFS copy", vmdkPath)
+		}
+		log.Info("using NFS populator")
+		return createNFSPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
+	}
 
 	switch diskType {
 	case resolver.DiskTypeVVol:
@@ -113,6 +127,17 @@ func createRDMPopulator(storageApi StorageApi, vmwareClient vmware.Client, sourc
 	return NewRDMPopulator(rdmApi, vmwareClient, copyCtx)
 }
 
+// createNFSPopulator creates the NFS file-copy populator
+func createNFSPopulator(storageApi StorageApi, vmwareClient vmware.Client, sourceDiskCap, sourceDatastoreAlloc int64) (Populator, error) {
+	nfsApi, ok := storageApi.(NFSCapable)
+	if !ok {
+		return nil, fmt.Errorf("storage API does not implement NFSCapable")
+	}
+
+	copyCtx := CopyContext{CloneMethod: "nfs", SourceDiskCapacityBytes: sourceDiskCap, SourceDiskDatastoreAllocatedBytes: sourceDatastoreAlloc}
+	return NewNFSPopulator(nfsApi, vmwareClient, copyCtx)
+}
+
 // createVMDKPopulator creates VMDK/Xcopy populator (default/fallback)
 func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshConfig *SSHConfig, sourceDiskCap, sourceDatastoreAlloc int64) (Populator, error) {
 	vmdkApi, ok := storageApi.(VMDKCapable)
@@ -160,6 +185,10 @@ func canUse(storageApi StorageApi, diskType resolver.DiskType) bool {
 			return false
 		}
 		_, ok := storageApi.(RDMCapable)
+		return ok
+
+	case resolver.DiskTypeNFS:
+		_, ok := storageApi.(NFSCapable)
 		return ok
 
 	default:

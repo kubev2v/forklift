@@ -56,6 +56,13 @@ var populators = map[string]populator{
 		imageVar:        "VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE",
 		metricsEndpoint: ":8082",
 	},
+	"vsphere-nfscopy": {
+		kind:            "VSphereNfsCopyVolumePopulator",
+		resource:        "vspherenfscopyvolumepopulators",
+		controllerFunc:  getVNPopulatorPodArgs,
+		imageVar:        "VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE",
+		metricsEndpoint: ":8083",
+	},
 }
 
 func main() {
@@ -170,6 +177,25 @@ func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.Pers
 		args = append(args, "--migration-host="+xcopy.Spec.MigrationHost)
 	}
 	return args, nil
+}
+
+func getVNPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.PersistentVolumeClaim) ([]string, error) {
+	var nfsCopy v1beta1.VSphereNfsCopyVolumePopulator
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &nfsCopy)
+	if nil != err {
+		return nil, err
+	}
+	return []string{
+		"--source-vm-id=" + nfsCopy.Spec.VmId,
+		"--source-vmdk=" + nfsCopy.Spec.VmdkPath,
+		"--target-namespace=" + nfsCopy.GetNamespace(),
+		"--cr-name=" + nfsCopy.Name,
+		"--cr-namespace=" + nfsCopy.Namespace,
+		"--owner-name=" + pvc.Name,
+		"--secret-name=" + nfsCopy.Spec.SecretName,
+		"--storage-vendor-product=" + nfsCopy.Spec.StorageVendorProduct,
+		"--nfs-copy",
+	}, nil
 }
 
 func getVolumePath(rawBlock bool) string {

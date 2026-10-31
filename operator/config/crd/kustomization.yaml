@@ -14,6 +14,7 @@ resources:
 - bases/forklift.konveyor.io_ovirtvolumepopulators.yaml
 - bases/forklift.konveyor.io_openstackvolumepopulators.yaml
 - bases/forklift.konveyor.io_vspherexcopyvolumepopulators.yaml
+- bases/forklift.konveyor.io_vspherenfscopyvolumepopulators.yaml
 - bases/forklift.konveyor.io_ovaproviderservers.yaml
 - bases/forklift.konveyor.io_hypervproviderservers.yaml
 - bases/forklift.konveyor.io_copyappliances.yaml

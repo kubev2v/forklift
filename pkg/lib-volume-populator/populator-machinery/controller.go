@@ -110,6 +110,11 @@ var (
 			resource:           api.VSphereXcopyVolumePopulatorResource,
 			regexKey:           "vsphere_xcopy_volume_populator",
 		},
+		api.VSphereNfsCopyVolumePopulatorKind: {
+			storageResourceKey: "source_vmdk",
+			resource:           api.VSphereNfsCopyVolumePopulatorResource,
+			regexKey:           "vsphere_xcopy_volume_populator",
+		},
 	}
 
 	monitoredPVCs = map[string]interface{}{}
@@ -221,7 +226,7 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		maxInFlight:       maxInFlight,
 	}
 
-	if gk.Kind == api.VSphereXcopyVolumePopulatorKind {
+	if api.IsVSphereCopyOffloadKind(gk.Kind) {
 		c.metrics.initCompletionMetrics()
 	}
 	c.metrics.startListener(httpEndpoint, metricsPath)
@@ -678,8 +683,8 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 				},
 				Spec: makePopulatePodSpec(pvcPrimeName, secretName),
 			}
-			if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
-				pod.Spec.ServiceAccountName = "populator" // Xcopy always uses its dedicated SA
+			if api.IsVSphereCopyOffloadKind(c.gk.Kind) {
+				pod.Spec.ServiceAccountName = "populator" // Copy-offload always uses its dedicated SA
 			} else if sa, ok := pvc.Annotations[AnnPopulatorServiceAccount]; ok && sa != "" {
 				pod.Spec.ServiceAccountName = sa // Other populators use the annotation
 			}
@@ -790,8 +795,8 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 		if corev1.PodSucceeded != pod.Status.Phase {
 			if corev1.PodFailed == pod.Status.Phase {
-				// Skip retry logic for VSphere xcopy populator - let it fail immediately
-				if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
+				// Skip retry logic for the VSphere copy-offload populators - let them fail immediately
+				if api.IsVSphereCopyOffloadKind(c.gk.Kind) {
 					// Record failure metrics with available labels from the CR.
 					migration, _, _ := unstructured.NestedString(crInstance.Object, "metadata", "labels", "migration")
 					vendor, _, _ := unstructured.NestedString(crInstance.Object, "spec", "storageVendorProduct")
@@ -949,7 +954,7 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 
 	// For xcopy populator: detect completion metrics from the scraped body.
 	var completion *completionData
-	if populatorKind == api.VSphereXcopyVolumePopulatorKind && !c.metrics.isCompletionRecorded(pvc.UID) {
+	if api.IsVSphereCopyOffloadKind(populatorKind) && !c.metrics.isCompletionRecorded(pvc.UID) {
 		completion = c.parseAndRecordCompletion(bodyStr, pvc, cr)
 	}
 
@@ -972,7 +977,7 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 	// Best-effort: a miss or parse/write failure here is logged and skipped, and must
 	// not prevent the independent xcopyUsed/vibVersion scrapes below from being applied.
 	var importRegExp *regexp.Regexp
-	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
+	if api.IsVSphereCopyOffloadKind(populatorKind) {
 		importRegExp = regexp.MustCompile(`vsphere_xcopy_volume_populator_progress\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+\.?\d*)`)
 	} else {
 		importRegExp = regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
@@ -993,6 +998,7 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 
 	// xcopyUsed / vibVersion: best-effort, independent of progress above so that a
 	// failure/miss on either side never blocks the other from reaching the CR.
+	// Xcopy only: the NFS copy's CRD has no such fields.
 	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
 		xcopyRegExp := regexp.MustCompile(`vsphere_xcopy_volume_populator_xcopy_used\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+)`)
 		if xcopyMatch := xcopyRegExp.FindStringSubmatch(bodyStr); xcopyMatch != nil {

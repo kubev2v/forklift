@@ -257,6 +257,65 @@ var _ = Describe("vSphere builder", func() {
 			Expect(pvc.Spec.DataSourceRef.APIGroup).To(Equal(&v1beta1.SchemeGroupVersion.Group))
 			Expect(pvc.Spec.DataSourceRef.Name).To(Equal(pvc.Name))
 		})
+		It("should use the NFS copy populator and a Filesystem volume for the NFS offload plugin", func() {
+			builder := createBuilder(
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "test-secret", Namespace: "test"},
+					Data:       map[string][]byte{"foo": []byte("bar")},
+				},
+			)
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{
+						ID:   "test-vm-id",
+						Name: "nfs-source-vm",
+					},
+					Disks: []vsphere.Disk{
+						{
+							Datastore: vsphere.Ref{ID: "ds-nfs"},
+							File:      "[nfs-ds] vm-123/vm-123.vmdk",
+							Bus:       vsphere.SCSI,
+							Capacity:  1024 * 1024 * 1024, // 1 GiB
+							Key:       2000,
+						},
+					},
+				},
+			}
+
+			storageMap := v1beta1.StorageMap{
+				Spec: v1beta1.StorageMapSpec{
+					Map: []v1beta1.StoragePair{
+						{
+							Source:      ref.Ref{ID: "ds-nfs"},
+							Destination: v1beta1.DestinationStorage{StorageClass: "fa-file-sc"},
+							OffloadPlugin: &v1beta1.OffloadPlugin{
+								VSphereNfsCopyPluginConfig: &v1beta1.VSphereNfsCopyPluginConfig{
+									StorageVendorProduct: "pureFlashArray",
+									SecretRef:            "test-secret",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			builder.Source.Inventory = &mockInventory{
+				ds: model.Datastore{Resource: model.Resource{ID: "ds-nfs"}, Type: "NFS41"},
+				vm: vm,
+			}
+			builder.Map.Storage = &storageMap
+
+			pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, map[string]string{}, "test-secret")
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pvcs).To(HaveLen(1))
+			pvc := pvcs[0]
+			// The NFS plugin gets its own populator resource, not the xcopy one.
+			Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(v1beta1.VSphereNfsCopyVolumePopulatorKind))
+			Expect(pvc.Spec.DataSourceRef.APIGroup).To(Equal(&v1beta1.SchemeGroupVersion.Group))
+			// The array copies into an NFS export, which is a Filesystem volume.
+			Expect(pvc.Spec.VolumeMode).To(Equal(ptr.To(core.PersistentVolumeFilesystem)))
+		})
 		It("should sanitize invalid VM names via ChangeVmName fallback in setPVCNameFromTemplate", func() {
 			builder := createBuilder()
 			builder.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(false)

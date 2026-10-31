@@ -675,10 +675,14 @@ func (r *Validator) getPlanVM(vm *model.VM) *plan.VM {
 	return nil
 }
 
-// Validate that VM has no pre-existing snapshots for warm migration
+// Validate that VM has no pre-existing snapshots for warm migration, or for a
+// cold migration whose NFS disks are copy-offloaded
 func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
 	// Check if this is a warm migration
 	if !r.Plan.IsWarm() {
+		if r.coldOffloadRejectsSnapshot(vmRef) {
+			return false, "VM has pre-existing snapshots which cannot be copy-offloaded from an NFS datastore; consolidate the snapshots before migrating", "", nil
+		}
 		return true, "", "", nil
 	}
 	vm := &model.VM{}
@@ -693,6 +697,43 @@ func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category st
 	}
 
 	return true, "", "", nil
+}
+
+// coldOffloadRejectsSnapshot reports whether the VM has a snapshot on an NFS
+// datastore offloaded to the array, which cannot merge a snapshot chain.
+func (r *Validator) coldOffloadRejectsSnapshot(vmRef ref.Ref) bool {
+	if r.Map.Storage == nil {
+		return false
+	}
+	vm := &model.VM{}
+	if err := r.Source.Inventory.Find(vm, vmRef); err != nil {
+		r.Log.Info("snapshot offload check skipped, VM lookup failed",
+			"vm", vmRef.String(), "error", err.Error())
+		return false
+	}
+	if vm.Snapshot.ID == "" {
+		return false
+	}
+	for _, m := range r.Map.Storage.Spec.Map {
+		if m.OffloadPlugin == nil || m.OffloadPlugin.VSphereNfsCopyPluginConfig == nil {
+			continue
+		}
+		ds := &model.Datastore{}
+		if err := r.Source.Inventory.Find(ds, m.Source); err != nil {
+			r.Log.Info("snapshot offload check skipped, datastore lookup failed",
+				"datastore", m.Source.String(), "error", err.Error())
+			continue
+		}
+		if !strings.HasPrefix(ds.Type, "NFS") {
+			continue
+		}
+		for _, disk := range vm.Disks {
+			if disk.Datastore.ID == ds.ID {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (r *Validator) PowerState(vmRef ref.Ref) (ok bool, err error) {
