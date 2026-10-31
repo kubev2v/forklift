@@ -352,49 +352,50 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 				}
 				return
 			}
-			existingGuestNetworks := m.GuestNetworks
-			existingGuestOS := m.GuestOS
-			prevDisks := m.Disks
-			prevTpm := m.TpmEnabled
-			prevSecureBoot := m.SecureBoot
+			prev := *m
 			applyVMTo(vm, m)
-			if ctx.client.LightMode {
-				// LightMode hardcodes Security={TpmEnabled:false,SecureBoot:false}
-				// and omits Get-VHD (Capacity=0, RCTEnabled=false). Preserve the
-				// previous DB values so these fields aren't zeroed on light cycles.
-				// the full refresh (every 10th cycle) overwrites with real data.
-				if len(m.GuestNetworks) == 0 && len(existingGuestNetworks) > 0 {
-					m.GuestNetworks = existingGuestNetworks
-				}
-				if m.GuestOS == "" && existingGuestOS != "" {
-					m.GuestOS = existingGuestOS
-				}
-				if !m.TpmEnabled && prevTpm {
-					m.TpmEnabled = prevTpm
-				}
-				if !m.SecureBoot && prevSecureBoot {
-					m.SecureBoot = prevSecureBoot
-				}
-				for j := range m.Disks {
-					for _, prev := range prevDisks {
-						if m.Disks[j].ID == prev.ID {
-							if m.Disks[j].Capacity == 0 && prev.Capacity > 0 {
-								m.Disks[j].Capacity = prev.Capacity
-							}
-							if !m.Disks[j].RCTEnabled && prev.RCTEnabled {
-								m.Disks[j].RCTEnabled = prev.RCTEnabled
-							}
-							break
-						}
-					}
-				}
-			}
+			preserveVMFields(m, &prev, ctx.client.LightMode)
 			err = tx.Update(m)
 			return
 		}
 		updates = append(updates, updater)
 	}
 	return
+}
+
+// Guest OS/networks are only reported while the VM is running (KVP).
+func preserveVMFields(m *model.VM, prev *model.VM, lightMode bool) {
+	if len(m.GuestNetworks) == 0 && len(prev.GuestNetworks) > 0 {
+		m.GuestNetworks = prev.GuestNetworks
+	}
+	if m.GuestOS == "" && prev.GuestOS != "" {
+		m.GuestOS = prev.GuestOS
+	}
+	if lightMode {
+		// LightMode hardcodes Security={TpmEnabled:false,SecureBoot:false}
+		// and omits Get-VHD (Capacity=0, RCTEnabled=false). Preserve the
+		// previous DB values so these fields aren't zeroed on light cycles.
+		// the full refresh (every 10th cycle) overwrites with real data.
+		if !m.TpmEnabled && prev.TpmEnabled {
+			m.TpmEnabled = prev.TpmEnabled
+		}
+		if !m.SecureBoot && prev.SecureBoot {
+			m.SecureBoot = prev.SecureBoot
+		}
+		for j := range m.Disks {
+			for _, p := range prev.Disks {
+				if m.Disks[j].ID == p.ID {
+					if m.Disks[j].Capacity == 0 && p.Capacity > 0 {
+						m.Disks[j].Capacity = p.Capacity
+					}
+					if !m.Disks[j].RCTEnabled && p.RCTEnabled {
+						m.Disks[j].RCTEnabled = p.RCTEnabled
+					}
+					break
+				}
+			}
+		}
+	}
 }
 
 func (r *VMAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err error) {
