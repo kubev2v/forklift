@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -312,6 +313,7 @@ func (v *HostAdapter) Model() model.Model {
 func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 	v.Base.Apply(&v.model.Base, u)
 	for _, p := range u.ChangeSet {
+		v.applyStorageProperty(p)
 		switch p.Op {
 		case Assign:
 			switch p.Name {
@@ -475,7 +477,8 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 					v.model.HostScsiDisks = nil
 					for _, iScsiLun := range array.ScsiLun {
 						hostScsiDisk := model.HostScsiDisk{}
-						if disk, ok := iScsiLun.(*types.HostScsiDisk); ok {
+						if disk, ok := iScsiLun.(*types.HostScsiDisk); ok && disk != nil {
+							hostScsiDisk.UUID = disk.Uuid
 							hostScsiDisk.CanonicalName = disk.CanonicalName
 							hostScsiDisk.Vendor = strings.TrimSpace(disk.Vendor)
 							hostScsiDisk.Model = strings.TrimSpace(disk.Model)
@@ -490,7 +493,11 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				if array, cast := p.Val.(types.ArrayOfHostHostBusAdapter); cast {
 					v.model.HbaDiskInfo = nil
 					for _, hba := range array.HostHostBusAdapter {
-						hbaDiskInfo := model.HbaDiskInfo{}
+						name := storageTypeName(hba)
+						if name == "" {
+							continue
+						}
+						hbaDiskInfo := model.HbaDiskInfo{Type: name}
 						protocolType := model.ProtocolUnknown
 						switch hba.(type) {
 						case *types.HostFibreChannelHba:
@@ -511,6 +518,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 							protocolType = model.ProtocolTCP
 						}
 						hostHba := hba.GetHostHostBusAdapter()
+						hbaDiskInfo.Pci = hostHba.Pci
 						hbaDiskInfo.Device = hostHba.Device
 						hbaDiskInfo.Model = hostHba.Model
 						hbaDiskInfo.Driver = hostHba.Driver
@@ -518,9 +526,11 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 						hbaDiskInfo.Protocol = string(protocolType)
 						switch adapter := hba.(type) {
 						case *types.HostFibreChannelHba:
+							hbaDiskInfo.SpeedBitsPerSecond = &adapter.Speed
 							hbaDiskInfo.NodeWorldWideName = formatWorldWideName(adapter.NodeWorldWideName)
 							hbaDiskInfo.PortWorldWideName = formatWorldWideName(adapter.PortWorldWideName)
 						case *types.HostFibreChannelOverEthernetHba:
+							hbaDiskInfo.SpeedBitsPerSecond = &adapter.Speed
 							hbaDiskInfo.NodeWorldWideName = formatWorldWideName(adapter.NodeWorldWideName)
 							hbaDiskInfo.PortWorldWideName = formatWorldWideName(adapter.PortWorldWideName)
 						}
@@ -563,6 +573,164 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 			}
 		}
 	}
+	v.updateStorageVendors()
+}
+
+// storageTypeName also rejects typed nil source objects before dereferencing
+// govmomi's polymorphic HBA, policy and transport interfaces.
+func storageTypeName(value any) string {
+	if value == nil {
+		return ""
+	}
+	v := reflect.ValueOf(value)
+	if v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return ""
+		}
+		v = v.Elem()
+	}
+	return v.Type().Name()
+}
+
+// Collector.filter disables partial updates, so collection changes arrive as
+// assignments of the requested property, not element-level Add operations.
+func (v *HostAdapter) applyStorageProperty(p types.PropertyChange) {
+	remove := p.Op == types.PropertyChangeOpRemove || p.Op == types.PropertyChangeOpIndirectRemove
+	if !remove && p.Op != types.PropertyChangeOpAssign {
+		return
+	}
+	switch p.Name {
+	case fPciDevice:
+		if remove || p.Val == nil {
+			v.model.PciDevices = nil
+			return
+		}
+		if array, ok := p.Val.(types.ArrayOfHostPciDevice); ok {
+			v.model.PciDevices = nil
+			for _, pci := range array.HostPciDevice {
+				v.model.PciDevices = append(v.model.PciDevices, model.HostPciDevice{ID: pci.Id, VendorName: strings.TrimSpace(pci.VendorName)})
+			}
+		}
+	case fMultipathInfo:
+		if remove || p.Val == nil {
+			v.model.HostMultipathInfo = nil
+			return
+		}
+		switch info := p.Val.(type) {
+		case types.HostMultipathInfo:
+			v.model.HostMultipathInfo = storageMultipath(&info)
+		case *types.HostMultipathInfo:
+			v.model.HostMultipathInfo = storageMultipath(info)
+		}
+	case fNvmeTopology:
+		if remove || p.Val == nil {
+			v.model.HostNvmeTopology = nil
+			return
+		}
+		if array, ok := p.Val.(types.ArrayOfHostNvmeTopologyInterface); ok {
+			v.model.HostNvmeTopology = storageNvme(array.HostNvmeTopologyInterface)
+		}
+	case fHostBusAdapter:
+		if remove || p.Val == nil {
+			v.model.HbaDiskInfo = nil
+		}
+	case fScsiLun:
+		if remove || p.Val == nil {
+			v.model.HostScsiDisks = nil
+		}
+	case fScsiTopology:
+		if remove || p.Val == nil {
+			v.model.HostScsiTopology = nil
+		}
+	}
+}
+
+// PCI IDs are joined exactly within the owning host. Ambiguous duplicate IDs
+// remain unknown. Persisting the PCI inventory makes partial updates order-free.
+func (v *HostAdapter) updateStorageVendors() {
+	vendors := map[string]string{}
+	for _, pci := range v.model.PciDevices {
+		if pci.ID == "" {
+			continue
+		}
+		if _, exists := vendors[pci.ID]; exists {
+			vendors[pci.ID] = ""
+		} else {
+			vendors[pci.ID] = pci.VendorName
+		}
+	}
+	for i := range v.model.HbaDiskInfo {
+		v.model.HbaDiskInfo[i].Vendor = vendors[v.model.HbaDiskInfo[i].Pci]
+	}
+}
+
+func storageMultipath(info *types.HostMultipathInfo) (result []model.HostMultipathLun) {
+	if info == nil {
+		return
+	}
+	for _, lun := range info.Lun {
+		out := model.HostMultipathLun{Key: lun.Key, ID: lun.Id, Lun: lun.Lun}
+		if storageTypeName(lun.Policy) != "" {
+			out.Policy = lun.Policy.GetHostMultipathInfoLogicalUnitPolicy().Policy
+			if fixed, ok := lun.Policy.(*types.HostMultipathInfoFixedLogicalUnitPolicy); ok {
+				out.PreferredPath = fixed.Prefer
+			}
+		}
+		if lun.StorageArrayTypePolicy != nil {
+			out.StorageArrayTypePolicy = lun.StorageArrayTypePolicy.Policy
+		}
+		for _, path := range lun.Path {
+			out.Paths = append(out.Paths, model.HostMultipathPath{Key: path.Key, Name: path.Name, Adapter: path.Adapter, Lun: path.Lun, PathState: path.PathState, State: path.State, IsWorkingPath: path.IsWorkingPath, Transport: storageTarget(path.Transport)})
+		}
+		result = append(result, out)
+	}
+	return
+}
+
+func storageTarget(transport types.BaseHostTargetTransport) *model.HostStorageTarget {
+	name := storageTypeName(transport)
+	if name == "" {
+		return nil
+	}
+	result := &model.HostStorageTarget{Type: name, Protocol: string(model.ProtocolUnknown)}
+	switch t := transport.(type) {
+	case *types.HostFibreChannelTargetTransport:
+		result.Protocol = string(model.ProtocolFibreChannel)
+		result.NodeWorldWideName = formatWorldWideName(t.NodeWorldWideName)
+		result.PortWorldWideName = formatWorldWideName(t.PortWorldWideName)
+	case *types.HostFibreChannelOverEthernetTargetTransport:
+		result.Protocol = string(model.ProtocolFCoE)
+		result.NodeWorldWideName = formatWorldWideName(t.NodeWorldWideName)
+		result.PortWorldWideName = formatWorldWideName(t.PortWorldWideName)
+		result.VnportMAC = t.VnportMac
+		result.FcfMAC = t.FcfMac
+		result.VLANID = &t.VlanId
+	case *types.HostInternetScsiTargetTransport:
+		result.Protocol = string(model.ProtocolISCSI)
+		result.ISCSIName = t.IScsiName
+		result.ISCSIAlias = t.IScsiAlias
+		result.Addresses = append([]string(nil), t.Address...)
+	case *types.HostParallelScsiTargetTransport:
+		result.Protocol = string(model.ProtocolSCSI)
+	case *types.HostSerialAttachedTargetTransport:
+		result.Protocol = string(model.ProtocolSAS)
+	}
+	return result
+}
+
+func storageNvme(interfaces []types.HostNvmeTopologyInterface) (result []model.HostNvmeTopology) {
+	for _, adapter := range interfaces {
+		out := model.HostNvmeTopology{Key: adapter.Key, Adapter: adapter.Adapter}
+		for _, controller := range adapter.ConnectedController {
+			c := model.HostNvmeController{Key: controller.Key, ControllerNumber: controller.ControllerNumber, Subnqn: controller.Subnqn, Name: controller.Name, AssociatedAdapter: controller.AssociatedAdapter, TransportType: controller.TransportType, VendorID: controller.VendorId, Model: controller.Model, SerialNumber: controller.SerialNumber, FirmwareVersion: controller.FirmwareVersion}
+			for _, ns := range controller.AttachedNamespace {
+				c.AttachedNamespace = append(c.AttachedNamespace, model.HostNvmeNamespace{Key: ns.Key, Name: ns.Name, ID: ns.Id, BlockSize: ns.BlockSize, CapacityInBlocks: ns.CapacityInBlocks})
+			}
+			out.ConnectedController = append(out.ConnectedController, c)
+		}
+		result = append(result, out)
+	}
+	return
 }
 
 // Network model adapter.
@@ -697,6 +865,10 @@ func (v *ResourcePoolAdapter) Apply(u types.ObjectUpdate) {
 func (v *DatastoreAdapter) Apply(u types.ObjectUpdate) {
 	v.Base.Apply(&v.model.Base, u)
 	for _, p := range u.ChangeSet {
+		if p.Name == fVmfsExtent && (p.Op == types.PropertyChangeOpRemove || p.Op == types.PropertyChangeOpIndirectRemove) {
+			v.model.StorageArrays = nil
+			v.model.StorageContainerID = ""
+		}
 		switch p.Op {
 		case Assign:
 			switch p.Name {
@@ -743,6 +915,8 @@ func (v *DatastoreAdapter) Apply(u types.ObjectUpdate) {
 // applyDatastoreInfoProperty decodes the datastore "info" property, including
 // VMFS, NAS, and vVOL filesystem metadata.
 func applyDatastoreInfoProperty(val types.AnyType, ds *model.Datastore) {
+	ds.StorageArrays = nil
+	ds.StorageContainerID = ""
 	if val == nil {
 		return
 	}
@@ -770,6 +944,10 @@ func applyDatastoreInfoProperty(val types.AnyType, ds *model.Datastore) {
 	case types.VvolDatastoreInfo:
 		clearVvolDatastoreInfo(ds)
 		if t.VvolDS != nil {
+			ds.StorageContainerID = t.VvolDS.ScId
+			for _, array := range t.VvolDS.StorageArray {
+				ds.StorageArrays = append(ds.StorageArrays, model.StorageArray{UUID: array.Uuid, Name: array.Name, VendorID: array.VendorId, ModelID: array.ModelId})
+			}
 			ds.FilesystemType = t.VvolDS.Type
 			ds.ProtocolEndpointType = t.VvolDS.ProtocolEndpointType
 			backing := []string{}
@@ -799,6 +977,8 @@ func applyDatastoreInfoProperty(val types.AnyType, ds *model.Datastore) {
 }
 
 func clearVvolDatastoreInfo(ds *model.Datastore) {
+	ds.StorageArrays = nil
+	ds.StorageContainerID = ""
 	ds.FilesystemType = ""
 	ds.FilesystemMajorVersion = 0
 	ds.ProtocolEndpointType = ""
@@ -1624,17 +1804,19 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				disks = append(disks, withBusAddress(md, busNumber))
 			case *types.VirtualDiskFlatVer2BackingInfo:
 				md := model.Disk{
-					Key:            disk.Key,
-					UnitNumber:     *disk.UnitNumber,
-					ControllerKey:  disk.ControllerKey,
-					File:           backing.FileName,
-					Capacity:       disk.CapacityInBytes,
-					Shared:         backing.Sharing != "sharingNone" && backing.Sharing != "",
-					Mode:           backing.DiskMode,
-					Bus:            bus,
-					Serial:         backing.Uuid,
-					WinDriveLetter: winDriveLetter,
-					VVolID:         backing.BackingObjectId,
+					ThinProvisioned: backing.ThinProvisioned,
+					EagerlyScrub:    backing.EagerlyScrub,
+					Key:             disk.Key,
+					UnitNumber:      *disk.UnitNumber,
+					ControllerKey:   disk.ControllerKey,
+					File:            backing.FileName,
+					Capacity:        disk.CapacityInBytes,
+					Shared:          backing.Sharing != "sharingNone" && backing.Sharing != "",
+					Mode:            backing.DiskMode,
+					Bus:             bus,
+					Serial:          backing.Uuid,
+					WinDriveLetter:  winDriveLetter,
+					VVolID:          backing.BackingObjectId,
 				}
 				if backing.Parent != nil {
 					md.ParentFile = backing.Parent.FileName
@@ -1649,20 +1831,22 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				disks = append(disks, withBusAddress(md, busNumber))
 			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
 				md := model.Disk{
-					Key:            disk.Key,
-					UnitNumber:     *disk.UnitNumber,
-					ControllerKey:  disk.ControllerKey,
-					File:           backing.FileName,
-					Capacity:       disk.CapacityInBytes,
-					Shared:         backing.Sharing != "sharingNone" && backing.Sharing != "",
-					Mode:           backing.DiskMode,
-					RDM:            true,
-					PhysicalMode:   backing.CompatibilityMode == string(types.VirtualDiskCompatibilityModePhysicalMode),
-					Bus:            bus,
-					Serial:         backing.Uuid,
-					WinDriveLetter: winDriveLetter,
-					DeviceName:     backing.DeviceName,
-					LunUuid:        backing.LunUuid,
+					CompatibilityMode: backing.CompatibilityMode,
+					BackingUUID:       backing.Uuid,
+					Key:               disk.Key,
+					UnitNumber:        *disk.UnitNumber,
+					ControllerKey:     disk.ControllerKey,
+					File:              backing.FileName,
+					Capacity:          disk.CapacityInBytes,
+					Shared:            backing.Sharing != "sharingNone" && backing.Sharing != "",
+					Mode:              backing.DiskMode,
+					RDM:               true,
+					PhysicalMode:      backing.CompatibilityMode == string(types.VirtualDiskCompatibilityModePhysicalMode),
+					Bus:               bus,
+					Serial:            backing.Uuid,
+					WinDriveLetter:    winDriveLetter,
+					DeviceName:        backing.DeviceName,
+					LunUuid:           backing.LunUuid,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -1674,13 +1858,15 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				disks = append(disks, withBusAddress(md, busNumber))
 			case *types.VirtualDiskRawDiskVer2BackingInfo:
 				md := model.Disk{
-					Key:           disk.Key,
-					UnitNumber:    *disk.UnitNumber,
-					ControllerKey: disk.ControllerKey,
-					File:          backing.DescriptorFileName,
-					Capacity:      disk.CapacityInBytes,
-					Shared:        backing.Sharing != "sharingNone" && backing.Sharing != "",
-					RDM:           true,
+					CompatibilityMode: string(types.VirtualDiskCompatibilityModePhysicalMode),
+					BackingUUID:       backing.Uuid,
+					Key:               disk.Key,
+					UnitNumber:        *disk.UnitNumber,
+					ControllerKey:     disk.ControllerKey,
+					File:              backing.DescriptorFileName,
+					Capacity:          disk.CapacityInBytes,
+					Shared:            backing.Sharing != "sharingNone" && backing.Sharing != "",
+					RDM:               true,
 					// VirtualDiskRawDiskVer2BackingInfo represents direct pass-through
 					// to a physical device without SCSI virtualization, so it is
 					// always treated as physical mode.
