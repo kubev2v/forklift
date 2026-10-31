@@ -111,6 +111,7 @@ func ConvertToVmStruct(envelope []ovf.Envelope, ovaPath []string) []ovf.VM {
 
 			newVM.ApplyVirtualConfig(virtualSystem.HardwareSection.Configs)
 			newVM.ApplyExtraVirtualConfig(virtualSystem.HardwareSection.ExtraConfig)
+			newVM.ApplyNtnxFromVirtualSystem(virtualSystem)
 
 			var id string
 			if isValidUUID(virtualSystem.ID) {
