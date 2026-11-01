@@ -112,12 +112,17 @@ func (r *NetworkAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, er
 	if err != nil {
 		return
 	}
+	skipped := ctx.client.SkippedNodes()
 	serverMap := make(map[string]bool)
 	for _, n := range serverList {
 		serverMap[n.UUID] = true
 	}
 	for _, n := range existing {
 		if _, found := serverMap[n.ID]; !found {
+			// Don't delete networks owned by nodes in circuit-breaker cooldown.
+			if networkOwnedBySkippedNode(n.Hosts, skipped) {
+				continue
+			}
 			currentID := n.ID
 			updater := func(tx *libmodel.Tx) (err error) {
 				m := &model.Network{Base: model.Base{ID: currentID}}
@@ -131,6 +136,17 @@ func (r *NetworkAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, er
 		}
 	}
 	return
+}
+
+// networkOwnedBySkippedNode returns true if any of the network's host refs
+// point to a node in the skipped set.
+func networkOwnedBySkippedNode(hosts []model.Ref, skipped map[string]bool) bool {
+	for _, h := range hosts {
+		if skipped[strings.ToUpper(h.ID)] {
+			return true
+		}
+	}
+	return false
 }
 
 // Storage adapter.
@@ -339,6 +355,7 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	if err != nil {
 		return
 	}
+	skipped := ctx.client.SkippedNodes()
 	for i := range vmList {
 		vm := &vmList[i]
 		updater := func(tx *libmodel.Tx) (err error) {
@@ -357,7 +374,20 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 			prevDisks := m.Disks
 			prevTpm := m.TpmEnabled
 			prevSecureBoot := m.SecureBoot
+			prevNICs := m.NICs
+			prevCheckpoint := m.HasCheckpoint
 			applyVMTo(vm, m)
+			// Preserve stored details when the VM's host node is in
+			// circuit-breaker cooldown (details could not be refreshed).
+			if skipped[strings.ToUpper(vm.OwnerNode)] {
+				m.GuestNetworks = existingGuestNetworks
+				m.GuestOS = existingGuestOS
+				m.TpmEnabled = prevTpm
+				m.SecureBoot = prevSecureBoot
+				m.HasCheckpoint = prevCheckpoint
+				m.NICs = prevNICs
+				m.Disks = prevDisks
+			}
 			if ctx.client.LightMode {
 				// LightMode hardcodes Security={TpmEnabled:false,SecureBoot:false}
 				// and omits Get-VHD (Capacity=0, RCTEnabled=false). Preserve the
@@ -410,12 +440,17 @@ func (r *VMAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err err
 	if err != nil {
 		return
 	}
+	skipped := ctx.client.SkippedNodes()
 	serverMap := make(map[string]bool)
 	for _, vm := range serverList {
 		serverMap[vm.UUID] = true
 	}
 	for _, vm := range existing {
 		if _, found := serverMap[vm.ID]; !found {
+			// Don't delete VMs whose host is in circuit-breaker cooldown.
+			if skipped[strings.ToUpper(vm.Host)] {
+				continue
+			}
 			currentID := vm.ID
 			updater := func(tx *libmodel.Tx) (err error) {
 				m := &model.VM{Base: model.Base{ID: currentID}}
@@ -505,6 +540,7 @@ func (r *HostAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	if err != nil {
 		return
 	}
+	skipped := ctx.client.SkippedNodes()
 	for i := range hosts {
 		host := &hosts[i]
 		updater := func(tx *libmodel.Tx) (err error) {
@@ -519,7 +555,16 @@ func (r *HostAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 				}
 				return
 			}
+			prevCpu := m.CpuSockets
+			prevCores := m.CpuCores
+			prevMem := m.MemoryBytes
 			applyHostTo(host, m)
+			// Preserve stored hardware when the node was skipped (circuit breaker).
+			if skipped[strings.ToUpper(host.Name)] {
+				m.CpuSockets = prevCpu
+				m.CpuCores = prevCores
+				m.MemoryBytes = prevMem
+			}
 			err = tx.Update(m)
 			return
 		}
@@ -720,6 +765,13 @@ func applyNetworkTo(r *types.Network, m *model.Network) {
 	m.UUID = r.UUID
 	m.SwitchName = r.Name
 	m.SwitchType = r.SwitchType
+	m.Hosts = nil
+	for _, node := range r.OwnerNodes {
+		m.Hosts = append(m.Hosts, model.Ref{
+			Kind: model.HostKind,
+			ID:   node,
+		})
+	}
 }
 
 // Apply Storage to (update) the model.

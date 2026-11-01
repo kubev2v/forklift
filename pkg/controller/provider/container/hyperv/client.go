@@ -44,6 +44,10 @@ const (
 // node, the default 60s is insufficient for WinRM to return the output.
 const longCommandTimeout = 5 * time.Minute
 
+// nodeRetryCooldown is the minimum interval between WinRM attempts to a
+// node that previously failed.
+const nodeRetryCooldown = 2 * time.Minute
+
 const (
 	VMGenerationGen1 = 1
 	VMGenerationGen2 = 2
@@ -120,6 +124,10 @@ type Client struct {
 	// goroutine. Started before Phase 1 so it overlaps with ClusterAdapter.
 	netLocalPrefetch     chan netLocalPrefetchResult
 	netLocalPrefetchDone bool
+	// nodeBreakerMu guards nodeFailedAt for concurrent goroutine access.
+	nodeBreakerMu sync.Mutex
+	// nodeFailedAt tracks the last WinRM failure time per node
+	nodeFailedAt map[string]time.Time
 }
 
 type netLocalPrefetchResult struct {
@@ -208,6 +216,47 @@ func (r *Client) InvalidateCycleCache() {
 	r.netCache = nil
 }
 
+// markNodeFailed records the current time as the last failure for a node.
+func (r *Client) markNodeFailed(name string) {
+	r.nodeBreakerMu.Lock()
+	defer r.nodeBreakerMu.Unlock()
+	if r.nodeFailedAt == nil {
+		r.nodeFailedAt = make(map[string]time.Time)
+	}
+	r.nodeFailedAt[strings.ToUpper(name)] = time.Now()
+}
+
+// isNodeAvailable returns false if the node failed within nodeRetryCooldown.
+func (r *Client) isNodeAvailable(name string) bool {
+	r.nodeBreakerMu.Lock()
+	defer r.nodeBreakerMu.Unlock()
+	if r.nodeFailedAt == nil {
+		return true
+	}
+	t, ok := r.nodeFailedAt[strings.ToUpper(name)]
+	if !ok {
+		return true
+	}
+	if time.Since(t) > nodeRetryCooldown {
+		delete(r.nodeFailedAt, strings.ToUpper(name))
+		return true
+	}
+	return false
+}
+
+// SkippedNodes returns the uppercase names of nodes currently in cooldown.
+func (r *Client) SkippedNodes() map[string]bool {
+	r.nodeBreakerMu.Lock()
+	defer r.nodeBreakerMu.Unlock()
+	out := make(map[string]bool)
+	for name, t := range r.nodeFailedAt {
+		if time.Since(t) <= nodeRetryCooldown {
+			out[name] = true
+		}
+	}
+	return out
+}
+
 // StartVMPrefetch kicks off the combined VM+details script on all cluster nodes
 // in background goroutines. Call this after the cluster cache is populated
 // (Phase 1) so it can overlap with Phase 2 adapters. The results are consumed
@@ -288,6 +337,7 @@ func (r *Client) ListHosts() ([]types.Host, error) {
 	hosts := make([]types.Host, len(cc.nodes))
 	ch := make(chan hostResult, len(cc.nodes))
 
+	launched := 0
 	for i, n := range cc.nodes {
 		hosts[i] = types.Host{
 			ID:          n.Id,
@@ -295,16 +345,21 @@ func (r *Client) ListHosts() ([]types.Host, error) {
 			State:       driver.ClusterNodeStateName(n.State),
 			ClusterName: cc.cluster.Name,
 		}
+		if !r.isNodeAvailable(n.Name) {
+			continue
+		}
+		launched++
 		go func(idx int, name string) {
 			info, err := r.getNodeComputerInfo(name)
 			if err != nil {
 				r.Log.V(1).Info("Failed to get hardware info for node", "node", name, "error", err)
+				r.markNodeFailed(name)
 			}
 			ch <- hostResult{index: idx, info: info}
 		}(i, n.Name)
 	}
 
-	for range cc.nodes {
+	for j := 0; j < launched; j++ {
 		res := <-ch
 		if res.info != nil {
 			hosts[res.index].CpuCount = res.info.NumberOfProcessors
@@ -436,6 +491,10 @@ func (r *Client) fetchAllNodesVMsAndDetails() ([]nodeResult, error) {
 		if strings.EqualFold(node.Name, localName) || node.State != driver.ClusterNodeStateUp {
 			continue
 		}
+		if !r.isNodeAvailable(node.Name) {
+			r.Log.Info("Skipping unreachable node (circuit breaker)", "node", node.Name)
+			continue
+		}
 		remoteCount++
 		go func(name string) {
 			r.fetchNodeVMsAndDetails(ch, name, name, script, light)
@@ -448,6 +507,7 @@ func (r *Client) fetchAllNodesVMsAndDetails() ([]nodeResult, error) {
 		res := <-ch
 		if res.err != nil {
 			r.Log.Error(res.err, "Failed to list VMs on node, skipping", "node", res.nodeName)
+			r.markNodeFailed(res.nodeName)
 			continue
 		}
 		succeeded++
@@ -603,6 +663,10 @@ func (r *Client) listClusterDomainsParallel() ([]driver.Domain, error) {
 		if strings.EqualFold(node.Name, localName) || node.State != driver.ClusterNodeStateUp {
 			continue
 		}
+		if !r.isNodeAvailable(node.Name) {
+			r.Log.Info("Skipping unreachable node (circuit breaker)", "node", node.Name)
+			continue
+		}
 		remoteCount++
 		go func(name string) {
 			r.fetchNodeVMsAndDetails(ch, name, name, ps.ListAllVMs, false)
@@ -615,6 +679,7 @@ func (r *Client) listClusterDomainsParallel() ([]driver.Domain, error) {
 		res := <-ch
 		if res.err != nil {
 			r.Log.Error(res.err, "Failed to list VMs on node, skipping", "node", res.nodeName)
+			r.markNodeFailed(res.nodeName)
 			continue
 		}
 		succeeded++
@@ -647,17 +712,24 @@ func (r *Client) enrichVMDetails(vms []types.VM, networks []types.Network) {
 			batchMap map[string]*batchVMDetail
 			err      error
 		}
+		launched := 0
 		results := make(chan nodeResult, len(nodeVMs))
 		for node, indices := range nodeVMs {
+			if !r.isNodeAvailable(node) {
+				r.Log.Info("Skipping VM detail enrichment (circuit breaker)", "node", node, "vms", len(indices))
+				continue
+			}
+			launched++
 			go func(n string, idx []int) {
 				bm, err := r.collectBatchVMDetails(n)
 				results <- nodeResult{node: n, indices: idx, batchMap: bm, err: err}
 			}(node, indices)
 		}
-		for range nodeVMs {
+		for j := 0; j < launched; j++ {
 			res := <-results
 			if res.err != nil {
 				r.Log.Error(res.err, "Batch detail collection failed for node, falling back to per-VM", "node", res.node)
+				r.markNodeFailed(res.node)
 				r.fallbackPerVMDetails(vms, res.indices, networks)
 				continue
 			}
@@ -1143,11 +1215,15 @@ func (r *Client) mergeRemoteNodeNetworks(result *[]types.Network, seen map[strin
 		if strings.EqualFold(node.Name, localName) || node.State != driver.ClusterNodeStateUp {
 			continue
 		}
+		if !r.isNodeAvailable(node.Name) {
+			continue
+		}
 		count++
 		go func(name string) {
 			stdout, err := r.driver.RunOnNode(ps.ListAllSwitches, name)
 			if err != nil {
 				r.Log.Info("Failed to collect switches from remote node", "node", name, "error", err)
+				r.markNodeFailed(name)
 				ch <- nodeSwitches{nodeName: name}
 				return
 			}
@@ -1252,8 +1328,14 @@ func (r *Client) EnrichDiskCapacity() error {
 		node string
 		caps map[string]vhdCapacity
 	}
+	launched := 0
 	ch := make(chan nodeCapResult, len(nodeVMs))
 	for node := range nodeVMs {
+		if node != "__local__" && !r.isNodeAvailable(node) {
+			r.Log.Info("Skipping VHD capacity enrichment (circuit breaker)", "node", node)
+			continue
+		}
+		launched++
 		go func(n string) {
 			var out string
 			var err error
@@ -1265,6 +1347,9 @@ func (r *Client) EnrichDiskCapacity() error {
 			if err != nil {
 				r.Log.Info("VHD capacity enrichment failed, will be filled on next refresh",
 					"node", n, "error", err)
+				if n != "__local__" {
+					r.markNodeFailed(n)
+				}
 				ch <- nodeCapResult{node: n}
 				return
 			}
@@ -1284,7 +1369,7 @@ func (r *Client) EnrichDiskCapacity() error {
 	}
 
 	allCaps := make(map[string]vhdCapacity)
-	for range nodeVMs {
+	for j := 0; j < launched; j++ {
 		res := <-ch
 		if res.caps == nil {
 			continue
