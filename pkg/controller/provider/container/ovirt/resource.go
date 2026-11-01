@@ -146,6 +146,16 @@ type Host struct {
 			VLan      struct {
 				ID string `json:"id"`
 			} `json:"vlan"`
+			IP struct {
+				Address string `json:"address"`
+				Gateway string `json:"gateway"`
+				Netmask string `json:"netmask"`
+			} `json:"ip"`
+			IPv6 struct {
+				Address string `json:"address"`
+				Gateway string `json:"gateway"`
+				Netmask string `json:"netmask"`
+			} `json:"ipv6"`
 		} `json:"host_nic"`
 	} `json:"nics"`
 	Networks struct {
@@ -154,6 +164,11 @@ type Host struct {
 			Network Ref    `json:"network"`
 		} `json:"network_attachment"`
 	} `json:"network_attachments"`
+	DNS struct {
+		Servers struct {
+			List []string `json:"name_server"`
+		} `json:"name_servers"`
+	} `json:"dns_resolver_configuration"`
 }
 
 // Apply to (update) the model.
@@ -169,6 +184,7 @@ func (r *Host) ApplyTo(m *model.Host) {
 	m.CpuCores = r.int16(r.CPU.Topology.Cores)
 	r.addNetworkAttachment(m)
 	r.addNICs(m)
+	m.DNSServers = r.DNS.Servers.List
 }
 
 func (r *Host) addNetworkAttachment(m *model.Host) {
@@ -189,11 +205,17 @@ func (r *Host) addNICs(m *model.Host) {
 		m.NICs = append(
 			m.NICs,
 			model.HostNIC{
-				ID:        n.ID,
-				Name:      n.Name,
-				LinkSpeed: r.int64(n.LinkSpeed),
-				MTU:       r.int64(n.MTU),
-				VLan:      n.VLan.ID,
+				ID:          n.ID,
+				Name:        n.Name,
+				LinkSpeed:   r.int64(n.LinkSpeed),
+				MTU:         r.int64(n.MTU),
+				VLan:        n.VLan.ID,
+				IP:          n.IP.Address,
+				Gateway:     n.IP.Gateway,
+				Netmask:     n.IP.Netmask,
+				IPv6:        n.IPv6.Address,
+				IPv6Gateway: n.IPv6.Gateway,
+				IPv6Prefix:  n.IPv6.Netmask,
 			})
 	}
 }
@@ -307,7 +329,8 @@ type VM struct {
 			Profile Ref    `json:"vnic_profile"`
 			Devices struct {
 				List []struct {
-					IPS struct {
+					Name string `json:"name"`
+					IPS  struct {
 						IP []struct {
 							Address string `json:"address"`
 							Version string `json:"version"`
@@ -408,7 +431,11 @@ func (r *VM) addNICs(m *model.VM) {
 	m.NICs = []model.NIC{}
 	for _, n := range r.NICs.List {
 		ips := []model.IpAddress{}
+		var deviceName string
 		for _, d := range n.Devices.List {
+			if deviceName == "" && d.Name != "" {
+				deviceName = d.Name
+			}
 			for _, ip := range d.IPS.IP {
 				ips = append(
 					ips,
@@ -420,13 +447,14 @@ func (r *VM) addNICs(m *model.VM) {
 		}
 		m.NICs = append(
 			m.NICs, model.NIC{
-				ID:        n.ID,
-				Name:      n.Name,
-				Profile:   n.Profile.ID,
-				Interface: n.Interface,
-				MAC:       n.MAC.Address,
-				Plugged:   r.bool(n.Plugged),
-				IpAddress: ips,
+				ID:         n.ID,
+				Name:       n.Name,
+				Profile:    n.Profile.ID,
+				Interface:  n.Interface,
+				MAC:        n.MAC.Address,
+				Plugged:    r.bool(n.Plugged),
+				IpAddress:  ips,
+				DeviceName: deviceName,
 			})
 	}
 }
