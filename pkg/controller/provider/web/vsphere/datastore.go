@@ -174,6 +174,8 @@ func (h *DatastoreHandler) filter(ctx *gin.Context, list *[]model.Datastore) (er
 // REST Resource.
 type Datastore struct {
 	Resource
+	StorageArrays               []model.StorageArray    `json:"storageArrays,omitempty"`
+	StorageContainerID          string                  `json:"storageContainerId,omitempty"`
 	Type                        string                  `json:"type"`
 	FilesystemType              string                  `json:"filesystemType,omitempty"`
 	FilesystemMajorVersion      int32                   `json:"filesystemMajorVersion,omitempty"`
@@ -197,6 +199,8 @@ type Datastore struct {
 func (r *Datastore) With(m *model.Datastore) {
 	r.Resource.With(&m.Base)
 	r.Type = m.Type
+	r.StorageArrays = append([]model.StorageArray(nil), m.StorageArrays...)
+	r.StorageContainerID = m.StorageContainerID
 	r.FilesystemType = m.FilesystemType
 	r.FilesystemMajorVersion = m.FilesystemMajorVersion
 	r.ProtocolEndpointType = m.ProtocolEndpointType

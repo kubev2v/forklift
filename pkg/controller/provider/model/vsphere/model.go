@@ -177,6 +177,9 @@ type Host struct {
 	Networks                []Ref              `sql:""`
 	Datastores              []Ref              `sql:""`
 	HostScsiDisks           []HostScsiDisk     `sql:""`
+	PciDevices              []HostPciDevice    `sql:""`
+	HostMultipathInfo       []HostMultipathLun `sql:""`
+	HostNvmeTopology        []HostNvmeTopology `sql:""`
 	AdvancedOptions         Ref                `sql:""`
 	HbaDiskInfo             []HbaDiskInfo      `sql:""`
 	HostScsiTopology        []HostScsiTopology `sql:""`
@@ -185,6 +188,8 @@ type Host struct {
 }
 
 type HostScsiDisk struct {
+	// Source ScsiLun UUID, distinct from the canonical NAA name and key.
+	UUID string `json:"uuid,omitempty"`
 	// Canonical name of the SCSI logical unit.
 	//
 	// Disk partition or extent identifiers refer to this name when
@@ -200,6 +205,11 @@ type HostScsiDisk struct {
 }
 
 type HbaDiskInfo struct {
+	Type   string `json:"type,omitempty"`
+	Pci    string `json:"pci,omitempty"`
+	Vendor string `json:"vendor,omitempty"`
+	// FC/FCoE source speed in bits/second; nil for adapters without a source.
+	SpeedBitsPerSecond *int64 `json:"speedBitsPerSecond,omitempty"`
 	// The device name of host bus adapter.
 	Device string `json:"hbaDevice"`
 	// The supported protocol by this device
@@ -220,6 +230,81 @@ type HostScsiTopology struct {
 	HbaKey string `json:"key"`
 	// List of identifiers for the SCSI targets
 	ScsiDiskKeys []string `json:"scsiDiskKeys"`
+}
+
+// HostPciDevice retains only the PCI identity needed to join an HBA to its
+// vendor. It must survive inventory reloads and independently ordered updates.
+type HostPciDevice struct {
+	ID         string `json:"id"`
+	VendorName string `json:"vendorName,omitempty"`
+}
+
+// HostMultipathLun retains source references, not inferred disk placement.
+// The number of reported paths is len(Paths), including non-working paths;
+// adapter associations must not be counted as paths.
+type HostMultipathLun struct {
+	Key                    string              `json:"key"`
+	ID                     string              `json:"id"`
+	Lun                    string              `json:"lun"`
+	Policy                 string              `json:"policy,omitempty"`
+	PreferredPath          string              `json:"preferredPath,omitempty"`
+	StorageArrayTypePolicy string              `json:"storageArrayTypePolicy,omitempty"`
+	Paths                  []HostMultipathPath `json:"paths,omitempty"`
+}
+
+type HostMultipathPath struct {
+	Key     string `json:"key"`
+	Name    string `json:"name"`
+	Adapter string `json:"adapter"`
+	Lun     string `json:"lun"`
+	// Keep both vSphere state fields: they have distinct source semantics.
+	PathState     string             `json:"pathState,omitempty"`
+	State         string             `json:"state,omitempty"`
+	IsWorkingPath *bool              `json:"isWorkingPath,omitempty"`
+	Transport     *HostStorageTarget `json:"transport,omitempty"`
+}
+
+type HostStorageTarget struct {
+	Type              string   `json:"type"`
+	Protocol          string   `json:"protocol"`
+	NodeWorldWideName string   `json:"nodeWorldWideName,omitempty"`
+	PortWorldWideName string   `json:"portWorldWideName,omitempty"`
+	ISCSIName         string   `json:"iscsiName,omitempty"`
+	ISCSIAlias        string   `json:"iscsiAlias,omitempty"`
+	Addresses         []string `json:"addresses,omitempty"`
+	VnportMAC         string   `json:"vnportMac,omitempty"`
+	FcfMAC            string   `json:"fcfMac,omitempty"`
+	VLANID            *int32   `json:"vlanId,omitempty"`
+}
+
+type HostNvmeTopology struct {
+	Key                 string               `json:"key"`
+	Adapter             string               `json:"adapter"`
+	ConnectedController []HostNvmeController `json:"connectedController,omitempty"`
+}
+
+type HostNvmeController struct {
+	Key               string `json:"key"`
+	ControllerNumber  int32  `json:"controllerNumber"`
+	Subnqn            string `json:"subnqn"`
+	Name              string `json:"name"`
+	AssociatedAdapter string `json:"associatedAdapter"`
+	// Raw HostNvmeTransportType: fibreChannel/tcp/rdma are fabric transports;
+	// pcie/loopback/unsupported or future values must not be inferred as fabrics.
+	TransportType     string              `json:"transportType"`
+	VendorID          string              `json:"vendorId,omitempty"`
+	Model             string              `json:"model,omitempty"`
+	SerialNumber      string              `json:"serialNumber,omitempty"`
+	FirmwareVersion   string              `json:"firmwareVersion,omitempty"`
+	AttachedNamespace []HostNvmeNamespace `json:"attachedNamespace,omitempty"`
+}
+
+type HostNvmeNamespace struct {
+	Key              string `json:"key"`
+	Name             string `json:"name"`
+	ID               int32  `json:"id"`
+	BlockSize        int32  `json:"blockSize"`
+	CapacityInBlocks int64  `json:"capacityInBlocks"`
 }
 
 type HostNetwork struct {
@@ -310,6 +395,8 @@ type DVSHost struct {
 
 type Datastore struct {
 	Base
+	StorageArrays               []StorageArray    `sql:""`
+	StorageContainerID          string            `sql:""`
 	Type                        string            `sql:""`
 	FilesystemType              string            `sql:""`
 	FilesystemMajorVersion      int32             `sql:""`
@@ -327,6 +414,15 @@ type Datastore struct {
 	IORMCongestionThreshold     int32             `sql:""`
 	IORMCongestionThresholdMode IORMThresholdMode `sql:""`
 	IORMPercentOfPeakThroughput int32             `sql:""`
+}
+
+// StorageArray is an authoritative VASA array associated with a vVol datastore.
+// VendorID/ModelID are source strings, not SCSI inquiry vendor/model values.
+type StorageArray struct {
+	UUID     string `json:"uuid,omitempty"`
+	Name     string `json:"name,omitempty"`
+	VendorID string `json:"vendorId,omitempty"`
+	ModelID  string `json:"modelId,omitempty"`
 }
 
 type VM struct {
@@ -419,6 +515,12 @@ type Controller struct {
 
 // Virtual Disk.
 type Disk struct {
+	// Absent compatibilityMode stays unknown in historical snapshots.
+	CompatibilityMode string `json:"compatibilityMode,omitempty"`
+	// UUID of the concrete raw backing, never a host LUN identifier.
+	BackingUUID           string `json:"backingUuid,omitempty"`
+	ThinProvisioned       *bool  `json:"thinProvisioned,omitempty"`
+	EagerlyScrub          *bool  `json:"eagerlyScrub,omitempty"`
 	Key                   int32  `json:"key"`
 	UnitNumber            int32  `json:"unitNumber"`
 	ControllerKey         int32  `json:"controllerKey"`

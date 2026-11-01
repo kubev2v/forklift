@@ -1,14 +1,23 @@
 package vsphere
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"reflect"
 	"sync"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	webbase "github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	web "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	"github.com/vmware/govmomi/vim25/types"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // --- helpers for building packed PCI slot numbers ---
@@ -1180,5 +1189,369 @@ func TestVmAdapterApplyVAppProduct(t *testing.T) {
 	})
 	if v.model.VAppProducts != nil {
 		t.Errorf("VAppProducts = %+v, want nil", v.model.VAppProducts)
+	}
+}
+
+func storageJSON(t *testing.T, value any) map[string]any {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result map[string]any
+	if err = json.Unmarshal(data, &result); err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+func storageFields(t *testing.T, got map[string]any, want map[string]any) {
+	t.Helper()
+	for key, value := range want {
+		if !reflect.DeepEqual(got[key], value) {
+			t.Errorf("%s: got %#v, want %#v", key, got[key], value)
+		}
+	}
+}
+
+func storageUpdate(name string, value any) types.ObjectUpdate {
+	return types.ObjectUpdate{ChangeSet: []types.PropertyChange{{Name: name, Op: types.PropertyChangeOpAssign, Val: value}}}
+}
+
+func storageHostJSON(t *testing.T, a *HostAdapter) map[string]any {
+	t.Helper()
+	var resource web.Host
+	resource.With(&a.model)
+	return storageJSON(t, &resource)
+}
+
+func TestStorageDiskOptionalValues(t *testing.T) {
+	yes, no := true, false
+	tests := []struct {
+		name    string
+		backing types.BaseVirtualDeviceBackingInfo
+		want    map[string]any
+	}{
+		{"thin", &types.VirtualDiskFlatVer2BackingInfo{ThinProvisioned: &yes, EagerlyScrub: &no}, map[string]any{"thinProvisioned": true, "eagerlyScrub": false}},
+		{"thick", &types.VirtualDiskFlatVer2BackingInfo{ThinProvisioned: &no, EagerlyScrub: &yes}, map[string]any{"thinProvisioned": false, "eagerlyScrub": true}},
+		{"unknown", &types.VirtualDiskFlatVer2BackingInfo{}, map[string]any{"thinProvisioned": nil, "eagerlyScrub": nil}},
+		{"flat v1 unknown", &types.VirtualDiskFlatVer1BackingInfo{}, map[string]any{"thinProvisioned": nil, "eagerlyScrub": nil}},
+		{"physical RDM", &types.VirtualDiskRawDiskMappingVer1BackingInfo{CompatibilityMode: "physicalMode", Uuid: "backing-1", LunUuid: "lun-1", DeviceName: "/vmfs/devices/disks/naa.01"}, map[string]any{"compatibilityMode": "physicalMode", "backingUuid": "backing-1", "lunUuid": "lun-1", "physicalMode": true, "thinProvisioned": nil}},
+		{"virtual RDM", &types.VirtualDiskRawDiskMappingVer1BackingInfo{CompatibilityMode: "virtualMode"}, map[string]any{"compatibilityMode": "virtualMode", "physicalMode": nil}},
+		{"unknown RDM mode", &types.VirtualDiskRawDiskMappingVer1BackingInfo{}, map[string]any{"compatibilityMode": nil, "physicalMode": nil}},
+		{"raw v2 UUID is not LUN UUID", &types.VirtualDiskRawDiskVer2BackingInfo{Uuid: "backing-2"}, map[string]any{"compatibilityMode": "physicalMode", "backingUuid": "backing-2", "lunUuid": nil, "physicalMode": true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			unit := int32(0)
+			a := VmAdapter{}
+			a.updateDisks(&types.ArrayOfVirtualDevice{VirtualDevice: []types.BaseVirtualDevice{&types.VirtualDisk{VirtualDevice: types.VirtualDevice{Key: 2000, UnitNumber: &unit, Backing: tt.backing}, CapacityInBytes: 1024}}})
+			if len(a.model.Disks) != 1 {
+				t.Fatalf("disks: %#v", a.model.Disks)
+			}
+			storageFields(t, storageJSON(t, a.model.Disks[0]), tt.want)
+		})
+	}
+	var old model.Disk
+	if err := json.Unmarshal([]byte(`{"rdm":true}`), &old); err != nil {
+		t.Fatal(err)
+	}
+	storageFields(t, storageJSON(t, old), map[string]any{"compatibilityMode": nil, "thinProvisioned": nil, "eagerlyScrub": nil, "backingUuid": nil})
+}
+
+func TestStorageHostAdapterAndLunIdentity(t *testing.T) {
+	a := HostAdapter{}
+	fc := &types.HostFibreChannelHba{HostHostBusAdapter: types.HostHostBusAdapter{Key: "hba-1", Device: "vmhba1", Pci: "0000:03:00.0", Model: "adapter model", Driver: "driver"}, Speed: 16000000000, NodeWorldWideName: 1, PortWorldWideName: 2}
+	a.Apply(storageUpdate(fHostBusAdapter, types.ArrayOfHostHostBusAdapter{HostHostBusAdapter: []types.BaseHostHostBusAdapter{fc, &types.HostTcpHba{HostHostBusAdapter: types.HostHostBusAdapter{Key: "software", Device: "vmhba64"}}}}))
+	// PCI inventory may arrive after the HBA, including after reloading SQLite.
+	a.model.ID = "host-1"
+	db := libmodel.New(filepath.Join(t.TempDir(), "inventory.db"), &model.Host{})
+	if err := db.Open(true); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close(true) }()
+	if err := db.Insert(&a.model); err != nil {
+		t.Fatal(err)
+	}
+	a = HostAdapter{model: model.Host{Base: model.Base{ID: "host-1"}}}
+	if err := db.Get(&a.model); err != nil {
+		t.Fatal(err)
+	}
+	a.Apply(storageUpdate("hardware.pciDevice", types.ArrayOfHostPciDevice{HostPciDevice: []types.HostPciDevice{{Id: "0000:03:00.0", VendorName: " Adapter vendor "}, {Id: "0000:04:00.0", VendorName: "wrong vendor"}}}))
+	a.Apply(storageUpdate(fScsiLun, types.ArrayOfScsiLun{ScsiLun: []types.BaseScsiLun{&types.HostScsiDisk{ScsiLun: types.ScsiLun{Key: "lun-key", CanonicalName: "naa.0001", Uuid: "lun-uuid", Vendor: " LUN vendor ", Model: " LUN model "}}}}))
+	j := storageHostJSON(t, &a)
+	hbas := j["hbaDiskInfo"].([]any)
+	storageFields(t, hbas[0].(map[string]any), map[string]any{"type": "HostFibreChannelHba", "pci": "0000:03:00.0", "vendor": "Adapter vendor", "speedBitsPerSecond": float64(16000000000), "nodeWorldWideName": "0000000000000001", "portWorldWideName": "0000000000000002"})
+	storageFields(t, hbas[1].(map[string]any), map[string]any{"type": "HostTcpHba", "vendor": nil, "speedBitsPerSecond": nil})
+	storageFields(t, j["hostScsiDisks"].([]any)[0].(map[string]any), map[string]any{"uuid": "lun-uuid", "canonicalName": "naa.0001", "key": "lun-key", "vendor": "LUN vendor"})
+	// A later HBA refresh must preserve its exact PCI correlation.
+	a.Apply(storageUpdate(fHostBusAdapter, types.ArrayOfHostHostBusAdapter{HostHostBusAdapter: []types.BaseHostHostBusAdapter{fc}}))
+	storageFields(t, storageHostJSON(t, &a)["hbaDiskInfo"].([]any)[0].(map[string]any), map[string]any{"vendor": "Adapter vendor"})
+	a.Apply(types.ObjectUpdate{ChangeSet: []types.PropertyChange{{Name: "hardware.pciDevice", Op: types.PropertyChangeOpRemove}}})
+	storageFields(t, storageHostJSON(t, &a)["hbaDiskInfo"].([]any)[0].(map[string]any), map[string]any{"vendor": nil})
+}
+
+func TestStorageMultipathPreservesPaths(t *testing.T) {
+	yes, no := true, false
+	a := HostAdapter{}
+	a.Apply(storageUpdate("config.storageDevice.multipathInfo", types.HostMultipathInfo{Lun: []types.HostMultipathInfoLogicalUnit{{Key: "mp-1", Id: "naa.01", Lun: "lun-1", Policy: &types.HostMultipathInfoFixedLogicalUnitPolicy{HostMultipathInfoLogicalUnitPolicy: types.HostMultipathInfoLogicalUnitPolicy{Policy: "VMW_PSP_FIXED"}, Prefer: "path-1"}, StorageArrayTypePolicy: &types.HostMultipathInfoLogicalUnitStorageArrayTypePolicy{Policy: "VMW_SATP_ALUA"}, Path: []types.HostMultipathInfoPath{
+		{Key: "path-1", Name: "vmhba1:C0:T0:L0", Adapter: "hba-1", Lun: "lun-1", PathState: "active", State: "active", IsWorkingPath: &yes, Transport: &types.HostFibreChannelTargetTransport{NodeWorldWideName: 1, PortWorldWideName: 2}},
+		{Key: "path-2", Name: "vmhba1:C0:T1:L0", Adapter: "hba-1", Lun: "lun-1", PathState: "standby", IsWorkingPath: &no, Transport: &types.HostInternetScsiTargetTransport{IScsiName: "iqn.target", Address: []string{"10.0.0.1:3260", "10.0.0.2:3260"}}},
+		{Key: "path-3", Adapter: "hba-2", Lun: "lun-1", PathState: "dead"},
+	}}}}))
+	j := storageHostJSON(t, &a)
+	luns, ok := j["hostMultipathInfo"].([]any)
+	if !ok || len(luns) != 1 {
+		t.Fatalf("multipath missing: %#v", j["hostMultipathInfo"])
+	}
+	lun := luns[0].(map[string]any)
+	storageFields(t, lun, map[string]any{"key": "mp-1", "id": "naa.01", "lun": "lun-1", "policy": "VMW_PSP_FIXED", "preferredPath": "path-1", "storageArrayTypePolicy": "VMW_SATP_ALUA"})
+	paths := lun["paths"].([]any)
+	if len(paths) != 3 {
+		t.Fatalf("lost paths: %#v", paths)
+	}
+	storageFields(t, paths[0].(map[string]any), map[string]any{"adapter": "hba-1", "lun": "lun-1", "pathState": "active", "state": "active", "isWorkingPath": true})
+	storageFields(t, paths[0].(map[string]any)["transport"].(map[string]any), map[string]any{"type": "HostFibreChannelTargetTransport", "protocol": "FibreChannel", "nodeWorldWideName": "0000000000000001"})
+	storageFields(t, paths[1].(map[string]any), map[string]any{"isWorkingPath": false, "pathState": "standby"})
+	storageFields(t, paths[1].(map[string]any)["transport"].(map[string]any), map[string]any{"iscsiName": "iqn.target", "addresses": []any{"10.0.0.1:3260", "10.0.0.2:3260"}})
+	storageFields(t, paths[2].(map[string]any), map[string]any{"isWorkingPath": nil, "pathState": "dead"})
+	a.Apply(types.ObjectUpdate{ChangeSet: []types.PropertyChange{{Name: "config.storageDevice.multipathInfo", Op: types.PropertyChangeOpRemove}}})
+	if v := storageHostJSON(t, &a)["hostMultipathInfo"]; v != nil {
+		t.Fatalf("stale multipath: %#v", v)
+	}
+}
+
+func TestStorageNvmeTopologyTransports(t *testing.T) {
+	for _, transport := range []string{"fibreChannel", "tcp", "rdma", "pcie", "unsupported", "future"} {
+		t.Run(transport, func(t *testing.T) {
+			a := HostAdapter{}
+			a.Apply(storageUpdate("config.storageDevice.nvmeTopology.adapter", types.ArrayOfHostNvmeTopologyInterface{HostNvmeTopologyInterface: []types.HostNvmeTopologyInterface{{Key: "interface-1", Adapter: "hba-1", ConnectedController: []types.HostNvmeController{{Key: "ctrl-1", ControllerNumber: 7, Subnqn: "nqn.2026.test:array", Name: "nvme-controller", AssociatedAdapter: "hba-1", TransportType: transport, VendorId: "0001", Model: "NVMe array", SerialNumber: "serial-1", AttachedNamespace: []types.HostNvmeNamespace{{Key: "ns-1", Name: "eui.0001", Id: 1, BlockSize: 512, CapacityInBlocks: 2048}, {Key: "ns-2", Name: "eui.0002", Id: 2, BlockSize: 4096, CapacityInBlocks: 4096}}}}}}}))
+			j := storageHostJSON(t, &a)
+			topology, ok := j["hostNvmeTopology"].([]any)
+			if !ok || len(topology) != 1 {
+				t.Fatalf("NVMe missing: %#v", j["hostNvmeTopology"])
+			}
+			adapter := topology[0].(map[string]any)
+			storageFields(t, adapter, map[string]any{"key": "interface-1", "adapter": "hba-1"})
+			controller := adapter["connectedController"].([]any)[0].(map[string]any)
+			storageFields(t, controller, map[string]any{"key": "ctrl-1", "controllerNumber": float64(7), "subnqn": "nqn.2026.test:array", "associatedAdapter": "hba-1", "transportType": transport, "vendorId": "0001"})
+			ns := controller["attachedNamespace"].([]any)
+			if len(ns) != 2 {
+				t.Fatalf("lost namespaces: %#v", ns)
+			}
+			storageFields(t, ns[0].(map[string]any), map[string]any{"id": float64(1), "name": "eui.0001", "blockSize": float64(512), "capacityInBlocks": float64(2048)})
+			a.Apply(storageUpdate("config.storageDevice.nvmeTopology.adapter", types.ArrayOfHostNvmeTopologyInterface{HostNvmeTopologyInterface: []types.HostNvmeTopologyInterface{{Key: "interface-1", Adapter: "hba-1"}}}))
+			adapter = storageHostJSON(t, &a)["hostNvmeTopology"].([]any)[0].(map[string]any)
+			if v := adapter["connectedController"]; v != nil {
+				t.Fatalf("stale controllers: %#v", v)
+			}
+		})
+	}
+}
+
+func TestStorageVvolArraysStayDistinct(t *testing.T) {
+	a := DatastoreAdapter{}
+	a.Apply(storageUpdate(fVmfsExtent, &types.VvolDatastoreInfo{VvolDS: &types.HostVvolVolume{ScId: "container-1", StorageArray: []types.VASAStorageArray{{Name: "array one", Uuid: "array-uuid-1", VendorId: "vendor-1", ModelId: "model-1"}, {Name: "array two", Uuid: "array-uuid-2"}}}}))
+	var r web.Datastore
+	r.With(&a.model)
+	j := storageJSON(t, &r)
+	arrays, ok := j["storageArrays"].([]any)
+	if !ok || len(arrays) != 2 {
+		t.Fatalf("arrays missing: %#v", j["storageArrays"])
+	}
+	storageFields(t, arrays[0].(map[string]any), map[string]any{"uuid": "array-uuid-1", "name": "array one", "vendorId": "vendor-1", "modelId": "model-1"})
+	storageFields(t, j, map[string]any{"storageContainerId": "container-1"})
+	a.Apply(storageUpdate(fVmfsExtent, types.VvolDatastoreInfo{}))
+	r.With(&a.model)
+	storageFields(t, storageJSON(t, &r), map[string]any{"storageArrays": nil, "storageContainerId": nil})
+}
+
+func TestStorageVvolMetadataRemoval(t *testing.T) {
+	for _, change := range []types.PropertyChange{
+		{Name: fVmfsExtent, Op: types.PropertyChangeOpAssign, Val: nil},
+		{Name: fVmfsExtent, Op: types.PropertyChangeOpRemove},
+		{Name: fVmfsExtent, Op: types.PropertyChangeOpAssign, Val: types.VsanDatastoreInfo{}},
+		{Name: fVmfsExtent, Op: types.PropertyChangeOpAssign, Val: (*types.VvolDatastoreInfo)(nil)},
+	} {
+		t.Run(string(change.Op)+"/"+storageTypeName(change.Val), func(t *testing.T) {
+			a := DatastoreAdapter{}
+			a.Apply(storageUpdate(fVmfsExtent, types.VvolDatastoreInfo{VvolDS: &types.HostVvolVolume{ScId: "container-1", StorageArray: []types.VASAStorageArray{{Uuid: "array-1"}}}}))
+			a.Apply(types.ObjectUpdate{ChangeSet: []types.PropertyChange{change}})
+			var resource web.Datastore
+			resource.With(&a.model)
+			storageFields(t, storageJSON(t, &resource), map[string]any{"storageArrays": nil, "storageContainerId": nil})
+		})
+	}
+}
+
+func TestStorageHostPartialAndEmptyUpdates(t *testing.T) {
+	a := HostAdapter{}
+	a.Apply(storageUpdate(fHostBusAdapter, types.ArrayOfHostHostBusAdapter{HostHostBusAdapter: []types.BaseHostHostBusAdapter{nil, (*types.HostFibreChannelHba)(nil), &types.HostFibreChannelOverEthernetHba{HostFibreChannelHba: types.HostFibreChannelHba{HostHostBusAdapter: types.HostHostBusAdapter{Pci: "pci-1"}, Speed: 0, NodeWorldWideName: -1}}}}))
+	a.Apply(storageUpdate(fPciDevice, types.ArrayOfHostPciDevice{HostPciDevice: []types.HostPciDevice{{Id: "pci-1", VendorName: "one"}, {Id: "pci-1", VendorName: "two"}}}))
+	a.Apply(storageUpdate(fScsiLun, types.ArrayOfScsiLun{ScsiLun: []types.BaseScsiLun{nil, (*types.HostScsiDisk)(nil)}}))
+	hbas := storageHostJSON(t, &a)["hbaDiskInfo"].([]any)
+	if len(hbas) != 1 {
+		t.Fatalf("HBA count: %d", len(hbas))
+	}
+	storageFields(t, hbas[0].(map[string]any), map[string]any{"type": "HostFibreChannelOverEthernetHba", "protocol": "FCoE", "speedBitsPerSecond": float64(0), "nodeWorldWideName": "ffffffffffffffff", "vendor": nil})
+	a.Apply(storageUpdate(fMultipathInfo, &types.HostMultipathInfo{Lun: []types.HostMultipathInfoLogicalUnit{{Lun: "one", Policy: (*types.HostMultipathInfoFixedLogicalUnitPolicy)(nil), Path: []types.HostMultipathInfoPath{{Transport: (*types.HostFibreChannelTargetTransport)(nil)}}}, {Lun: "two"}}}))
+	if len(a.model.HostMultipathInfo) != 2 {
+		t.Fatal("lost orphan LUNs")
+	}
+	a.Apply(storageUpdate(fMultipathInfo, (*types.HostMultipathInfo)(nil)))
+	a.Apply(storageUpdate(fNvmeTopology, types.ArrayOfHostNvmeTopologyInterface{}))
+	a.Apply(storageUpdate(fHostBusAdapter, types.ArrayOfHostHostBusAdapter{}))
+	storageFields(t, storageHostJSON(t, &a), map[string]any{"hostMultipathInfo": nil, "hostNvmeTopology": nil, "hbaDiskInfo": nil, "hostScsiDisks": nil})
+}
+
+func TestStorageSQLiteToREST(t *testing.T) {
+	no := false
+	unit := int32(0)
+	host := HostAdapter{model: model.Host{Base: model.Base{ID: "host-1"}}}
+	host.Apply(storageUpdate(fScsiLun, types.ArrayOfScsiLun{ScsiLun: []types.BaseScsiLun{&types.HostScsiDisk{ScsiLun: types.ScsiLun{Uuid: "host-lun-1", CanonicalName: "naa.01", Key: "lun-key", Vendor: " LUN vendor ", Model: " LUN model "}}}}))
+	host.Apply(storageUpdate(fHostBusAdapter, types.ArrayOfHostHostBusAdapter{HostHostBusAdapter: []types.BaseHostHostBusAdapter{&types.HostFibreChannelHba{HostHostBusAdapter: types.HostHostBusAdapter{Pci: "pci-1", Key: "hba-1", Device: "vmhba1", Driver: "lpfc", Model: "FC adapter"}, Speed: 16000000000, NodeWorldWideName: 1, PortWorldWideName: 2}}}))
+	// #8960 must continue to retain every LUN, including multiple LUNs per target.
+	topology := storageUpdate(fScsiTopology, types.ArrayOfHostScsiTopologyInterface{HostScsiTopologyInterface: []types.HostScsiTopologyInterface{{Adapter: "hba-1", Target: []types.HostScsiTopologyTarget{{Lun: []types.HostScsiTopologyLun{{ScsiLun: "lun-key"}, {ScsiLun: "lun-key-2"}, {}}}, {}}}}})
+	host.Apply(topology)
+	host.Apply(topology) // Refresh replaces the topology rather than appending it.
+	host.Apply(storageUpdate(fPciDevice, types.ArrayOfHostPciDevice{HostPciDevice: []types.HostPciDevice{{Id: "pci-1", VendorName: "adapter vendor"}}}))
+	host.Apply(storageUpdate(fMultipathInfo, types.HostMultipathInfo{Lun: []types.HostMultipathInfoLogicalUnit{{Lun: "lun-key", Path: []types.HostMultipathInfoPath{{Key: "path-1", Adapter: "hba-1", IsWorkingPath: &no, Transport: &types.HostFibreChannelOverEthernetTargetTransport{HostFibreChannelTargetTransport: types.HostFibreChannelTargetTransport{NodeWorldWideName: 1, PortWorldWideName: 2}, VlanId: 0, VnportMac: "00:01:02:03:04:05"}}}}}}))
+	host.Apply(storageUpdate(fNvmeTopology, types.ArrayOfHostNvmeTopologyInterface{HostNvmeTopologyInterface: []types.HostNvmeTopologyInterface{{Adapter: "hba-1", ConnectedController: []types.HostNvmeController{{Key: "controller-1", TransportType: "tcp", AttachedNamespace: []types.HostNvmeNamespace{{Id: 9, Name: "ns-9"}}}}}}}))
+	ds := DatastoreAdapter{model: model.Datastore{Base: model.Base{ID: "ds-1"}}}
+	ds.Apply(storageUpdate(fVmfsExtent, types.VvolDatastoreInfo{VvolDS: &types.HostVvolVolume{HostFileSystemVolume: types.HostFileSystemVolume{Type: "VVOL"}, ProtocolEndpointType: "SCSI", HostPE: []types.VVolHostPE{{ProtocolEndpoint: []types.HostProtocolEndpoint{{DeviceId: " naa.pe-1 "}, {DeviceId: "naa.pe-1"}, {DeviceId: ""}, {DeviceId: "naa.pe-2"}}}}, ScId: "sc-1", StorageArray: []types.VASAStorageArray{{Uuid: "array-1", Name: "array", VendorId: "vendor", ModelId: "model"}}}}))
+	vmfs := DatastoreAdapter{model: model.Datastore{Base: model.Base{ID: "ds-vmfs"}}}
+	vmfs.Apply(storageUpdate(fVmfsExtent, types.VmfsDatastoreInfo{Vmfs: &types.HostVmfsVolume{HostFileSystemVolume: types.HostFileSystemVolume{Type: "VMFS"}, MajorVersion: 6, Extent: []types.HostScsiDiskPartition{{DiskName: "naa.01"}, {DiskName: "naa.02"}}}}))
+	nfs := DatastoreAdapter{model: model.Datastore{Base: model.Base{ID: "ds-nfs"}}}
+	nfs.Apply(storageUpdate(fVmfsExtent, types.NasDatastoreInfo{Nas: &types.HostNasVolume{HostFileSystemVolume: types.HostFileSystemVolume{Type: "NFS41"}, RemoteHost: "10.0.0.1", RemotePath: "/export", RemoteHostNames: []string{"10.0.0.1", "10.0.0.2"}}}))
+	vm := VmAdapter{model: model.VM{Base: model.Base{ID: "vm-1"}, Host: "host-1"}}
+	vm.updateDisks(&types.ArrayOfVirtualDevice{VirtualDevice: []types.BaseVirtualDevice{
+		&types.VirtualDisk{VirtualDevice: types.VirtualDevice{UnitNumber: &unit, Backing: &types.VirtualDiskFlatVer2BackingInfo{ThinProvisioned: &no, EagerlyScrub: &no}}},
+		&types.VirtualDisk{VirtualDevice: types.VirtualDevice{UnitNumber: &unit, Backing: &types.VirtualDiskRawDiskMappingVer1BackingInfo{LunUuid: "host-lun-1", Uuid: "backing-1", CompatibilityMode: "virtualMode"}}},
+	}})
+	db := libmodel.New(filepath.Join(t.TempDir(), "storage.db"), &model.Host{}, &model.Datastore{}, &model.VM{})
+	if err := db.Open(true); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close(true) }()
+	for _, m := range []libmodel.Model{&host.model, &ds.model, &vmfs.model, &nfs.model, &vm.model} {
+		if err := db.Insert(m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Close(false); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Open(false); err != nil {
+		t.Fatal(err)
+	}
+	server := storageAPIServer(t, db)
+	storageCheckAPI(t, server, "hosts", "host-1", func(t *testing.T, hj map[string]any) {
+		storageFields(t, hj["hbaDiskInfo"].([]any)[0].(map[string]any), map[string]any{"vendor": "adapter vendor", "type": "HostFibreChannelHba", "pci": "pci-1", "speedBitsPerSecond": float64(16000000000), "hbaDevice": "vmhba1", "key": "hba-1", "model": "FC adapter", "driver": "lpfc", "protocol": "FibreChannel", "nodeWorldWideName": "0000000000000001", "portWorldWideName": "0000000000000002"})
+		storageFields(t, hj["hostScsiDisks"].([]any)[0].(map[string]any), map[string]any{"uuid": "host-lun-1", "canonicalName": "naa.01", "key": "lun-key", "vendor": "LUN vendor", "model": "LUN model"})
+		storageFields(t, hj, map[string]any{"hostScsiTopology": []any{map[string]any{"key": "hba-1", "scsiDiskKeys": []any{"lun-key", "lun-key-2"}}}})
+		path := hj["hostMultipathInfo"].([]any)[0].(map[string]any)["paths"].([]any)[0].(map[string]any)
+		storageFields(t, path, map[string]any{"isWorkingPath": false, "adapter": "hba-1"})
+		storageFields(t, path["transport"].(map[string]any), map[string]any{"protocol": "FCoE", "vlanId": float64(0), "nodeWorldWideName": "0000000000000001", "vnportMac": "00:01:02:03:04:05"})
+		c := hj["hostNvmeTopology"].([]any)[0].(map[string]any)["connectedController"].([]any)[0].(map[string]any)
+		storageFields(t, c, map[string]any{"transportType": "tcp", "key": "controller-1"})
+		storageFields(t, c["attachedNamespace"].([]any)[0].(map[string]any), map[string]any{"id": float64(9), "name": "ns-9"})
+	})
+	storageCheckAPI(t, server, "datastores", "ds-1", func(t *testing.T, dj map[string]any) {
+		storageFields(t, dj, map[string]any{"storageContainerId": "sc-1", "filesystemType": "VVOL", "protocolEndpointType": "SCSI", "backingDevicesNames": []any{"naa.pe-1", "naa.pe-2"}})
+		storageFields(t, dj["storageArrays"].([]any)[0].(map[string]any), map[string]any{"uuid": "array-1", "name": "array", "vendorId": "vendor", "modelId": "model"})
+	})
+	storageCheckAPI(t, server, "datastores", "ds-vmfs", func(t *testing.T, dj map[string]any) {
+		storageFields(t, dj, map[string]any{"filesystemType": "VMFS", "filesystemMajorVersion": float64(6), "backingDevicesNames": []any{"naa.01", "naa.02"}, "storageArrays": nil, "storageContainerId": nil})
+	})
+	storageCheckAPI(t, server, "datastores", "ds-nfs", func(t *testing.T, dj map[string]any) {
+		storageFields(t, dj, map[string]any{"filesystemType": "NFS41", "nasRemoteHost": "10.0.0.1", "nasRemotePath": "/export", "nasRemoteHostNames": []any{"10.0.0.1", "10.0.0.2"}, "storageArrays": nil, "storageContainerId": nil})
+	})
+	storageCheckAPI(t, server, "vms", "vm-1", func(t *testing.T, vj map[string]any) {
+		storageFields(t, vj["disks"].([]any)[0].(map[string]any), map[string]any{"thinProvisioned": false, "eagerlyScrub": false})
+		storageFields(t, vj["disks"].([]any)[1].(map[string]any), map[string]any{"compatibilityMode": "virtualMode", "backingUuid": "backing-1", "lunUuid": "host-lun-1"})
+	})
+	// Reused source identifiers on another host must not acquire host-1's data.
+	other := model.Host{Base: model.Base{ID: "host-2"}}
+	if err := db.Insert(&other); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&other); err != nil {
+		t.Fatal(err)
+	}
+	var hr web.Host
+	hr.With(&host.model)
+	hr.With(&other)
+	storageFields(t, storageJSON(t, &hr), map[string]any{"hostMultipathInfo": nil, "hostNvmeTopology": nil, "hbaDiskInfo": nil})
+}
+
+// Serve a populated inventory without starting a live vCenter connection.
+// The adapters, SQLite database, routes and JSON serialization are real.
+// Unused collector methods deliberately remain unimplemented.
+type storageAPICollector struct {
+	libcontainer.Collector
+	db libmodel.DB
+}
+
+func (c *storageAPICollector) Owner() meta.Object {
+	return &api.Provider{ObjectMeta: meta.ObjectMeta{UID: "storage-provider"}}
+}
+func (c *storageAPICollector) Start() error    { return nil }
+func (c *storageAPICollector) HasParity() bool { return true }
+func (c *storageAPICollector) DB() libmodel.DB { return c.db }
+
+func storageAPIServer(t *testing.T, db libmodel.DB) *gin.Engine {
+	t.Helper()
+	authRequired := webbase.Settings.AuthRequired
+	webbase.Settings.AuthRequired = false
+	t.Cleanup(func() { webbase.Settings.AuthRequired = authRequired })
+	container := libcontainer.New()
+	if err := container.Add(&storageAPICollector{db: db}); err != nil {
+		t.Fatal(err)
+	}
+	router := gin.New()
+	handler := web.Handler{Handler: webbase.Handler{Container: container}}
+	(&web.HostHandler{Handler: handler}).AddRoutes(router)
+	(&web.DatastoreHandler{Handler: handler}).AddRoutes(router)
+	(&web.VMHandler{Handler: handler}).AddRoutes(router)
+	return router
+}
+
+func storageCheckAPI(t *testing.T, server http.Handler, collection, id string, check func(*testing.T, map[string]any)) {
+	t.Helper()
+	root := "/providers/vsphere/storage-provider/" + collection
+	for _, suffix := range []string{"/" + id, "?detail=1", "?detail=all", ""} {
+		t.Run(collection+"/"+id+suffix, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			server.ServeHTTP(response, httptest.NewRequest(http.MethodGet, root+suffix, nil))
+			if response.Code != http.StatusOK {
+				t.Fatalf("GET %s: %d %s", root+suffix, response.Code, response.Body.String())
+			}
+			var resource map[string]any
+			if suffix == "/"+id {
+				if err := json.Unmarshal(response.Body.Bytes(), &resource); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				var resources []map[string]any
+				if err := json.Unmarshal(response.Body.Bytes(), &resources); err != nil {
+					t.Fatal(err)
+				}
+				for _, item := range resources {
+					if item["id"] == id {
+						resource = item
+						break
+					}
+				}
+			}
+			if resource == nil || resource["id"] != id {
+				t.Fatalf("resource %s missing: %s", id, response.Body.String())
+			}
+			if suffix == "" && collection != "vms" {
+				// Host/datastore lists default to summaries; callers must request detail.
+				storageFields(t, resource, map[string]any{"hbaDiskInfo": nil, "hostScsiDisks": nil, "hostScsiTopology": nil, "hostMultipathInfo": nil, "hostNvmeTopology": nil, "filesystemType": nil, "storageArrays": nil, "storageContainerId": nil})
+				return
+			}
+			check(t, resource)
+		})
 	}
 }

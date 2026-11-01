@@ -234,6 +234,8 @@ func (h *HostHandler) buildAdapters(host *Host) (err error) {
 // REST Resource.
 type Host struct {
 	Resource
+	HostMultipathInfo       []model.HostMultipathLun `json:"hostMultipathInfo,omitempty"`
+	HostNvmeTopology        []model.HostNvmeTopology `json:"hostNvmeTopology,omitempty"`
 	Cluster                 string                   `json:"cluster"`
 	Status                  string                   `json:"status"`
 	InMaintenanceMode       bool                     `json:"inMaintenance"`
@@ -284,6 +286,8 @@ func (r *Host) With(m *model.Host) {
 	r.HostScsiDisks = append([]model.HostScsiDisk(nil), m.HostScsiDisks...)
 	r.HbaDiskInfo = append([]model.HbaDiskInfo(nil), m.HbaDiskInfo...)
 	r.HostScsiTopology = append([]model.HostScsiTopology(nil), m.HostScsiTopology...)
+	r.HostMultipathInfo = append([]model.HostMultipathLun(nil), m.HostMultipathInfo...)
+	r.HostNvmeTopology = append([]model.HostNvmeTopology(nil), m.HostNvmeTopology...)
 	r.VMotionSupported = m.VMotionSupported
 	r.StorageVMotionSupported = m.StorageVMotionSupported
 }
