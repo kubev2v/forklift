@@ -10,12 +10,23 @@ tarball=/usr/share/copy-appliance-template/appliance-root.tar.gz
 rm -rf "${staging}"
 mkdir -p "${root}" "$(dirname "${tarball}")"
 
-dnf install -y \
-  --installroot="${root}" \
-  --releasever=9 \
-  --nodocs \
-  --nogpgcheck \
-  --setopt=install_weak_deps=False \
+dnf_install=(
+  dnf install -y
+  --installroot="${root}"
+  --releasever=9
+  --nodocs
+  --nogpgcheck
+  --setopt=install_weak_deps=False
+)
+# Fedora dnf5 only sees repos inside the installroot. UBI 9 already has EL9 repos.
+. /etc/os-release
+if [[ "${ID}" == fedora ]]; then
+  dnf_install+=(
+    --repofrompath=cs9-baseos,https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/
+    --repofrompath=cs9-appstream,https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/
+  )
+fi
+"${dnf_install[@]}" \
   open-vm-tools \
   podman \
   containernetworking-plugins
