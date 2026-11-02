@@ -720,49 +720,9 @@ func (c *FlashSystemClonner) Map(initiatorGroup string, targetLUN populator.LUN,
 		// Then map with explicit SCSI ID, which allows multi-host mapping
 		c.log.Info("volume already mapped to another host, finding next available SCSI ID for multi-host mapping", "vdisk_id", vdiskID)
 
-		// Query lshostvdiskmap for the target host to get all current SCSI IDs
-		hostMapEndpoint := fmt.Sprintf("/lshostvdiskmap/%s", hostID)
-		hostMapBody, hostMapStatus, hostMapErr := c.api.makeRequest("POST", hostMapEndpoint, map[string]string{})
-		if hostMapErr != nil || hostMapStatus != http.StatusOK {
-			return populator.LUN{}, fmt.Errorf("failed to query host volume mappings: %w", hostMapErr)
+		if err := c.mapMultiHostVolume(endpoint, hostID, vdiskID); err != nil {
+			return populator.LUN{}, err
 		}
-
-		var hostMappings []struct {
-			SCSIID string `json:"SCSI_id"`
-		}
-		if unmarshalErr := json.Unmarshal(hostMapBody, &hostMappings); unmarshalErr != nil {
-			return populator.LUN{}, fmt.Errorf("failed to parse host volume mappings: %w", unmarshalErr)
-		}
-
-		// Find the maximum SCSI ID currently in use
-		maxSCSIID := -1
-		for _, mapping := range hostMappings {
-			scsiID := 0
-			if _, err := fmt.Sscanf(mapping.SCSIID, "%d", &scsiID); err == nil {
-				if scsiID > maxSCSIID {
-					maxSCSIID = scsiID
-				}
-			}
-		}
-
-		// Use the next available SCSI ID
-		nextSCSIID := maxSCSIID + 1
-		c.log.V(2).Info("found next available SCSI ID", "max_scsi_id", maxSCSIID, "next_scsi_id", nextSCSIID, "host", initiatorGroup)
-
-		// Retry mapping with explicit SCSI ID for multi-host assignment
-		// Note: REST API may allow multi-host mapping when explicit SCSI ID is provided
-		scsiPayload := map[string]interface{}{
-			"host":  hostID,
-			"scsi":  nextSCSIID,
-			"force": true,
-		}
-		mapBody, mapStatus, mapErr = c.api.makeRequest("POST", endpoint, scsiPayload)
-		if mapErr != nil {
-			return populator.LUN{}, fmt.Errorf("failed to create host mapping with SCSI ID %d: %w", nextSCSIID, mapErr)
-		} else if mapStatus != http.StatusOK && mapStatus != http.StatusCreated {
-			return populator.LUN{}, fmt.Errorf("failed to map VDisk '%s' to Host '%s' with SCSI ID %d, status: %d, body: %s", vdiskID, hostID, nextSCSIID, mapStatus, string(mapBody))
-		}
-		c.log.Info("volume mapped successfully with SCSI ID for multi-host access", "vdisk_id", vdiskID, "host_id", hostID, "scsi_id", nextSCSIID)
 	} else if mapErr != nil {
 		return populator.LUN{}, fmt.Errorf("failed to create host mapping: %w", mapErr)
 	} else if mapStatus != http.StatusOK && mapStatus != http.StatusCreated {
@@ -772,6 +732,64 @@ func (c *FlashSystemClonner) Map(initiatorGroup string, targetLUN populator.LUN,
 	c.log.Info("volume mapped successfully", "vdisk_id", vdiskID, "host_id", hostID)
 
 	return targetLUN, nil
+}
+
+func (c *FlashSystemClonner) mapMultiHostVolume(endpoint, hostID, vdiskID string) error {
+	const maxAttempts = 6
+	minimumSCSIID := 0
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		body, status, err := c.api.makeRequest("POST", fmt.Sprintf("/lshostvdiskmap/%s", hostID), map[string]string{})
+		if err != nil {
+			return fmt.Errorf("failed to query host volume mappings: %w", err)
+		}
+		if status != http.StatusOK {
+			return fmt.Errorf("failed to query host volume mappings: status %d, body: %s", status, body)
+		}
+		var mappings []struct {
+			SCSIID string `json:"SCSI_id"`
+		}
+		if err := json.Unmarshal(body, &mappings); err != nil {
+			return fmt.Errorf("failed to parse host volume mappings: %w", err)
+		}
+		nextSCSIID := minimumSCSIID
+		for _, mapping := range mappings {
+			var id int
+			if _, err := fmt.Sscanf(mapping.SCSIID, "%d", &id); err == nil && id >= nextSCSIID {
+				nextSCSIID = id + 1
+			}
+		}
+		payload := map[string]interface{}{"host": hostID, "scsi": nextSCSIID, "force": true}
+		body, status, err = c.api.makeRequest("POST", endpoint, payload)
+		if err != nil {
+			// CMMVC5878E means this volume is already mapped; CMMVC5879E means the SCSI ID is occupied.
+			if status == http.StatusConflict && strings.Contains(err.Error(), "CMMVC5878E") {
+				return nil
+			}
+			if status == http.StatusConflict && strings.Contains(err.Error(), "CMMVC5879E") {
+				if attempt+1 == maxAttempts {
+					return fmt.Errorf("failed to map VDisk '%s' to Host '%s' after %d attempts: %w", vdiskID, hostID, maxAttempts, err)
+				}
+				minimumSCSIID = nextSCSIID + 1
+				delay := time.Duration(1<<uint(attempt)) * time.Second
+				// Vary each delay by ±25% to spread concurrent retries.
+				jitterRange := delay / 4
+				jitter, jitterErr := crand.Int(crand.Reader, big.NewInt(int64(2*jitterRange)+1))
+				if jitterErr == nil {
+					delay += time.Duration(jitter.Int64()) - jitterRange
+				}
+				c.log.Info("SCSI ID already in use, retrying host mapping", "host_id", hostID, "scsi_id", nextSCSIID, "backoff", delay)
+				time.Sleep(delay)
+				continue
+			}
+			return fmt.Errorf("failed to create host mapping with SCSI ID %d: %w", nextSCSIID, err)
+		}
+		if status != http.StatusOK && status != http.StatusCreated {
+			return fmt.Errorf("failed to map VDisk '%s' to Host '%s' with SCSI ID %d, status: %d, body: %s", vdiskID, hostID, nextSCSIID, status, body)
+		}
+		c.log.Info("volume mapped successfully with SCSI ID for multi-host access", "vdisk_id", vdiskID, "host_id", hostID, "scsi_id", nextSCSIID)
+		return nil
+	}
+	return fmt.Errorf("failed to map VDisk '%s' to Host '%s' after %d attempts", vdiskID, hostID, maxAttempts)
 }
 
 func extractFromContext(context populator.MappingContext) ExtractedMapping {
