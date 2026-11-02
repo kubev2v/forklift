@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
+	cnv "kubevirt.io/api/core/v1"
 	export "kubevirt.io/api/export/v1beta1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -177,6 +178,7 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	_ = core.AddToScheme(scheme)
+	_ = cnv.AddToScheme(scheme)
 	_ = export.AddToScheme(scheme)
 	_ = cdi.AddToScheme(scheme)
 
@@ -246,6 +248,27 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 			},
 		}
 	}
+	makeVM := func(volumeName, claimName string) *cnv.VirtualMachine {
+		return &cnv.VirtualMachine{
+			ObjectMeta: metav1.ObjectMeta{Name: vmName, Namespace: ns},
+			Spec: cnv.VirtualMachineSpec{
+				Template: &cnv.VirtualMachineInstanceTemplateSpec{
+					Spec: cnv.VirtualMachineInstanceSpec{
+						Volumes: []cnv.Volume{{
+							Name: volumeName,
+							VolumeSource: cnv.VolumeSource{
+								PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
+									PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
+										ClaimName: claimName,
+									},
+								},
+							},
+						}},
+					},
+				},
+			},
+		}
+	}
 	dvTemplate := &cdi.DataVolume{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "target-ns", Annotations: map[string]string{}},
 	}
@@ -254,7 +277,7 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 	vmRef := ref.Ref{ID: "vm-1", Name: vmName, Namespace: ns}
 
 	t.Run("default uses exact source PVC name", func(t *testing.T) {
-		builder := newBuilder(makeExport(pvcName), makePVC(pvcName))
+		builder := newBuilder(makeExport(pvcName), makePVC(pvcName), makeVM(pvcName, pvcName))
 		dvs, err := builder.DataVolumes(vmRef, secret, configMap, dvTemplate.DeepCopy(), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -271,7 +294,7 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 	})
 
 	t.Run("explicit non-OCP template uses generateName", func(t *testing.T) {
-		builder := newBuilder(makeExport(pvcName), makePVC(pvcName))
+		builder := newBuilder(makeExport(pvcName), makePVC(pvcName), makeVM(pvcName, pvcName))
 		builder.Plan.Spec.PVCNameTemplate = planbase.DefaultPVCNameTemplate
 		builder.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(true)
 		dvs, err := builder.DataVolumes(vmRef, secret, configMap, dvTemplate.DeepCopy(), nil)
@@ -303,7 +326,7 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 	})
 
 	t.Run("plan template overrides OCP default", func(t *testing.T) {
-		builder := newBuilder(makeExport(pvcName), makePVC(pvcName))
+		builder := newBuilder(makeExport(pvcName), makePVC(pvcName), makeVM(pvcName, pvcName))
 		builder.Plan.Spec.PVCNameTemplate = "custom-{{.DiskIndex}}"
 		builder.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(false)
 		dvs, err := builder.DataVolumes(vmRef, secret, configMap, dvTemplate.DeepCopy(), nil)
@@ -323,7 +346,7 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 		settings.Settings.OCPPVCNameTemplate = "ocpglob-{{.DiskIndex}}"
 		t.Cleanup(func() { settings.Settings.OCPPVCNameTemplate = prev })
 
-		builder := newBuilder(makeExport(pvcName), makePVC(pvcName))
+		builder := newBuilder(makeExport(pvcName), makePVC(pvcName), makeVM(pvcName, pvcName))
 		builder.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(false)
 		dvs, err := builder.DataVolumes(vmRef, secret, configMap, dvTemplate.DeepCopy(), nil)
 		if err != nil {
@@ -334,6 +357,32 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 		}
 		if dvs[0].Name != "ocpglob-0" {
 			t.Errorf("expected Name %q, got Name=%q GenerateName=%q", "ocpglob-0", dvs[0].Name, dvs[0].GenerateName)
+		}
+	})
+
+	t.Run("divergent volume and PVC names after storage migration", func(t *testing.T) {
+		const (
+			volName   = "rootdisk"
+			claimName = "rootdisk-mig-dkbt44"
+		)
+		builder := newBuilder(
+			makeExport(volName),
+			makePVC(claimName),
+			makeVM(volName, claimName),
+		)
+		dvs, err := builder.DataVolumes(vmRef, secret, configMap, dvTemplate.DeepCopy(), nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(dvs) != 1 {
+			t.Fatalf("expected 1 DataVolume, got %d", len(dvs))
+		}
+		if dvs[0].Name != claimName {
+			t.Errorf("expected Name %q, got Name=%q", claimName, dvs[0].Name)
+		}
+		wantSource := ns + "/" + claimName
+		if got := dvs[0].Annotations[planbase.AnnDiskSource]; got != wantSource {
+			t.Errorf("expected AnnDiskSource %q, got %q", wantSource, got)
 		}
 	})
 }

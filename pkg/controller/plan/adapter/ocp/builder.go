@@ -99,6 +99,23 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		return []cdi.DataVolume{}, nil
 	}
 
+	// Map the VMExport volume name to its PVC claim name, which may change during
+	// storage-class migration.
+	vm := &cnv.VirtualMachine{}
+	err = r.sourceClient.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	volToPVC := make(map[string]string)
+	for _, vol := range vm.Spec.Template.Spec.Volumes {
+		switch {
+		case vol.PersistentVolumeClaim != nil:
+			volToPVC[vol.Name] = vol.PersistentVolumeClaim.ClaimName
+		case vol.DataVolume != nil:
+			volToPVC[vol.Name] = vol.DataVolume.Name
+		}
+	}
+
 	// Build storage map
 	storageMap := map[string]v1beta1.DestinationStorage{}
 	for _, storage := range r.Map.Storage.Spec.Map {
@@ -120,9 +137,13 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 
 	dataVolumes := []cdi.DataVolume{}
 	for diskIndex, volume := range vmExport.Status.Links.External.Volumes {
-		// Get PVC
+		// Resolve PVC name via VM spec, fall back to the VMExport volume name.
+		pvcName := volume.Name
+		if name, ok := volToPVC[volume.Name]; ok {
+			pvcName = name
+		}
 		pvc := &core.PersistentVolumeClaim{}
-		err = r.sourceClient.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: volume.Name}, pvc)
+		err = r.sourceClient.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: pvcName}, pvc)
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
