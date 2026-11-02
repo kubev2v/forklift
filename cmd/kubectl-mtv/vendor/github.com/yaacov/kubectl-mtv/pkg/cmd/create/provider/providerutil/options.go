@@ -44,6 +44,7 @@ type ProviderOptions struct {
 	AzureTargetRegion          string
 	AzureSnapshotSku           string
 	AzureSnapshotResourceGroup string
+	AzureVolumeSnapshotClass   string
 	// Nutanix specific options
 	NutanixPrismType   string
 	NutanixClusterUUID string

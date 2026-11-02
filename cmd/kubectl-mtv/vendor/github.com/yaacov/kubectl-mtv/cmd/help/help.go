@@ -80,7 +80,7 @@ Help topics are also available for domain-specific languages:
 					if machine {
 						return outputTopic(cmd, topic, outputFormat)
 					}
-					fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n%s\n", topic.Short, topic.Content)
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n%s\n", topic.Short, topic.Content)
 					return nil
 				}
 			}
@@ -159,7 +159,7 @@ func outputTopic(cmd *cobra.Command, topic *help.Topic, format string) error {
 		return fmt.Errorf("failed to marshal topic: %w", err)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), string(output))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(output))
 	return nil
 }
 
@@ -181,6 +181,6 @@ func outputSchema(cmd *cobra.Command, schema *help.HelpSchema, format string) er
 		return fmt.Errorf("failed to marshal schema: %w", err)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), string(output))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(output))
 	return nil
 }

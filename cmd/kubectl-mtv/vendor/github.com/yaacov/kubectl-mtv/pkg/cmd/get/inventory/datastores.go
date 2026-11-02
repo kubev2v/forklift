@@ -44,6 +44,7 @@ func listDatastoresOnce(ctx context.Context, kubeConfigFlags *genericclioptions.
 			{Title: "NAME", Key: "name"},
 			{Title: "ID", Key: "id"},
 			{Title: "TYPE", Key: "type"},
+			{Title: "FS TYPE", Key: "filesystemType"},
 			{Title: "CAPACITY", Key: "capacityFormatted"},
 			{Title: "FREE", Key: "freeSpaceFormatted"},
 			{Title: "ACCESSIBLE", Key: "accessible", ColorFunc: output.ColorizeBooleanString},

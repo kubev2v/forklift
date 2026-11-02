@@ -27,8 +27,11 @@ func validateProviderOptions(options providerutil.ProviderOptions) error {
 	if options.Secret != "" && (options.AzureTenantID != "" || options.AzureSubscriptionID != "" || options.AzureClientID != "" || options.AzureClientSecret != "" || options.AzureResourceGroup != "") {
 		return fmt.Errorf("if a secret is provided, Azure credential flags should not be specified")
 	}
-	if options.Secret == "" && (options.AzureTenantID == "" || options.AzureSubscriptionID == "" || options.AzureClientID == "" || options.AzureClientSecret == "" || options.AzureResourceGroup == "") {
-		return fmt.Errorf("if no secret is provided, all Azure credentials must be specified (--azure-tenant-id, --azure-subscription-id, --azure-client-id, --azure-client-secret, --azure-resource-group)")
+	if options.Secret == "" && (options.AzureTenantID == "" || options.AzureSubscriptionID == "" || options.AzureClientID == "" || options.AzureClientSecret == "") {
+		return fmt.Errorf("if no secret is provided, Azure credentials must be specified (--azure-tenant-id, --azure-subscription-id, --azure-client-id, --azure-client-secret)")
+	}
+	if options.Secret == "" && options.AzureResourceGroup == "" && options.AzureSnapshotResourceGroup == "" {
+		return fmt.Errorf("--azure-snapshot-resource-group is required when --azure-resource-group is omitted")
 	}
 
 	return nil
@@ -112,6 +115,9 @@ func CreateProvider(configFlags *genericclioptions.ConfigFlags, options provider
 	}
 	if options.AzureSnapshotResourceGroup != "" {
 		provider.Spec.Settings["snapshotResourceGroup"] = options.AzureSnapshotResourceGroup
+	}
+	if options.AzureVolumeSnapshotClass != "" {
+		provider.Spec.Settings["volumeSnapshotClassName"] = options.AzureVolumeSnapshotClass
 	}
 
 	var createdSecret *corev1.Secret

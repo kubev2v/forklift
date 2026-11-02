@@ -12,6 +12,9 @@ import (
 // snapshot creation/removal and does not take ownership of the snapshot.
 const SpecSettingsSnapshotMorefKey = "SNAPSHOT_MOREF"
 
+// SpecSettingsNbdDisksKey holds comma-separated copy-appliance NBD URIs.
+const SpecSettingsNbdDisksKey = "V2V_nbdDisks"
+
 // ConversionType defines the type of conversion to perform.
 type ConversionType string
 
@@ -201,6 +204,14 @@ type ConversionSpec struct {
 	// Extra volume mounts to add to the conversion pod container.
 	// +optional
 	ExtraMounts []core.VolumeMount `json:"extraMounts,omitempty"`
+	// Extra init containers to prepend to the pod's init container list.
+	// +optional
+	ExtraInitContainers []core.Container `json:"extraInitContainers,omitempty"`
+}
+
+// IsHyperV returns true when this Conversion targets a Hyper-V source.
+func (r *ConversionSpec) IsHyperV() bool {
+	return r.Settings["V2V_SOURCE"] == "hyperv"
 }
 
 // InspectionConcern is a single issue reported by the deep-inspection process.

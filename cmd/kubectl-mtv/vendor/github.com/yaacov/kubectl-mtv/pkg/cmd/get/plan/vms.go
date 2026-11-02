@@ -143,7 +143,7 @@ func printNoMigrationMessage(planName string, plan *unstructured.Unstructured) {
 			})
 		}
 
-		output.NewTablePrinter().
+		_ = output.NewTablePrinter().
 			WithColumns(cols...).
 			AddItems(items).
 			Print()
@@ -248,7 +248,7 @@ func printPipelineTable(vm map[string]interface{}, vmCompletionStatus string) {
 		})
 	}
 
-	output.NewTablePrinter().
+	_ = output.NewTablePrinter().
 		WithColumns(cols...).
 		AddItems(items).
 		Print()
@@ -382,7 +382,7 @@ func printDisksTable(vm map[string]interface{}, vmCompletionStatus string) {
 			})
 		}
 
-		output.NewTablePrinter().
+		_ = output.NewTablePrinter().
 			WithColumns(diskCols...).
 			AddItems(items).
 			Print()

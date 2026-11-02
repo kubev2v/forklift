@@ -57,6 +57,11 @@ func GetGroupResource(required runtime.Object) (groupresource schema.GroupResour
 			Group:    SchemeGroupVersion.Group,
 			Resource: "migrations",
 		}
+	case *CopyAppliance:
+		groupresource = schema.GroupResource{
+			Group:    SchemeGroupVersion.Group,
+			Resource: "copyappliances",
+		}
 	default:
 		err = fmt.Errorf("resource type is not known")
 	}

@@ -54,6 +54,13 @@ func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 			{Title: "SIZE", Key: "provisionedSizeHuman"},
 			{Title: "PATH", Key: "filePath"},
 		}
+	case "azure":
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "SKU", Key: "object.sku"},
+			{Title: "SIZE-GB", Key: "object.sizeGB"},
+		}
 	default:
 		defaultHeaders = []output.Column{
 			{Title: "NAME", Key: "name"},
@@ -76,6 +83,8 @@ func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 	case "ova":
 		data, err = providerClient.GetDisks(ctx, 4)
 	case "hyperv":
+		data, err = providerClient.GetDisks(ctx, 4)
+	case "azure":
 		data, err = providerClient.GetDisks(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support disk inventory", providerType)

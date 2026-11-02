@@ -69,7 +69,7 @@ func wrapClusterError(err error, operation string) error {
 	// Resource not found - MTV not installed
 	if strings.Contains(errStr, "the server could not find the requested resource") ||
 		strings.Contains(errStr, "no matches for kind") {
-		return fmt.Errorf("MTV (Migration Toolkit for Virtualization) is not installed on this cluster\n\nThe ForkliftController CRD was not found. Please install MTV first.")
+		return fmt.Errorf("MTV (Migration Toolkit for Virtualization) is not installed on this cluster\n\nThe ForkliftController CRD was not found. Please install MTV first")
 	}
 
 	// Default: return original error with operation context
@@ -180,9 +180,10 @@ func extractSettingValue(spec map[string]interface{}, def SettingDefinition) Set
 		case bool:
 			sv.Value = v
 		case string:
-			if v == "true" {
+			switch v {
+			case "true":
 				sv.Value = true
-			} else if v == "false" {
+			case "false":
 				sv.Value = false
 			}
 		}
