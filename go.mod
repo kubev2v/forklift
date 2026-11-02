@@ -1,6 +1,6 @@
 module github.com/kubev2v/forklift
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
