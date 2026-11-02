@@ -134,7 +134,7 @@ func analyzePodsLogs(ctx context.Context, clientset *kubernetes.Clientset, pod *
 
 		// Use anonymous function to ensure logStream.Close() is called via defer
 		func() {
-			defer logStream.Close()
+			defer func() { _ = logStream.Close() }()
 			scanner := bufio.NewScanner(logStream)
 			for scanner.Scan() {
 				line := scanner.Text()

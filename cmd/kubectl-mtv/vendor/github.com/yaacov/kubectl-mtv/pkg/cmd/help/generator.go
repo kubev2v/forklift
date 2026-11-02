@@ -231,9 +231,10 @@ func flagToSchema(f *pflag.Flag) Flag {
 		switch {
 		case flagType == "bool":
 			// Convert boolean strings to actual booleans
-			if f.DefValue == "true" {
+			switch f.DefValue {
+			case "true":
 				flag.Default = true
-			} else if f.DefValue == "false" {
+			case "false":
 				flag.Default = false
 			}
 		case flagType == "int" || flagType == "int8" || flagType == "int16" || flagType == "int32" || flagType == "int64":

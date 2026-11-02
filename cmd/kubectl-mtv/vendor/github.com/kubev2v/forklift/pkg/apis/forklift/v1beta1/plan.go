@@ -144,6 +144,12 @@ type PlanSpec struct {
 	// Preserve static IPs of VMs in vSphere
 	// +kubebuilder:default:=true
 	PreserveStaticIPs bool `json:"preserveStaticIPs,omitempty"`
+	// PreCopySourceDisks enables two-phase disk transfer for Hyper-V migrations.
+	// When true, an init container converts the source VHDX files to raw format
+	// directly on the target block device using qemu-img, then virt-v2v performs
+	// only in-place guest customization.
+	// +optional
+	PreCopySourceDisks bool `json:"preCopySourceDisks,omitempty"`
 	// SkipZoneNodeSelector controls whether to skip adding a zone-based node selector to
 	// migrated VMs. By default, the migration automatically reads the availability zone from
 	// the source provider's spec.settings.target-az configuration and adds a node selector
@@ -281,6 +287,16 @@ type PlanSpec struct {
 	// Can be overridden per VM via spec.vms[].scsiReservation.
 	// +optional
 	SCSIReservation bool `json:"scsiReservation,omitempty"`
+	// SelinuxRelabelAtBoot defers SELinux relabeling until the guest's first boot after conversion.
+	// Passed to virt-v2v as --selinux-relabel-at-boot. Can be overridden per VM via spec.vms[].selinuxRelabelAtBoot.
+	// +optional
+	SelinuxRelabelAtBoot bool `json:"selinuxRelabelAtBoot,omitempty"`
+	// SelinuxRelabelExclude lists guest directories excluded from SELinux relabeling during conversion.
+	// Passed to virt-v2v as --selinux-relabel-exclude. Can be overridden per VM via spec.vms[].selinuxRelabelExclude.
+	// Use carefully: changes made inside excluded directories during customization may retain incorrect
+	// SELinux labels and cause failures later. Only exclude directories that are known not to need relabeling.
+	// +optional
+	SelinuxRelabelExclude []string `json:"selinuxRelabelExclude,omitempty"`
 	// DeleteGuestConversionPod determines if the guest conversion pod should be deleted after successful migration.
 	// Note:
 	//   - If this option is enabled and migration succeeds then the pod will get deleted. However the VM could still not boot and the virt-v2v logs, with additional information, will be deleted alongside guest conversion pod.
@@ -524,7 +540,7 @@ func (r *Plan) DestinationHasUdnNetwork(client k8sclient.Client) bool {
 	if err != nil {
 		return false
 	}
-	_, hasUdnLabel := namespace.ObjectMeta.Labels[namespaceLabelPrimaryUDN]
+	_, hasUdnLabel := namespace.Labels[namespaceLabelPrimaryUDN]
 	if !hasUdnLabel {
 		return false
 	}
@@ -571,11 +587,23 @@ func (r *Plan) IsSourceProviderOCP() bool {
 
 func (r *Plan) IsSourceProviderVSphere() bool { return r.Provider.Source.Type() == VSphere }
 
+func (r *Plan) IsSourceProviderHyperV() bool {
+	return r.Provider.Source.Type() == HyperV
+}
+
 func (r *Plan) ShouldRunPreflightInspection() bool {
-	return r.IsSourceProviderVSphere() &&
-		r.IsWarm() &&
-		!r.Spec.SkipGuestConversion &&
-		r.Spec.RunPreflightInspection
+	if r.Spec.SkipGuestConversion || !r.Spec.RunPreflightInspection {
+		return false
+	}
+	// VMware: warm only (requires snapshot for disk access)
+	if r.IsSourceProviderVSphere() {
+		return r.IsWarm()
+	}
+	// Hyper-V: only with preCopySourceDisks (SMB mount after power-off)
+	if r.IsSourceProviderHyperV() {
+		return r.Spec.PreCopySourceDisks
+	}
+	return false
 }
 
 // IsUsingOffloadPlugin determines if any of the mappings is using storage offload

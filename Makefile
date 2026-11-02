@@ -343,7 +343,7 @@ push-operator-image: build-operator-image
 
 VIRTIO_WIN_LEGACY_PREFETCH := build/virt-v2v/prefetch
 VIRTIO_WIN_LEGACY_RPM := $(VIRTIO_WIN_LEGACY_PREFETCH)/virtio-win-0.1.160-1.noarch.rpm
-KERNEL_MODULES_INTERNAL_RPM := $(VIRTIO_WIN_LEGACY_PREFETCH)/kernel-modules-internal-6.12.0-271.el10.x86_64.rpm
+KERNEL_MODULES_INTERNAL_RPM := $(VIRTIO_WIN_LEGACY_PREFETCH)/kernel-modules-internal-6.12.0-279.el10.x86_64.rpm
 
 fetch-virtio-win-legacy:
 	bash build/virt-v2v/scripts/fetch-virtio-win-legacy.sh

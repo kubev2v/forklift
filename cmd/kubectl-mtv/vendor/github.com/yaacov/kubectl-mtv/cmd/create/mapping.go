@@ -103,7 +103,7 @@ Pair formats:
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Network mapping name")
 	cmd.Flags().StringVarP(&sourceProvider, "source", "S", "", "Source provider name")
-	cmd.Flags().StringVarP(&targetProvider, "target", "T", "", "Target provider name")
+	cmd.Flags().StringVarP(&targetProvider, "target", "T", "", "OpenShift target provider name")
 	cmd.Flags().StringVar(&networkPairs, "network-pairs", "", "Network mapping pairs in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated). Append ';networkIPMode=preserve|dhcp|none' to override plan-level preserveStaticIPs")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output mapping CR to stdout instead of creating it")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format for dry-run (json, yaml). Defaults to yaml when --dry-run is used")
@@ -226,8 +226,8 @@ plugin configuration for optimized data transfer.`,
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Storage mapping name")
 	cmd.Flags().StringVarP(&sourceProvider, "source", "S", "", "Source provider name")
-	cmd.Flags().StringVarP(&targetProvider, "target", "T", "", "Target provider name")
-	cmd.Flags().StringVar(&storagePairs, "storage-pairs", "", "Storage mapping pairs in format 'source:storage-class[;volumeMode=Block|Filesystem][;accessMode=ReadWriteOnce|ReadWriteMany|ReadOnlyMany][;offloadPlugin=vsphere|csiVolumeImport][;offloadSecret=secret-name][;offloadVendor=vantara|ontap|...]' (comma-separated pairs, semicolon-separated parameters)")
+	cmd.Flags().StringVarP(&targetProvider, "target", "T", "", "OpenShift target provider name")
+	cmd.Flags().StringVar(&storagePairs, "storage-pairs", "", "Storage mapping pairs in format 'source:storage-class[;volumeMode=Block|Filesystem][;accessMode=ReadWriteOnce|ReadWriteMany|ReadOnlyMany][;offloadPlugin=vsphere|csiVolumeImport][;offloadSecret=secret-name][;offloadVendor=vantara|ontap|...]' (comma-separated). With offloadPlugin=csiVolumeImport, offloadVendor is primera3par|ontap only")
 	cmd.Flags().StringVar(&defaultVolumeMode, "default-volume-mode", "", "Default volume mode for all storage pairs (Filesystem|Block)")
 	cmd.Flags().StringVar(&defaultAccessMode, "default-access-mode", "", "Default access mode for all storage pairs (ReadWriteOnce|ReadWriteMany|ReadOnlyMany)")
 	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", flags.OffloadPluginHelp)

@@ -101,6 +101,7 @@ var SupportedSettingNames = []string{
 	"feature_windows_registry_network_config",
 	"feature_windows_wait_for_reboot",
 	"feature_mcp_server",
+	"feature_copy_appliance",
 
 	// Performance
 	"controller_max_vm_inflight",
@@ -117,6 +118,7 @@ var SupportedSettingNames = []string{
 	"controller_snapshot_removal_check_retries",
 	"controller_host_lease_namespace",
 	"controller_host_lease_duration_seconds",
+	"controller_multus_network_name_always_qualified",
 
 	// Debug
 	"controller_log_level",
