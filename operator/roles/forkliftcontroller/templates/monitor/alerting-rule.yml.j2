@@ -8,15 +8,6 @@ spec:
   groups:
   - name: {{ app_name }}-alerts
     rules:
-    - alert: MigrationSucceeded
-      expr: mtv_plan_alert_status{status="Succeeded"}
-      annotations:
-          summary: Migration plan {% raw %}"{{ $labels.plan_name }}"{% endraw %} succeeded
-          description: Migration plan {% raw %}"{{ $labels.plan_name }}"{% endraw %} succeeded
-      labels:
-        app: {{ app_name }}
-        type: migration-succeeded
-        severity: info
     - alert: MigrationFailed
       expr: mtv_plan_alert_status{status="Failed"}
       annotations:
