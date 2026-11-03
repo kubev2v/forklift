@@ -581,10 +581,12 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec, usesIn
 	if usesInstanceType {
 		return
 	}
+	// Set the guest memory to match the source VM. When the destination VM is
+	// built from a KubeVirt common template (vmTemplate), the template carries a
+	// default Domain.Memory.Guest that this overrides. KubeVirt derives
+	// Resources.Requests.Memory from Guest, so we don't set it explicitly.
 	memory := resource.NewQuantity(vm.MemorySizeMiB*1024*1024, resource.BinarySI)
-	object.Template.Spec.Domain.Resources.Requests = core.ResourceList{
-		core.ResourceMemory: *memory,
-	}
+	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: memory}
 }
 
 // DataVolumes builds one CDI HTTP-import DataVolume per non-CDROM disk,
