@@ -15,6 +15,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
 	liblogging "github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cnv "kubevirt.io/api/core/v1"
 	libvirtxml "libvirt.org/go/libvirtxml"
@@ -95,6 +96,55 @@ func TestMapDisksOrdersBySCSIThenSATAThenIDE(t *testing.T) {
 		if !isBootDisk && disk.BootOrder != nil {
 			t.Errorf("disk[%d] %q: expected no BootOrder, got %v", i, disk.Name, *disk.BootOrder)
 		}
+	}
+}
+
+// TestMapMemoryGuest verifies how mapMemory handles Domain.Memory.Guest when
+// the destination VM is built from a KubeVirt common template that ships a
+// default guest memory. Without an instance type it must override that default
+// with the source VM's memory, otherwise the migrated VM keeps the (larger)
+// template default and its guest-visible memory is inflated (MTV-7338). With an
+// instance type the instance type supplies the memory, so mapMemory leaves it
+// untouched. KubeVirt derives Resources.Requests.Memory from Guest, so
+// mapMemory never sets it.
+func TestMapMemoryGuest(t *testing.T) {
+	const sourceMiB = 2048
+	templateDefault := int64(8 * 1024 * 1024 * 1024) // 8Gi shipped by the template
+
+	tests := []struct {
+		name             string
+		usesInstanceType bool
+		wantBytes        int64
+	}{
+		{name: "overrides template default", usesInstanceType: false, wantBytes: int64(sourceMiB) * 1024 * 1024},
+		{name: "instance type leaves memory untouched", usesInstanceType: true, wantBytes: templateDefault},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vm := &model.VM{}
+			vm.MemorySizeMiB = sourceMiB
+
+			builder := &Builder{Context: &plancontext.Context{Log: liblogging.WithName("test")}}
+			object := &cnv.VirtualMachineSpec{
+				Template: &cnv.VirtualMachineInstanceTemplateSpec{
+					Spec: cnv.VirtualMachineInstanceSpec{
+						Domain: cnv.DomainSpec{
+							Memory: &cnv.Memory{Guest: resource.NewQuantity(templateDefault, resource.BinarySI)},
+						},
+					},
+				},
+			}
+
+			builder.mapMemory(vm, object, tt.usesInstanceType)
+
+			if object.Template.Spec.Domain.Memory == nil || object.Template.Spec.Domain.Memory.Guest == nil {
+				t.Fatalf("expected Domain.Memory.Guest to be set, got nil")
+			}
+			if got := object.Template.Spec.Domain.Memory.Guest.Value(); got != tt.wantBytes {
+				t.Errorf("Domain.Memory.Guest = %d, want %d", got, tt.wantBytes)
+			}
+		})
 	}
 }
 
