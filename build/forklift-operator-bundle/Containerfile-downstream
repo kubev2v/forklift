@@ -11,11 +11,11 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:c285973da460c0b8da563f2569b2fe4fd84eaf5683ed553bcf6febd5fe42b184"
+ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:05ac4ab0b4385ad3f9814b1e9767ac15f77b16dc5fa1b5eb9a53bfb9d4643a67"
 
 ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:61a342392a7435bbee8ba5de9c60a7af9ae93aa4388120c4dc37d4d94ad52d65"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:530223ab0e7a878a21302ef9da90772b919b75f5088c83390e13dbc73aba5fbf"
+ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:1562c3319a5df3e80377b586e33f0f1d01d312068e2c6f1884fe0d84eb4bddd4"
 
 ARG COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE="registry.redhat.io/mtv-candidate/mtv-copy-appliance-builder-rhel9@sha256:3e940e2c7a285b070a6460f6282a9d810215a91b5a7114eb9465a7a698545a60"
 
@@ -31,7 +31,7 @@ ARG NBD_CONTAINER_IMAGE="registry.redhat.io/mtv-candidate/mtv-copy-appliance-nbd
 
 ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:7af0acef6e73d2dbafbad2e789195c89c08c315d3a822325ba93ca23ec0237f8"
 
-ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:d6e6c7e55a9fbacfddd489e26f62d6450eaa2a7aabbf1e6cea4633438c8efc77"
+ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:f753c5c4e7566f3d88fc0197a5b0c136ac4725aef14320ac060cc237d2f5ab87"
 
 ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:39b4248ceb1b08e8cc3b92362ec6b122a49c0a4a1a8e2864d17bdb1d458f78e1"
 
@@ -41,7 +41,7 @@ ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rh
 
 ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:bca6d4427af2370a807e149f1944655ca8b50a1746053e1b0f8b75e16432deea"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:f6582da69be1cff149aef92f3c4a3357a5b9b60c438f95db4d4293e762dcede5"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:da8236425b244bf5cd017e81564a947fb36665a30966d1e0693880c1c4401c7c"
 
 ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:d7069054f868ae8a330005fffcf1b046243638030a1b495680ff32c3307ddbfe"
 

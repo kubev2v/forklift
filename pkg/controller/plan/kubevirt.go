@@ -33,6 +33,7 @@ import (
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	inspectionparser "github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/ensurer"
 	migbase "github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
@@ -2151,7 +2152,7 @@ func (r *KubeVirt) PopulatorVolumes(vmRef ref.Ref) (pvcs []*core.PersistentVolum
 		err = liberr.Wrap(err)
 		return
 	}
-	annotations := make(map[string]string)
+	annotations := ensurer.EnsurePVCAnnotations(nil)
 	if sa := resolveServiceAccount(r.Plan); sa != "" {
 		annotations[AnnPopulatorServiceAccount] = sa
 	}
@@ -5106,6 +5107,7 @@ func (r *KubeVirt) EnsurePersistentVolumeClaim(vmRef ref.Ref, persistentVolumeCl
 		}
 
 		if !exists {
+			pvc.Annotations = ensurer.EnsurePVCAnnotations(pvc.Annotations)
 			err = r.Destination.Create(context.TODO(), &pvc)
 			if err != nil {
 				err = liberr.Wrap(err)

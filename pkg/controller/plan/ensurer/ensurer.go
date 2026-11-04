@@ -6,6 +6,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	core "k8s.io/api/core/v1"
@@ -122,6 +123,7 @@ func (r *Ensurer) PersistentVolumeClaims(vm *planapi.VMStatus, pvcs []core.Persi
 
 	for _, pvc := range pvcs {
 		if !exists[pvc.Annotations[api.AnnDiskSource]] {
+			pvc.Annotations = EnsurePVCAnnotations(pvc.Annotations)
 			r.Labeler.SetLabels(&pvc, r.Labeler.MigrationVMLabels(vm.Ref))
 			err = r.Destination.Create(context.Background(), &pvc)
 			if err != nil {
@@ -222,4 +224,16 @@ func (r *Ensurer) SharedSecrets(vm *planapi.VMStatus, secrets []core.Secret) (er
 			vm.String())
 	}
 	return
+}
+
+// EnsurePVCAnnotations fills annotations every PVC-only disk needs,
+// without replacing a value already set.
+func EnsurePVCAnnotations(annotations map[string]string) map[string]string {
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	if _, found := annotations[planbase.AnnContentType]; !found {
+		annotations[planbase.AnnContentType] = string(cdi.DataVolumeKubeVirt)
+	}
+	return annotations
 }

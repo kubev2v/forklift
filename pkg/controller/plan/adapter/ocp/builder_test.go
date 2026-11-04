@@ -337,6 +337,45 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 			t.Errorf("expected Name %q, got Name=%q GenerateName=%q", "ocpglob-0", dvs[0].Name, dvs[0].GenerateName)
 		}
 	})
+
+	t.Run("block PVC with capacity larger than request uses capacity (MTV-7343)", func(t *testing.T) {
+		blockMode := core.PersistentVolumeBlock
+		pvc := makePVC(pvcName)
+		pvc.Spec.VolumeMode = &blockMode
+		pvc.Spec.Resources.Requests[core.ResourceStorage] = resource.MustParse("111.1Gi")
+		pvc.Status.Capacity = core.ResourceList{core.ResourceStorage: resource.MustParse("112Gi")}
+
+		builder := newBuilder(makeExport(pvcName), pvc)
+		dvs, err := builder.DataVolumes(vmRef, secret, configMap, dvTemplate.DeepCopy(), nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(dvs) != 1 {
+			t.Fatalf("expected 1 DataVolume, got %d", len(dvs))
+		}
+		got := dvs[0].Spec.Storage.Resources.Requests[core.ResourceStorage]
+		if got.Cmp(resource.MustParse("112Gi")) != 0 {
+			t.Errorf("expected target size 112Gi (source capacity), got %s", got.String())
+		}
+	})
+
+	t.Run("filesystem PVC uses the requested size", func(t *testing.T) {
+		pvc := makePVC(pvcName)
+		pvc.Status.Capacity = core.ResourceList{core.ResourceStorage: resource.MustParse("112Gi")}
+
+		builder := newBuilder(makeExport(pvcName), pvc)
+		dvs, err := builder.DataVolumes(vmRef, secret, configMap, dvTemplate.DeepCopy(), nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(dvs) != 1 {
+			t.Fatalf("expected 1 DataVolume, got %d", len(dvs))
+		}
+		got := dvs[0].Spec.Storage.Resources.Requests[core.ResourceStorage]
+		if got.Cmp(resource.MustParse("1Gi")) != 0 {
+			t.Errorf("expected target size 1Gi (source request), got %s", got.String())
+		}
+	})
 }
 
 func TestTlsCertForExport(t *testing.T) {
