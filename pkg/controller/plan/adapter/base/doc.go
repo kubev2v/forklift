@@ -127,6 +127,10 @@ const (
 	// Explicitly disable CDI's populator auto-detection to avoid webhook validation errors
 	AnnUsePopulator = "cdi.kubevirt.io/storage.usePopulator"
 
+	// Disk content type CDI writes on DataVolume-owned PVC. virt-exportserver
+	// uses it to choose raw export; a missing value falls back to archive mode.
+	AnnContentType = "cdi.kubevirt.io/storage.contentType"
+
 	// Consumer-side disk metadata used by NetApp Shift/Trident integration.
 	AnnNfsServer   = "forklift.konveyor.io/nfs-server"
 	AnnNfsPath     = "forklift.konveyor.io/nfs-path"

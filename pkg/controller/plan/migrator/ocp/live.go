@@ -1498,6 +1498,12 @@ func (r *Builder) targetPvc(source *model.PersistentVolumeClaim, storage api.Des
 	} else {
 		pvc.Spec.VolumeMode = source.Object.Spec.VolumeMode
 	}
+	if contentType, ok := source.Object.Annotations[planbase.AnnContentType]; ok {
+		if pvc.Annotations == nil {
+			pvc.Annotations = map[string]string{}
+		}
+		pvc.Annotations[planbase.AnnContentType] = contentType
+	}
 	return
 }
 
