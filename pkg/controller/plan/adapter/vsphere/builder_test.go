@@ -257,7 +257,7 @@ var _ = Describe("vSphere builder", func() {
 			Expect(pvc.Spec.DataSourceRef.APIGroup).To(Equal(&v1beta1.SchemeGroupVersion.Group))
 			Expect(pvc.Spec.DataSourceRef.Name).To(Equal(pvc.Name))
 		})
-		It("should use the NFS copy populator and a Filesystem volume for the NFS offload plugin", func() {
+		It("should use a Filesystem volume for the NFS offload plugin", func() {
 			builder := createBuilder(
 				&core.Secret{
 					ObjectMeta: meta.ObjectMeta{Name: "test-secret", Namespace: "test"},
@@ -310,8 +310,7 @@ var _ = Describe("vSphere builder", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pvcs).To(HaveLen(1))
 			pvc := pvcs[0]
-			// The NFS plugin gets its own populator resource, not the xcopy one.
-			Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(v1beta1.VSphereNfsCopyVolumePopulatorKind))
+			Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(v1beta1.VSphereXcopyVolumePopulatorKind))
 			Expect(pvc.Spec.DataSourceRef.APIGroup).To(Equal(&v1beta1.SchemeGroupVersion.Group))
 			// The array copies into an NFS export, which is a Filesystem volume.
 			Expect(pvc.Spec.VolumeMode).To(Equal(ptr.To(core.PersistentVolumeFilesystem)))

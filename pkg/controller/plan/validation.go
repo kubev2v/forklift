@@ -123,7 +123,10 @@ const (
 	// NfsOffloadDiskNotNFS (Critical) blocks when a disk maps to the NFS offload plugin
 	// but its source datastore is not NFS.
 	NfsOffloadDiskNotNFS = "NfsOffloadDiskNotNFS"
-	ConversionResumable  = "ConversionResumable"
+	// XcopyOffloadDiskNotVMFS (Critical) blocks when a disk maps to the XCOPY offload plugin
+	// but its source datastore is NFS.
+	XcopyOffloadDiskNotVMFS = "XcopyOffloadDiskNotVMFS"
+	ConversionResumable     = "ConversionResumable"
 )
 
 // Categories
@@ -462,6 +465,33 @@ func hasNfsOffloadDiskNotNFS(vm *vsphere.VM, storageMap *api.StorageMap, invento
 		}
 		// Only a NAS datastore carries an export, so these are empty for VMFS and VVol.
 		if ds.NasRemotePath == "" && ds.NasRemoteHost == "" && len(ds.NasRemoteHostNames) == 0 {
+			label := ds.Name
+			if label == "" {
+				label = disk.Datastore.ID
+			}
+			return label, nil
+		}
+	}
+	return "", nil
+}
+
+// hasXcopyOffloadDiskNotVMFS returns the label of the first datastore mapped to the XCOPY
+// offload plugin that is NFS. The clone resolves initiators from the source VMFS extent.
+func hasXcopyOffloadDiskNotVMFS(vm *vsphere.VM, storageMap *api.StorageMap, inventory web.Client) (string, error) {
+	for _, disk := range vm.SortedDisksAsVmware() {
+		pair, found := storageMap.FindStorage(disk.Datastore.ID)
+		if !found {
+			continue
+		}
+		if pair.OffloadPlugin == nil || pair.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+			continue
+		}
+		ds := &vsphere.Datastore{}
+		if err := inventory.Find(ds, refapi.Ref{ID: disk.Datastore.ID}); err != nil {
+			return "", liberr.Wrap(err, "datastore", disk.Datastore.ID)
+		}
+		// Only a NAS datastore carries an export, so these are empty for VMFS and VVol.
+		if ds.NasRemotePath != "" || ds.NasRemoteHost != "" || len(ds.NasRemoteHostNames) > 0 {
 			label := ds.Name
 			if label == "" {
 				label = disk.Datastore.ID
@@ -1035,6 +1065,14 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		Message:  "The NFS offload plugin is mapped to a datastore that is not NFS. The storage array copies the disk file between its own NFS exports, so the source datastore must be NFS. Map these datastores to the vSphere XCOPY plugin instead.",
 		Items:    []string{},
 	}
+	xcopyOffloadDiskNotVMFS := libcnd.Condition{
+		Type:     XcopyOffloadDiskNotVMFS,
+		Status:   True,
+		Reason:   NotSupported,
+		Category: api.CategoryCritical,
+		Message:  "The vSphere XCOPY plugin is mapped to a datastore that is NFS. The clone resolves the host initiators from the source datastore's VMFS extent, which an NFS datastore does not have. Map these datastores to the NFS offload plugin instead.",
+		Items:    []string{},
+	}
 	vmCriticalConcerns := libcnd.Condition{
 		Type:     VMCriticalConcerns,
 		Status:   True,
@@ -1202,6 +1240,11 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 						return nErr
 					} else if label != "" {
 						nfsOffloadDiskNotNFS.Items = append(nfsOffloadDiskNotNFS.Items, label)
+					}
+					if label, xErr := hasXcopyOffloadDiskNotVMFS(vsphereVM, storageMap, ctx.Source.Inventory); xErr != nil {
+						return xErr
+					} else if label != "" {
+						xcopyOffloadDiskNotVMFS.Items = append(xcopyOffloadDiskNotVMFS.Items, label)
 					}
 					curVMHasVddk, err := r.vmUsesVddk(storageMap, vsphereVM, vm.Name)
 					if err != nil {
@@ -1568,6 +1611,9 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	}
 	if len(nfsOffloadDiskNotNFS.Items) > 0 {
 		plan.Status.SetCondition(nfsOffloadDiskNotNFS)
+	}
+	if len(xcopyOffloadDiskNotVMFS.Items) > 0 {
+		plan.Status.SetCondition(xcopyOffloadDiskNotVMFS)
 	}
 	if len(vmCriticalConcerns.Items) > 0 {
 		plan.Status.SetCondition(vmCriticalConcerns)
