@@ -127,7 +127,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 			return nil, liberr.Wrap(err)
 		}
 
-		size := pvc.Spec.Resources.Requests["storage"]
+		size := RequestSize(pvc)
 		dataVolume := dvTemplate.DeepCopy()
 		dataVolume.GenerateName = ""
 
@@ -247,7 +247,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 			}
 			volName = pvc.Name
 			volNamespace = pvc.Namespace
-			size = pvc.Spec.Resources.Requests["storage"]
+			size = RequestSize(pvc)
 		case vol.DataVolume != nil:
 			pvc := &core.PersistentVolumeClaim{}
 			err = r.sourceClient.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vol.DataVolume.Name}, pvc)
@@ -256,7 +256,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 			}
 			volName = pvc.Name
 			volNamespace = pvc.Namespace
-			size = pvc.Spec.Resources.Requests["storage"]
+			size = RequestSize(pvc)
 		default:
 			r.Log.Info("Unsupported volume type", "type", vol.VolumeSource)
 			continue
@@ -892,6 +892,23 @@ func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vmRef re
 	}
 
 	return planbase.SetPVCNameOnObject(objectMeta, pvcNameTemplate, useGenerateName, templateData)
+}
+
+// RequestSize returns the size a target volume needs to hold the source
+// PVC's data: the bound capacity for block volumes (it may exceed the
+// request), the request for filesystem volumes, the request as fallback
+// when unbound.
+func RequestSize(pvc *core.PersistentVolumeClaim) resource.Quantity {
+	// Block volume: the target must match the bound capacity, which may
+	// be larger than the request.
+	if pvc.Spec.VolumeMode != nil &&
+		*pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
+		if capacity, found := pvc.Status.Capacity[core.ResourceStorage]; found {
+			return capacity
+		}
+	}
+	// Filesystem volume or not bound yet: the request is the best size.
+	return pvc.Spec.Resources.Requests[core.ResourceStorage]
 }
 
 // NO-OP
