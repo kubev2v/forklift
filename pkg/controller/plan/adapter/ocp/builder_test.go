@@ -20,13 +20,10 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
-	"github.com/kubev2v/forklift/pkg/settings"
-	"github.com/kubev2v/forklift/pkg/templateutil"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	export "kubevirt.io/api/export/v1beta1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -304,10 +301,10 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 		}
 	})
 
-	t.Run("explicit non-OCP template uses generateName", func(t *testing.T) {
+	t.Run("explicit template uses generateName", func(t *testing.T) {
 		builder := newBuilder(makeExport(pvcName), makePVC(pvcName))
-		builder.Plan.Spec.PVCNameTemplate = planbase.DefaultPVCNameTemplate
-		builder.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(true)
+		builder.Plan.Spec.PVCNameTemplate = "{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}"
+		builder.Plan.Spec.PVCNameTemplateUseGenerateName = true
 		dvs, err := builder.DataVolumes(vmRef, secret, configMap, dvTemplate.DeepCopy(), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -323,23 +320,23 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 
 	t.Run("setPVCNameFromTemplate with trunc template", func(t *testing.T) {
 		builder := newBuilder()
-		objectMeta := &metav1.ObjectMeta{}
-		err := builder.setPVCNameFromTemplate(objectMeta, vmRef, &core.PersistentVolumeClaim{
+		builder.Plan.Spec.PVCNameTemplate = "{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}"
+		pvcName, err := builder.setPVCNameFromTemplate(vmRef, &core.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{Name: pvcName, Namespace: ns},
-		}, 0, planbase.DefaultPVCNameTemplate, true)
+		}, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		want := "test-plan-test-vm-disk-0-"
-		if objectMeta.GenerateName != want {
-			t.Errorf("expected GenerateName %q, got %q", want, objectMeta.GenerateName)
+		want := "test-plan-test-vm-disk-0"
+		if pvcName != want {
+			t.Errorf("expected generated name %q, got %q", want, pvcName)
 		}
 	})
 
 	t.Run("plan template overrides OCP default", func(t *testing.T) {
 		builder := newBuilder(makeExport(pvcName), makePVC(pvcName))
 		builder.Plan.Spec.PVCNameTemplate = "custom-{{.DiskIndex}}"
-		builder.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(false)
+		builder.Plan.Spec.PVCNameTemplateUseGenerateName = false
 		dvs, err := builder.DataVolumes(vmRef, secret, configMap, dvTemplate.DeepCopy(), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -352,13 +349,14 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 		}
 	})
 
-	t.Run("OCP global template overrides OCP default", func(t *testing.T) {
-		prev := settings.Settings.OCPPVCNameTemplate
-		settings.Settings.OCPPVCNameTemplate = "ocpglob-{{.DiskIndex}}"
-		t.Cleanup(func() { settings.Settings.OCPPVCNameTemplate = prev })
+	t.Run("block PVC with capacity larger than request uses capacity (MTV-7343)", func(t *testing.T) {
+		blockMode := core.PersistentVolumeBlock
+		pvc := makePVC(pvcName)
+		pvc.Spec.VolumeMode = &blockMode
+		pvc.Spec.Resources.Requests[core.ResourceStorage] = resource.MustParse("111.1Gi")
+		pvc.Status.Capacity = core.ResourceList{core.ResourceStorage: resource.MustParse("112Gi")}
 
-		builder := newBuilder(makeExport(pvcName), makePVC(pvcName))
-		builder.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(false)
+		builder := newBuilder(makeExport(pvcName), pvc)
 		dvs, err := builder.DataVolumes(vmRef, secret, configMap, dvTemplate.DeepCopy(), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -366,8 +364,27 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 		if len(dvs) != 1 {
 			t.Fatalf("expected 1 DataVolume, got %d", len(dvs))
 		}
-		if dvs[0].Name != "ocpglob-0" {
-			t.Errorf("expected Name %q, got Name=%q GenerateName=%q", "ocpglob-0", dvs[0].Name, dvs[0].GenerateName)
+		got := dvs[0].Spec.Storage.Resources.Requests[core.ResourceStorage]
+		if got.Cmp(resource.MustParse("112Gi")) != 0 {
+			t.Errorf("expected target size 112Gi (source capacity), got %s", got.String())
+		}
+	})
+
+	t.Run("filesystem PVC uses the requested size", func(t *testing.T) {
+		pvc := makePVC(pvcName)
+		pvc.Status.Capacity = core.ResourceList{core.ResourceStorage: resource.MustParse("112Gi")}
+
+		builder := newBuilder(makeExport(pvcName), pvc)
+		dvs, err := builder.DataVolumes(vmRef, secret, configMap, dvTemplate.DeepCopy(), nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(dvs) != 1 {
+			t.Fatalf("expected 1 DataVolume, got %d", len(dvs))
+		}
+		got := dvs[0].Spec.Storage.Resources.Requests[core.ResourceStorage]
+		if got.Cmp(resource.MustParse("1Gi")) != 0 {
+			t.Errorf("expected target size 1Gi (source request), got %s", got.String())
 		}
 	})
 }
