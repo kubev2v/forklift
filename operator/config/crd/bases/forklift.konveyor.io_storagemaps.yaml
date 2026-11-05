@@ -91,6 +91,7 @@ spec:
                               enum:
                               - primera3par
                               - ontap
+                              - powerstore
                               type: string
                           required:
                           - secretRef

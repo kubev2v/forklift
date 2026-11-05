@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	forklift "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/storage/resolver/dell/powerstore"
 	"github.com/kubev2v/forklift/pkg/storage/resolver/hpe"
 	"github.com/kubev2v/forklift/pkg/storage/resolver/ontap"
 )
@@ -53,6 +54,23 @@ func TestNewCsiImportPluginOntap(t *testing.T) {
 	}
 	if _, ok := plugin.(*ontap.OntapImporter); !ok {
 		t.Errorf("expected *ontap.OntapImporter, got %T", plugin)
+	}
+}
+
+func TestNewCsiImportPluginPowerStore(t *testing.T) {
+	plugin, err := newCsiImportPlugin(forklift.StorageVendorProductPowerStore, map[string][]byte{
+		"STORAGE_HOSTNAME": []byte("https://host"),
+		"STORAGE_USERNAME": []byte("user"),
+		"STORAGE_PASSWORD": []byte("pass"),
+	}, nil, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if plugin == nil {
+		t.Fatal("expected non-nil plugin")
+	}
+	if _, ok := plugin.(*powerstore.PowerstoreImporter); !ok {
+		t.Errorf("expected *powerstore.PowerstoreImporter, got %T", plugin)
 	}
 }
 
