@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/forklift-api/webhooks/util"
@@ -19,6 +20,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -49,6 +51,14 @@ func (mutator *SecretMutator) Mutate(ar *admissionv1.AdmissionReview) *admission
 		return util.ToAdmissionResponseError(err)
 	}
 
+	// A no-op rewrite (e.g. by the storage version migrator or an encryption key
+	// rotation) must not trigger external calls or denial (MTV-7041). Data and
+	// Labels are the only fields this mutator ever changes.
+	if ar.Request.Operation == admissionv1.Update && mutator.isUnchanged(ar.Request.OldObject.Raw) {
+		log.Info("secret unchanged, skipping mutation")
+		return util.ToAdmissionResponseAllow()
+	}
+
 	// The label createdForResourceType must exist due to the configuration of the webhook
 	resourceType := mutator.secret.GetLabels()["createdForResourceType"]
 	if mutate, ok := resourceTypeToMutateFunc[resourceType]; ok {
@@ -56,6 +66,20 @@ func (mutator *SecretMutator) Mutate(ar *admissionv1.AdmissionReview) *admission
 	}
 
 	return util.ToAdmissionResponseAllow()
+}
+
+// isUnchanged reports whether the updated secret differs from the stored one
+// in any field this mutator may modify.
+func (mutator *SecretMutator) isUnchanged(oldRaw []byte) bool {
+	if len(oldRaw) == 0 {
+		return false
+	}
+	old := &core.Secret{}
+	if err := json.Unmarshal(oldRaw, old); err != nil {
+		return false
+	}
+	return apiequality.Semantic.DeepEqual(mutator.secret.Data, old.Data) &&
+		apiequality.Semantic.DeepEqual(mutator.secret.Labels, old.Labels)
 }
 
 func (mutator *SecretMutator) mutateProviderSecret() *admissionv1.AdmissionResponse {
@@ -92,22 +116,15 @@ func (mutator *SecretMutator) mutateProviderSecret() *admissionv1.AdmissionRespo
 			}
 		}
 		certUrl := fmt.Sprint(url.Scheme, "://", url.Host, "/ovirt-engine/services/pki-resource?resource=ca-certificate&format=X509-PEM-CA")
-		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{RootCAs: certPool}
-		response, err := http.Get(certUrl)
+		// Retrieving the engine CA must not block the write: the webhook has
+		// failurePolicy Fail, and denying rewrites of the secret (e.g. by the
+		// encryption migration controller) hangs cluster operators (MTV-7041).
+		// Connection problems are surfaced by the provider controller instead.
+		cert, err := fetchEngineCACertificate(certUrl, certPool)
 		if err != nil {
-			log.Error(err, "mutating webhook error, failed to send request for CA certificate retrieval")
-			return util.ToAdmissionResponseError(err)
-		}
-		defer response.Body.Close()
-
-		cert, err := io.ReadAll(response.Body)
-		if err != nil {
-			log.Error(err, "mutating webhook error, failed to read certificate retrieval response")
-			return util.ToAdmissionResponseError(err)
-		}
-
-		//check if the CA included in the secrete provided by the user and update it if needed
-		if !contains(mutator.secret.Data["cacert"], cert) {
+			log.Error(err, "failed to retrieve the engine CA certificate, allowing the secret without updating it")
+		} else if !contains(mutator.secret.Data["cacert"], cert) {
+			//check if the CA included in the secrete provided by the user and update it if needed
 			mutator.secret.Data["cacert"] = appendCerts(mutator.secret.Data["cacert"], cert)
 			mutator.secret.Labels["ca-cert-updated"] = "true"
 			secretChanged = true
@@ -213,6 +230,28 @@ func (mutator *SecretMutator) mutateHostSecret() *admissionv1.AdmissionResponse 
 		}
 	}
 	return util.ToAdmissionResponseAllow()
+}
+
+// fetchEngineCACertificate retrieves the oVirt engine CA certificate, verifying
+// the engine against the CA provided in the secret. The timeout must stay well
+// below the webhook's timeoutSeconds (30).
+func fetchEngineCACertificate(certUrl string, certPool *x509.CertPool) ([]byte, error) {
+	client := &http.Client{
+		// The transport is per-request, so a kept-alive connection would linger
+		// idle after the fetch returns with nobody to reuse or close it.
+		Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: certPool}, DisableKeepAlives: true},
+		Timeout:   10 * time.Second,
+	}
+	response, err := client.Get(certUrl)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = response.Body.Close() }()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("engine returned status %s when retrieving its CA certificate", response.Status)
+	}
+	return io.ReadAll(response.Body)
 }
 
 func contains(secretCert, cert []byte) bool {
