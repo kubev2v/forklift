@@ -11,6 +11,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	ocpadapter "github.com/kubev2v/forklift/pkg/controller/plan/adapter/ocp"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/ensurer"
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
@@ -22,7 +23,6 @@ import (
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/api/core/v1"
@@ -1482,7 +1482,7 @@ func (r *Builder) targetPvc(source *model.PersistentVolumeClaim, storage api.Des
 	pvc.Spec = core.PersistentVolumeClaimSpec{
 		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
-				core.ResourceStorage: r.requestSize(source),
+				core.ResourceStorage: ocpadapter.RequestSize(&source.Object),
 			},
 		},
 		StorageClassName: &storage.StorageClass,
@@ -1502,6 +1502,17 @@ func (r *Builder) targetPvc(source *model.PersistentVolumeClaim, storage api.Des
 
 // targetDataVolume creates a target CR based on the source CR.
 func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.PersistentVolumeClaim, storage api.DestinationStorage) (dv cdi.DataVolume) {
+	// The target must hold at least the source volume: use the larger of
+	// the source DV's request and the size the source volume needs.
+	targetSize := ocpadapter.RequestSize(&pvc.Object)
+	if sourceStorage := source.Object.Spec.Storage; sourceStorage != nil {
+		if sourceRequest := sourceStorage.Resources.Requests.Storage(); sourceRequest != nil {
+			if sourceRequest.Cmp(targetSize) > 0 {
+				targetSize = *sourceRequest
+			}
+		}
+	}
+
 	dv = cdi.DataVolume{}
 	dv.Namespace = r.Plan.Spec.TargetNamespace
 	dv.Name = source.Name
@@ -1516,7 +1527,7 @@ func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.Persiste
 		Storage: &cdi.StorageSpec{
 			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
-					core.ResourceStorage: r.requestSize(pvc),
+					core.ResourceStorage: targetSize,
 				},
 			},
 			StorageClassName: &storage.StorageClass,
@@ -1526,8 +1537,14 @@ func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.Persiste
 		if len(source.Object.Spec.Storage.Resources.Limits) != 0 {
 			dv.Spec.Storage.Resources.Limits = source.Object.Spec.Storage.Resources.Limits
 		}
-		if len(source.Object.Spec.Storage.Resources.Requests) != 0 {
-			dv.Spec.Storage.Resources.Requests = source.Object.Spec.Storage.Resources.Requests
+	}
+	// The raised request may exceed the copied source limit, admission
+	// rejects requests > limits, so raise the limit to match.
+	if limit := dv.Spec.Storage.Resources.Limits.Storage(); limit != nil {
+		if limit.Cmp(targetSize) < 0 {
+			dv.Spec.Storage.Resources.Limits = core.ResourceList{
+				core.ResourceStorage: targetSize,
+			}
 		}
 	}
 	if storage.AccessMode != "" {
@@ -1537,17 +1554,6 @@ func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.Persiste
 		dv.Spec.Storage.VolumeMode = &storage.VolumeMode
 	}
 	return
-}
-
-func (r *Builder) requestSize(pvc *model.PersistentVolumeClaim) resource.Quantity {
-	isBlock := (pvc.Object.Spec.VolumeMode != nil) && (*pvc.Object.Spec.VolumeMode == core.PersistentVolumeBlock)
-	if isBlock {
-		// MTV-5328: some block storage backings may create
-		// the pvc with a capacity that is higher than
-		// the request.
-		return *pvc.Object.Status.Capacity.Storage()
-	}
-	return *pvc.Object.Spec.Resources.Requests.Storage()
 }
 
 // LocalInstanceType builds a copy of a namespace-local InstanceType from the source.
