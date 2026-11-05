@@ -305,6 +305,7 @@ type VM struct {
 	// Note: vSphere reports version as "toolsVersionStatus2"; we keep the Go field
 	// name ToolsVersionStatus for continuity while serializing as toolsVersionStatus2.
 	ToolsVersionStatus string                   `json:"toolsVersionStatus2"`
+	Timezone           string                   `json:"timezone"`
 	DiskEnableUuid     bool                     `json:"diskEnableUuid"`
 	NestedHVEnabled    bool                     `json:"nestedHVEnabled"`
 	VAppProducts       []model.VAppProduct      `json:"vAppProducts"`
@@ -359,6 +360,7 @@ func (r *VM) With(m *model.VM) {
 	r.ToolsStatus = m.ToolsStatus
 	r.ToolsRunningStatus = m.ToolsRunningStatus
 	r.ToolsVersionStatus = m.ToolsVersionStatus
+	r.Timezone = m.Timezone
 	r.DiskEnableUuid = m.DiskEnableUuid
 	r.NestedHVEnabled = m.NestedHVEnabled
 	r.VAppProducts = m.VAppProducts
