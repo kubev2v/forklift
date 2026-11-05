@@ -376,7 +376,7 @@ func (r *Builder) mapDisks(vm *model.VM, pvcs []*core.PersistentVolumeClaim, obj
 			Name: volumeName,
 			DiskDevice: cnv.DiskDevice{
 				Disk: &cnv.DiskTarget{
-					Bus: diskBus(disk.AdapterType),
+					Bus: cnv.DiskBusVirtio,
 				},
 			},
 			Serial: disk.UUID,
@@ -444,21 +444,6 @@ func findPVC(diskID string, pvcs []*core.PersistentVolumeClaim) *core.Persistent
 		}
 	}
 	return nil
-}
-
-// diskBus maps a Nutanix disk adapter type to a KubeVirt disk bus. AHV's
-// SCSI and SATA/IDE adapters correspond directly to the equivalent KubeVirt
-// buses; everything else (e.g. PCI) defaults to virtio, which AHV also
-// exposes as a PCI-attached device.
-func diskBus(adapterType string) cnv.DiskBus {
-	switch adapterType {
-	case adapterSCSI:
-		return cnv.DiskBusSCSI
-	case adapterSATA, adapterIDE:
-		return cnv.DiskBusSATA
-	default:
-		return cnv.DiskBusVirtio
-	}
 }
 
 // mapFirmware maps AHV's BootType (LEGACY, UEFI, SECURE_BOOT) to a KubeVirt

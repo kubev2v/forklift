@@ -96,6 +96,9 @@ func TestMapDisksOrdersBySCSIThenSATAThenIDE(t *testing.T) {
 		if !isBootDisk && disk.BootOrder != nil {
 			t.Errorf("disk[%d] %q: expected no BootOrder, got %v", i, disk.Name, *disk.BootOrder)
 		}
+		if disk.Disk == nil || disk.Disk.Bus != cnv.DiskBusVirtio {
+			t.Errorf("disk[%d] %q: expected virtio bus, got %+v", i, disk.Name, disk.DiskDevice)
+		}
 	}
 }
 
