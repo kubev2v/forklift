@@ -372,11 +372,18 @@ func (r *Builder) mapDisks(vm *model.VM, pvcs []*core.PersistentVolumeClaim, obj
 				},
 			},
 		})
+		bus := cnv.DiskBusVirtio
+		// Raw-copy (skipGuestConversion) with useCompatibilityMode keeps SATA
+		// so guests without VirtIO block drivers can still boot (same as vSphere).
+		if r.Context != nil && r.Plan != nil &&
+			r.Plan.Spec.SkipGuestConversion && r.Plan.Spec.UseCompatibilityMode {
+			bus = cnv.DiskBusSATA
+		}
 		kDisk := cnv.Disk{
 			Name: volumeName,
 			DiskDevice: cnv.DiskDevice{
 				Disk: &cnv.DiskTarget{
-					Bus: cnv.DiskBusVirtio,
+					Bus: bus,
 				},
 			},
 			Serial: disk.UUID,

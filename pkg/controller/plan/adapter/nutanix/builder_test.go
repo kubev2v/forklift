@@ -102,6 +102,35 @@ func TestMapDisksOrdersBySCSIThenSATAThenIDE(t *testing.T) {
 	}
 }
 
+func TestMapDisksUsesSATAInCompatibilityMode(t *testing.T) {
+	vm := newOrderingTestVM()
+	pvcs := []*core.PersistentVolumeClaim{
+		pvcFor("pvc-scsi-0", "disk-scsi-0", false),
+		pvcFor("pvc-sata", "disk-sata", false),
+	}
+	builder := &Builder{Context: &plancontext.Context{
+		Log: liblogging.WithName("test"),
+		Plan: &api.Plan{
+			Spec: api.PlanSpec{
+				SkipGuestConversion:  true,
+				UseCompatibilityMode: true,
+			},
+		},
+	}}
+	object := &cnv.VirtualMachineSpec{Template: &cnv.VirtualMachineInstanceTemplateSpec{}}
+	builder.mapDisks(vm, pvcs, object)
+
+	disks := object.Template.Spec.Domain.Devices.Disks
+	if len(disks) != 2 {
+		t.Fatalf("expected 2 disks, got %d", len(disks))
+	}
+	for i, disk := range disks {
+		if disk.Disk == nil || disk.Disk.Bus != cnv.DiskBusSATA {
+			t.Errorf("disk[%d] %q: expected sata bus, got %+v", i, disk.Name, disk.DiskDevice)
+		}
+	}
+}
+
 // TestMapMemoryGuest verifies how mapMemory handles Domain.Memory.Guest when
 // the destination VM is built from a KubeVirt common template that ships a
 // default guest memory. Without an instance type it must override that default
