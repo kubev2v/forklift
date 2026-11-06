@@ -77,49 +77,17 @@ func TestNewPowerstoreImporter(t *testing.T) {
 	}
 }
 
-func TestResolveVVolByID(t *testing.T) {
-	uuid := "e8307953-a6a3-4adb-bce1-098c210ca53c"
-	srv, imp := mockPowerstoreAPI(t, map[string]string{
-		"id=eq." + uuid: "my-powerstore-volume",
-	})
-	defer srv.Close()
-
-	backing := &resolver.DiskBacking{VVolID: "vvol:" + uuid}
-	annotations, err := imp.Resolve(backing)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if annotations[annotationKey] != "my-powerstore-volume" {
-		t.Errorf("unexpected annotation value: %v", annotations)
-	}
-}
-
-func TestResolveVVolByWWN(t *testing.T) {
-	// PowerStore (like HPE Primera) can report the VVol BackingObjectId as a WWN.
-	naa := "naa.68ccf098000a2415fa5c15f00000000f"
-	srv, imp := mockPowerstoreAPI(t, map[string]string{
-		"wwn=eq." + naa: "my-vvol-volume",
-	})
-	defer srv.Close()
-
-	backing := &resolver.DiskBacking{VVolID: naa}
-	annotations, err := imp.Resolve(backing)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if annotations[annotationKey] != "my-vvol-volume" {
-		t.Errorf("unexpected annotation value: %v", annotations)
-	}
-}
-
-func TestResolveVVolNotFound(t *testing.T) {
+func TestResolveVVol(t *testing.T) {
 	srv, imp := mockPowerstoreAPI(t, map[string]string{})
 	defer srv.Close()
 
-	backing := &resolver.DiskBacking{VVolID: "vvol:no-such-uuid"}
+	backing := &resolver.DiskBacking{VVolID: "vvol:e8307953-a6a3-4adb-bce1-098c210ca53c"}
 	_, err := imp.Resolve(backing)
 	if err == nil {
-		t.Fatal("expected error for unknown VVol, got nil")
+		t.Fatal("expected error for VVol, got nil")
+	}
+	if !strings.Contains(err.Error(), "supports only RDM") {
+		t.Errorf("unexpected error message: %v", err)
 	}
 }
 
@@ -168,7 +136,7 @@ func TestResolveVMDK(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for VMDK, got nil")
 	}
-	if !strings.Contains(err.Error(), "does not support VMDK") {
+	if !strings.Contains(err.Error(), "supports only RDM") {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }

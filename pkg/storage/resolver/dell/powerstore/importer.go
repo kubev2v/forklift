@@ -49,32 +49,10 @@ func (p *PowerstoreImporter) Resolve(backing *resolver.DiskBacking) (map[string]
 	if backing == nil {
 		return nil, fmt.Errorf("nil disk backing")
 	}
-	switch resolver.DetectDiskType(backing) {
-	case resolver.DiskTypeVVol:
-		return p.resolveVVol(backing.VVolID)
-	case resolver.DiskTypeRDM:
-		return p.resolveRDM(backing.DeviceName)
-	default:
-		return nil, fmt.Errorf("PowerStore CSI import does not support VMDK disks")
+	if diskType := resolver.DetectDiskType(backing); diskType != resolver.DiskTypeRDM {
+		return nil, fmt.Errorf("PowerStore CSI import supports only RDM disks, got %s", diskType)
 	}
-}
-
-// resolveVVol maps a vSphere VVol BackingObjectId to a PowerStore volume name.
-// BackingObjectId is normally "vvol:<uuid>", which matches the PowerStore volume's own
-// internal id, so we query by id directly. PowerStore can also report it as "naa.<hex>"
-// (a WWN), same quirk HPE Primera has — in that case we query by wwn instead.
-func (p *PowerstoreImporter) resolveVVol(vVolId string) (map[string]string, error) {
-	var name string
-	var err error
-	if strings.HasPrefix(vVolId, "naa.") {
-		name, err = p.volumeNameByField("wwn", strings.ToLower(vVolId))
-	} else {
-		name, err = p.volumeNameByField("id", strings.TrimPrefix(vVolId, "vvol:"))
-	}
-	if err != nil {
-		return nil, fmt.Errorf("PowerStore VVol resolution failed (VVolID: %s): %w", vVolId, err)
-	}
-	return map[string]string{annotationKey: name}, nil
+	return p.resolveRDM(backing.DeviceName)
 }
 
 // resolveRDM maps a vSphere RDM device name to a PowerStore volume name via its WWN.
