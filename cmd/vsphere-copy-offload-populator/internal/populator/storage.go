@@ -30,6 +30,12 @@ type RDMCapable interface {
 	RDMCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, progress chan<- uint64) error
 }
 
+// NFSCapable defines storage that can copy a file between two NFS exports it serves.
+type NFSCapable interface {
+	// NFSCopy copies the source VMDK's flat extent into the PV's export
+	NFSCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, progress chan<- uint64) error
+}
+
 // StorageMapper handles initiator group mapping for VMDK/Xcopy operations
 type StorageMapper interface {
 	// EnsureClonnerIgroup creates or updates an initiator group with the clonnerIqn

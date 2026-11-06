@@ -449,6 +449,32 @@ func (c *VSphereClient) GetDatastore(ctx context.Context, dc *object.Datacenter,
 	return ds, nil
 }
 
+// nasDatastore reports whether the datastore holding the disk is NFS-backed and,
+// if so, the export path and the NFS server it mounts from.
+func (c *VSphereClient) nasDatastore(ctx context.Context, ds *types.ManagedObjectReference) (bool, string, string) {
+	if ds == nil {
+		return false, "", ""
+	}
+	var moDS mo.Datastore
+	err := property.DefaultCollector(c.Client.Client).RetrieveOne(ctx, *ds, []string{"summary.type", "info"}, &moDS)
+	if err != nil {
+		return false, "", ""
+	}
+	if !strings.HasPrefix(moDS.Summary.Type, "NFS") {
+		return false, "", ""
+	}
+	nas, ok := moDS.Info.(*types.NasDatastoreInfo)
+	if !ok || nas.Nas == nil {
+		return true, "", ""
+	}
+	// RemoteHostNames is the current field; RemoteHost may be deprecated
+	host := nas.Nas.RemoteHost
+	if n := len(nas.Nas.RemoteHostNames); n > 0 {
+		host = nas.Nas.RemoteHostNames[n-1]
+	}
+	return true, nas.Nas.RemotePath, host
+}
+
 // GetVMDiskBacking retrieves disk backing information to determine disk type
 func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*resolver.DiskBacking, error) {
 	log := klog.FromContext(ctx)
@@ -492,12 +518,16 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 				}, nil
 			}
 
-			// Regular VMDK
-			log.V(2).Info("disk is VMDK-backed", "vmdk", vmdkPath)
+			// Regular VMDK, on a block or an NFS datastore
+			isNAS, remotePath, remoteHost := c.nasDatastore(ctx, matched.Datastore)
+			log.V(2).Info("disk is VMDK-backed", "vmdk", vmdkPath, "nas", isNAS)
 			return &resolver.DiskBacking{
-				VVolID:     "",
-				IsRDM:      false,
-				DeviceName: matched.FileName,
+				VVolID:        "",
+				IsRDM:         false,
+				DeviceName:    matched.FileName,
+				IsNAS:         isNAS,
+				NasRemotePath: remotePath,
+				NasRemoteHost: remoteHost,
 			}, nil
 
 		case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
@@ -610,8 +640,9 @@ func (c *VSphereClient) GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath 
 				}
 				diskBacking = &resolver.DiskBacking{VVolID: matchedBacking.BackingObjectId, DeviceName: matchedBacking.FileName}
 			} else {
-				log.V(2).Info("disk is VMDK-backed", "vmdk", vmdkPath)
-				diskBacking = &resolver.DiskBacking{DeviceName: matchedBacking.FileName}
+				isNAS, remotePath, remoteHost := c.nasDatastore(ctx, matchedBacking.Datastore)
+				log.V(2).Info("disk is VMDK-backed", "vmdk", vmdkPath, "nas", isNAS)
+				diskBacking = &resolver.DiskBacking{DeviceName: matchedBacking.FileName, IsNAS: isNAS, NasRemotePath: remotePath, NasRemoteHost: remoteHost}
 			}
 		case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
 			if !strings.Contains(strings.ToLower(backing.FileName), normalizedPath) &&

@@ -96,6 +96,27 @@ spec:
                           - secretRef
                           - storageVendorProduct
                           type: object
+                        vsphereNfsCopyConfig:
+                          description: |-
+                            VSphereNfsCopyPluginConfig offloads the copy of a disk on a vSphere NFS datastore
+                            to the storage array, which copies the disk file into the destination NFS export.
+                            The source datastore and the destination StorageClass must be served by the same array.
+                          properties:
+                            secretRef:
+                              description: |-
+                                SecretRef is the name of the secret with the storage credentials for the plugin.
+                                The secret should reside in the same namespace where the source provider is.
+                              type: string
+                            storageVendorProduct:
+                              description: StorageVendorProduct the string identifier
+                                of the storage vendor product
+                              enum:
+                              - pureFlashArray
+                              type: string
+                          required:
+                          - secretRef
+                          - storageVendorProduct
+                          type: object
                         vsphereXcopyConfig:
                           description: |-
                             VSphereXcopyPluginConfig works with the Vsphere Xcopy Volume Populator

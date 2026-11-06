@@ -1631,7 +1631,8 @@ func (r *Builder) SupportsVolumePopulators() bool {
 			return false
 		}
 
-		if m.OffloadPlugin != nil && (m.OffloadPlugin.VSphereXcopyPluginConfig != nil || m.OffloadPlugin.CsiVolumeImport != nil) {
+		if m.OffloadPlugin != nil && (m.OffloadPlugin.VSphereXcopyPluginConfig != nil ||
+			m.OffloadPlugin.VSphereNfsCopyPluginConfig != nil || m.OffloadPlugin.CsiVolumeImport != nil) {
 			klog.V(2).Infof("found offload plugin on ds map %+v", dsMapIn)
 			return true
 		}
@@ -1760,7 +1761,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				continue
 			}
 
-			if effectiveMapped.OffloadPlugin == nil || effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+			if effectiveMapped.OffloadPlugin == nil ||
+				(effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig == nil &&
+					effectiveMapped.OffloadPlugin.VSphereNfsCopyPluginConfig == nil) {
 				continue
 			}
 
@@ -1779,9 +1782,21 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				storageClass := effectiveMapped.Destination.StorageClass
 				r.Log.Info(fmt.Sprintf("getting storage mapping by storage class %q and datastore %v datastore name %s datastore", storageClass, disk.Datastore, disk.Datastore))
 				vsphereInstance := r.Plan.Provider.Source.GetName()
-				migrationHosts := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.DedicatedMigrationHosts
-				storageVendorProduct := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct
-				storageVendorSecretRef := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.SecretRef
+				// The NFS plugin copies on the array alone, so it has no migration hosts
+				var migrationHosts []string
+				var storageVendorProduct api.StorageVendorProduct
+				var storageVendorSecretRef string
+				nfsCopy := false
+				if nfs := effectiveMapped.OffloadPlugin.VSphereNfsCopyPluginConfig; nfs != nil {
+					nfsCopy = true
+					storageVendorProduct = nfs.StorageVendorProduct
+					storageVendorSecretRef = nfs.SecretRef
+				} else {
+					xcopy := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig
+					migrationHosts = xcopy.DedicatedMigrationHosts
+					storageVendorProduct = xcopy.StorageVendorProduct
+					storageVendorSecretRef = xcopy.SecretRef
+				}
 
 				r.Log.Info(fmt.Sprintf("vsphere provider %v storage vendor product %v storage secret name %v ", vsphereInstance, storageVendorProduct, storageVendorSecretRef))
 
@@ -1810,6 +1825,12 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					labels[Shareable] = "true"
 				}
 				r.Log.Info("target namespace for migration", "namespace", namespace)
+				// The NFS plugin copies into an NFS destination export, which is a
+				// Filesystem volume. Block offload (XCOPY) targets stay Block.
+				volumeMode := pvblock
+				if nfsCopy {
+					volumeMode = core.PersistentVolumeFilesystem
+				}
 				pvc := core.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:   namespace,
@@ -1818,7 +1839,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					},
 					Spec: core.PersistentVolumeClaimSpec{
 						StorageClassName: &storageClass,
-						VolumeMode:       &pvblock,
+						VolumeMode:       &volumeMode,
 						Resources: core.VolumeResourceRequirements{
 							Requests: core.ResourceList{
 								core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
