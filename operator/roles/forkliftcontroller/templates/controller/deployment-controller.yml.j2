@@ -208,6 +208,10 @@ spec:
         - name: FEATURE_XFS_REPAIR_IGNORE
           value: "true"
 {% endif %}
+{% if feature_split_virt_customize|bool %}
+        - name: FEATURE_SPLIT_VIRT_CUSTOMIZE
+          value: "true"
+{% endif %}
 {% if feature_ocp_live_migration|bool %}
         - name: FEATURE_OCP_LIVE_MIGRATION
           value: "true"

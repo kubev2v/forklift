@@ -115,6 +115,12 @@ type ForkliftControllerSpec struct {
 	// +kubebuilder:validation:Enum="true";"false"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:radio:true","urn:alm:descriptor:com.tectonic.ui:radio:false"}
 	FeatureCopyAppliance string `json:"feature_copy_appliance,omitempty"`
+	// Run virt-v2v and virt-customize as separate commands.
+	// +optional
+	// +kubebuilder:default="true"
+	// +kubebuilder:validation:Enum="true";"false"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	FeatureSplitVirtCustomize string `json:"feature_split_virt_customize,omitempty"`
 
 	// Container Images
 
