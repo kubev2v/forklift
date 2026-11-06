@@ -56,6 +56,13 @@ var populators = map[string]populator{
 		imageVar:        "VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE",
 		metricsEndpoint: ":8082",
 	},
+	"nutanix-nfs": {
+		kind:            "NutanixNfsVolumePopulator",
+		resource:        "nutanixnfsvolumepopulators",
+		controllerFunc:  getNutanixNfsPopulatorPodArgs,
+		imageVar:        "NUTANIX_NFS_POPULATOR_IMAGE",
+		metricsEndpoint: ":8083",
+	},
 }
 
 func main() {
@@ -168,6 +175,28 @@ func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.Pers
 	}
 	if xcopy.Spec.MigrationHost != "" {
 		args = append(args, "--migration-host="+xcopy.Spec.MigrationHost)
+	}
+	return args, nil
+}
+
+func getNutanixNfsPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, pvc corev1.PersistentVolumeClaim) ([]string, error) {
+	var populator v1beta1.NutanixNfsVolumePopulator
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &populator)
+	if err != nil {
+		return nil, err
+	}
+	args := []string{
+		"--volume-path=" + getVolumePath(rawBlock),
+		"--server-ip=" + populator.Spec.ServerIP,
+		"--export=" + populator.Spec.Export,
+		"--source-path=" + populator.Spec.SourcePath,
+		"--pvc-size=" + strconv.FormatInt(populator.Spec.DiskSizeBytes, 10),
+		"--cr-name=" + populator.Name,
+		"--cr-namespace=" + populator.Namespace,
+		"--owner-uid=" + string(pvc.UID),
+		// The machinery reads --secret-name to wire EnvFrom + cacert into the
+		// copy pod (controller.go). Must be non-empty or the pod is invalid.
+		"--secret-name=" + populator.Spec.SecretName,
 	}
 	return args, nil
 }
