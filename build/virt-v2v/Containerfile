@@ -3,7 +3,7 @@ FROM registry.access.redhat.com/ubi10:10.2-1792744468 AS winlegacyiso
 COPY build/virt-v2v/prefetch/ /tmp/virtio-win-prefetch/
 RUN rpm -Uvh --nodeps /tmp/virtio-win-prefetch/virtio-win-*.noarch.rpm
 
-FROM registry.access.redhat.com/ubi10/go-toolset:1.26-1792768404 AS builder
+FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1793908205 AS builder
 USER 0
 COPY build/virt-v2v/repos/centos-stream10-builder.repo /tmp/cs10-repos/centos-stream10-builder.repo
 COPY build/virt-v2v/scripts/enable-cs10-repos.sh /tmp/enable-cs10-repos.sh
