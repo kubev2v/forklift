@@ -129,6 +129,7 @@ OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)
 POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG)
 OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)
 OPENSTACK_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG)
+NUTANIX_NFS_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/nutanix-nfs-populator:$(REGISTRY_TAG)
 OVA_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG)
 HYPERV_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-hyperv-provider-server:$(REGISTRY_TAG)
 OVA_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG)
@@ -460,6 +461,12 @@ build-openstack-populator-image: check_container_runtime
 
 push-openstack-populator-image: build-openstack-populator-image
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
+
+build-nutanix-nfs-populator-image: check_container_runtime
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(NUTANIX_NFS_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/nutanix-nfs-populator/Containerfile .
+
+push-nutanix-nfs-populator-image: build-nutanix-nfs-populator-image
+	$(CONTAINER_CMD) push $(NUTANIX_NFS_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
 
 build-vsphere-copy-offload-populator-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/vsphere-copy-offload-populator/Containerfile .
