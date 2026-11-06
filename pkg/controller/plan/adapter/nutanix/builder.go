@@ -3,12 +3,19 @@ package nutanix
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"net/http"
 	"net/url"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -16,12 +23,15 @@ import (
 	providerbase "github.com/kubev2v/forklift/pkg/controller/base"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	libutil "github.com/kubev2v/forklift/pkg/lib/util"
+	"github.com/kubev2v/forklift/pkg/settings"
 	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
@@ -1293,16 +1303,291 @@ func (r *Builder) LunPersistentVolumeClaims(_ ref.Ref) ([]core.PersistentVolumeC
 	return nil, nil
 }
 
+// SupportsVolumePopulators reports whether this migration should transfer
+// disks by reading them over NFS from the Prism Element storage container
+// (NutanixNfsVolumePopulator) instead of the CDI HTTP import path. Gated on
+// the FEATURE_NUTANIX_NFS_OFFLOAD controller flag and cold migration only.
 func (r *Builder) SupportsVolumePopulators() bool {
-	return false
+	return settings.Settings.NutanixNfsOffload && !r.Plan.IsWarm()
 }
 
-func (r *Builder) PopulatorVolumes(_ ref.Ref, _ map[string]string, _ string) ([]*core.PersistentVolumeClaim, error) {
-	return nil, planbase.VolumePopulatorNotSupportedError
+// PopulatorVolumes builds one target PVC per non-CDROM disk, each backed by a
+// NutanixNfsVolumePopulator CR that a populator pod fulfils by streaming the
+// vmdisk over NFS. Mirrors the vSphere xcopy populator flow but needs no
+// storage-vendor credentials or offload plugin -- the NFS read is generic.
+func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
+	vm := &model.VM{}
+	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
+		return nil, liberr.Wrap(err, "vm", vmRef.String())
+	}
+
+	storageMap := map[string]api.DestinationStorage{}
+	for _, mapped := range r.Map.Storage.Spec.Map {
+		storageMap[mapped.Source.ID] = mapped.Destination
+	}
+
+	// NFS is served by the VM's owning Prism Element cluster, not Prism
+	// Central. Cluster.ExternalIP is that cluster's VIP.
+	cluster := &model.Cluster{}
+	if err = r.Source.Inventory.Find(cluster, ref.Ref{ID: vm.Cluster}); err != nil {
+		return nil, liberr.Wrap(err, "cluster", vm.Cluster)
+	}
+	if cluster.ExternalIP == "" {
+		return nil, liberr.New("cluster has no external IP for NFS transfer", "cluster", vm.Cluster)
+	}
+
+	namespace := r.Plan.Spec.TargetNamespace
+	diskIndex := 0
+	for _, disk := range dataDisks(vm) {
+		destination, mapped := storageMap[disk.StorageContainerUUID]
+		if !mapped {
+			return nil, liberr.New(
+				"no storage mapping for disk storage container",
+				"vm", vmRef.String(),
+				"disk", disk.UUID,
+				"storageContainer", disk.StorageContainerUUID)
+		}
+		if disk.StorageContainerName == "" {
+			return nil, liberr.New(
+				"storage container has no name for NFS export",
+				"vm", vmRef.String(),
+				"disk", disk.UUID,
+				"storageContainer", disk.StorageContainerUUID)
+		}
+
+		// Default to Filesystem: NFS-backed storage classes (e.g. nfs-csi,
+		// common for this path) don't support raw Block volumes. The storage
+		// map can override for block-capable backends. The copy binary handles
+		// both (writes /mnt/disk.img in filesystem mode).
+		volumeMode := core.PersistentVolumeFilesystem
+		if destination.VolumeMode != "" {
+			volumeMode = destination.VolumeMode
+		}
+		accessMode := core.ReadWriteOnce
+		if destination.AccessMode != "" {
+			accessMode = destination.AccessMode
+		}
+
+		pvcAnnotations := map[string]string{}
+		for k, v := range annotations {
+			pvcAnnotations[k] = v
+		}
+		// Tasks are keyed by disk.UUID (see Tasks()); AnnDiskSource is what
+		// GetPopulatorTaskName / ResolvePersistentVolumeClaimIdentifier read.
+		pvcAnnotations[planbase.AnnDiskSource] = disk.UUID
+
+		storageClass := destination.StorageClass
+		// Include the migration UID so a retried migration gets fresh CRs/PVCs
+		// instead of colliding (AlreadyExists) with a stale one from a prior
+		// attempt that points at an image a previous Finalize already deleted.
+		// Hashed to stay within the 63-char name limit; stable within a
+		// migration so re-reconciles are idempotent.
+		sum := sha256.Sum256([]byte(fmt.Sprintf("%s-%s-%s", r.Migration.UID, vmRef.ID, disk.UUID)))
+		name := fmt.Sprintf("nnvp-%x", sum[:12])
+		labels := map[string]string{
+			"migration": string(r.Migration.UID),
+			"plan":      string(r.Plan.GetUID()),
+			"vmID":      vmRef.ID,
+		}
+
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace:   namespace,
+				Name:        name,
+				Labels:      labels,
+				Annotations: pvcAnnotations,
+			},
+			Spec: core.PersistentVolumeClaimSpec{
+				AccessModes:      []core.PersistentVolumeAccessMode{accessMode},
+				StorageClassName: &storageClass,
+				VolumeMode:       &volumeMode,
+				Resources: core.VolumeResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceStorage: *resource.NewQuantity(disk.DiskSizeBytes, resource.BinarySI),
+					},
+				},
+				DataSourceRef: &core.TypedObjectReference{
+					APIGroup: &api.SchemeGroupVersion.Group,
+					Kind:     api.NutanixNfsVolumePopulatorKind,
+					Name:     name,
+				},
+			},
+		}
+
+		// Read the immutable catalog-image clone PreTransferActions created,
+		// not the live source vmdisk -- so a concurrent power-on of the source
+		// VM can't tear the copy. The clone's backing vmdisk UUID and container
+		// come from the PE v2 image API (v3/v4 don't expose them).
+		imageName := migrationImageName(string(r.Migration.UID), vmRef, disk.UUID)
+		vmDiskID, imgContainerUUID, rerr := r.resolveCatalogImage(cluster.ExternalIP, imageName)
+		if rerr != nil {
+			return nil, rerr
+		}
+		export := disk.StorageContainerName
+		if imgContainerUUID != "" && imgContainerUUID != disk.StorageContainerUUID {
+			sc := &model.StorageContainer{}
+			if ferr := r.Source.Inventory.Find(sc, ref.Ref{ID: imgContainerUUID}); ferr == nil && sc.Name != "" {
+				export = sc.Name
+			} else {
+				return nil, liberr.New(
+					"catalog image landed on an unknown container",
+					"image", imageName, "container", imgContainerUUID)
+			}
+		}
+
+		populator := &api.NutanixNfsVolumePopulator{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+				Labels:    labels,
+			},
+			Spec: api.NutanixNfsVolumePopulatorSpec{
+				ServerIP:      cluster.ExternalIP,
+				Export:        export,
+				SourcePath:    path.Join(".acropolis", "vmdisk", vmDiskID),
+				DiskSizeBytes: disk.DiskSizeBytes,
+				// The populator machinery wires this secret into the copy pod
+				// (EnvFrom + cacert); kubevirt.PopulatorVolumes created it. The
+				// copy binary itself doesn't need credentials (NFS is
+				// unauthenticated), but the machinery requires a valid name.
+				SecretName: secretName,
+			},
+		}
+
+		if err = r.ensurePopulatorPVCAndCR(pvc, populator); err != nil {
+			return nil, err
+		}
+		pvcs = append(pvcs, pvc)
+		diskIndex++
+	}
+
+	return pvcs, nil
 }
 
-func (r *Builder) PopulatorTransferredBytes(_ *core.PersistentVolumeClaim) (int64, error) {
-	return 0, planbase.VolumePopulatorNotSupportedError
+// v2Image is the subset of the Prism Element v2 image API response we need to
+// locate a catalog image's immutable backing vmdisk clone.
+type v2Image struct {
+	Name                 string `json:"name"`
+	UUID                 string `json:"uuid"`
+	VmDiskID             string `json:"vm_disk_id"`
+	StorageContainerUUID string `json:"storage_container_uuid"`
+}
+
+// resolveCatalogImage finds the catalog image (created by PreTransferActions)
+// by name via the Prism Element v2 image API and returns its backing vmdisk
+// UUID and container UUID. The v3/v4 image APIs don't expose the backing
+// vmdisk, and v4-created images still appear in v2 on the PE, so v2 is the
+// reliable lookup regardless of how the image was created.
+//
+// PreTransferActions creates the image asynchronously and the migration loop
+// calls PopulatorVolumes before the image is guaranteed ready, so a
+// not-yet-visible (or not-yet-backed) image is reported as
+// ProviderNotReadyError to requeue rather than fail the migration.
+func (r *Builder) resolveCatalogImage(peVIP, imageName string) (vmDiskID, containerUUID string, err error) {
+	notReady := web.ProviderNotReadyError{Provider: r.Source.Provider}
+	endpoint := fmt.Sprintf("https://%s:9440/PrismGateway/services/rest/v2.0/images/?count=4096", peVIP)
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", "", liberr.Wrap(err)
+	}
+	req.SetBasicAuth(string(r.Source.Secret.Data["user"]), string(r.Source.Secret.Data["password"]))
+	httpClient := &http.Client{
+		Timeout:   60 * time.Second,
+		Transport: &http.Transport{TLSClientConfig: tlsConfigFromSecret(r.Source.Secret)},
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", "", liberr.Wrap(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return "", "", liberr.New("v2 image list failed", "endpoint", endpoint, "status", resp.StatusCode)
+	}
+	var out struct {
+		Entities []v2Image `json:"entities"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return "", "", liberr.Wrap(err)
+	}
+	for _, img := range out.Entities {
+		if img.Name != imageName {
+			continue
+		}
+		if img.VmDiskID == "" {
+			// Image exists but its backing clone isn't populated yet.
+			return "", "", notReady
+		}
+		return img.VmDiskID, img.StorageContainerUUID, nil
+	}
+	// Image not created/visible yet; PreTransferActions is still working.
+	return "", "", notReady
+}
+
+// tlsConfigFromSecret builds a TLS config honoring the provider secret's
+// ca.crt / insecureSkipVerify, matching how the rest of the adapter connects.
+func tlsConfigFromSecret(secret *core.Secret) *tls.Config {
+	cfg := &tls.Config{MinVersion: tls.VersionTLS12}
+	if string(secret.Data["insecureSkipVerify"]) == "true" {
+		cfg.InsecureSkipVerify = true // #nosec G402 - honoring the provider's insecureSkipVerify setting
+	}
+	if ca := secret.Data["ca.crt"]; len(ca) > 0 {
+		pool := x509.NewCertPool()
+		if pool.AppendCertsFromPEM(ca) {
+			cfg.RootCAs = pool
+		}
+	}
+	return cfg
+}
+
+// ensurePopulatorPVCAndCR creates the target PVC and its populator CR
+// idempotently, wiring an OwnerReference from the CR back to the created PVC.
+func (r *Builder) ensurePopulatorPVCAndCR(pvc *core.PersistentVolumeClaim, populator *api.NutanixNfsVolumePopulator) error {
+	err := r.Destination.Create(context.TODO(), pvc, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return liberr.Wrap(err)
+	}
+	// Fetch back to get the UID assigned by Kubernetes.
+	created := &core.PersistentVolumeClaim{}
+	if err = r.Destination.Get(context.TODO(), client.ObjectKey{Namespace: pvc.Namespace, Name: pvc.Name}, created); err != nil {
+		return liberr.Wrap(err)
+	}
+	pvc.ObjectMeta = created.ObjectMeta
+
+	populator.OwnerReferences = []meta.OwnerReference{{
+		APIVersion: "v1",
+		Kind:       "PersistentVolumeClaim",
+		Name:       created.Name,
+		UID:        created.UID,
+	}}
+	err = r.Destination.Create(context.TODO(), populator, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return liberr.Wrap(err)
+	}
+	return nil
+}
+
+// PopulatorTransferredBytes derives transferred bytes from the percentage the
+// populator-machinery writes to the CR's status.progress (0-100), scaled by the
+// disk's provisioned size. The migration controller reconverts this to a
+// percentage against the task total (in MiB).
+func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (int64, error) {
+	populator := &api.NutanixNfsVolumePopulator{}
+	err := r.Destination.Get(context.TODO(), client.ObjectKey{Namespace: pvc.Namespace, Name: pvc.Name}, populator)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			return 0, nil
+		}
+		return 0, liberr.Wrap(err)
+	}
+	// A missing or malformed progress value is treated as 0% rather than an
+	// error -- the populator-machinery hasn't scraped the pod yet.
+	pct := 0.0
+	if populator.Status.Progress != "" {
+		if parsed, perr := strconv.ParseFloat(populator.Status.Progress, 64); perr == nil {
+			pct = parsed
+		}
+	}
+	return int64(pct / 100.0 * float64(populator.Spec.DiskSizeBytes)), nil
 }
 
 func (r *Builder) PopulatorOffloadInfo(_ *core.PersistentVolumeClaim) (map[string]string, error) {
@@ -1317,8 +1602,10 @@ func (r *Builder) SetPopulatorDataSourceLabels(_ ref.Ref, _ []*core.PersistentVo
 	return nil
 }
 
-func (r *Builder) GetPopulatorTaskName(_ *core.PersistentVolumeClaim) (string, error) {
-	return "", nil
+// GetPopulatorTaskName returns the disk identifier the pipeline task is keyed
+// on (disk.UUID; see Tasks()).
+func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (string, error) {
+	return pvc.Annotations[planbase.AnnDiskSource], nil
 }
 
 func (r *Builder) PreferenceName(_ ref.Ref, _ *core.ConfigMap) (string, error) {

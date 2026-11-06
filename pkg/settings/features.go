@@ -24,6 +24,7 @@ const (
 	FeatureXfsRepairIgnore              = "FEATURE_XFS_REPAIR_IGNORE"
 	FeatureCopyAppliance                = "FEATURE_COPY_APPLIANCE"
 	FeatureSplitVirtCustomize           = "FEATURE_SPLIT_VIRT_CUSTOMIZE"
+	FeatureNutanixNfsOffload            = "FEATURE_NUTANIX_NFS_OFFLOAD"
 )
 
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
@@ -83,6 +84,10 @@ type Features struct {
 	CopyAppliance bool
 	// Whether to run virt-v2v and virt-customize as separate commands.
 	SplitVirtCustomize bool
+	// Whether to transfer Nutanix disks by reading them directly over NFS from
+	// the Prism Element storage container (volume populator), bypassing the
+	// Prism REST Image Service and its HTTP 429 rate limiting. Cold only.
+	NutanixNfsOffload bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -127,5 +132,6 @@ func (r *Features) Load() (err error) {
 	r.XfsRepairIgnore = getEnvBool(FeatureXfsRepairIgnore, false)
 	r.CopyAppliance = getEnvBool(FeatureCopyAppliance, false)
 	r.SplitVirtCustomize = getEnvBool(FeatureSplitVirtCustomize, false)
+	r.NutanixNfsOffload = getEnvBool(FeatureNutanixNfsOffload, false)
 	return
 }
