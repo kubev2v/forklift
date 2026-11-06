@@ -7,6 +7,7 @@ import (
 
 	forklift "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
+	"github.com/kubev2v/forklift/pkg/storage/resolver/dell/powermax"
 	"github.com/kubev2v/forklift/pkg/storage/resolver/dell/powerstore"
 	"github.com/kubev2v/forklift/pkg/storage/resolver/hpe"
 	"github.com/kubev2v/forklift/pkg/storage/resolver/ontap"
@@ -50,6 +51,8 @@ func newCsiImportPlugin(product forklift.StorageVendorProduct, secretData map[st
 		return ontap.NewOntapImporter(host, user, pass, svm, backendUUID, driverType, skipSSL, k8sClient, storageClass)
 	case forklift.StorageVendorProductPowerStore:
 		return powerstore.NewPowerstoreImporter(host, user, pass, skipSSL)
+	case forklift.StorageVendorProductPowerMax:
+		return powermax.NewPowermaxImporter(host, user, pass, string(secretData["POWERMAX_SYMMETRIX_ID"]), skipSSL)
 	default:
 		return nil, fmt.Errorf("CSI import not supported for vendor %q", product)
 	}

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	forklift "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/storage/resolver/dell/powermax"
 	"github.com/kubev2v/forklift/pkg/storage/resolver/dell/powerstore"
 	"github.com/kubev2v/forklift/pkg/storage/resolver/hpe"
 	"github.com/kubev2v/forklift/pkg/storage/resolver/ontap"
@@ -71,6 +72,32 @@ func TestNewCsiImportPluginPowerStore(t *testing.T) {
 	}
 	if _, ok := plugin.(*powerstore.PowerstoreImporter); !ok {
 		t.Errorf("expected *powerstore.PowerstoreImporter, got %T", plugin)
+	}
+}
+
+func TestNewCsiImportPluginPowerMax(t *testing.T) {
+	plugin, err := newCsiImportPlugin(forklift.StorageVendorProductPowerMax, map[string][]byte{
+		"STORAGE_HOSTNAME":      []byte("https://host:8443"),
+		"STORAGE_USERNAME":      []byte("user"),
+		"STORAGE_PASSWORD":      []byte("pass"),
+		"POWERMAX_SYMMETRIX_ID": []byte("000197900046"),
+	}, nil, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := plugin.(*powermax.PowermaxImporter); !ok {
+		t.Errorf("expected *powermax.PowermaxImporter, got %T", plugin)
+	}
+}
+
+func TestNewCsiImportPluginPowerMaxMissingSymmetrixID(t *testing.T) {
+	_, err := newCsiImportPlugin(forklift.StorageVendorProductPowerMax, map[string][]byte{
+		"STORAGE_HOSTNAME": []byte("https://host:8443"),
+		"STORAGE_USERNAME": []byte("user"),
+		"STORAGE_PASSWORD": []byte("pass"),
+	}, nil, "")
+	if err == nil {
+		t.Fatal("expected error for missing POWERMAX_SYMMETRIX_ID, got nil")
 	}
 }
 
