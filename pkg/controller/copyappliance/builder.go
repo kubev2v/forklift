@@ -162,7 +162,7 @@ func (r *Builder) attachDisks(vmRef ref.Ref, spec *api.CopyApplianceSpec) error 
 		return liberr.Wrap(err, "vm", vmRef.String())
 	}
 	for _, disk := range vm.Disks {
-		if disk.Shared || disk.RDM || disk.File == "" {
+		if disk.RDM || disk.File == "" {
 			continue
 		}
 		spec.AttachDisks = append(spec.AttachDisks, api.AttachedDisk{
