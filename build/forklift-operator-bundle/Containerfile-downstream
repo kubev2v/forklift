@@ -31,7 +31,7 @@ ARG NBD_CONTAINER_IMAGE="registry.redhat.io/mtv-candidate/mtv-copy-appliance-nbd
 
 ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:62eaae0f99367115577602e9854a4477c8e3829cf31910276ee8410e48e323ce"
 
-ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:14ccfd2c80d0349ab911072fe1b033d844797ba840af688bd9e230579471b3b5"
+ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:0a065c5f836a758bb7fc2746d6b076d70f1a40df8703987f94beff9ddcfcd01f"
 
 ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:6a9b9ac9fdcb8323863345bc0acfe2a2279a2db301ed2aefc7482a53d0317939"
 
