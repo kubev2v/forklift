@@ -104,9 +104,9 @@ func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) error {
 // ConfigMap carries a CA certificate for CDI's HTTP importer to trust when
 // downloading catalog images. In secure mode (no insecureSkipVerify), only
 // ca.crt from the provider secret is copied; CDI verifies import TLS against
-// that bundle. When insecureSkipVerify is set, DataVolumes() may fetch and
-// pin leaf certificates from import endpoints (CDI HTTP import has no
-// insecureSkipVerify field).
+// that bundle. When insecureSkipVerify is set, DataVolumes() turns off
+// verification on the HTTP source and also pins the import endpoints' leaf
+// certificates for CDI releases that predate that field.
 func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) error {
 	if cacert, found := libutil.GetCACert(in); found && len(cacert) > 0 {
 		setCDICACerts(object, cacert)
@@ -652,6 +652,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		if err != nil {
 			return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", disk.UUID)
 		}
+		setInsecureSkipVerify(httpSource, r.Source.Secret)
 
 		dv := r.mapDataVolume(disk, destination, dvTemplate, httpSource, diskIndex)
 		dvs = append(dvs, *dv)
@@ -659,6 +660,18 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	}
 
 	return dvs, nil
+}
+
+// setInsecureSkipVerify carries the provider's insecureSkipVerify onto the
+// CDI HTTP source. Pinning the endpoint certificate is not enough on its own:
+// Prism's factory certificate (CN=*.nutanix.local) has no SANs, so Go's
+// hostname check rejects it for any provider URL. CDI releases without this
+// field drop it and fall back to the pinned certificate.
+func setInsecureSkipVerify(source *cdi.DataVolumeSourceHTTP, secret *core.Secret) {
+	if providerbase.GetInsecureSkipVerifyFlag(secret) {
+		insecure := true
+		source.InsecureSkipVerify = &insecure
+	}
 }
 
 // elementHTTPSource builds a DataVolumeSourceHTTP pointing at a Prism
