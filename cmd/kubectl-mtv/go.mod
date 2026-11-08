@@ -63,7 +63,7 @@ require (
 	github.com/yaacov/kubectl-mtv-mcp v0.0.6 // indirect
 	github.com/yaacov/tree-search-language/v6 v6.0.8 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	go.yaml.in/yaml/v4 v4.0.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
