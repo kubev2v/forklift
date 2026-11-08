@@ -375,6 +375,7 @@ type PortGroup struct {
 type Switch struct {
 	Key        string   `json:"key"`
 	Name       string   `json:"name"`
+	MTU        int32    `json:"mtu"`
 	PortGroups []string `json:"portGroups"`
 	PNICs      []string `json:"pNICs"`
 }
@@ -386,6 +387,7 @@ type Network struct {
 	Key      string    `sql:""`
 	Host     []DVSHost `sql:""`
 	VlanId   string    `sql:""`
+	MaxMTU   int32     `sql:""`
 }
 
 type DVSHost struct {

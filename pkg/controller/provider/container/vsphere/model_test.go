@@ -792,6 +792,76 @@ func newTestInventoryDB(t *testing.T) libmodel.DB {
 	return db
 }
 
+func TestSwitchMTURetention(t *testing.T) {
+	db := libmodel.New(filepath.Join(t.TempDir(), "network.db"), &model.Host{}, &model.Network{})
+	if err := db.Open(true); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close(true) })
+	for _, mtu := range []int32{0, 1500, 9000} {
+		host := &HostAdapter{model: model.Host{Base: model.Base{ID: "host-1"}}}
+		host.Apply(types.ObjectUpdate{
+			Obj: types.ManagedObjectReference{Type: "HostSystem", Value: "host-1"},
+			ChangeSet: []types.PropertyChange{{Op: Assign, Name: fVSwitch, Val: types.ArrayOfHostVirtualSwitch{
+				HostVirtualSwitch: []types.HostVirtualSwitch{{Key: "switch-key", Name: "vSwitch0", Mtu: mtu}},
+			}}},
+		})
+		dvs := &DVSwitchAdapter{model: model.Network{Base: model.Base{ID: "dvs-1", Variant: model.NetDvSwitch}}}
+		dvs.Apply(types.ObjectUpdate{
+			Obj:       types.ManagedObjectReference{Type: DVSwitch, Value: "dvs-1"},
+			ChangeSet: []types.PropertyChange{{Op: Assign, Name: fDVSwitchConfig, Val: types.VMwareDVSConfigInfo{MaxMtu: mtu}}},
+		})
+		for _, object := range []libmodel.Model{host.Model(), dvs.Model()} {
+			if err := db.Insert(object); err != nil {
+				t.Fatal(err)
+			}
+		}
+		storedHost := &model.Host{Base: model.Base{ID: "host-1"}}
+		storedDVS := &model.Network{Base: model.Base{ID: "dvs-1"}}
+		if err := db.Get(storedHost); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Get(storedDVS); err != nil {
+			t.Fatal(err)
+		}
+		if len(storedHost.Network.Switches) != 1 || storedHost.Network.Switches[0].MTU != mtu || storedDVS.MaxMTU != mtu {
+			t.Fatalf("MTU %d not retained: host=%+v distributed=%+v", mtu, storedHost.Network, storedDVS)
+		}
+		var resource web.Network
+		resource.With(storedDVS)
+		value, present := storageJSON(t, &resource)["maxMtu"]
+		if mtu == 0 {
+			if present {
+				t.Fatal("unknown maximum MTU must be omitted from REST output")
+			}
+		} else if !present || value != float64(mtu) {
+			t.Fatalf("REST maximum MTU = %v, want %d", value, mtu)
+		}
+		if err := db.Delete(storedHost); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Delete(storedDVS); err != nil {
+			t.Fatal(err)
+		}
+		dvs.Apply(types.ObjectUpdate{ChangeSet: []types.PropertyChange{{Op: types.PropertyChangeOpRemove, Name: fDVSwitchConfig}}})
+		if dvs.model.MaxMTU != 0 {
+			t.Fatal("removed MTU must be unknown")
+		}
+		resource.With(&dvs.model)
+		if _, present := storageJSON(t, &resource)["maxMtu"]; present {
+			t.Fatal("removed maximum MTU must be omitted from REST output")
+		}
+	}
+
+	dvs := &DVSwitchAdapter{model: model.Network{MaxMTU: 9000}}
+	dvs.Apply(types.ObjectUpdate{ChangeSet: []types.PropertyChange{{
+		Op: Assign, Name: fDVSwitchConfig, Val: types.DVSConfigInfo{},
+	}}})
+	if dvs.model.MaxMTU != 0 {
+		t.Fatal("configuration without VMware MTU must clear the previous measurement")
+	}
+}
+
 func newTestCollector() *Collector {
 	return &Collector{
 		customFieldDefs:   map[int32]model.CustomFieldDef{},

@@ -180,6 +180,7 @@ type Network struct {
 	Host     []model.DVSHost `json:"host"`
 	Tag      string          `json:"tag,omitempty"`
 	Key      string          `json:"key,omitempty"`
+	MaxMTU   int32           `json:"maxMtu,omitempty"`
 }
 
 // Build the resource using the model.
@@ -197,6 +198,7 @@ func (r *Network) With(m *model.Network) {
 		r.Key = m.Key
 	case model.NetDvSwitch:
 		r.Host = m.Host
+		r.MaxMTU = m.MaxMTU
 	}
 }
 

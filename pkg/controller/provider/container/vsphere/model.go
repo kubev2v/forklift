@@ -373,6 +373,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 							model.Switch{
 								Key:        vSwitch.Key,
 								Name:       vSwitch.Name,
+								MTU:        vSwitch.Mtu,
 								PortGroups: vSwitch.Portgroup,
 								PNICs:      vSwitch.Pnic,
 							})
@@ -809,6 +810,15 @@ func (v *DVSwitchAdapter) Apply(u types.ObjectUpdate) {
 				if array, cast := p.Val.(types.ArrayOfDistributedVirtualSwitchHostMember); cast {
 					v.addHost(array)
 				}
+			case fDVSwitchConfig:
+				v.model.MaxMTU = 0
+				if config, cast := p.Val.(types.VMwareDVSConfigInfo); cast {
+					v.model.MaxMTU = config.MaxMtu
+				}
+			}
+		case types.PropertyChangeOpRemove:
+			if p.Name == fDVSwitchConfig {
+				v.model.MaxMTU = 0
 			}
 		}
 	}
