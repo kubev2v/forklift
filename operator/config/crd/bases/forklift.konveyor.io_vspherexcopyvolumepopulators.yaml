@@ -40,6 +40,10 @@ spec:
             type: object
           spec:
             properties:
+              priorityClassName:
+                description: PriorityClassName sets the scheduling priority for the
+                  XCOPY populator pod.
+                type: string
               secretName:
                 description: The secret name with vsphere and storage credentials
                 type: string

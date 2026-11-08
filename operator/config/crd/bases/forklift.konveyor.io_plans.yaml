@@ -1257,6 +1257,10 @@ spec:
                     "net-{{.NetworkIndex}}"
                     "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
                 type: string
+              offloadPopulatorPriorityClassName:
+                description: OffloadPopulatorPriorityClassName sets the existing PriorityClass
+                  for vSphere XCOPY populator pods.
+                type: string
               preserveClusterCpuModel:
                 description: Preserve the CPU model and flags the VM runs with in
                   its oVirt cluster.
@@ -1376,8 +1380,8 @@ spec:
                   variables:\n  - .SourcePVCName: name of the PVC in the source cluster\n
                   \ - .SourcePVCNamespace: namespace of the PVC in the source cluster\n\nDefault
                   behavior when not set:\n  - VMware: generates names like \"{{trunc
-                  4 .PlanName}}-{{trunc 4 .VmName}}-disk-{{.DiskIndex}}\"\n  - OpenShift:
-                  uses the original source PVC name (\"{{.SourcePVCName}}\")\n\nNote:\n
+                  15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}\"\n
+                  \ - OpenShift: uses the original source PVC name (\"{{.SourcePVCName}}\")\n\nNote:\n
                   \ This template can be overridden at the individual VM level.\nExamples:\n
                   \ \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n  \"{{if eq .DiskIndex
                   .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\" (VMware)\n

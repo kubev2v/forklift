@@ -165,16 +165,23 @@ func isThrottled(recorder *record.FakeRecorder) bool {
 	}
 }
 
-// createdPodLabels returns the labels of the pod created via the fake kubeClient, or nil if none was created.
-func createdPodLabels(fakeClient *fake.Clientset) map[string]string {
+func createdPod(fakeClient *fake.Clientset) *corev1.Pod {
 	for _, action := range fakeClient.Actions() {
 		if action.GetVerb() == "create" && action.GetResource().Resource == "pods" {
 			obj := action.(interface{ GetObject() runtime.Object }).GetObject()
-			pod := obj.(*corev1.Pod)
-			return pod.Labels
+			return obj.(*corev1.Pod)
 		}
 	}
 	return nil
+}
+
+// createdPodLabels returns the labels of the pod created via the fake kubeClient, or nil if none was created.
+func createdPodLabels(fakeClient *fake.Clientset) map[string]string {
+	pod := createdPod(fakeClient)
+	if pod == nil {
+		return nil
+	}
+	return pod.Labels
 }
 
 // ── Test cases ──────────────────────────────────────────────────────────────
@@ -325,5 +332,60 @@ func TestThrottle_Mixed_WithoutMigrationHost_ThrottlesOnSourceHost(t *testing.T)
 	}
 	if !isThrottled(recorder) {
 		t.Error("expected throttle on sourceHost when no migrationHost configured")
+	}
+}
+
+func TestXcopyPriorityClassName_PopulatesPodSpec(t *testing.T) {
+	pvc := makePVC("pvc-1", "test-ns", "cr-1", "test-sc")
+	cr := makeCR("cr-1", "test-ns", "source-host", "")
+	_ = unstructured.SetNestedField(cr.Object, "xcopy-migration", "spec", "priorityClassName")
+	c, fakeClient, _ := buildController(t, 10, nil, []*corev1.PersistentVolumeClaim{pvc}, []*unstructured.Unstructured{cr})
+
+	if err := c.syncPvc(context.Background(), "test-ns/pvc-1", "test-ns", "pvc-1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	pod := createdPod(fakeClient)
+	if pod == nil {
+		t.Fatal("expected pod to be created")
+	}
+	if pod.Spec.PriorityClassName != "xcopy-migration" {
+		t.Errorf("expected priorityClassName %q, got %q", "xcopy-migration", pod.Spec.PriorityClassName)
+	}
+}
+
+func TestXcopyPriorityClassName_OmittedLeavesPodSpecUnset(t *testing.T) {
+	pvc := makePVC("pvc-1", "test-ns", "cr-1", "test-sc")
+	cr := makeCR("cr-1", "test-ns", "source-host", "")
+	c, fakeClient, _ := buildController(t, 10, nil, []*corev1.PersistentVolumeClaim{pvc}, []*unstructured.Unstructured{cr})
+
+	if err := c.syncPvc(context.Background(), "test-ns/pvc-1", "test-ns", "pvc-1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	pod := createdPod(fakeClient)
+	if pod == nil {
+		t.Fatal("expected pod to be created")
+	}
+	if pod.Spec.PriorityClassName != "" {
+		t.Errorf("expected priorityClassName to be unset, got %q", pod.Spec.PriorityClassName)
+	}
+}
+
+func TestXcopyPriorityClassName_IgnoredByOtherPopulators(t *testing.T) {
+	pvc := makePVC("pvc-1", "test-ns", "cr-1", "test-sc")
+	pvc.Spec.DataSourceRef.Kind = "OvirtVolumePopulator"
+	cr := makeCR("cr-1", "test-ns", "source-host", "")
+	_ = unstructured.SetNestedField(cr.Object, "xcopy-migration", "spec", "priorityClassName")
+	c, fakeClient, _ := buildController(t, 10, nil, []*corev1.PersistentVolumeClaim{pvc}, []*unstructured.Unstructured{cr})
+	c.gk.Kind = "OvirtVolumePopulator"
+
+	if err := c.syncPvc(context.Background(), "test-ns/pvc-1", "test-ns", "pvc-1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	pod := createdPod(fakeClient)
+	if pod == nil {
+		t.Fatal("expected pod to be created")
+	}
+	if pod.Spec.PriorityClassName != "" {
+		t.Errorf("expected other populator priorityClassName to be unset, got %q", pod.Spec.PriorityClassName)
 	}
 }
