@@ -159,6 +159,17 @@ func TestResolver_Path_VM(t *testing.T) {
 	}
 }
 
+func TestResolver_Path_Workload(t *testing.T) {
+	r := &Resolver{Provider: testProvider()}
+	path, err := r.Path(&Workload{}, "vm1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "providers/hyperv/provider-uid-123/workloads/vm1"; path != want {
+		t.Errorf("Path = %q, want %q", path, want)
+	}
+}
+
 func TestResolver_Path_Unknown(t *testing.T) {
 	r := &Resolver{Provider: testProvider()}
 	_, err := r.Path("unsupported", "id")
