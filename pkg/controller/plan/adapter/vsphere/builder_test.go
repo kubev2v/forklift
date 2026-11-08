@@ -264,6 +264,7 @@ var _ = Describe("vSphere builder", func() {
 					Data:       map[string][]byte{"foo": []byte("bar")},
 				},
 			)
+			builder.Plan.Spec.OffloadPopulatorPriorityClassName = "xcopy-migration"
 			vm := model.VM{
 				VM1: model.VM1{
 					VM0: model.VM0{
@@ -314,6 +315,10 @@ var _ = Describe("vSphere builder", func() {
 			Expect(pvc.Spec.DataSourceRef.APIGroup).To(Equal(&v1beta1.SchemeGroupVersion.Group))
 			// The array copies into an NFS export, which is a Filesystem volume.
 			Expect(pvc.Spec.VolumeMode).To(Equal(ptr.To(core.PersistentVolumeFilesystem)))
+			populator := &v1beta1.VSphereXcopyVolumePopulator{}
+			err = builder.Destination.Get(context.TODO(), client.ObjectKey{Name: pvc.Name, Namespace: pvc.Namespace}, populator)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(populator.Spec.PriorityClassName).To(BeEmpty())
 		})
 		It("should sanitize invalid VM names via ChangeVmName fallback in setPVCNameFromTemplate", func() {
 			builder := createBuilder()
@@ -398,12 +403,13 @@ var _ = Describe("vSphere builder", func() {
 			Expect(pvcs[0].Spec.VolumeMode).To(Equal(ptr.To(core.PersistentVolumeBlock)))
 		})
 
-		It("should not set migrationHost when dedicatedMigrationHosts is not set", func() {
+		It("should set the priorityClassName and leave migrationHost unset without dedicated hosts", func() {
 			builder := createBuilder(
 				&core.Secret{
 					ObjectMeta: meta.ObjectMeta{Name: "test-secret", Namespace: "test"},
 				},
 			)
+			builder.Plan.Spec.OffloadPopulatorPriorityClassName = "xcopy-migration"
 			vm := model.VM{
 				VM1: model.VM1{
 					VM0: model.VM0{
@@ -455,6 +461,7 @@ var _ = Describe("vSphere builder", func() {
 			err = builder.Destination.Get(context.TODO(), client.ObjectKey{Name: pvcs[0].Name, Namespace: pvcs[0].Namespace}, populator)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(populator.Spec.MigrationHost).To(BeEmpty())
+			Expect(populator.Spec.PriorityClassName).To(Equal("xcopy-migration"))
 		})
 
 		It("should set migrationHost when dedicatedMigrationHosts is set in storage mapping", func() {
