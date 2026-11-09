@@ -1197,7 +1197,7 @@ func (r *Ensurer) EnsureSourceVMIM(vm *planapi.VMStatus, source *cnv.VirtualMach
 		list,
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
-			Namespace:     r.Plan.Spec.TargetNamespace,
+			Namespace:     source.Namespace,
 		},
 	)
 	if err != nil {
