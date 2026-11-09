@@ -1,0 +1,11 @@
+[connection]
+id=ens224
+type=ethernet
+interface-name=ens224
+
+[ipv4]
+method=manual
+address1=10.203.244.116/24,10.203.244.1
+
+[ipv6]
+method=disabled
