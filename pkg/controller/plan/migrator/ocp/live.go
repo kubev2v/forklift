@@ -21,6 +21,7 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	appsv1 "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -165,6 +166,10 @@ func (r *LiveMigrator) Complete(vm *planapi.VMStatus) {
 		err = r.DeleteVirtualMachine(vm)
 		if err != nil {
 			r.Log.Error(err, "Unable to clean up target VM.", "vm", vm.String())
+		}
+		err = r.DeleteControllerRevisions(vm)
+		if err != nil {
+			r.Log.Error(err, "Unable to clean up ControllerRevisions.", "vm", vm.String())
 		}
 	}
 }
@@ -500,6 +505,15 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		target, err = r.builder.VirtualMachine(vm)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				r.StepError(vm, err)
+				err = nil
+			}
+			break
+		}
+		err = r.ensurer.EnsureRevisions(vm, target)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				r.Log.Error(err, "error ensuring revisions", "vm", vm.Name)
 				r.StepError(vm, err)
 				err = nil
 			}
@@ -967,6 +981,23 @@ func (r *LiveMigrator) DeletePersistentVolumeClaims(vm *planapi.VMStatus) (err e
 	return
 }
 
+// DeleteControllerRevisions deletes ControllerRevisions created for this migration.
+func (r *LiveMigrator) DeleteControllerRevisions(vm *planapi.VMStatus) (err error) {
+	err = r.Destination.DeleteAllOf(
+		context.Background(),
+		&appsv1.ControllerRevision{},
+		&client.DeleteAllOfOptions{
+			ListOptions: client.ListOptions{
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
+				Namespace:     r.Plan.Spec.TargetNamespace,
+			},
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+	return
+}
+
 // DeleteVirtualMachine deletes the target VirtualMachine.
 func (r *LiveMigrator) DeleteVirtualMachine(vm *planapi.VMStatus) (err error) {
 	err = r.Destination.DeleteAllOf(
@@ -1256,6 +1287,72 @@ func (r *Ensurer) EnsureLocalInstanceType(vm *planapi.VMStatus, target *instance
 	return
 }
 
+// EnsureRevisions copies the ControllerRevisions named by the target matchers.
+func (r *Ensurer) EnsureRevisions(vm *planapi.VMStatus, target *cnv.VirtualMachine) (err error) {
+	if target.Spec.Preference != nil {
+		err = r.ensureControllerRevision(vm, target.Spec.Preference.RevisionName)
+		if err != nil {
+			err = liberr.Wrap(err, "preference revision")
+			return
+		}
+	}
+	if target.Spec.Instancetype != nil {
+		err = r.ensureControllerRevision(vm, target.Spec.Instancetype.RevisionName)
+		if err != nil {
+			err = liberr.Wrap(err, "instancetype revision")
+			return
+		}
+	}
+	return
+}
+
+// ensureControllerRevision copies a source ControllerRevision into the target namespace.
+// An empty name is ignored. A revision already present on the target is left in place.
+func (r *Ensurer) ensureControllerRevision(vm *planapi.VMStatus, name string) (err error) {
+	if name == "" {
+		return
+	}
+	targetKey := types.NamespacedName{Namespace: r.Plan.Spec.TargetNamespace, Name: name}
+	err = r.Destination.Get(context.Background(), targetKey, &appsv1.ControllerRevision{})
+	if err == nil {
+		return nil
+	}
+	if !k8serr.IsNotFound(err) {
+		err = liberr.Wrap(err, "revision", targetKey.String(), "vm", vm.String())
+		return
+	}
+	sourceKey := types.NamespacedName{Namespace: vm.Namespace, Name: name}
+	source := &appsv1.ControllerRevision{}
+	err = r.SourceClient.Get(context.Background(), sourceKey, source)
+	if err != nil {
+		err = liberr.Wrap(err, "revision", sourceKey.String(), "vm", vm.String())
+		return
+	}
+	target := source.DeepCopy()
+	target.UID = ""
+	target.ResourceVersion = ""
+	target.ManagedFields = nil
+	// Drop the source VM owner. KubeVirt adds the target VM once that VM exists and its status points at this revision.
+	target.OwnerReferences = nil
+	target.Namespace = r.Plan.Spec.TargetNamespace
+	r.Labeler.SetLabels(target, r.Labeler.MigrationVMLabels(vm.Ref))
+	err = r.Destination.Create(context.Background(), target)
+	if err != nil {
+		if k8serr.IsAlreadyExists(err) {
+			err = nil
+			return
+		}
+		err = liberr.Wrap(err, "Failed to create ControllerRevision.", "revision", targetKey.String())
+		return
+	}
+	r.Log.Info("Created ControllerRevision.",
+		"revision",
+		targetKey.String(),
+		"vm",
+		vm.String())
+	return
+}
+
 // EnsureServiceExport exists on destination cluster.
 func (r *Ensurer) EnsureServiceExport(vm *planapi.VMStatus, export *multicluster.ServiceExport) (err error) {
 	err = r.Destination.Create(context.TODO(), export)
@@ -1305,8 +1402,8 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus) (object *cnv.VirtualMachi
 			//
 			// If the VM refers to cluster scope preferences and instance types rather than
 			// local scope, we should probably not attempt to create missing ones.
-			Instancetype: source.Object.Spec.Instancetype,
-			Preference:   source.Object.Spec.Preference,
+			Instancetype: instancetypeMatcher(&source.Object),
+			Preference:   preferenceMatcher(&source.Object),
 			Template:     source.Object.Spec.Template.DeepCopy(),
 			Running:      nil,
 			RunStrategy:  &waitAsReceiver,
@@ -1336,6 +1433,30 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus) (object *cnv.VirtualMachi
 	}
 	r.mapNetworks(source.Namespace, object)
 	return
+}
+
+// KubeVirt stores the captured revision in status and leaves spec.revisionName empty.
+// VirtualMachine create ignores status, so the target matcher spec carries that name.
+func instancetypeMatcher(vm *cnv.VirtualMachine) *cnv.InstancetypeMatcher {
+	if vm.Spec.Instancetype == nil {
+		return nil
+	}
+	matcher := *vm.Spec.Instancetype
+	if ref := vm.Status.InstancetypeRef; ref != nil && ref.ControllerRevisionRef != nil && ref.ControllerRevisionRef.Name != "" {
+		matcher.RevisionName = ref.ControllerRevisionRef.Name
+	}
+	return &matcher
+}
+
+func preferenceMatcher(vm *cnv.VirtualMachine) *cnv.PreferenceMatcher {
+	if vm.Spec.Preference == nil {
+		return nil
+	}
+	matcher := *vm.Spec.Preference
+	if ref := vm.Status.PreferenceRef; ref != nil && ref.ControllerRevisionRef != nil && ref.ControllerRevisionRef.Name != "" {
+		matcher.RevisionName = ref.ControllerRevisionRef.Name
+	}
+	return &matcher
 }
 
 func (r *Builder) mapNetworks(srcNS string, target *cnv.VirtualMachine) {

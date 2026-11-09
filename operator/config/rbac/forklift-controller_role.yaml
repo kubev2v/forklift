@@ -198,6 +198,15 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - apps
+  resources:
+  - controllerrevisions
+  verbs:
+  - get
+  - create
+  - delete
+  - deletecollection
+- apiGroups:
   - instancetype.kubevirt.io
   resources:
   - virtualmachineclusterpreferences
