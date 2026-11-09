@@ -112,7 +112,8 @@ const (
 	fDVSwitchVlan = "config.defaultPortConfig"
 	fKey          = "key"
 	// DV Switch
-	fDVSwitchHost = "config.host"
+	fDVSwitchHost   = "config.host"
+	fDVSwitchConfig = "config"
 	// ResourcePool
 	fResourcePool = "resourcePool"
 	// Datastore
@@ -1046,6 +1047,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fName,
 				fParent,
 				fDVSwitchHost,
+				fDVSwitchConfig,
 			},
 		},
 		{ // Datastore

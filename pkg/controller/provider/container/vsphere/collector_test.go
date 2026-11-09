@@ -86,6 +86,18 @@ var _ = Describe("vSphere collector", func() {
 		Client:         vimClient,
 	}
 
+	It("collects distributed switch maximum MTU", func() {
+		collector.client.ServiceContent.About.ApiVersion = "7.0"
+		for _, spec := range collector.propertySpec() {
+			if spec.Type == DVSwitch {
+				Expect(spec.PathSet).To(ContainElement("config"))
+				Expect(spec.PathSet).NotTo(ContainElement("config.maxMtu"))
+				return
+			}
+		}
+		Fail("distributed switch property specification missing")
+	})
+
 	table.DescribeTable("should", func(version string, matchTpm gtypes.GomegaMatcher) {
 		collector.client.ServiceContent.About.ApiVersion = version
 		Expect(collector.vmPathSet()).Should(matchTpm)
