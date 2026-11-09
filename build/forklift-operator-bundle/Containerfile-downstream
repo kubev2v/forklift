@@ -47,7 +47,7 @@ ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha2
 
 ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel10@sha256:1a3c88a01abaa41313564af245a025d3485e620e6b238bede6e732f2f3055a82"
 
-ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:b2b0056f16f299fd51269fe252efa6f99da9a6002614e9b700bd716161ab862f"
+ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:383155f6f4e646c192fb49d4f5062ec115208c521d4508d9a35ea35bbf36fe84"
 
 ARG VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-copy-offload-populator-rhel9@sha256:e435e9716f9ee790006068477dc61505fd1d4fbf4ee642a61ebbefae54f059c5"
 
