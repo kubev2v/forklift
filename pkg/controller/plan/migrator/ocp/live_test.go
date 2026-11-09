@@ -393,6 +393,121 @@ var _ = Describe("revision copy", func() {
 	})
 })
 
+var _ = Describe("EnsureSourceVMIM", func() {
+	// Cross-namespace live migration on a single cluster: the source and
+	// destination providers are the same, so SourceClient and the destination
+	// client address the same cluster. The target VMIM already exists in the
+	// target namespace carrying identical migration labels. The source VMIM must
+	// still be created in the source namespace (MTV-7232).
+	It("creates the source VMIM even when a target VMIM with identical labels exists", func() {
+		scheme := runtime.NewScheme()
+		Expect(cnv.AddToScheme(scheme)).To(Succeed())
+
+		vm := &planapi.VMStatus{}
+		vm.ID = "vm-1"
+		vm.Name = "vm"
+		vm.Namespace = "source"
+
+		ctx := &plancontext.Context{
+			Plan: &api.Plan{
+				ObjectMeta: meta.ObjectMeta{UID: "plan-1"},
+				Spec:       api.PlanSpec{TargetNamespace: "target"},
+			},
+			Migration: &api.Migration{ObjectMeta: meta.ObjectMeta{UID: "mig-1"}},
+			Log:       logging.WithName("test"),
+		}
+		ctx.Labeler = plancontext.Labeler{Context: ctx}
+
+		// Target VMIM already present in the target namespace with identical labels.
+		targetVMIM := &cnv.VirtualMachineInstanceMigration{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace: "target",
+				Name:      "forklift-target",
+				Labels:    ctx.Labeler.MigrationVMLabels(vm.Ref),
+			},
+		}
+		cluster := fake.NewClientBuilder().WithScheme(scheme).WithObjects(targetVMIM).Build()
+		ctx.Destination = plancontext.Destination{Client: cluster}
+
+		r := &Ensurer{
+			Ensurer:      &ensurer.Ensurer{Context: ctx},
+			SourceClient: cluster,
+		}
+
+		source := &cnv.VirtualMachineInstanceMigration{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace:    "source",
+				GenerateName: "forklift-",
+				Labels:       ctx.Labeler.MigrationVMLabels(vm.Ref),
+			},
+			Spec: cnv.VirtualMachineInstanceMigrationSpec{
+				VMIName: "vm",
+				SendTo: &cnv.VirtualMachineInstanceMigrationSource{
+					MigrationID: "vm-1-mig-1",
+					ConnectURL:  "tcp://sync",
+				},
+			},
+		}
+
+		Expect(r.EnsureSourceVMIM(vm, source)).To(Succeed())
+
+		list := &cnv.VirtualMachineInstanceMigrationList{}
+		Expect(cluster.List(context.Background(), list, &client.ListOptions{Namespace: "source"})).To(Succeed())
+		Expect(list.Items).To(HaveLen(1))
+		Expect(list.Items[0].Spec.SendTo).ToNot(BeNil())
+	})
+
+	It("does not create a duplicate source VMIM when one already exists", func() {
+		scheme := runtime.NewScheme()
+		Expect(cnv.AddToScheme(scheme)).To(Succeed())
+
+		vm := &planapi.VMStatus{}
+		vm.ID = "vm-1"
+		vm.Name = "vm"
+		vm.Namespace = "source"
+
+		ctx := &plancontext.Context{
+			Plan: &api.Plan{
+				ObjectMeta: meta.ObjectMeta{UID: "plan-1"},
+				Spec:       api.PlanSpec{TargetNamespace: "target"},
+			},
+			Migration: &api.Migration{ObjectMeta: meta.ObjectMeta{UID: "mig-1"}},
+			Log:       logging.WithName("test"),
+		}
+		ctx.Labeler = plancontext.Labeler{Context: ctx}
+
+		existing := &cnv.VirtualMachineInstanceMigration{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace: "source",
+				Name:      "forklift-existing",
+				Labels:    ctx.Labeler.MigrationVMLabels(vm.Ref),
+			},
+		}
+		cluster := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existing).Build()
+		ctx.Destination = plancontext.Destination{Client: cluster}
+
+		r := &Ensurer{
+			Ensurer:      &ensurer.Ensurer{Context: ctx},
+			SourceClient: cluster,
+		}
+
+		source := &cnv.VirtualMachineInstanceMigration{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace:    "source",
+				GenerateName: "forklift-",
+				Labels:       ctx.Labeler.MigrationVMLabels(vm.Ref),
+			},
+		}
+
+		Expect(r.EnsureSourceVMIM(vm, source)).To(Succeed())
+
+		list := &cnv.VirtualMachineInstanceMigrationList{}
+		Expect(cluster.List(context.Background(), list, &client.ListOptions{Namespace: "source"})).To(Succeed())
+		Expect(list.Items).To(HaveLen(1))
+		Expect(list.Items[0].Name).To(Equal("forklift-existing"))
+	})
+})
+
 func revision(namespace, name, data string) *appsv1.ControllerRevision {
 	return &appsv1.ControllerRevision{
 		ObjectMeta: meta.ObjectMeta{Namespace: namespace, Name: name},
