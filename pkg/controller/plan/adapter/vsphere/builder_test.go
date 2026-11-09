@@ -184,6 +184,79 @@ var _ = Describe("vSphere builder", func() {
 			pvc := pvcs[0]
 			Expect(pvc.Spec.AccessModes).To(ContainElement(core.ReadWriteMany))
 			Expect(pvc.Spec.VolumeMode).To(Equal(ptr.To(core.PersistentVolumeBlock)))
+			populator := &v1beta1.VSphereXcopyVolumePopulator{}
+			err = builder.Destination.Get(context.TODO(), client.ObjectKey{Name: pvc.Name, Namespace: pvc.Namespace}, populator)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(populator.Spec.PriorityClassName).To(BeEmpty())
+		})
+
+		It("should set the populator priorityClassName when the plan configures one", func() {
+			// Setup
+			builder := createBuilder(
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "test-secret", Namespace: "test"},
+					Data: map[string][]byte{
+						"foo": []byte("bar"),
+					},
+				},
+			)
+			builder.Plan.Spec.OffloadPopulatorPriorityClassName = "xcopy-migration"
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{
+						ID:   "test-vm-id",
+						Name: "test",
+					},
+					Disks: []vsphere.Disk{
+						{
+							Datastore: vsphere.Ref{ID: "ds-1"},
+							File:      "[datastore1] vm-123/vm-123.vmdk",
+							Bus:       vsphere.SCSI,
+							Capacity:  1024 * 1024 * 1024, // 1 GiB
+							Key:       2000,
+						},
+					},
+				},
+			}
+
+			dsMap := []v1beta1.StoragePair{
+				{
+					Source: ref.Ref{ID: "ds-1"},
+					Destination: v1beta1.DestinationStorage{
+						StorageClass: "test-sc",
+					},
+					OffloadPlugin: &v1beta1.OffloadPlugin{
+						VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+							StorageVendorProduct: "test-vendor",
+							SecretRef:            "test-secret",
+						},
+					},
+				},
+			}
+			storageMap := v1beta1.StorageMap{
+				Spec: v1beta1.StorageMapSpec{
+					Map: dsMap,
+				},
+			}
+
+			// Mock inventory
+			inventory := &mockInventory{
+				ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+				vm: vm,
+			}
+			builder.Source.Inventory = inventory
+			builder.Map.Storage = &storageMap
+
+			// Execute
+			pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, map[string]string{}, "test-secret")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pvcs).To(HaveLen(1))
+			populator := &v1beta1.VSphereXcopyVolumePopulator{}
+			err = builder.Destination.Get(context.TODO(), client.ObjectKey{Name: pvcs[0].Name, Namespace: pvcs[0].Namespace}, populator)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(populator.Spec.PriorityClassName).To(Equal("xcopy-migration"))
 		})
 		It("should set default PVC template name", func() {
 			// Setup

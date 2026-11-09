@@ -1776,6 +1776,8 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				migrationHosts := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.DedicatedMigrationHosts
 				storageVendorProduct := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct
 				storageVendorSecretRef := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.SecretRef
+				priorityClassName := ""
+				priorityClassName = r.Plan.Spec.OffloadPopulatorPriorityClassName
 
 				r.Log.Info(fmt.Sprintf("vsphere provider %v storage vendor product %v storage secret name %v ", vsphereInstance, storageVendorProduct, storageVendorSecretRef))
 
@@ -1914,6 +1916,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						SecretName:           diskSecretName,
 						StorageVendorProduct: string(storageVendorProduct),
 						MigrationHost:        migrationHost,
+						PriorityClassName:    priorityClassName,
 					},
 				}
 				createdPVC := &core.PersistentVolumeClaim{}
