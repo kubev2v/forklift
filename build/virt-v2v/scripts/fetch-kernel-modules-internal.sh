@@ -4,9 +4,9 @@ set -euo pipefail
 
 dest_dir="$(cd "$(dirname "$0")/.." && pwd)/prefetch"
 mkdir -p "${dest_dir}"
-rpm_basename="${KERNEL_MODULES_INTERNAL_RPM_BASENAME:-kernel-modules-internal-6.12.0-271.el10.x86_64.rpm}"
+rpm_basename="${KERNEL_MODULES_INTERNAL_RPM_BASENAME:-kernel-modules-internal-6.12.0-279.el10.x86_64.rpm}"
 rpm_out="${dest_dir}/${rpm_basename}"
-rpm_url="${KERNEL_MODULES_INTERNAL_RPM_URL:-https://kojihub.stream.centos.org/kojifiles/packages/kernel/6.12.0/271.el10/x86_64/${rpm_basename}}"
+rpm_url="${KERNEL_MODULES_INTERNAL_RPM_URL:-https://kojihub.stream.centos.org/kojifiles/packages/kernel/6.12.0/279.el10/x86_64/${rpm_basename}}"
 
 if [[ -s "${rpm_out}" ]]; then
     echo "Already present: ${rpm_out}"
