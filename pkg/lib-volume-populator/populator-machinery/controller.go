@@ -679,6 +679,8 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			}
 			if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
 				pod.Spec.ServiceAccountName = "populator" // Xcopy always uses its dedicated SA
+				priorityClassName, _, _ := unstructured.NestedString(crInstance.Object, "spec", "priorityClassName")
+				pod.Spec.PriorityClassName = priorityClassName
 			} else if sa, ok := pvc.Annotations[AnnPopulatorServiceAccount]; ok && sa != "" {
 				pod.Spec.ServiceAccountName = sa // Other populators use the annotation
 			}

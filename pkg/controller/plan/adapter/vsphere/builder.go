@@ -1587,9 +1587,11 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				naa := r.lookupDatastoreNAA(naaDS, dsNaaMap)
 				storageClass := effectiveMapped.Destination.StorageClass
 				r.Log.Info(fmt.Sprintf("getting storage mapping by storage class %q and datastore %v datastore name %s datastore", storageClass, disk.Datastore, disk.Datastore))
-				vsphereInstance := r.Context.Plan.Provider.Source.GetName()
+				vsphereInstance := r.Plan.Provider.Source.GetName()
 				storageVendorProduct := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct
 				storageVendorSecretRef := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.SecretRef
+				priorityClassName := ""
+				priorityClassName = r.Plan.Spec.OffloadPopulatorPriorityClassName
 
 				r.Log.Info(fmt.Sprintf("vsphere provider %v storage vendor product %v storage secret name %v ", vsphereInstance, storageVendorProduct, storageVendorSecretRef))
 
@@ -1721,6 +1723,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						VmdkPath:             baseVolume(disk.File, r.Plan.IsWarm()),
 						SecretName:           diskSecretName,
 						StorageVendorProduct: string(storageVendorProduct),
+						PriorityClassName:    priorityClassName,
 					},
 				}
 				createdPVC := &core.PersistentVolumeClaim{}
