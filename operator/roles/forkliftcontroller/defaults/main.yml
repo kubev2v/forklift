@@ -14,6 +14,7 @@ populator_controller_image_fqin: "{{ lookup( 'env', 'POPULATOR_CONTROLLER_IMAGE'
 populator_ovirt_image_fqin: "{{ lookup( 'env', 'OVIRT_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_RHV_POPULATOR') }}"
 populator_openstack_image_fqin: "{{ lookup( 'env', 'OPENSTACK_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OPENSTACK_POPULATOR') }}"
 populator_vsphere_copy_offload_image_fqin: "{{ lookup( 'env', 'VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VSPHERE_COPY_OFFLOAD_POPULATOR') }}"
+populator_nutanix_nfs_image_fqin: "{{ lookup( 'env', 'NUTANIX_NFS_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_NUTANIX_NFS_POPULATOR') }}"
 must_gather_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_MUST_GATHER') }}"
 virt_v2v_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V') }}"
 virt_v2v_image_xfs_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE_XFS') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V_XFS') }}"
@@ -25,6 +26,7 @@ ova_proxy_fqin: "{{ lookup( 'env', 'OVA_PROXY_IMAGE') or lookup( 'env', 'RELATED
 copy_appliance_template_builder_image_fqin: "{{ lookup( 'env', 'COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_COPY_APPLIANCE_TEMPLATE_BUILDER') or 'quay.io/kubev2v/copy-appliance-template-builder:latest' }}"
 copy_appliance_container_image_fqin: "{{ lookup( 'env', 'COPY_APPLIANCE_CONTAINER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_COPY_APPLIANCE_CONTAINER') }}"
 feature_copy_appliance: false
+feature_nutanix_nfs_offload: false
 
 # Computed names derived from app_name (internal to Ansible, not CRD fields).
 controller_configmap_name: "{{ controller_service_name }}-config"

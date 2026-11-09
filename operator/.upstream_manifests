@@ -5939,6 +5939,15 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_nutanix_nfs_offload:
+                default: "false"
+                description: |-
+                  Enable transferring Nutanix disks over NFS via the volume populator,
+                  bypassing the Prism REST image download (cold migrations only).
+                enum:
+                - "true"
+                - "false"
+                type: string
               feature_ocp_live_migration:
                 default: "true"
                 description: Enable OCP live migration.
@@ -6274,6 +6283,10 @@ spec:
               populator_controller_image_fqin:
                 description: Volume populator controller image. Optional. If left
                   empty, the operator automatically sets this from the release payload.
+                type: string
+              populator_nutanix_nfs_image_fqin:
+                description: Nutanix NFS populator image. Optional. If left empty,
+                  the operator automatically sets this from the release payload.
                 type: string
               populator_openstack_image_fqin:
                 description: OpenStack populator image. Optional. If left empty, the
@@ -8172,6 +8185,103 @@ spec:
     storage: true
     subresources:
       status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
+  name: nutanixnfsvolumepopulators.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: NutanixNfsVolumePopulator
+    listKind: NutanixNfsVolumePopulatorList
+    plural: nutanixnfsvolumepopulators
+    shortNames:
+    - nnvp
+    - nnvps
+    singular: nutanixnfsvolumepopulator
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          NutanixNfsVolumePopulator copies a Nutanix VM disk into a target PVC by
+          reading the disk file directly from the owning Prism Element cluster's
+          storage container over NFS, bypassing the Prism REST Image Service (and its
+          HTTP 429 rate limiting).
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              diskSizeBytes:
+                description: DiskSizeBytes is the provisioned (virtual) size of the
+                  source disk.
+                format: int64
+                type: integer
+              export:
+                description: |-
+                  Export is the storage container name exported over NFS (e.g.
+                  "SelfServiceContainer").
+                type: string
+              secretName:
+                description: |-
+                  SecretName optionally references credentials / CA / mount options for
+                  the transfer. NFSv3 is unauthenticated, so this is reserved for future
+                  use (e.g. mount tuning or a TLS-fronted endpoint).
+                type: string
+              serverIP:
+                description: |-
+                  ServerIP is the NFS endpoint to mount. This is the owning Prism Element
+                  cluster's external/virtual IP (Cluster.ExternalIP), NOT Prism Central.
+                type: string
+              sourcePath:
+                description: |-
+                  SourcePath is the path to the disk file within the export, e.g.
+                  ".acropolis/vmdisk/<vmdisk-uuid>" for a direct vmdisk read, or the
+                  catalog image's file path when using the clone-to-image route.
+                type: string
+            required:
+            - diskSizeBytes
+            - export
+            - serverIP
+            - sourcePath
+            type: object
+          status:
+            properties:
+              copyDurationSeconds:
+                type: string
+              progress:
+                type: string
+              result:
+                type: string
+              transferredBytes:
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -14093,6 +14203,8 @@ spec:
           value: ${OVIRT_POPULATOR_IMAGE}
         - name: OPENSTACK_POPULATOR_IMAGE
           value: ${OPENSTACK_POPULATOR_IMAGE}
+        - name: NUTANIX_NFS_POPULATOR_IMAGE
+          value: ${NUTANIX_NFS_POPULATOR_IMAGE}
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: ${OVA_PROVIDER_SERVER_IMAGE}
         - name: HYPERV_PROVIDER_SERVER_IMAGE

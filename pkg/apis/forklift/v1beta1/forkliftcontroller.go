@@ -49,6 +49,13 @@ type ForkliftControllerSpec struct {
 	// +kubebuilder:validation:Enum="true";"false"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:radio:true","urn:alm:descriptor:com.tectonic.ui:radio:false"}
 	FeatureCopyOffload string `json:"feature_copy_offload,omitempty"`
+	// Enable transferring Nutanix disks over NFS via the volume populator,
+	// bypassing the Prism REST image download (cold migrations only).
+	// +optional
+	// +kubebuilder:default="false"
+	// +kubebuilder:validation:Enum="true";"false"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:radio:true","urn:alm:descriptor:com.tectonic.ui:radio:false"}
+	FeatureNutanixNfsOffload string `json:"feature_nutanix_nfs_offload,omitempty"`
 	// Enable OCP live migration.
 	// +optional
 	// +kubebuilder:default="true"
@@ -176,6 +183,10 @@ type ForkliftControllerSpec struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	PopulatorOpenstackImageFQIN string `json:"populator_openstack_image_fqin,omitempty"`
+	// Nutanix NFS populator image. Optional. If left empty, the operator automatically sets this from the release payload.
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	PopulatorNutanixNfsImageFQIN string `json:"populator_nutanix_nfs_image_fqin,omitempty"`
 	// vSphere xcopy populator image. Optional. If left empty, the operator automatically sets this from the release payload.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}

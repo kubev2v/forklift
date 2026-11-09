@@ -28,6 +28,10 @@ spec:
             value: "{{ populator_ovirt_image_fqin or lookup('env', 'OVIRT_POPULATOR_IMAGE') or lookup('env', 'RELATED_IMAGE_RHV_POPULATOR') }}"
           - name: OPENSTACK_POPULATOR_IMAGE
             value: "{{ populator_openstack_image_fqin or lookup('env', 'OPENSTACK_POPULATOR_IMAGE') or lookup('env', 'RELATED_IMAGE_OPENSTACK_POPULATOR') }}"
+{% if feature_nutanix_nfs_offload|bool %}
+          - name: NUTANIX_NFS_POPULATOR_IMAGE
+            value: "{{ populator_nutanix_nfs_image_fqin or lookup('env', 'NUTANIX_NFS_POPULATOR_IMAGE') or lookup('env', 'RELATED_IMAGE_NUTANIX_NFS_POPULATOR') }}"
+{% endif %}
 {% if feature_copy_offload|bool %}
           - name: VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE
             value: "{{ populator_vsphere_copy_offload_image_fqin or lookup('env', 'VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE') or lookup('env', 'RELATED_IMAGE_VSPHERE_COPY_OFFLOAD_POPULATOR') }}"
