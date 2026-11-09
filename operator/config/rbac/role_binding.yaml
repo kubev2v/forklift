@@ -9,4 +9,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: forklift-operator
-  namespace: konveyor-forklift
+  # NOTE: 'system' is a Kustomize template placeholder
+  # It gets replaced with the actual namespace from kustomization.yaml
+  # Example: 'forklift-operator-system', 'openshift-mtv', etc.
+  namespace: system
