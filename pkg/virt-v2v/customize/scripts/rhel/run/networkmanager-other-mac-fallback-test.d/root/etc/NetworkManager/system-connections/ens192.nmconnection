@@ -1,0 +1,11 @@
+[connection]
+id=ens192
+type=ethernet
+interface-name=ens192
+
+[ipv4]
+method=manual
+address1=10.202.244.116/24,10.202.244.1
+
+[ipv6]
+method=disabled
