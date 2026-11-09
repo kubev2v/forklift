@@ -21,6 +21,12 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	flashSystemAlreadyMappedToHost = "CMMVC5878E"
+	flashSystemSCSIIDInUse         = "CMMVC5879E"
+	flashSystemMappedToOtherHost   = "CMMVC9375E"
+)
+
 // FlashSystemProviderIDPrefix is the standard NAA prefix for IBM LUNs.
 const FlashSystemProviderIDPrefix = "naa.6005076"
 const HostIdKey = "hostId"
@@ -712,9 +718,9 @@ func (c *FlashSystemClonner) Map(initiatorGroup string, targetLUN populator.LUN,
 	mapBody, mapStatus, mapErr := c.api.makeRequest("POST", endpoint, mapPayload)
 
 	// Handle the specific case where mapping already exists to same host
-	if mapErr != nil && mapStatus == http.StatusConflict && strings.Contains(mapErr.Error(), "CMMVC5878E") {
+	if mapErr != nil && mapStatus == http.StatusConflict && strings.Contains(mapErr.Error(), flashSystemAlreadyMappedToHost) {
 		c.log.V(2).Info("volume already mapped to host", "vdisk_id", vdiskID, "host_id", hostID)
-	} else if mapErr != nil && mapStatus == http.StatusConflict && strings.Contains(mapErr.Error(), "CMMVC9375E") {
+	} else if mapErr != nil && mapStatus == http.StatusConflict && strings.Contains(mapErr.Error(), flashSystemMappedToOtherHost) {
 		// Volume is already mapped to a different host (CMMVC9375E)
 		// Use lshostvdiskmap to find the next available SCSI ID for the target host
 		// Then map with explicit SCSI ID, which allows multi-host mapping
@@ -734,10 +740,16 @@ func (c *FlashSystemClonner) Map(initiatorGroup string, targetLUN populator.LUN,
 	return targetLUN, nil
 }
 
+// mapMultiHostVolume retries multi-host mappings after SCSI ID conflicts.
 func (c *FlashSystemClonner) mapMultiHostVolume(endpoint, hostID, vdiskID string) error {
+	return c.mapMultiHostVolumeWithSleep(endpoint, hostID, vdiskID, time.Sleep)
+}
+
+// mapMultiHostVolumeWithSleep retries multi-host mappings with an injectable backoff wait.
+func (c *FlashSystemClonner) mapMultiHostVolumeWithSleep(endpoint, hostID, vdiskID string, sleep func(time.Duration)) error {
 	const maxAttempts = 6
 	minimumSCSIID := 0
-	for attempt := 0; attempt < maxAttempts; attempt++ {
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		body, status, err := c.api.makeRequest("POST", fmt.Sprintf("/lshostvdiskmap/%s", hostID), map[string]string{})
 		if err != nil {
 			return fmt.Errorf("failed to query host volume mappings: %w", err)
@@ -761,16 +773,15 @@ func (c *FlashSystemClonner) mapMultiHostVolume(endpoint, hostID, vdiskID string
 		payload := map[string]interface{}{"host": hostID, "scsi": nextSCSIID, "force": true}
 		body, status, err = c.api.makeRequest("POST", endpoint, payload)
 		if err != nil {
-			// CMMVC5878E means this volume is already mapped; CMMVC5879E means the SCSI ID is occupied.
-			if status == http.StatusConflict && strings.Contains(err.Error(), "CMMVC5878E") {
+			if status == http.StatusConflict && strings.Contains(err.Error(), flashSystemAlreadyMappedToHost) {
 				return nil
 			}
-			if status == http.StatusConflict && strings.Contains(err.Error(), "CMMVC5879E") {
-				if attempt+1 == maxAttempts {
+			if status == http.StatusConflict && strings.Contains(err.Error(), flashSystemSCSIIDInUse) {
+				if attempt == maxAttempts {
 					return fmt.Errorf("failed to map VDisk '%s' to Host '%s' after %d attempts: %w", vdiskID, hostID, maxAttempts, err)
 				}
 				minimumSCSIID = nextSCSIID + 1
-				delay := time.Duration(1<<uint(attempt)) * time.Second
+				delay := time.Duration(1<<uint(attempt-1)) * time.Second
 				// Vary each delay by ±25% to spread concurrent retries.
 				jitterRange := delay / 4
 				jitter, jitterErr := crand.Int(crand.Reader, big.NewInt(int64(2*jitterRange)+1))
@@ -778,7 +789,7 @@ func (c *FlashSystemClonner) mapMultiHostVolume(endpoint, hostID, vdiskID string
 					delay += time.Duration(jitter.Int64()) - jitterRange
 				}
 				c.log.Info("SCSI ID already in use, retrying host mapping", "host_id", hostID, "scsi_id", nextSCSIID, "backoff", delay)
-				time.Sleep(delay)
+				sleep(delay)
 				continue
 			}
 			return fmt.Errorf("failed to create host mapping with SCSI ID %d: %w", nextSCSIID, err)
