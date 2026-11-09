@@ -99,7 +99,7 @@ var _ = Describe("vSphere builder", func() {
 			pvc := &core.PersistentVolumeClaim{
 				ObjectMeta: meta.ObjectMeta{Name: "test-pvc", Namespace: "test"},
 			}
-			err := builder.mergeSecrets("migration-test-secret", "test", "storage-test-secret", "test", "merged-test-secret", pvc)
+			err := builder.mergeSecrets("migration-test-secret", "test", "storage-test-secret", "test", "merged-test-secret", pvc, "")
 			underTest := core.Secret{}
 			errGet := builder.Destination.Get(context.Background(), client.ObjectKey{
 				Name:      "merged-test-secret",
@@ -398,18 +398,22 @@ var _ = Describe("vSphere builder", func() {
 			Expect(pvcs[0].Spec.VolumeMode).To(Equal(ptr.To(core.PersistentVolumeBlock)))
 		})
 
-		It("should not set migrationHost when dedicatedMigrationHosts is not set", func() {
+		DescribeTable("selects the host and credentials without dedicatedMigrationHosts", func(method string) {
 			builder := createBuilder(
 				&core.Secret{
 					ObjectMeta: meta.ObjectMeta{Name: "test-secret", Namespace: "test"},
+					Data:       map[string][]byte{"user": []byte("root"), "password": []byte("host-password")},
 				},
 			)
+			builder.Source.Provider.Spec.Settings = map[string]string{v1beta1.ESXiCloneMethod: method}
+			builder.hosts = map[string]*v1beta1.Host{"vm-host": {Spec: v1beta1.HostSpec{IpAddress: "10.0.0.10", Secret: core.ObjectReference{Name: "test-secret", Namespace: "test"}}}}
 			vm := model.VM{
 				VM1: model.VM1{
 					VM0: model.VM0{
 						ID:   "test-vm-id",
 						Name: "test",
 					},
+					Host: "vm-host",
 					Disks: []vsphere.Disk{
 						{
 							Datastore: vsphere.Ref{ID: "ds-1"},
@@ -454,8 +458,21 @@ var _ = Describe("vSphere builder", func() {
 			populator := &v1beta1.VSphereXcopyVolumePopulator{}
 			err = builder.Destination.Get(context.TODO(), client.ObjectKey{Name: pvcs[0].Name, Namespace: pvcs[0].Namespace}, populator)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(populator.Spec.MigrationHost).To(BeEmpty())
-		})
+			diskSecret := &core.Secret{}
+			Expect(builder.Destination.Get(context.TODO(), client.ObjectKey{Name: populator.Spec.SecretName, Namespace: populator.Namespace}, diskSecret)).To(Succeed())
+			if method == v1beta1.ESXiCloneMethodAPI {
+				Expect(populator.Spec.MigrationHost).To(Equal("vm-host"))
+				Expect(diskSecret.Data).To(HaveKeyWithValue("ESXI_HOST_ADDRESS", []byte("10.0.0.10")))
+				Expect(diskSecret.Data).To(HaveKeyWithValue("ESXI_HOST_PASSWORD", []byte("host-password")))
+			} else {
+				Expect(populator.Spec.MigrationHost).To(BeEmpty())
+				Expect(diskSecret.Data).NotTo(HaveKey("ESXI_HOST_ADDRESS"))
+			}
+		},
+			Entry("vib follows the VM", v1beta1.ESXiCloneMethodVIB),
+			Entry("ssh follows the VM", v1beta1.ESXiCloneMethodSSH),
+			Entry("api pins the VM host", v1beta1.ESXiCloneMethodAPI),
+		)
 
 		It("should set migrationHost when dedicatedMigrationHosts is set in storage mapping", func() {
 			builder := createBuilder(
@@ -2611,6 +2628,116 @@ var _ = Describe("Copy appliance DataVolumes", func() {
 		Expect(dvs).To(HaveLen(1))
 		Expect(dvs[0].Annotations).To(HaveKeyWithValue(planbase.AnnVddkNbdConnection, nbdURI))
 		Expect(dvs[0].Annotations).To(HaveKeyWithValue(planbase.AnnVddkNbdTlsSecret, "test-secret"))
+	})
+})
+
+var _ = Describe("api clone method host credentials", func() {
+	const hostID = "host-36"
+
+	hostCR := func(ip, secretName string) *v1beta1.Host {
+		return &v1beta1.Host{
+			ObjectMeta: meta.ObjectMeta{Name: "esxi-host-36", Namespace: "test"},
+			Spec: v1beta1.HostSpec{
+				IpAddress: ip,
+				Secret:    core.ObjectReference{Name: secretName, Namespace: "test"},
+			},
+		}
+	}
+
+	It("resolves the address and credentials of the pinned host", func() {
+		builder := createBuilder(&core.Secret{
+			ObjectMeta: meta.ObjectMeta{Name: "esxi-creds", Namespace: "test"},
+			Data: map[string][]byte{
+				"user":     []byte("root"),
+				"password": []byte("s3cret"),
+			},
+		})
+		builder.hosts = map[string]*v1beta1.Host{hostID: hostCR("10.0.0.10", "esxi-creds")}
+
+		address, user, password, err := builder.resolveHostCredentials(hostID)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(address).To(Equal("10.0.0.10"))
+		Expect(string(user)).To(Equal("root"))
+		Expect(string(password)).To(Equal("s3cret"))
+	})
+
+	DescribeTable("injects the Host secret credentials and TLS configuration", func(insecure string, caKey string) {
+		builder := createBuilder(&core.Secret{
+			ObjectMeta: meta.ObjectMeta{Name: "esxi-creds", Namespace: "test"},
+			Data: map[string][]byte{
+				"user":               []byte("root"),
+				"password":           []byte("s3cret"),
+				"insecureSkipVerify": []byte(insecure),
+				caKey:                []byte("host-ca"),
+			},
+		})
+		builder.hosts = map[string]*v1beta1.Host{hostID: hostCR("10.0.0.10", "esxi-creds")}
+
+		secret := &core.Secret{Data: map[string][]byte{}}
+		Expect(builder.addHostCredentialsToSecret(secret, hostID)).To(Succeed())
+		Expect(secret.Data).To(HaveKeyWithValue("ESXI_HOST_ADDRESS", []byte("10.0.0.10")))
+		Expect(secret.Data).To(HaveKeyWithValue("ESXI_HOST_USERNAME", []byte("root")))
+		Expect(secret.Data).To(HaveKeyWithValue("ESXI_HOST_PASSWORD", []byte("s3cret")))
+		Expect(secret.Data).To(HaveKeyWithValue("ESXI_HOST_INSECURE_SKIP_VERIFY", []byte(insecure)))
+		Expect(secret.Data).To(HaveKeyWithValue("ESXI_HOST_CA_CERT", []byte("host-ca")))
+	},
+		Entry("verified TLS with standard CA field", "false", "ca.crt"),
+		Entry("verified TLS with legacy CA field", "false", "cacert"),
+		Entry("explicit insecure TLS", "true", "ca.crt"),
+	)
+
+	DescribeTable("reports why the host is unusable",
+		func(mutate func(b *Builder), id string, expected string) {
+			builder := createBuilder(&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "esxi-creds", Namespace: "test"},
+				Data: map[string][]byte{
+					"user":     []byte("root"),
+					"password": []byte("s3cret"),
+				},
+			})
+			builder.hosts = map[string]*v1beta1.Host{hostID: hostCR("10.0.0.10", "esxi-creds")}
+			mutate(builder)
+
+			_, _, _, err := builder.resolveHostCredentials(id)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(expected))
+		},
+		Entry("the host could not be determined",
+			func(*Builder) {}, "", "could not be determined"),
+		Entry("no Host CR exists for the host",
+			func(*Builder) {}, "host-99", "no Ready Host CR"),
+		Entry("the Host CR has no ipAddress",
+			func(b *Builder) {
+				b.hosts = map[string]*v1beta1.Host{hostID: hostCR("", "esxi-creds")}
+			}, hostID, "empty spec.ipAddress"),
+		Entry("the secret has no username",
+			func(b *Builder) {
+				secret := &core.Secret{}
+				Expect(b.Get(context.TODO(), client.ObjectKey{Name: "esxi-creds", Namespace: "test"}, secret)).To(Succeed())
+				delete(secret.Data, "user")
+				Expect(b.Update(context.TODO(), secret)).To(Succeed())
+			}, hostID, "missing 'user' or 'password'"),
+		Entry("the secret has no password",
+			func(b *Builder) {
+				secret := &core.Secret{}
+				Expect(b.Get(context.TODO(), client.ObjectKey{Name: "esxi-creds", Namespace: "test"}, secret)).To(Succeed())
+				delete(secret.Data, "password")
+				Expect(b.Update(context.TODO(), secret)).To(Succeed())
+			}, hostID, "missing 'user' or 'password'"),
+		Entry("the referenced secret does not exist",
+			func(b *Builder) {
+				b.hosts = map[string]*v1beta1.Host{hostID: hostCR("10.0.0.10", "missing")}
+			}, hostID, "could not be read"),
+	)
+
+	It("defaults the clone method to vib when the provider does not set it", func() {
+		builder := createBuilder()
+		Expect(builder.esxiCloneMethod()).To(Equal(v1beta1.ESXiCloneMethodVIB))
+
+		builder.Source.Provider.Spec.Settings = map[string]string{
+			v1beta1.ESXiCloneMethod: v1beta1.ESXiCloneMethodAPI,
+		}
+		Expect(builder.esxiCloneMethod()).To(Equal(v1beta1.ESXiCloneMethodAPI))
 	})
 })
 
