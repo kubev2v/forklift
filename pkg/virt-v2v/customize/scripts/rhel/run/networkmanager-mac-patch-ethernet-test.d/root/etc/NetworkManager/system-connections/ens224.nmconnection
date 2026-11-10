@@ -11,4 +11,4 @@ address1=172.16.0.50/24,172.16.0.1
 method=disabled
 
 [ethernet]
-mac-address=ff:ff:ff:ff:ff:ff
+mac-address=00:50:56:D4:E5:F6

@@ -1,0 +1,14 @@
+[connection]
+id=aaa-other
+type=ethernet
+interface-name=ens224
+
+[ethernet]
+mac-address=00:50:56:88:18:24
+
+[ipv4]
+method=manual
+address1=10.202.244.116/24,10.202.244.1
+
+[ipv6]
+method=disabled

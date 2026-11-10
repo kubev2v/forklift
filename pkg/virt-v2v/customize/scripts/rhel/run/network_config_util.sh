@@ -39,11 +39,14 @@ mac_in_pod_list() {
     return 1
 }
 
+# Binding MAC only (mac-address / HWADDR). Do not use cloned-mac-address:
+# that is a spoofed address after activation, not which device the profile
+# may bind to.
 nmconnection_mac() {
     local f="$1" mac
-    mac=$(sed -n '/^\[ethernet\]/,/^\[/{ /^\(mac-address\|cloned-mac-address\)=/p; }' "$f" | head -1 | cut -d= -f2-)
+    mac=$(sed -n '/^\[ethernet\]/,/^\[/{ /^mac-address=/p; }' "$f" | head -1 | cut -d= -f2-)
     if [ -z "$mac" ]; then
-        mac=$(grep -m1 -iE '^(mac-address|cloned-mac-address)=' "$f" | cut -d= -f2-)
+        mac=$(grep -m1 -iE '^mac-address=' "$f" | cut -d= -f2-)
     fi
     normalize_mac "$mac"
 }
@@ -54,6 +57,28 @@ ifcfg_mac() {
     # Strip surrounding quotes (e.g. HWADDR="00:50:56:97:33:D8").
     mac=$(echo "$mac" | tr -d '"'"'")
     normalize_mac "$mac"
+}
+
+# Find the file with binding MAC $2 among the file names on stdin.
+# $1 reads a file's binding MAC: nmconnection_mac or ifcfg_mac.
+# Prefer an exact MAC match, else the first unbound profile (no MAC).
+# Never fall back to a profile bound to a different MAC.
+select_file_for_mac() {
+    local mac_reader="$1" want="" unbound="" f="" file_mac=""
+    want=$(normalize_mac "$2")
+    while IFS= read -r f; do
+        [ -z "$f" ] && continue
+        [ -f "$f" ] || continue
+        file_mac=$("$mac_reader" "$f")
+        if [ -n "$file_mac" ] && [ "$file_mac" = "$want" ]; then
+            echo "$f"
+            return 0
+        fi
+        if [ -z "$file_mac" ] && [ -z "$unbound" ]; then
+            unbound="$f"
+        fi
+    done
+    [ -n "$unbound" ] && echo "$unbound"
 }
 
 set_nm_keyfile_kv() {
@@ -441,8 +466,11 @@ udev_from_ifcfg() {
             continue
         fi
 
-        # Find the matching network script file
-        IFCFG=$(grep -l "IPADDR[0-9]*=.*$S_IP\b" "$SCRIPTS_DIR"/ifcfg-* 2>/dev/null)
+        # Find the matching network script file.
+        # Backup files have the same IP, so match on MAC too.
+        IFCFG=$(grep -l "IPADDR[0-9]*=.*$S_IP\b" "$SCRIPTS_DIR"/ifcfg-* 2>/dev/null |
+                    grep -vE '(\.(bak|orig|rpmsave|rpmnew|old)|~)$' |
+                    select_file_for_mac ifcfg_mac "$S_HW")
         if [ -z "$IFCFG" ]; then
             log "Info: no ifcfg config file found for $S_IP in $SCRIPTS_DIR."
             continue
@@ -486,8 +514,11 @@ udev_from_nm() {
             continue
         fi
 
-        # Find the matching NetworkManager connection file
-        NM_FILE=$(grep -El "address[0-9]*=.*$S_IP\b" "$NETWORK_CONNECTIONS_DIR"/*)
+        # Find the matching NetworkManager connection file.
+        # Several profiles can have the same IP, so match on MAC too.
+        NM_FILE=$(grep -El "address[0-9]*=.*$S_IP\b" \
+                      "$NETWORK_CONNECTIONS_DIR"/*.nmconnection 2>/dev/null |
+                      select_file_for_mac nmconnection_mac "$S_HW")
         if [ -z "$NM_FILE" ]; then
             log "Info: no nm config file name found for $S_IP."
             continue
@@ -821,8 +852,9 @@ udev_from_ifquery() {
 # file with a lower priority number takes precedence over the default policy.
 # On older distros the .link file is redundant with the udev rule but harmless.
 #
-# .link files are only created when a NetworkManager connection profile exists
-# for the IP but does not already contain the correct mac-address= binding.
+# A .link file is created when an NM profile has an interface name for the IP.
+# Do not skip when the profile has mac-address=: that tells NM which device to
+# use, the .link file is what renames the device.
 generate_link_files() {
     # Only run on NM-based distros,skip Ubuntu/Debian/SUSE where this dir is absent.
     if [ ! -d "$NETWORK_CONNECTIONS_DIR" ]; then
@@ -841,7 +873,9 @@ generate_link_files() {
 
         # Find the NM connection profile that owns this IP.
         local NM_FILE
-        NM_FILE=$(grep -El "address[0-9]*=.*$S_IP\b" "$NETWORK_CONNECTIONS_DIR"/* 2>/dev/null | head -1)
+        NM_FILE=$(grep -El "address[0-9]*=.*$S_IP\b" \
+                      "$NETWORK_CONNECTIONS_DIR"/*.nmconnection 2>/dev/null |
+                      select_file_for_mac nmconnection_mac "$S_HW")
         if [ -z "$NM_FILE" ]; then
             continue
         fi
@@ -855,14 +889,6 @@ generate_link_files() {
 
         local MAC_LOWER
         MAC_LOWER=$(echo "$S_HW" | tr 'A-F' 'a-f')
-
-        # If the profile already carries the correct MAC, a .link file is redundant.
-        local EXISTING_MAC
-        EXISTING_MAC=$(grep '^mac-address=' "$NM_FILE" | cut -d'=' -f2 | tr 'A-F' 'a-f')
-        if [ "$EXISTING_MAC" = "$MAC_LOWER" ]; then
-            log "Info: $NM_FILE already contains mac-address=$MAC_LOWER, skipping .link for $DEVICE."
-            continue
-        fi
 
         # Create the target directory only when the first .link file is needed.
         if [ "$CREATED" = false ]; then
