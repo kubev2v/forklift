@@ -82,8 +82,12 @@ const (
 	UseVddkAioOptimization = "useVddkAioOptimization"
 	VddkConfig             = "vddkConfig"
 	ESXiCloneMethod        = "esxiCloneMethod"
-	TargetAZ               = "target-az"
-	TargetRegion           = "target-region"
+	// vSphere restriction to a single datacenter, by name. Resolved to a
+	// managed object reference internally; empty or absent means no
+	// restriction.
+	Datacenter   = "datacenter"
+	TargetAZ     = "target-az"
+	TargetRegion = "target-region"
 	// Nutanix Prism endpoint settings.
 	NutanixPrismType   = "prismType"
 	NutanixClusterUUID = "clusterUuid"

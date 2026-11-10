@@ -21,6 +21,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	libvsphere "github.com/kubev2v/forklift/pkg/lib/vsphere"
 	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vapi/tags"
@@ -340,6 +341,10 @@ type Collector struct {
 	// so repeated per-VM upserts can be skipped via in-memory comparison.
 	customFieldDefs   map[int32]model.CustomFieldDef
 	customFieldDefsMu *sync.RWMutex
+	// The datacenter the `datacenter` setting restricts collection to,
+	// resolved to its managed object reference at connect. Nil when the
+	// provider is not restricted.
+	datacenter *types.ManagedObjectReference
 }
 
 // New collector.
@@ -843,6 +848,11 @@ func (r *Collector) connect(ctx context.Context) (status int, err error) {
 		return
 	}
 
+	if err = r.resolveDatacenter(ctx); err != nil {
+		r.close()
+		return
+	}
+
 	if r.client.IsVC() {
 		r.restClient = rest.NewClient(r.client.Client)
 		userInfo := liburl.UserPassword(r.user(), r.password())
@@ -865,6 +875,31 @@ func (r *Collector) validateServerType() error {
 		return liberr.New("provider sdkEndpoint is set to ESXi but the URL points to a vCenter server")
 	}
 	return nil
+}
+
+// resolveDatacenter resolves the `datacenter` setting to the datacenter's
+// managed object reference, so collection is rooted at the reference and a
+// datacenter rename does not break an already-connected collector. The
+// setting value is never rewritten. An empty value is treated as unset (no
+// restriction). An unresolvable name fails the connection so the provider's
+// validation reports it instead of silently collecting an empty inventory.
+func (r *Collector) resolveDatacenter(ctx context.Context) (err error) {
+	r.datacenter = nil
+	name := r.provider.Spec.Settings[api.Datacenter]
+	if name == "" {
+		return
+	}
+	dc, err := find.NewFinder(r.client.Client).Datacenter(ctx, name)
+	if err != nil {
+		return liberr.Wrap(
+			err,
+			fmt.Sprintf("datacenter '%s' not found in vCenter", name),
+			"datacenter",
+			name)
+	}
+	ref := dc.Reference()
+	r.datacenter = &ref
+	return
 }
 
 // Build the client.
@@ -929,7 +964,25 @@ func (r *Collector) filter(pc *property.Collector) *property.WaitFilter {
 }
 
 // Build the object Spec.
+// Unrestricted, the traversal is rooted at the vCenter root folder. With the
+// `datacenter` setting, it is rooted at the scoped datacenter's managed
+// object reference, so only that datacenter's objects are collected. The
+// scoped selection set applies the datacenter's folder traversals directly;
+// TsRootFolder is included so the recursive folder traversal its name refers
+// to resolves, and its own childEntity path matches nothing on a datacenter.
 func (r *Collector) objectSpec() types.ObjectSpec {
+	if r.datacenter != nil {
+		return types.ObjectSpec{
+			Obj: *r.datacenter,
+			SelectSet: []types.BaseSelectionSpec{
+				TsDatacenterVM,
+				TsDatacenterHost,
+				TsDatacenterNet,
+				TsDatacenterDatastore,
+				TsRootFolder,
+			},
+		}
+	}
 	return types.ObjectSpec{
 		Obj: r.client.ServiceContent.RootFolder,
 		SelectSet: []types.BaseSelectionSpec{
