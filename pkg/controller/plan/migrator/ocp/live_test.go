@@ -253,6 +253,267 @@ var _ = Describe("target DataVolume", func() {
 	})
 })
 
+var _ = Describe("revision matchers", func() {
+	It("copies a status revision onto the target spec", func() {
+		vm := &cnv.VirtualMachine{
+			Spec: cnv.VirtualMachineSpec{
+				Instancetype: &cnv.InstancetypeMatcher{Name: "u1.medium", Kind: "VirtualMachineClusterInstancetype"},
+				Preference:   &cnv.PreferenceMatcher{Name: "pref"},
+			},
+			Status: cnv.VirtualMachineStatus{
+				InstancetypeRef: &cnv.InstancetypeStatusRef{
+					ControllerRevisionRef: &cnv.ControllerRevisionRef{Name: "it-status"},
+				},
+				PreferenceRef: &cnv.InstancetypeStatusRef{
+					ControllerRevisionRef: &cnv.ControllerRevisionRef{Name: "pref-status"},
+				},
+			},
+		}
+
+		instancetype := instancetypeMatcher(vm)
+		preference := preferenceMatcher(vm)
+
+		Expect(instancetype.Name).To(Equal("u1.medium"))
+		Expect(instancetype.Kind).To(Equal("VirtualMachineClusterInstancetype"))
+		Expect(instancetype.RevisionName).To(Equal("it-status"))
+		Expect(preference.Name).To(Equal("pref"))
+		Expect(preference.RevisionName).To(Equal("pref-status"))
+		Expect(vm.Spec.Instancetype.RevisionName).To(BeEmpty())
+		Expect(vm.Spec.Preference.RevisionName).To(BeEmpty())
+	})
+
+	It("keeps the spec revision when status has none", func() {
+		vm := &cnv.VirtualMachine{
+			Spec: cnv.VirtualMachineSpec{
+				Instancetype: &cnv.InstancetypeMatcher{Name: "u1.medium", RevisionName: "it-spec"},
+				Preference:   &cnv.PreferenceMatcher{Name: "pref", RevisionName: "pref-spec"},
+			},
+		}
+
+		Expect(instancetypeMatcher(vm).RevisionName).To(Equal("it-spec"))
+		Expect(preferenceMatcher(vm).RevisionName).To(Equal("pref-spec"))
+		Expect(vm.Spec.Instancetype.RevisionName).To(Equal("it-spec"))
+		Expect(vm.Spec.Preference.RevisionName).To(Equal("pref-spec"))
+	})
+})
+
+var _ = Describe("revision copy", func() {
+	It("copies the revision named by the target matcher spec", func() {
+		source, destination := revisionClients(
+			revision("workloads", "it-status", `{"from":"workloads"}`),
+			revision("other", "it-status", `{"from":"other"}`),
+			revision("workloads", "pref-status", `{"from":"preference"}`),
+		)
+		r := revisionEnsurer(source, destination)
+		vm := &planapi.VMStatus{}
+		vm.ID = "vm-1"
+		vm.Name = "vm"
+		vm.Namespace = "workloads"
+		target := &cnv.VirtualMachine{
+			Spec: cnv.VirtualMachineSpec{
+				Instancetype: &cnv.InstancetypeMatcher{RevisionName: "it-status"},
+				Preference:   &cnv.PreferenceMatcher{RevisionName: "pref-status"},
+			},
+		}
+
+		Expect(r.EnsureRevisions(vm, target)).To(Succeed())
+
+		expectRevision(destination, "it-status", `{"from":"workloads"}`)
+		expectRevision(destination, "pref-status", `{"from":"preference"}`)
+		copied := &appsv1.ControllerRevision{}
+		Expect(destination.Get(context.Background(), types.NamespacedName{Namespace: "target", Name: "it-status"}, copied)).To(Succeed())
+		Expect(copied.Labels).To(HaveKeyWithValue(plancontext.LabelMigration, "mig-1"))
+		Expect(copied.Labels).To(HaveKeyWithValue(plancontext.LabelVM, "vm-1"))
+	})
+
+	It("removes revisions this migration created and leaves pre-existing ones", func() {
+		source, destination := revisionClients(
+			revision("workloads", "it-status", `{"from":"workloads"}`),
+		)
+		preexisting := revision("target", "already-there", `{"from":"destination"}`)
+		Expect(destination.Create(context.Background(), preexisting)).To(Succeed())
+		ctx := revisionContext(destination)
+		r := &Ensurer{
+			Ensurer:      &ensurer.Ensurer{Context: ctx},
+			SourceClient: source,
+		}
+		vm := &planapi.VMStatus{}
+		vm.ID = "vm-1"
+		vm.Name = "vm"
+		vm.Namespace = "workloads"
+		target := &cnv.VirtualMachine{
+			Spec: cnv.VirtualMachineSpec{
+				Instancetype: &cnv.InstancetypeMatcher{RevisionName: "it-status"},
+			},
+		}
+		Expect(r.EnsureRevisions(vm, target)).To(Succeed())
+
+		migrator := &LiveMigrator{Context: ctx}
+		Expect(migrator.DeleteControllerRevisions(vm)).To(Succeed())
+
+		err := destination.Get(context.Background(), types.NamespacedName{Namespace: "target", Name: "it-status"}, &appsv1.ControllerRevision{})
+		Expect(err).To(HaveOccurred())
+		expectRevision(destination, "already-there", `{"from":"destination"}`)
+	})
+})
+
+var _ = Describe("EnsureSourceVMIM", func() {
+	// Cross-namespace live migration on a single cluster: the source and
+	// destination providers are the same, so SourceClient and the destination
+	// client address the same cluster. The target VMIM already exists in the
+	// target namespace carrying identical migration labels. The source VMIM must
+	// still be created in the source namespace (MTV-7232).
+	It("creates the source VMIM even when a target VMIM with identical labels exists", func() {
+		scheme := runtime.NewScheme()
+		Expect(cnv.AddToScheme(scheme)).To(Succeed())
+
+		vm := &planapi.VMStatus{}
+		vm.ID = "vm-1"
+		vm.Name = "vm"
+		vm.Namespace = "source"
+
+		ctx := &plancontext.Context{
+			Plan: &api.Plan{
+				ObjectMeta: meta.ObjectMeta{UID: "plan-1"},
+				Spec:       api.PlanSpec{TargetNamespace: "target"},
+			},
+			Migration: &api.Migration{ObjectMeta: meta.ObjectMeta{UID: "mig-1"}},
+			Log:       logging.WithName("test"),
+		}
+		ctx.Labeler = plancontext.Labeler{Context: ctx}
+
+		// Target VMIM already present in the target namespace with identical labels.
+		targetVMIM := &cnv.VirtualMachineInstanceMigration{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace: "target",
+				Name:      "forklift-target",
+				Labels:    ctx.Labeler.MigrationVMLabels(vm.Ref),
+			},
+		}
+		cluster := fake.NewClientBuilder().WithScheme(scheme).WithObjects(targetVMIM).Build()
+		ctx.Destination = plancontext.Destination{Client: cluster}
+
+		r := &Ensurer{
+			Ensurer:      &ensurer.Ensurer{Context: ctx},
+			SourceClient: cluster,
+		}
+
+		source := &cnv.VirtualMachineInstanceMigration{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace:    "source",
+				GenerateName: "forklift-",
+				Labels:       ctx.Labeler.MigrationVMLabels(vm.Ref),
+			},
+			Spec: cnv.VirtualMachineInstanceMigrationSpec{
+				VMIName: "vm",
+				SendTo: &cnv.VirtualMachineInstanceMigrationSource{
+					MigrationID: "vm-1-mig-1",
+					ConnectURL:  "tcp://sync",
+				},
+			},
+		}
+
+		Expect(r.EnsureSourceVMIM(vm, source)).To(Succeed())
+
+		list := &cnv.VirtualMachineInstanceMigrationList{}
+		Expect(cluster.List(context.Background(), list, &client.ListOptions{Namespace: "source"})).To(Succeed())
+		Expect(list.Items).To(HaveLen(1))
+		Expect(list.Items[0].Spec.SendTo).ToNot(BeNil())
+	})
+
+	It("does not create a duplicate source VMIM when one already exists", func() {
+		scheme := runtime.NewScheme()
+		Expect(cnv.AddToScheme(scheme)).To(Succeed())
+
+		vm := &planapi.VMStatus{}
+		vm.ID = "vm-1"
+		vm.Name = "vm"
+		vm.Namespace = "source"
+
+		ctx := &plancontext.Context{
+			Plan: &api.Plan{
+				ObjectMeta: meta.ObjectMeta{UID: "plan-1"},
+				Spec:       api.PlanSpec{TargetNamespace: "target"},
+			},
+			Migration: &api.Migration{ObjectMeta: meta.ObjectMeta{UID: "mig-1"}},
+			Log:       logging.WithName("test"),
+		}
+		ctx.Labeler = plancontext.Labeler{Context: ctx}
+
+		existing := &cnv.VirtualMachineInstanceMigration{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace: "source",
+				Name:      "forklift-existing",
+				Labels:    ctx.Labeler.MigrationVMLabels(vm.Ref),
+			},
+		}
+		cluster := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existing).Build()
+		ctx.Destination = plancontext.Destination{Client: cluster}
+
+		r := &Ensurer{
+			Ensurer:      &ensurer.Ensurer{Context: ctx},
+			SourceClient: cluster,
+		}
+
+		source := &cnv.VirtualMachineInstanceMigration{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace:    "source",
+				GenerateName: "forklift-",
+				Labels:       ctx.Labeler.MigrationVMLabels(vm.Ref),
+			},
+		}
+
+		Expect(r.EnsureSourceVMIM(vm, source)).To(Succeed())
+
+		list := &cnv.VirtualMachineInstanceMigrationList{}
+		Expect(cluster.List(context.Background(), list, &client.ListOptions{Namespace: "source"})).To(Succeed())
+		Expect(list.Items).To(HaveLen(1))
+		Expect(list.Items[0].Name).To(Equal("forklift-existing"))
+	})
+})
+
+func revision(namespace, name, data string) *appsv1.ControllerRevision {
+	return &appsv1.ControllerRevision{
+		ObjectMeta: meta.ObjectMeta{Namespace: namespace, Name: name},
+		Data:       runtime.RawExtension{Raw: []byte(data)},
+	}
+}
+
+func revisionClients(objects ...client.Object) (client.Client, client.Client) {
+	scheme := runtime.NewScheme()
+	Expect(appsv1.AddToScheme(scheme)).To(Succeed())
+	source := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+	destination := fake.NewClientBuilder().WithScheme(scheme).Build()
+	return source, destination
+}
+
+func revisionContext(destination client.Client) *plancontext.Context {
+	ctx := &plancontext.Context{
+		Plan: &api.Plan{
+			ObjectMeta: meta.ObjectMeta{UID: "plan-1"},
+			Spec:       api.PlanSpec{TargetNamespace: "target"},
+		},
+		Migration:   &api.Migration{ObjectMeta: meta.ObjectMeta{UID: "mig-1"}},
+		Destination: plancontext.Destination{Client: destination},
+		Log:         logging.WithName("test"),
+	}
+	ctx.Labeler = plancontext.Labeler{Context: ctx}
+	return ctx
+}
+
+func revisionEnsurer(source, destination client.Client) *Ensurer {
+	return &Ensurer{
+		Ensurer:      &ensurer.Ensurer{Context: revisionContext(destination)},
+		SourceClient: source,
+	}
+}
+
+func expectRevision(destination client.Client, name, data string) {
+	got := &appsv1.ControllerRevision{}
+	Expect(destination.Get(context.Background(), types.NamespacedName{Namespace: "target", Name: name}, got)).To(Succeed())
+	Expect(got.Data.Raw).To(Equal([]byte(data)))
+}
+
 func makeBuilder(networkPairs ...api.NetworkPair) *Builder {
 	b := &Builder{}
 	b.Context = &plancontext.Context{}
