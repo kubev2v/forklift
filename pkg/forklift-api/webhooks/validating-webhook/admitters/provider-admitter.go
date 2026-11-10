@@ -23,6 +23,22 @@ func (admitter *ProviderAdmitter) validateSdkEndpointType() error {
 	return nil
 }
 
+// validateDatacenter rejects a vSphere provider that restricts its inventory
+// to a datacenter while connecting to ESXi directly: the restriction is
+// meaningless on a direct ESXi connection. An empty value is treated as
+// unset, and the setting is ignored on non-vSphere providers.
+func (admitter *ProviderAdmitter) validateDatacenter() error {
+	datacenter, ok := admitter.provider.Spec.Settings[api.Datacenter]
+	if ok && datacenter != "" && admitter.provider.Type() == api.VSphere && admitter.provider.Spec.Settings[api.SDK] == api.ESXI {
+		return liberr.New(
+			"vSphere provider with an ESXi SDK endpoint cannot restrict the inventory to a datacenter; "+
+				"the datacenter setting requires a vCenter SDK endpoint",
+			"datacenter", datacenter,
+			"endpoint", api.ESXI)
+	}
+	return nil
+}
+
 func (admitter *ProviderAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("Provider admitter was called")
 	raw := ar.Request.Object.Raw
@@ -32,6 +48,10 @@ func (admitter *ProviderAdmitter) Admit(ar *admissionv1.AdmissionReview) *admiss
 	}
 
 	if err := admitter.validateSdkEndpointType(); err != nil {
+		return util.ToAdmissionResponseError(err)
+	}
+
+	if err := admitter.validateDatacenter(); err != nil {
 		return util.ToAdmissionResponseError(err)
 	}
 
