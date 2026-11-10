@@ -49,7 +49,7 @@ func TestMultiHostMappingRetriesSCSIConflict(t *testing.T) {
 		t.Fatalf("queries=%d mappings=%v", queries, mappings)
 	}
 	for _, mapping := range mappings {
-		if mapping.path != "/mkvdiskhostmap/1" || mapping.payload["host"] != "host" {
+		if mapping.path != "/rest/v1/mkvdiskhostmap/1" || mapping.payload["host"] != "host" {
 			t.Fatalf("unexpected mapping request: %+v", mapping)
 		}
 	}
