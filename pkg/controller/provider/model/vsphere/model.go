@@ -168,6 +168,9 @@ type Host struct {
 	Timezone                string             `sql:""`
 	CpuSockets              int16              `sql:""`
 	CpuCores                int16              `sql:""`
+	CpuModel                string             `sql:""`
+	SerialNumber            string             `sql:""`
+	ServiceTag              string             `sql:""`
 	MemoryBytes             int64              `sql:""`
 	ProductName             string             `sql:""`
 	ProductVersion          string             `sql:""`

@@ -347,6 +347,38 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				if b, cast := p.Val.(int16); cast {
 					v.model.CpuCores = b
 				}
+			case fHostCpuModel:
+				if value, ok := p.Val.(string); ok {
+					v.model.CpuModel = strings.TrimSpace(value)
+				}
+			case fHostSystemInfo:
+				var info *types.HostSystemInfo
+				switch value := p.Val.(type) {
+				case types.HostSystemInfo:
+					info = &value
+				case *types.HostSystemInfo:
+					info = value
+				}
+				v.model.SerialNumber = ""
+				v.model.ServiceTag = ""
+				if info != nil {
+					v.model.SerialNumber = strings.TrimSpace(info.SerialNumber)
+					for _, identifier := range info.OtherIdentifyingInfo {
+						if identifier.IdentifierType == nil || identifier.IdentifierType.GetElementDescription() == nil {
+							continue
+						}
+						switch identifier.IdentifierType.GetElementDescription().Key {
+						case string(types.HostSystemIdentificationInfoIdentifierSerialNumberTag):
+							if v.model.SerialNumber == "" {
+								v.model.SerialNumber = strings.TrimSpace(identifier.IdentifierValue)
+							}
+						case string(types.HostSystemIdentificationInfoIdentifierServiceTag):
+							if v.model.ServiceTag == "" {
+								v.model.ServiceTag = strings.TrimSpace(identifier.IdentifierValue)
+							}
+						}
+					}
+				}
 			case fHostMemorySize:
 				if n, cast := p.Val.(int64); cast {
 					v.model.MemoryBytes = n
@@ -571,6 +603,14 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				if b, cast := p.Val.(bool); cast {
 					v.model.StorageVMotionSupported = b
 				}
+			}
+		case types.PropertyChangeOpRemove, types.PropertyChangeOpIndirectRemove:
+			switch p.Name {
+			case fHostCpuModel:
+				v.model.CpuModel = ""
+			case fHostSystemInfo:
+				v.model.SerialNumber = ""
+				v.model.ServiceTag = ""
 			}
 		}
 	}

@@ -90,6 +90,8 @@ const (
 	fInMaintMode             = "summary.runtime.inMaintenanceMode"
 	fCpuSockets              = "summary.hardware.numCpuPkgs"
 	fCpuCores                = "summary.hardware.numCpuCores"
+	fHostCpuModel            = "summary.hardware.cpuModel"
+	fHostSystemInfo          = "hardware.systemInfo"
 	fHostMemorySize          = "summary.hardware.memorySize"
 	fThumbprint              = "summary.config.sslThumbprint"
 	fMgtServerIp             = "summary.managementServerIp"
@@ -994,6 +996,8 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fInMaintMode,
 				fCpuSockets,
 				fCpuCores,
+				fHostCpuModel,
+				fHostSystemInfo,
 				fHostMemorySize,
 				fDatastore,
 				fNetwork,
