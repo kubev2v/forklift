@@ -163,4 +163,28 @@ var _ = Describe("vSphere provider", func() {
 			Expect(found).To(BeTrue())
 		})
 	})
+
+	Context("datacenter with an ESXi SDK endpoint", func() {
+		It("Provider creation is rejected", func() {
+			namespace := f.Namespace.Name
+			By("Create Secret from Definition")
+			s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, nil,
+				map[string][]byte{
+					v1beta1.Insecure: []byte("true"),
+					"password":       []byte("MTIzNDU2Cg=="),
+					"user":           []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
+				}, namespace, "esxi-datacenter-provider-secret"))
+			Expect(err).ToNot(HaveOccurred())
+			By("Create vSphere provider with both the datacenter setting and an ESXi SDK endpoint")
+			settings := map[string]string{
+				forkliftv1.VDDK:       "quay.io/kubev2v/vddk-test-vmdk",
+				forkliftv1.SDK:        forkliftv1.ESXI,
+				forkliftv1.Datacenter: "DC0",
+			}
+			pr := utils.NewProvider("vsphere-esxi-datacenter-provider", forkliftv1.VSphere, namespace, map[string]string{}, settings, "https://vcsim.konveyor-forklift:8989/sdk", s)
+			err = utils.CreateProviderFromDefinition(f.CrClient, pr)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("datacenter"))
+		})
+	})
 })
