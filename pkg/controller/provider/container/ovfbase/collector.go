@@ -146,9 +146,10 @@ func (r *Collector) Start() error {
 			r.endWatch()
 			r.log.Info("Stopped.")
 		}()
+		healer := &libmodel.IOErrHealer{DB: r.db, Log: r.log}
 		for {
 			if !ctx.canceled() {
-				_ = r.run(&ctx)
+				healer.Observe(r.run(&ctx))
 			} else {
 				return
 			}

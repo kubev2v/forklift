@@ -125,9 +125,14 @@ func (p *Pool) Open(nWriter, nReader int, path string, journal *Journal) (err er
 // Close DB connections.
 func (p *Pool) Close() (err error) {
 	for _, session := range p.sessions {
-		_ = session.db.Close()
+		if session.db != nil {
+			_ = session.db.Close()
+		}
 		session.closed = true
 	}
+	p.sessions = nil
+	p.next.writer = nil
+	p.next.reader = nil
 
 	return
 }
