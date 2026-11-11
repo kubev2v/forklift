@@ -4,6 +4,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/provider/ec2/controller/inventory"
+	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	core "k8s.io/api/core/v1"
 )
 
@@ -22,11 +23,11 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 
 	env = append(env,
 		core.EnvVar{
-			Name:  "V2V_source",
+			Name:  v2vconfig.EnvSourceName,
 			Value: "ec2",
 		},
 		core.EnvVar{
-			Name:  "V2V_vmName",
+			Name:  v2vconfig.EnvVmNameName,
 			Value: vmName,
 		},
 	)
