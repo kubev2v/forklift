@@ -26,7 +26,6 @@ ova_proxy_fqin: "{{ lookup( 'env', 'OVA_PROXY_IMAGE') or lookup( 'env', 'RELATED
 copy_appliance_template_builder_image_fqin: "{{ lookup( 'env', 'COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_COPY_APPLIANCE_TEMPLATE_BUILDER') or 'quay.io/kubev2v/copy-appliance-template-builder:latest' }}"
 copy_appliance_container_image_fqin: "{{ lookup( 'env', 'COPY_APPLIANCE_CONTAINER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_COPY_APPLIANCE_CONTAINER') }}"
 feature_copy_appliance: false
-feature_nutanix_nfs_offload: false
 
 # Computed names derived from app_name (internal to Ansible, not CRD fields).
 controller_configmap_name: "{{ controller_service_name }}-config"

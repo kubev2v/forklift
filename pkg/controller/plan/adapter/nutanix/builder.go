@@ -28,7 +28,6 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	libutil "github.com/kubev2v/forklift/pkg/lib/util"
-	"github.com/kubev2v/forklift/pkg/settings"
 	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -1305,10 +1304,11 @@ func (r *Builder) LunPersistentVolumeClaims(_ ref.Ref) ([]core.PersistentVolumeC
 
 // SupportsVolumePopulators reports whether this migration should transfer
 // disks by reading them over NFS from the Prism Element storage container
-// (NutanixNfsVolumePopulator) instead of the CDI HTTP import path. Gated on
-// the FEATURE_NUTANIX_NFS_OFFLOAD controller flag and cold migration only.
+// (NutanixNfsVolumePopulator) instead of the CDI HTTP import path. Enabled
+// per-provider via the nutanix "diskTransferMethod=nfs" setting; cold only.
 func (r *Builder) SupportsVolumePopulators() bool {
-	return settings.Settings.NutanixNfsOffload && !r.Plan.IsWarm()
+	return r.Source.Provider.Setting(api.NutanixDiskTransferMethod) == string(api.DiskTransferNFS) &&
+		!r.Plan.IsWarm()
 }
 
 // PopulatorVolumes builds one target PVC per non-CDROM disk, each backed by a

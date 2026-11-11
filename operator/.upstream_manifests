@@ -5939,15 +5939,6 @@ spec:
                 - "true"
                 - "false"
                 type: string
-              feature_nutanix_nfs_offload:
-                default: "false"
-                description: |-
-                  Enable transferring Nutanix disks over NFS via the volume populator,
-                  bypassing the Prism REST image download (cold migrations only).
-                enum:
-                - "true"
-                - "false"
-                type: string
               feature_ocp_live_migration:
                 default: "true"
                 description: Enable OCP live migration.
