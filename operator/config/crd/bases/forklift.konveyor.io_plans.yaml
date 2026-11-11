@@ -1479,6 +1479,27 @@ spec:
                 default: false
                 description: Determines if the plan should skip the guest conversion.
                 type: boolean
+              skipNicMacAddress:
+                description: |-
+                  SkipNicMacAddress controls whether the source NIC MAC address is copied
+                  onto the target VM interface.
+                  Only applicable to vSphere sources. Ignored for other providers (EC2, Hyper-V, oVirt, OpenStack).
+                  - false (default): copy the source MAC when one is available and the
+                    destination network allows it
+                  - true: do not set macAddress. KubeVirt assigns a MAC
+                type: boolean
+              skipNicPciAddress:
+                description: |-
+                  SkipNicPciAddress controls whether the source NIC PCI address is copied
+                  onto the target VM interface.
+                  Only applicable to vSphere sources. Ignored for other providers (EC2, Hyper-V, oVirt, OpenStack).
+                  A vSphere PCI address can conflict with the OpenShift Virtualization PCI
+                  topology when the NIC is a conventional PCI device rather than PCI Express,
+                  for example when useVirtioTransitional is set for a legacy guest such as
+                  Windows Server 2003. The VM then fails to boot until pciAddress is removed.
+                  - false (default): copy the source PCI address when one is available
+                  - true: do not set pciAddress
+                type: boolean
               skipZoneNodeSelector:
                 description: |-
                   SkipZoneNodeSelector controls whether to skip adding a zone-based node selector to

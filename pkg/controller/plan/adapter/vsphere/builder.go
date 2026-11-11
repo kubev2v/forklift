@@ -1115,11 +1115,11 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			Model: interfaceModel,
 		}
 
-		if !hasUDN || settings.Settings.UdnSupportsMac {
+		if !r.Plan.Spec.SkipNicMacAddress && (!hasUDN || settings.Settings.UdnSupportsMac) {
 			kInterface.MacAddress = nic.MAC
 		}
 
-		if nic.PciAddress != "" {
+		if nic.PciAddress != "" && !r.Plan.Spec.SkipNicPciAddress {
 			kInterface.PciAddress = nic.PciAddress
 		}
 
