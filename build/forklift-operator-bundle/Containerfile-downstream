@@ -35,7 +35,7 @@ ARG OPERATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhel
 
 ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:d79a579967c4db177d410986da49287213f056095f482d1223fd1c36944813be"
 
-ARG OVA_PROXY_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-proxy-rhel9@sha256:b9d9c2f275f5ab40a258aa2304c212f4e43b2b566bf32e544dfb75880f67a8ba"
+ARG OVA_PROXY_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-proxy-rhel9@sha256:2db82924e2d246514420f293ecc30bcea709389ba105ad4a4291462d7623633e"
 
 ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhv-populator-rhel8@sha256:cc41e43742ea1782036aa0165fa9e53f6f4a08e58d413ff693a2f9c8e4cfb6b3"
 
