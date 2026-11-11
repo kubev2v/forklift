@@ -2,19 +2,25 @@ package conversion
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
+	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
+	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -57,8 +63,46 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+	// Reconcile Failed conversions when the virt-v2v pod phase changes so they
+	// can be healed (Succeeded) or resumed (still Running/Pending).
+	err = cnt.Watch(
+		source.Kind(
+			mgr.GetCache(),
+			&core.Pod{},
+			handler.TypedEnqueueRequestsFromMapFunc(conversionRequestsForPod),
+			predicate.TypedFuncs[*core.Pod]{
+				CreateFunc: func(e event.TypedCreateEvent[*core.Pod]) bool {
+					return conversionPodEvent(e.Object)
+				},
+				UpdateFunc: func(e event.TypedUpdateEvent[*core.Pod]) bool {
+					return conversionPodEvent(e.ObjectNew) &&
+						e.ObjectOld.Status.Phase != e.ObjectNew.Status.Phase
+				},
+				DeleteFunc:  func(event.TypedDeleteEvent[*core.Pod]) bool { return false },
+				GenericFunc: func(event.TypedGenericEvent[*core.Pod]) bool { return false },
+			}))
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
 
 	return nil
+}
+
+func conversionPodEvent(pod *core.Pod) bool {
+	return pod != nil && pod.Labels[convctx.LabelConversion] != ""
+}
+
+func conversionRequestsForPod(_ context.Context, pod *core.Pod) []reconcile.Request {
+	if pod == nil {
+		return nil
+	}
+	name := pod.Labels[convctx.LabelConversion]
+	ns := pod.Labels[convctx.LabelPlanNamespace]
+	if name == "" || ns == "" {
+		return nil
+	}
+	return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: name, Namespace: ns}}}
 }
 
 var _ reconcile.Reconciler = &Reconciler{}
@@ -96,11 +140,27 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		r.Log.V(2).Info("Conditions.", "all", conversion.Status.Conditions)
 	}()
 
-	// only reconcile if the conversion pod is not finished
-	if conversion.Status.Phase == api.PhaseSucceeded || conversion.Status.Phase == api.PhaseFailed {
+	if conversion.Status.Phase == api.PhaseSucceeded {
 		result.RequeueAfter = 0
-		err = nil
 		return
+	}
+
+	// Failed conversions: inspect the virt-v2v pod and heal/resume when possible.
+	if conversion.Status.Phase == api.PhaseFailed {
+		recovered, resume, healErr := r.reconcileFailedConversion(ctx, conversion)
+		if healErr != nil {
+			err = healErr
+			return
+		}
+		if recovered {
+			result.RequeueAfter = 0
+			return
+		}
+		if !resume {
+			result.RequeueAfter = 0
+			return
+		}
+		// Pod still active — fall through and continue the pipeline.
 	}
 
 	if conversion.Status.Phase == "" {
@@ -148,16 +208,40 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	pipe := NewConversionPipeline(ctx, &r, conversion)
 	succeeded, pipelineErr := pipe.Run()
 	if pipelineErr != nil {
-		r.Log.Error(pipelineErr, "Conversion pipeline failed.",
-			"type", conversion.Spec.Type,
-			"phase", conversion.Status.Phase,
-			"stage", conversion.Status.Stage)
-		conversion.Status.Phase = api.PhaseFailed
-	} else if succeeded {
+		pod, podErr := r.conversionPod(ctx, conversion)
+		if podErr != nil && !errors.Is(podErr, ErrNoPodFound) {
+			err = podErr
+			return
+		}
+		switch {
+		case pod != nil && pod.Status.Phase == core.PodSucceeded:
+			r.Log.Info("Conversion pipeline failed but virt-v2v pod succeeded; marking conversion succeeded.",
+				"conversion", conversion.Name, "pod", pod.Name)
+			pipelineErr = nil
+			succeeded = true
+		case pod != nil && (pod.Status.Phase == core.PodRunning || pod.Status.Phase == core.PodPending):
+			// Transient API errors (e.g. get pods timeout) must not fail the
+			// conversion while virt-v2v is still active.
+			r.Log.Info("Conversion pipeline error while virt-v2v pod is still active; not marking Failed.",
+				"conversion", conversion.Name,
+				"pod", pod.Name,
+				"podPhase", pod.Status.Phase,
+				"error", pipelineErr.Error())
+			pipelineErr = nil
+		default:
+			r.Log.Error(pipelineErr, "Conversion pipeline failed.",
+				"type", conversion.Spec.Type,
+				"phase", conversion.Status.Phase,
+				"stage", conversion.Status.Stage)
+			conversion.Status.Phase = api.PhaseFailed
+		}
+	}
+	if succeeded {
 		r.Log.Info("Conversion pipeline succeeded.",
 			"type", conversion.Spec.Type)
 		conversion.Status.Phase = api.PhaseSucceeded
-	} else {
+		conversion.Status.Stage = api.StageFinished
+	} else if pipelineErr == nil && conversion.Status.Phase != api.PhaseFailed {
 		r.Log.V(3).Info("Conversion pipeline still in progress.",
 			"type", conversion.Spec.Type,
 			"phase", conversion.Status.Phase,
@@ -196,6 +280,67 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	result.RequeueAfter = base.SlowReQ
 
 	return
+}
+
+// conversionPod returns the managed virt-v2v pod from status or label lookup.
+func (r Reconciler) conversionPod(ctx context.Context, conversion *api.Conversion) (*core.Pod, error) {
+	ensurer, err := NewEnsurer(r.Client, r.Log, conversion.Spec)
+	if err != nil {
+		return nil, err
+	}
+	if conversion.Status.Pod.Name != "" {
+		pod := &core.Pod{}
+		err = ensurer.DestinationClient.Get(ctx, types.NamespacedName{
+			Namespace: conversion.Status.Pod.Namespace,
+			Name:      conversion.Status.Pod.Name,
+		}, pod)
+		if err == nil {
+			return pod, nil
+		}
+		if !k8serr.IsNotFound(err) {
+			return nil, err
+		}
+	}
+	cfg := convctx.PodConfigFromSpec(conversion)
+	return ensurer.GetPod(conversion, cfg.PodLabels)
+}
+
+// reconcileFailedConversion heals a Failed conversion from the virt-v2v pod.
+// recovered=true when status was updated to Succeeded.
+// resume=true when Failed was cleared so the pipeline can continue.
+func (r Reconciler) reconcileFailedConversion(ctx context.Context, conversion *api.Conversion) (recovered bool, resume bool, err error) {
+	pod, err := r.conversionPod(ctx, conversion)
+	if err != nil {
+		if errors.Is(err, ErrNoPodFound) {
+			return false, false, nil
+		}
+		return false, false, err
+	}
+	switch pod.Status.Phase {
+	case core.PodSucceeded:
+		r.markConversionSucceeded(conversion)
+		conversion.Status.ObservedGeneration = conversion.Generation
+		err = r.Status().Update(ctx, conversion)
+		r.Log.Info("Healed Failed conversion from succeeded virt-v2v pod.",
+			"conversion", conversion.Name, "pod", pod.Name)
+		return true, false, err
+	case core.PodRunning, core.PodPending:
+		r.Log.Info("Failed conversion has active virt-v2v pod; resuming pipeline.",
+			"conversion", conversion.Name, "pod", pod.Name, "podPhase", pod.Status.Phase)
+		conversion.Status.Phase = api.PhaseRunning
+		conversion.Status.CompletionTime = nil
+		conversion.Status.DeleteCondition(api.ConversionFailed)
+		return false, true, nil
+	default:
+		return false, false, nil
+	}
+}
+
+func (r Reconciler) markConversionSucceeded(conversion *api.Conversion) {
+	conversion.Status.Phase = api.PhaseSucceeded
+	conversion.Status.Stage = api.StageFinished
+	conversion.Status.DeleteCondition(api.ConversionFailed)
+	resolvePhaseConditions(conversion, nil)
 }
 
 // resolvePhaseConditions sets the Ready condition on conversion based on the current phase.
