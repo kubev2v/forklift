@@ -23,10 +23,8 @@ func (admitter *ProviderAdmitter) validateSdkEndpointType() error {
 	return nil
 }
 
-// validateDatacenter rejects a vSphere provider that restricts its inventory
-// to a datacenter while connecting to ESXi directly: the restriction is
-// meaningless on a direct ESXi connection. An empty value is treated as
-// unset, and the setting is ignored on non-vSphere providers.
+// validateDatacenter rejects a vSphere provider that sets the datacenter
+// setting while its SDK endpoint is esxi.
 func (admitter *ProviderAdmitter) validateDatacenter() error {
 	datacenter, ok := admitter.provider.Spec.Settings[api.Datacenter]
 	if ok && datacenter != "" && admitter.provider.Type() == api.VSphere && admitter.provider.Spec.Settings[api.SDK] == api.ESXI {

@@ -31,9 +31,8 @@ import (
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 )
 
-// The simulator harness below mirrors the in-process harness of the
-// collector package's scoped-datacenter tests; it is duplicated rather than
-// shared because test harnesses are not exported across packages.
+// The simulator harness below is duplicated from the collector package's
+// scoped-datacenter tests: Go test files are not importable across packages.
 
 // scopedVCenter starts a two-datacenter vCenter simulator. The collector's
 // connect() logs into the vAPI REST endpoint of a vCenter, which the
@@ -48,9 +47,8 @@ func scopedVCenter(t *testing.T) (*simulator.Model, *simulator.Server) {
 		t.Fatalf("create simulator model: %v", err)
 	}
 	t.Cleanup(sim.Remove)
-	// NewServer creates the ServeMux if it is still nil; create it here so
-	// the REST handler is registered before the server starts accepting
-	// connections.
+	// NewServer creates the ServeMux if it is still nil; assign it here so
+	// the REST handler is registered before the server accepts connections.
 	if sim.Service.ServeMux == nil {
 		sim.Service.ServeMux = http.NewServeMux()
 	}
@@ -70,11 +68,11 @@ func scopedVCenter(t *testing.T) (*simulator.Model, *simulator.Server) {
 }
 
 // scopedCollector builds a collector connected to the simulator with the
-// given provider settings, and its own object database. The database is
-// deliberately not closed by a cleanup: the container starts the collector's
-// update loop as a goroutine that unwinds asynchronously after the container
-// deletes it, and closing the database while that happens races. The process
-// is short-lived and the temp directory is reclaimed with the file open.
+// given provider settings, and its own object database. The database is not
+// closed by a cleanup: the container runs the collector's update loop as a
+// goroutine that unwinds asynchronously after the container deletes it, and
+// closing the database during that unwind races. The process is short-lived
+// and the temp directory is reclaimed with the file open.
 func scopedCollector(t *testing.T, server *simulator.Server, settings map[string]string) (*vsphereCollector.Collector, *api.Provider) {
 	t.Helper()
 	db := libmodel.New(filepath.Join(t.TempDir(), "inventory.db"), vspheremodel.All()...)
@@ -109,8 +107,7 @@ func scopedCollector(t *testing.T, server *simulator.Server, settings map[string
 // TestScopedInventoryVMRefs asserts the datacenter scope at the seam plan
 // validation resolves references through: the provider's inventory REST
 // client. A VM reference inside the scoped datacenter resolves by ID and by
-// name; a reference to a VM in the other datacenter is not found either way,
-// so the mistake surfaces at plan validation rather than at execution.
+// name; a reference to a VM in the other datacenter is not found either way.
 func TestScopedInventoryVMRefs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	sim, server := scopedVCenter(t)
@@ -123,9 +120,8 @@ func TestScopedInventoryVMRefs(t *testing.T) {
 	t.Cleanup(func() {
 		container.Delete(provider)
 		// The collector's update loop unwinds asynchronously after the
-		// delete cancels it; let that finish before the simulator is closed
-		// by this test's cleanups, so the logout does not race the server
-		// shutdown.
+		// delete cancels it; wait for it here so its logout does not race
+		// the simulator cleanup's server shutdown.
 		deadline := time.Now().Add(30 * time.Second)
 		for collector.HasParity() {
 			if time.Now().After(deadline) {
@@ -252,8 +248,8 @@ func pointClientAt(t *testing.T, srv *httptest.Server) {
 }
 
 // writeKubeconfig writes a minimal kubeconfig and points KUBECONFIG at it:
-// the REST client builds its authorization header from the controller-runtime
-// kubeconfig, which must load for a request to be built at all.
+// the REST client reads its authorization token through controller-runtime's
+// kubeconfig, which must load before any request is sent.
 func writeKubeconfig(t *testing.T) {
 	t.Helper()
 	const config = `apiVersion: v1

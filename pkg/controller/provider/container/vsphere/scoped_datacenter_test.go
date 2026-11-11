@@ -36,9 +36,8 @@ func scopedVCenter(t *testing.T) (*simulator.Model, *simulator.Server) {
 		t.Fatalf("create simulator model: %v", err)
 	}
 	t.Cleanup(sim.Remove)
-	// NewServer creates the ServeMux if it is still nil; create it here so
-	// the REST handler is registered before the server starts accepting
-	// connections.
+	// NewServer creates the ServeMux if it is still nil; assign it here so
+	// the REST handler is registered before the server accepts connections.
 	if sim.Service.ServeMux == nil {
 		sim.Service.ServeMux = http.NewServeMux()
 	}
@@ -121,9 +120,7 @@ func waitParity(t *testing.T, collector *Collector, done <-chan error) {
 }
 
 // entitiesUnder returns the simulator entities of the given kinds whose
-// parent chain reaches the named datacenter. The simulator's own object graph
-// is the expected value the collector's database is asserted against; the
-// test never inspects how the collector shapes its traversal.
+// parent chain reaches the named datacenter.
 func entitiesUnder(t *testing.T, sim *simulator.Model, dcName string, kinds ...string) []mo.Entity {
 	t.Helper()
 	var dcRef types.ManagedObjectReference
@@ -209,8 +206,7 @@ func collectedIDs[T any, P interface {
 }
 
 // markTemplate flags one virtual machine under the named datacenter as a
-// template and returns its ID, so collection of templates can be told apart
-// from collection of regular virtual machines.
+// template and returns its ID.
 func markTemplate(t *testing.T, sim *simulator.Model, dcName string) string {
 	t.Helper()
 	for _, e := range entitiesUnder(t, sim, dcName, "VirtualMachine") {
@@ -381,10 +377,9 @@ func TestDatacenterSettingValidation(t *testing.T) {
 	})
 }
 
-// TestDatacenterRenameAfterConnect asserts that renaming the scoped
-// datacenter after the provider is connected does not break in-flight
-// collection: the traversal root is the managed object reference and the name
-// is resolved only at connect.
+// TestDatacenterRenameAfterConnect asserts that a datacenter rename after
+// connect does not break collection: an update under the renamed datacenter
+// is applied, and the setting is not rewritten to the new name.
 func TestDatacenterRenameAfterConnect(t *testing.T) {
 	sim, server := scopedVCenter(t)
 	collector, provider, db := scopedCollector(t, server, map[string]string{api.Datacenter: "DC0"})

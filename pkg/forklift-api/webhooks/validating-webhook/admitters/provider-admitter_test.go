@@ -37,9 +37,9 @@ func admitProvider(t *testing.T, provider api.Provider, operation admissionv1.Op
 }
 
 // TestAdmitDatacenterSetting asserts the admission behavior of the
-// datacenter setting: the known-but-conflicting combination with a direct
-// ESXi SDK endpoint is rejected on create and update, and every other
-// combination — including the setting on non-vSphere providers — is allowed.
+// datacenter setting: the combination with a direct ESXi SDK endpoint is
+// rejected on create and update, and every other combination — including
+// the setting on non-vSphere providers — is allowed.
 func TestAdmitDatacenterSetting(t *testing.T) {
 	cases := []struct {
 		name        string

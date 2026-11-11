@@ -878,11 +878,7 @@ func (r *Collector) validateServerType() error {
 }
 
 // resolveDatacenter resolves the `datacenter` setting to the datacenter's
-// managed object reference, so collection is rooted at the reference and a
-// datacenter rename does not break an already-connected collector. The
-// setting value is never rewritten. An empty value is treated as unset (no
-// restriction). An unresolvable name fails the connection so the provider's
-// validation reports it instead of silently collecting an empty inventory.
+// managed object reference.
 func (r *Collector) resolveDatacenter(ctx context.Context) (err error) {
 	r.datacenter = nil
 	name := r.provider.Spec.Settings[api.Datacenter]
@@ -964,12 +960,9 @@ func (r *Collector) filter(pc *property.Collector) *property.WaitFilter {
 }
 
 // Build the object Spec.
-// Unrestricted, the traversal is rooted at the vCenter root folder. With the
-// `datacenter` setting, it is rooted at the scoped datacenter's managed
-// object reference, so only that datacenter's objects are collected. The
-// scoped selection set applies the datacenter's folder traversals directly;
-// TsRootFolder is included so the recursive folder traversal its name refers
-// to resolves, and its own childEntity path matches nothing on a datacenter.
+// If a datacenter has not been specified, this traverses
+// the entire vCenter/ESXi. Otherwise, it traverses the
+// inventory of the specified datacenter.
 func (r *Collector) objectSpec() types.ObjectSpec {
 	if r.datacenter != nil {
 		return types.ObjectSpec{
