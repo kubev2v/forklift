@@ -376,6 +376,95 @@ func TestDataVolumes_PVCNameTemplate(t *testing.T) {
 			t.Errorf("expected target size 1Gi (source request), got %s", got.String())
 		}
 	})
+
+}
+
+func TestRequestSize(t *testing.T) {
+	block := core.PersistentVolumeBlock
+	filesystem := core.PersistentVolumeFilesystem
+	overhead := int64(1 << 30) // 1Gi
+
+	prev := settings.Settings.BlockOverhead
+	settings.Settings.BlockOverhead = overhead
+	defer func() { settings.Settings.BlockOverhead = prev }()
+
+	makePVC := func(mode *core.PersistentVolumeMode, request, capacity string) *core.PersistentVolumeClaim {
+		pvc := &core.PersistentVolumeClaim{
+			Spec: core.PersistentVolumeClaimSpec{
+				VolumeMode: mode,
+				Resources: core.VolumeResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceStorage: resource.MustParse(request),
+					},
+				},
+			},
+		}
+		if capacity != "" {
+			pvc.Status.Capacity = core.ResourceList{
+				core.ResourceStorage: resource.MustParse(capacity),
+			}
+		}
+		return pvc
+	}
+
+	tests := []struct {
+		name     string
+		pvc      *core.PersistentVolumeClaim
+		destMode *core.PersistentVolumeMode
+		want     resource.Quantity
+	}{
+		{
+			name:     "block to block uses capacity plus BLOCK_OVERHEAD",
+			pvc:      makePVC(&block, "10Gi", "49Gi"),
+			destMode: &block,
+			want:     *resource.NewQuantity(49<<30+overhead, resource.BinarySI),
+		},
+		{
+			name:     "filesystem to block uses request plus BLOCK_OVERHEAD",
+			pvc:      makePVC(&filesystem, "10Gi", "49Gi"),
+			destMode: &block,
+			want:     *resource.NewQuantity(10<<30+overhead, resource.BinarySI),
+		},
+		{
+			name:     "block to filesystem uses capacity without BLOCK_OVERHEAD",
+			pvc:      makePVC(&block, "10Gi", "49Gi"),
+			destMode: &filesystem,
+			want:     resource.MustParse("49Gi"),
+		},
+		{
+			name:     "filesystem to filesystem uses request without overhead",
+			pvc:      makePVC(&filesystem, "10Gi", "49Gi"),
+			destMode: &filesystem,
+			want:     resource.MustParse("10Gi"),
+		},
+		{
+			name:     "block source missing capacity falls back to request plus BLOCK_OVERHEAD",
+			pvc:      makePVC(&block, "10Gi", ""),
+			destMode: &block,
+			want:     *resource.NewQuantity(10<<30+overhead, resource.BinarySI),
+		},
+		{
+			name:     "unset dest mode falls back to source block mode and applies BLOCK_OVERHEAD",
+			pvc:      makePVC(&block, "10Gi", "49Gi"),
+			destMode: nil,
+			want:     *resource.NewQuantity(49<<30+overhead, resource.BinarySI),
+		},
+		{
+			name:     "unset dest mode with filesystem source skips BLOCK_OVERHEAD",
+			pvc:      makePVC(&filesystem, "10Gi", "49Gi"),
+			destMode: nil,
+			want:     resource.MustParse("10Gi"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := RequestSize(tc.pvc, tc.destMode)
+			if got.Cmp(tc.want) != 0 {
+				t.Errorf("got %s want %s", got.String(), tc.want.String())
+			}
+		})
+	}
 }
 
 func TestTlsCertForExport(t *testing.T) {
