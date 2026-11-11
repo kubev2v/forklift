@@ -1479,10 +1479,15 @@ func (r *Builder) targetPvc(source *model.PersistentVolumeClaim, storage api.Des
 	pvc = core.PersistentVolumeClaim{}
 	pvc.Namespace = r.Plan.Spec.TargetNamespace
 	pvc.Name = source.Name
+	// Unset mapping mode falls back to the source mode (same as Spec below).
+	destMode := source.Object.Spec.VolumeMode
+	if storage.VolumeMode != "" {
+		destMode = &storage.VolumeMode
+	}
 	pvc.Spec = core.PersistentVolumeClaimSpec{
 		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
-				core.ResourceStorage: ocpadapter.RequestSize(&source.Object),
+				core.ResourceStorage: ocpadapter.RequestSize(&source.Object, destMode),
 			},
 		},
 		StorageClassName: &storage.StorageClass,
@@ -1502,9 +1507,14 @@ func (r *Builder) targetPvc(source *model.PersistentVolumeClaim, storage api.Des
 
 // targetDataVolume creates a target CR based on the source CR.
 func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.PersistentVolumeClaim, storage api.DestinationStorage) (dv cdi.DataVolume) {
+	// Unset mapping mode falls back to the source PVC mode.
+	destMode := pvc.Object.Spec.VolumeMode
+	if storage.VolumeMode != "" {
+		destMode = &storage.VolumeMode
+	}
 	// The target must hold at least the source volume: use the larger of
 	// the source DV's request and the size the source volume needs.
-	targetSize := ocpadapter.RequestSize(&pvc.Object)
+	targetSize := ocpadapter.RequestSize(&pvc.Object, destMode)
 	if sourceStorage := source.Object.Spec.Storage; sourceStorage != nil {
 		if sourceRequest := sourceStorage.Resources.Requests.Storage(); sourceRequest != nil {
 			if sourceRequest.Cmp(targetSize) > 0 {

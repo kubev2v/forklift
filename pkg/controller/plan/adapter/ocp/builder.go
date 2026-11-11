@@ -17,6 +17,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	ocpclient "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -129,7 +130,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 			return nil, liberr.Wrap(err)
 		}
 
-		size := RequestSize(pvc)
+		size := RequestSize(pvc, nil)
 		dataVolume := dvTemplate.DeepCopy()
 		dataVolume.GenerateName = ""
 
@@ -259,7 +260,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 			}
 			volName = pvc.Name
 			volNamespace = pvc.Namespace
-			size = RequestSize(pvc)
+			size = RequestSize(pvc, nil)
 		case vol.DataVolume != nil:
 			pvc := &core.PersistentVolumeClaim{}
 			err = r.sourceClient.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vol.DataVolume.Name}, pvc)
@@ -268,7 +269,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 			}
 			volName = pvc.Name
 			volNamespace = pvc.Namespace
-			size = RequestSize(pvc)
+			size = RequestSize(pvc, nil)
 		default:
 			r.Log.Info("Unsupported volume type", "type", vol.VolumeSource)
 			continue
@@ -837,21 +838,27 @@ func (r *Builder) setPVCNameFromTemplate(vmRef ref.Ref, sourcePVC *core.Persiste
 	return generatedName, nil
 }
 
-// RequestSize returns the size a target volume needs to hold the source
-// PVC's data: the bound capacity for block volumes (it may exceed the
-// request), the request for filesystem volumes, the request as fallback
-// when unbound.
-func RequestSize(pvc *core.PersistentVolumeClaim) resource.Quantity {
-	// Block volume: the target must match the bound capacity, which may
-	// be larger than the request.
+// RequestSize returns the target volume size for a source PVC.
+// Base size: block source capacity (else request). BLOCK_OVERHEAD only
+// when dest (or source if destMode is nil) is block.
+func RequestSize(pvc *core.PersistentVolumeClaim, destMode *core.PersistentVolumeMode) resource.Quantity {
+	size := pvc.Spec.Resources.Requests[core.ResourceStorage]
 	if pvc.Spec.VolumeMode != nil &&
 		*pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
 		if capacity, found := pvc.Status.Capacity[core.ResourceStorage]; found {
-			return capacity
+			size = capacity
 		}
 	}
-	// Filesystem volume or not bound yet: the request is the best size.
-	return pvc.Spec.Resources.Requests[core.ResourceStorage]
+
+	mode := destMode
+	if mode == nil {
+		mode = pvc.Spec.VolumeMode
+	}
+	if mode != nil && *mode == core.PersistentVolumeBlock {
+		sizeBytes := utils.CalculateSpaceWithOverhead(size.Value(), mode)
+		return *resource.NewQuantity(sizeBytes, resource.BinarySI)
+	}
+	return size
 }
 
 // NO-OP
