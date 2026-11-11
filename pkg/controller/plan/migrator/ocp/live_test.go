@@ -7,6 +7,8 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
@@ -135,6 +137,48 @@ var _ = Describe("target PVC", func() {
 		sourcePvc.Object.Spec.AccessModes = []core.PersistentVolumeAccessMode{core.ReadWriteMany}
 		pvc := builder.targetPvc(sourcePvc, storage)
 		Expect(pvc.Spec.AccessModes[0]).To(Equal(core.ReadWriteMany))
+	})
+
+	It("applies BLOCK_OVERHEAD for filesystem to block remaps", func() {
+		prev := settings.Settings.BlockOverhead
+		settings.Settings.BlockOverhead = int64(1 << 30)
+		DeferCleanup(func() { settings.Settings.BlockOverhead = prev })
+
+		fsMode := core.PersistentVolumeFilesystem
+		sourcePvc.Object.Spec.VolumeMode = &fsMode
+		sourcePvc.Object.Spec.Resources.Requests = core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10Gi"),
+		}
+		sourcePvc.Object.Status.Capacity = core.ResourceList{
+			core.ResourceStorage: resource.MustParse("49Gi"),
+		}
+		storage.VolumeMode = core.PersistentVolumeBlock
+
+		pvc := builder.targetPvc(sourcePvc, storage)
+		Expect(pvc.Spec.Resources.Requests.Storage().Cmp(
+			*resource.NewQuantity(10<<30+1<<30, resource.BinarySI),
+		)).To(Equal(0))
+		Expect(*pvc.Spec.VolumeMode).To(Equal(core.PersistentVolumeBlock))
+	})
+
+	It("uses block capacity without BLOCK_OVERHEAD for block to filesystem remaps", func() {
+		prev := settings.Settings.BlockOverhead
+		settings.Settings.BlockOverhead = int64(1 << 30)
+		DeferCleanup(func() { settings.Settings.BlockOverhead = prev })
+
+		blockMode := core.PersistentVolumeBlock
+		sourcePvc.Object.Spec.VolumeMode = &blockMode
+		sourcePvc.Object.Spec.Resources.Requests = core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10Gi"),
+		}
+		sourcePvc.Object.Status.Capacity = core.ResourceList{
+			core.ResourceStorage: resource.MustParse("49Gi"),
+		}
+		storage.VolumeMode = core.PersistentVolumeFilesystem
+
+		pvc := builder.targetPvc(sourcePvc, storage)
+		Expect(pvc.Spec.Resources.Requests.Storage().Cmp(resource.MustParse("49Gi"))).To(Equal(0))
+		Expect(*pvc.Spec.VolumeMode).To(Equal(core.PersistentVolumeFilesystem))
 	})
 
 })
