@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -22,15 +23,18 @@ import (
 // Provides performance optimization layer for migration planning, validation, and UI operations.
 type Collector struct {
 	libcontainer.Collector
-	db         libmodel.DB         // Local inventory database
-	provider   *api.Provider       // Provider CR configuration
-	secret     *core.Secret        // AWS credentials
-	client     *ec2client.Client   // AWS SDK client
-	log        logging.LevelLogger // Structured logger
-	cancel     context.CancelFunc  // Stop collection loop
-	parity     bool                // True when inventory synchronized with AWS
-	collecting bool                // True when collection in progress
-	mutex      sync.Mutex          // Protects 'collecting' flag
+	db       libmodel.DB         // Local inventory database
+	provider *api.Provider       // Provider CR configuration
+	secret   *core.Secret        // AWS credentials
+	client   *ec2client.Client   // AWS SDK client
+	log      logging.LevelLogger // Structured logger
+	cancel   context.CancelFunc  // Stop collection loop
+	// True when inventory synchronized with AWS. Atomic: written by the run
+	// loop goroutine and read by reconcilers and the inventory web handler
+	// through HasParity().
+	parity     atomic.Bool
+	collecting bool       // True when collection in progress
+	mutex      sync.Mutex // Protects 'collecting' flag
 }
 
 // New creates a new EC2 inventory collector with database, provider CR, and AWS credentials.
@@ -57,7 +61,7 @@ func (r *Collector) Name() string {
 
 // HasParity returns whether the inventory database is synchronized with the AWS account.
 func (r *Collector) HasParity() bool {
-	return r.parity
+	return r.parity.Load()
 }
 
 // Start initializes AWS client, performs initial inventory collection, then begins periodic refresh loop.
@@ -81,7 +85,7 @@ func (r *Collector) Start() error {
 		if err := r.Collect(); err != nil {
 			r.log.Error(err, "Initial collection failed")
 		} else {
-			r.parity = true
+			r.parity.Store(true)
 			r.log.Info("Initial collection completed, parity achieved.")
 		}
 
@@ -96,9 +100,9 @@ func (r *Collector) Start() error {
 				r.log.V(1).Info("Starting periodic collection")
 				if err := r.Collect(); err != nil {
 					r.log.Error(err, "Periodic collection failed")
-					r.parity = false
+					r.parity.Store(false)
 				} else {
-					r.parity = true
+					r.parity.Store(true)
 					r.log.V(1).Info("Periodic collection completed")
 				}
 			}
@@ -121,7 +125,7 @@ func (r *Collector) Shutdown() {
 
 // Reset marks the inventory as out of sync, forcing a full refresh on next collection.
 func (r *Collector) Reset() {
-	r.parity = false
+	r.parity.Store(false)
 	r.log.Info("Collector reset.")
 }
 

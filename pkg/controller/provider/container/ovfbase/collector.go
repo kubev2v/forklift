@@ -7,6 +7,7 @@ import (
 	"fmt"
 	liburl "net/url"
 	libpath "path"
+	"sync/atomic"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -43,8 +44,9 @@ type Collector struct {
 	db libmodel.DB
 	// Logger.
 	log logging.LevelLogger
-	// has parity.
-	parity bool
+	// has parity. Atomic: written by the run loop goroutine and read by
+	// reconcilers and the inventory web handler through HasParity().
+	parity atomic.Bool
 	// REST client.
 	client *Client
 	// cancel function.
@@ -109,12 +111,12 @@ func (r *Collector) DB() libmodel.DB {
 
 // Reset.
 func (r *Collector) Reset() {
-	r.parity = false
+	r.parity.Store(false)
 }
 
 // Reset.
 func (r *Collector) HasParity() bool {
-	return r.parity
+	return r.parity.Load()
 }
 
 // Test connect/logout.
@@ -189,15 +191,15 @@ func (r *Collector) run(ctx *Context) (err error) {
 		err = r.beginWatch()
 		if err == nil {
 			r.phase = Refresh
-			r.parity = true
+			r.parity.Store(true)
 		}
 	case Refresh:
 		err = r.refresh(ctx)
 		if err == nil {
-			r.parity = true
+			r.parity.Store(true)
 			time.Sleep(RefreshInterval)
 		} else {
-			r.parity = false
+			r.parity.Store(false)
 		}
 	default:
 		err = liberr.New("Phase unknown.")

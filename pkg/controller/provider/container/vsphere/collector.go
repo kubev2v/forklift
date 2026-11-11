@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kubev2v/forklift/pkg/settings"
@@ -329,8 +330,9 @@ type Collector struct {
 	restClient *rest.Client
 	// cancel function.
 	cancel func()
-	// has parity.
-	parity bool
+	// has parity. Atomic: written by the update loop goroutine and read by
+	// reconcilers through HasParity().
+	parity atomic.Bool
 	// Cached missing privileges from the last check.
 	missingPrivs   *privilegeCheckResult
 	missingPrivsMu *sync.RWMutex
@@ -381,12 +383,12 @@ func (r *Collector) DB() libmodel.DB {
 
 // Reset.
 func (r *Collector) Reset() {
-	r.parity = false
+	r.parity.Store(false)
 }
 
 // Reset.
 func (r *Collector) HasParity() bool {
-	return r.parity
+	return r.parity.Load()
 }
 
 // MissingPrivileges returns the cached privilege check results.
@@ -539,7 +541,7 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 	var tx *libmodel.Tx
 	watchList := []*libmodel.Watch{}
 	defer func() {
-		r.parity = false
+		r.parity.Store(false)
 		for _, w := range watchList {
 			w.End()
 		}
@@ -596,8 +598,7 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 			r.resetCustomFieldDefs()
 		}
 		if err == nil && (updateSet.Truncated == nil || !*updateSet.Truncated) {
-			if !r.parity {
-				r.parity = true
+			if !r.parity.Swap(true) {
 				r.log.Info(
 					"Initial parity.",
 					"duration",
@@ -1466,7 +1467,7 @@ func equalCustomFieldDefs(a, b map[int32]model.CustomFieldDef) bool {
 }
 
 // Object deleted.
-func (r Collector) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
+func (r *Collector) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	var deleted model.Model
 	switch u.Obj.Type {
 	case Folder:

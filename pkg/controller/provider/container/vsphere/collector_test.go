@@ -600,13 +600,13 @@ var _ = Describe("HasParity", func() {
 
 	It("should return true after setting parity", func() {
 		collector := &Collector{}
-		collector.parity = true
+		collector.parity.Store(true)
 		Expect(collector.HasParity()).To(BeTrue())
 	})
 
 	It("should return false after Reset clears parity", func() {
 		collector := &Collector{log: logging.WithName("test")}
-		collector.parity = true
+		collector.parity.Store(true)
 		collector.Reset()
 		Expect(collector.HasParity()).To(BeFalse())
 	})
