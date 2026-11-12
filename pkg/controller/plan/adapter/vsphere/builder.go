@@ -2101,6 +2101,15 @@ func (r *Builder) buildCsiImportPVC(
 	}
 	r.Log.V(2).Info("CSI import: vendor resolution succeeded", "annotations", vendorAnnotations)
 
+	// Let the vendor make the device importable (for example remove the source host mapping) before
+	// the PVC is created. A failure stops the migration here, so no PVC is created for an unprepared device.
+	if preparer, ok := plugin.(resolver.CsiImportPreparer); ok {
+		if err := preparer.Prepare(backing, vendorAnnotations); err != nil {
+			return nil, liberr.Wrap(err, "disk", disk.File)
+		}
+		r.Log.Info("CSI import: device prepared for import", "disk", disk.File)
+	}
+
 	// Merge annotations: forklift tracking first, then vendor (vendor wins on collision)
 	// AnnDiskSource must match the task name (vSphere disk file) for GetPopulatorTaskName
 	pvcAnnotations := map[string]string{

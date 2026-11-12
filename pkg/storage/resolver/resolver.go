@@ -9,3 +9,10 @@ type CsiImportPlugin interface {
 	// cannot handle this disk type (caller should fall through to other migration paths).
 	Resolve(backing *DiskBacking) (map[string]string, error)
 }
+
+// CsiImportPreparer is an optional step a vendor plugin implements to make a resolved disk
+// importable before the CSI PVC is created. It runs after the VM is powered off.
+// Any error stops the migration before the PVC is created.
+type CsiImportPreparer interface {
+	Prepare(backing *DiskBacking, annotations map[string]string) error
+}

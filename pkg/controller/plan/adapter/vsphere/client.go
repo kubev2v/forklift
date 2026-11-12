@@ -601,14 +601,18 @@ func (r *Client) getDiskBacking(ctx context.Context, vmId, diskFile string) (*re
 	err := property.DefaultCollector(r.client.Client).RetrieveOne(
 		ctx,
 		types.ManagedObjectReference{Type: "VirtualMachine", Value: vmId},
-		[]string{"config.hardware.device"},
+		[]string{"config.hardware.device", "snapshot"},
 		&vmMo,
 	)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
 
-	return resolver.DiskBackingFromDevices(vmMo.Config.Hardware.Device, diskFile)
+	backing, err := resolver.DiskBackingFromDevices(vmMo.Config.Hardware.Device, diskFile)
+	if err == nil {
+		backing.VMHasSnapshots = vmMo.Snapshot != nil && len(vmMo.Snapshot.RootSnapshotList) > 0
+	}
+	return backing, err
 }
 
 func (r *Client) getNAAFromDatastore(ctx context.Context, datastoreRef ref.Ref) (string, error) {

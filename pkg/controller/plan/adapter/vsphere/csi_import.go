@@ -52,7 +52,7 @@ func newCsiImportPlugin(product forklift.StorageVendorProduct, secretData map[st
 	case forklift.StorageVendorProductPowerStore:
 		return powerstore.NewPowerstoreImporter(host, user, pass, skipSSL)
 	case forklift.StorageVendorProductPowerMax:
-		return powermax.NewPowermaxImporter(host, user, pass, string(secretData["POWERMAX_SYMMETRIX_ID"]), skipSSL)
+		return powermax.NewPowermaxImporter(host, user, pass, string(secretData["POWERMAX_SYMMETRIX_ID"]), skipSSL, k8sClient, storageClass)
 	default:
 		return nil, fmt.Errorf("CSI import not supported for vendor %q", product)
 	}
