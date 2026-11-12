@@ -96,6 +96,38 @@ func TestMapDisksOrdersBySCSIThenSATAThenIDE(t *testing.T) {
 		if !isBootDisk && disk.BootOrder != nil {
 			t.Errorf("disk[%d] %q: expected no BootOrder, got %v", i, disk.Name, *disk.BootOrder)
 		}
+		if disk.Disk == nil || disk.Disk.Bus != cnv.DiskBusVirtio {
+			t.Errorf("disk[%d] %q: expected virtio bus, got %+v", i, disk.Name, disk.DiskDevice)
+		}
+	}
+}
+
+func TestMapDisksUsesSATAInCompatibilityMode(t *testing.T) {
+	vm := newOrderingTestVM()
+	pvcs := []*core.PersistentVolumeClaim{
+		pvcFor("pvc-scsi-0", "disk-scsi-0", false),
+		pvcFor("pvc-sata", "disk-sata", false),
+	}
+	builder := &Builder{Context: &plancontext.Context{
+		Log: liblogging.WithName("test"),
+		Plan: &api.Plan{
+			Spec: api.PlanSpec{
+				SkipGuestConversion:  true,
+				UseCompatibilityMode: true,
+			},
+		},
+	}}
+	object := &cnv.VirtualMachineSpec{Template: &cnv.VirtualMachineInstanceTemplateSpec{}}
+	builder.mapDisks(vm, pvcs, object)
+
+	disks := object.Template.Spec.Domain.Devices.Disks
+	if len(disks) != 2 {
+		t.Fatalf("expected 2 disks, got %d", len(disks))
+	}
+	for i, disk := range disks {
+		if disk.Disk == nil || disk.Disk.Bus != cnv.DiskBusSATA {
+			t.Errorf("disk[%d] %q: expected sata bus, got %+v", i, disk.Name, disk.DiskDevice)
+		}
 	}
 }
 
