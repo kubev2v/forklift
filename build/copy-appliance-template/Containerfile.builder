@@ -1,4 +1,4 @@
-FROM registry.fedoraproject.org/fedora:44 AS appliance
+FROM registry.fedoraproject.org/fedora:46 AS appliance
 
 RUN dnf install -y --setopt=install_weak_deps=False \
         qemu-img \
@@ -22,14 +22,14 @@ RUN mkdir -p /usr/lib64/guestfs/appliance && \
     qemu-img convert -c -O qcow2 root root.qcow2 && \
     mv -vf root.qcow2 root
 
-FROM registry.access.redhat.com/ubi10/go-toolset:1.26-1792768404 AS gobuild
+FROM registry.access.redhat.com/ubi10/go-toolset:10.3-1793903644 AS gobuild
 USER 0
 WORKDIR /build
 COPY . .
 ENV GOFLAGS="-mod=vendor"
 RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -ldflags="-w -s" -o /copy-appliance-template-uploader ./cmd/copy-appliance-template-uploader
 
-FROM registry.fedoraproject.org/fedora:44
+FROM registry.fedoraproject.org/fedora:46
 
 RUN dnf install -y --setopt=install_weak_deps=False \
         qemu-img \
