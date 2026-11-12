@@ -1,0 +1,5 @@
+[Match]
+MACAddress=00:50:56:88:6e:50
+
+[Link]
+Name=ens192
