@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"net/http"
@@ -15,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -1336,6 +1332,20 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		return nil, liberr.New("cluster has no external IP for NFS transfer", "cluster", vm.Cluster)
 	}
 
+	// The catalog image lookup goes through Prism Central's proxy when the
+	// provider is Prism Central, so it needs to know which endpoint type the
+	// provider points at.
+	client := &Client{Context: r.Context}
+	client.Subsystem = "builder"
+	if err = client.connect(); err != nil {
+		return nil, err
+	}
+	element, err := client.isPrismElement()
+	if err != nil {
+		return nil, err
+	}
+	imageListURL := catalogImageListURL(r.Source.Provider.Spec.URL, cluster, element)
+
 	namespace := r.Plan.Spec.TargetNamespace
 	diskIndex := 0
 	for _, disk := range dataDisks(vm) {
@@ -1419,7 +1429,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		// VM can't tear the copy. The clone's backing vmdisk UUID and container
 		// come from the PE v2 image API (v3/v4 don't expose them).
 		imageName := migrationImageName(string(r.Migration.UID), vmRef, disk.UUID)
-		vmDiskID, imgContainerUUID, rerr := r.resolveCatalogImage(cluster.ExternalIP, imageName)
+		vmDiskID, imgContainerUUID, rerr := r.resolveCatalogImage(client, imageListURL, imageName)
 		if rerr != nil {
 			return nil, rerr
 		}
@@ -1473,41 +1483,58 @@ type v2Image struct {
 	StorageContainerUUID string `json:"storage_container_uuid"`
 }
 
+// catalogImageListURL returns the Prism Element v2 image list endpoint used
+// by resolveCatalogImage.
+//
+// Prism Element providers query the cluster VIP directly; the provider
+// credentials are Prism Element credentials.
+//
+// Prism Central providers must not send their (Prism Central) credentials to
+// the Prism Element VIP: PC and PE commonly have different accounts, and the
+// PE certificate is usually not signed by the CA in the provider secret.
+// Instead the request goes to Prism Central with proxyClusterUuid set, and PC
+// forwards it to the owning Prism Element using its own trust relationship.
+// proxyClusterUuid is not part of Nutanix's documented API (the Prism UI
+// relies on it); revisit if Nutanix exposes the image's backing vmdisk
+// through a documented PC API.
+func catalogImageListURL(providerURL string, cluster *model.Cluster, element bool) string {
+	const imagesPath = "/PrismGateway/services/rest/v2.0/images/"
+	if element {
+		return fmt.Sprintf("https://%s:9440%s?count=4096", cluster.ExternalIP, imagesPath)
+	}
+	query := url.Values{}
+	query.Set("count", "4096")
+	query.Set("proxyClusterUuid", cluster.ID)
+	return fmt.Sprintf("%s%s?%s", strings.TrimRight(providerURL, "/"), imagesPath, query.Encode())
+}
+
 // resolveCatalogImage finds the catalog image (created by PreTransferActions)
-// by name via the Prism Element v2 image API and returns its backing vmdisk
-// UUID and container UUID. The v3/v4 image APIs don't expose the backing
-// vmdisk, and v4-created images still appear in v2 on the PE, so v2 is the
-// reliable lookup regardless of how the image was created.
+// by name via the Prism Element v2 image API (see catalogImageListURL) and
+// returns its backing vmdisk UUID and container UUID. The v3/v4 image APIs
+// don't expose the backing vmdisk, and v4-created images still appear in v2
+// on the PE, so v2 is the reliable lookup regardless of how the image was
+// created.
 //
 // PreTransferActions creates the image asynchronously and the migration loop
 // calls PopulatorVolumes before the image is guaranteed ready, so a
 // not-yet-visible (or not-yet-backed) image is reported as
 // ProviderNotReadyError to requeue rather than fail the migration.
-func (r *Builder) resolveCatalogImage(peVIP, imageName string) (vmDiskID, containerUUID string, err error) {
+//
+// The request goes through the shared, already-connected Nutanix client so
+// it uses the same TLS trust (ca.crt or the legacy cacert key,
+// insecureSkipVerify), authentication, 429/503 retry handling and request
+// metrics as every other Prism call the adapter makes.
+func (r *Builder) resolveCatalogImage(client *Client, endpoint, imageName string) (vmDiskID, containerUUID string, err error) {
 	notReady := web.ProviderNotReadyError{Provider: r.Source.Provider}
-	endpoint := fmt.Sprintf("https://%s:9440/PrismGateway/services/rest/v2.0/images/?count=4096", peVIP)
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
-	if err != nil {
-		return "", "", liberr.Wrap(err)
-	}
-	req.SetBasicAuth(string(r.Source.Secret.Data["user"]), string(r.Source.Secret.Data["password"]))
-	httpClient := &http.Client{
-		Timeout:   60 * time.Second,
-		Transport: &http.Transport{TLSClientConfig: tlsConfigFromSecret(r.Source.Secret)},
-	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return "", "", liberr.Wrap(err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return "", "", liberr.New("v2 image list failed", "endpoint", endpoint, "status", resp.StatusCode)
-	}
 	var out struct {
 		Entities []v2Image `json:"entities"`
 	}
-	if err = json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return "", "", liberr.Wrap(err)
+	status, err := client.Get(endpoint, &out)
+	if err != nil {
+		return "", "", liberr.Wrap(err, "endpoint", endpoint)
+	}
+	if status != http.StatusOK {
+		return "", "", liberr.New("v2 image list failed", "endpoint", endpoint, "status", status)
 	}
 	for _, img := range out.Entities {
 		if img.Name != imageName {
@@ -1521,22 +1548,6 @@ func (r *Builder) resolveCatalogImage(peVIP, imageName string) (vmDiskID, contai
 	}
 	// Image not created/visible yet; PreTransferActions is still working.
 	return "", "", notReady
-}
-
-// tlsConfigFromSecret builds a TLS config honoring the provider secret's
-// ca.crt / insecureSkipVerify, matching how the rest of the adapter connects.
-func tlsConfigFromSecret(secret *core.Secret) *tls.Config {
-	cfg := &tls.Config{MinVersion: tls.VersionTLS12}
-	if string(secret.Data["insecureSkipVerify"]) == "true" {
-		cfg.InsecureSkipVerify = true // #nosec G402 - honoring the provider's insecureSkipVerify setting
-	}
-	if ca := secret.Data["ca.crt"]; len(ca) > 0 {
-		pool := x509.NewCertPool()
-		if pool.AppendCertsFromPEM(ca) {
-			cfg.RootCAs = pool
-		}
-	}
-	return cfg
 }
 
 // ensurePopulatorPVCAndCR creates the target PVC and its populator CR
