@@ -2,7 +2,7 @@ module github.com/kubev2v/forklift/cmd/kubectl-mtv
 
 go 1.26.0
 
-require github.com/yaacov/kubectl-mtv v0.3.35
+require github.com/yaacov/kubectl-mtv v0.3.36
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
@@ -37,8 +37,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.6 // indirect
-	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/kubev2v/forklift v0.0.0-20261102084529-17132dcb88bb // indirect
+	github.com/kubev2v/forklift v0.0.0-20261111190406-31d5e641986b // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect

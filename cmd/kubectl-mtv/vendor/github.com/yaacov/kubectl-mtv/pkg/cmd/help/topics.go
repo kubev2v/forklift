@@ -269,8 +269,10 @@ Prerequisites:
 
 Offload Plugin Types
 --------------------
-  vsphere          Uses VAAI/XCOPY via a VolumePopulator pod to clone disks
-                   directly on the storage array.
+  vsphere          Uses VAAI/XCOPY via a VolumePopulator pod to clone VMFS
+                   disks directly on the storage array.
+  vsphereNfs       Asks a Pure FlashArray to copy a VMDK between its own NFS
+                   exports. No ESXi migration hosts. Destination is Filesystem.
   csiVolumeImport  Uses the CSI driver's native import capability to migrate
                    VVol/RDM disks. No populator pod or service account is
                    launched — the controller creates a PVC with import
@@ -281,6 +283,16 @@ How It Works (vsphere):
   2. Controller creates a VSphereXcopyVolumePopulator per disk
   3. Populator pod uses VAAI/XCOPY to clone directly on the array
   4. Plans with mixed VDDK/offload pairs are rejected at validation
+  5. Source datastore must be VMFS. NFS datastores use vsphereNfs
+
+How It Works (vsphereNfs):
+  1. StorageMap entry includes vsphereNfsCopyConfig with vendor pureFlashArray
+  2. The array copies the VMDK file from the source NFS export into the
+     destination NFS export. Both must be served by the same array
+  3. The controller creates a Filesystem PVC. There is no XCOPY populator pod
+     and no dedicated ESXi migration host
+  4. Secret keys match Pure XCOPY: STORAGE_HOSTNAME, STORAGE_USERNAME,
+     STORAGE_PASSWORD, STORAGE_TOKEN, PURE_CLUSTER_PREFIX
 
 How It Works (csiVolumeImport):
   1. StorageMap entry includes an OffloadPlugin with vendor + secret
@@ -354,12 +366,12 @@ Examples
   NetApp ONTAP:
     kubectl mtv create mapping storage --name ontap-offload \
       --source vsphere-prod --target host \
-      --storage-pairs "netapp-nfs:trident-nas;offloadPlugin=vsphere;offloadVendor=ontap" \
+      --storage-pairs "ontap-vmfs:trident-san;offloadPlugin=vsphere;offloadVendor=ontap" \
       --offload-storage-username ontap-admin \
       --offload-storage-password "$STORAGE_PASS" \
       --offload-storage-endpoint "https://ontap-cluster.company.com"
 
-  Pure FlashArray (with existing secret):
+  Pure FlashArray XCOPY (with existing secret):
     kubectl create secret generic pure-creds -n openshift-mtv \
       --from-literal=STORAGE_HOSTNAME="pure-array.company.com" \
       --from-literal=STORAGE_TOKEN="$PURE_API_TOKEN" \
@@ -367,7 +379,13 @@ Examples
 
     kubectl mtv create mapping storage --name pure-offload \
       --source vsphere-prod --target host \
-      --storage-pairs "pure-vvol:pure-block;offloadPlugin=vsphere;offloadVendor=pureFlashArray" \
+      --storage-pairs "pure-vmfs:pure-block;offloadPlugin=vsphere;offloadVendor=pureFlashArray" \
+      --default-offload-secret pure-creds
+
+  Pure FlashArray NFS copy (same secret keys, Filesystem destination):
+    kubectl mtv create mapping storage --name pure-nfs-offload \
+      --source vsphere-prod --target host \
+      --storage-pairs "nfs-ds:pure-nfs;offloadPlugin=vsphereNfs;offloadVendor=pureFlashArray;volumeMode=Filesystem" \
       --default-offload-secret pure-creds
 
   Plan with offload mapping:
@@ -398,9 +416,19 @@ Important Constraints
 
   vsphere (XCOPY) only:
   - ESXi hosts must have VAAI enabled
+  - Source datastore must be VMFS. The controller sets XcopyOffloadDiskNotVMFS
+    when this plugin is mapped to an NFS datastore
+  - Optional: --offload-populator-priority-class sets the populator pod PriorityClass
+  - Optional: offloadMigrationHosts selects dedicated ESXi hosts
+
+  vsphereNfs only:
+  - Vendor must be pureFlashArray
+  - Source datastore must be NFS, on the same array as the destination export
+  - volumeMode must be Filesystem when set. offloadMigrationHosts is not allowed
+  - The controller sets NfsOffloadDiskNotNFS when the source datastore is not NFS
 
   csiVolumeImport only:
-  - Currently supports primera3par vendor only`,
+  - Vendors are primera3par and ontap`,
 	},
 }
 

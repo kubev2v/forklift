@@ -103,6 +103,10 @@ func newPatchStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
   kubectl-mtv patch mapping storage --name my-storage-map \
     --add-pairs "datastore1:hpe-sc;offloadPlugin=csiVolumeImport;offloadVendor=primera3par"
 
+  # Add NFS array offload pair (Pure FlashArray)
+  kubectl-mtv patch mapping storage --name my-storage-map \
+    --add-pairs "nfs-ds:pure-nfs;offloadPlugin=vsphereNfs;offloadVendor=pureFlashArray;volumeMode=Filesystem"
+
   # Update storage pairs
   kubectl-mtv patch mapping storage --name my-storage-map --update-pairs "datastore1:premium"`,
 		Args:         cobra.MaximumNArgs(1),
@@ -130,8 +134,8 @@ func newPatchStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Storage mapping name")
 	flags.MarkRequiredForMCP(cmd, "name")
-	cmd.Flags().StringVar(&addPairs, "add-pairs", "", "Storage pairs to add in format 'source:storage-class[;volumeMode=Block|Filesystem][;accessMode=ReadWriteOnce|ReadWriteMany|ReadOnlyMany][;offloadPlugin=vsphere|csiVolumeImport][;offloadSecret=secret-name][;offloadVendor=vantara|ontap|...]' (comma-separated). With offloadPlugin=csiVolumeImport, offloadVendor is primera3par|ontap only")
-	cmd.Flags().StringVar(&updatePairs, "update-pairs", "", "Storage pairs to update in format 'source:storage-class[;volumeMode=Block|Filesystem][;accessMode=ReadWriteOnce|ReadWriteMany|ReadOnlyMany][;offloadPlugin=vsphere|csiVolumeImport][;offloadSecret=secret-name][;offloadVendor=vantara|ontap|...]' (comma-separated). With offloadPlugin=csiVolumeImport, offloadVendor is primera3par|ontap only")
+	cmd.Flags().StringVar(&addPairs, "add-pairs", "", "Storage pairs to add in format 'source:storage-class[;volumeMode=Block|Filesystem][;accessMode=ReadWriteOnce|ReadWriteMany|ReadOnlyMany][;offloadPlugin=vsphere|vsphereNfs|csiVolumeImport][;offloadSecret=secret-name][;offloadVendor=vantara|ontap|...]' (comma-separated). "+flags.StoragePairOffloadNote)
+	cmd.Flags().StringVar(&updatePairs, "update-pairs", "", "Storage pairs to update in format 'source:storage-class[;volumeMode=Block|Filesystem][;accessMode=ReadWriteOnce|ReadWriteMany|ReadOnlyMany][;offloadPlugin=vsphere|vsphereNfs|csiVolumeImport][;offloadSecret=secret-name][;offloadVendor=vantara|ontap|...]' (comma-separated). "+flags.StoragePairOffloadNote)
 	cmd.Flags().StringVar(&removePairs, "remove-pairs", "", "Source storage names to remove from mapping (comma-separated)")
 	cmd.Flags().StringVar(&defaultVolumeMode, "default-volume-mode", "", "Default volume mode for new/updated storage pairs (Filesystem|Block)")
 	cmd.Flags().StringVar(&defaultAccessMode, "default-access-mode", "", "Default access mode for new/updated storage pairs (ReadWriteOnce|ReadWriteMany|ReadOnlyMany)")

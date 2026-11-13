@@ -26,6 +26,7 @@ func Compress(in []byte, s *Scratch) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer s.cleanup()
 
 	// Create histogram, if none was provided.
 	maxCount := s.maxCount
@@ -199,7 +200,8 @@ func (s *Scratch) compress(src []byte) error {
 	c2.flush(s.actualTableLog)
 	c1.flush(s.actualTableLog)
 
-	return s.bw.close()
+	s.bw.close()
+	return nil
 }
 
 // writeCount will write the normalized histogram count to header.
@@ -211,7 +213,7 @@ func (s *Scratch) writeCount() error {
 		previous0 bool
 		charnum   uint16
 
-		maxHeaderSize = ((int(s.symbolLen) * int(tableLog)) >> 3) + 3
+		maxHeaderSize = ((int(s.symbolLen)*int(tableLog) + 4 + 2) >> 3) + 3
 
 		// Write Table Size
 		bitStream = uint32(tableLog - minTablelog)
@@ -395,7 +397,7 @@ func (s *Scratch) buildCTable() error {
 			if v > largeLimit {
 				s.zeroBits = true
 			}
-			for nbOccurrences := int16(0); nbOccurrences < v; nbOccurrences++ {
+			for range v {
 				tableSymbol[position] = symbol
 				position = (position + step) & tableMask
 				for position > highThreshold {
@@ -658,7 +660,8 @@ func (s *Scratch) validateNorm() (err error) {
 		if v >= 0 {
 			total += int(v)
 		} else {
-			total -= int(v)
+			// -1 takes one cell. Adding -v would let a wrapped -32768 pass.
+			total++
 		}
 	}
 	defer func() {
