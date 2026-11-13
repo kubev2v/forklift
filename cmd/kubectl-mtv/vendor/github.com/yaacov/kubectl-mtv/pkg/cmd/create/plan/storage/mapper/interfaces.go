@@ -1,11 +1,11 @@
 package mapper
 
 import (
-	"strings"
-
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // StorageMappingOptions contains options for storage mapping
@@ -31,7 +31,7 @@ type StorageMapper interface {
 
 // ApplyOffloadToPairs applies default volume mode, access mode, and offload
 // plugin settings from opts to every pair that does not already have them set.
-func ApplyOffloadToPairs(pairs []forkliftv1beta1.StoragePair, opts StorageMappingOptions) []forkliftv1beta1.StoragePair {
+func ApplyOffloadToPairs(pairs []forkliftv1beta1.StoragePair, opts StorageMappingOptions) ([]forkliftv1beta1.StoragePair, error) {
 	for i := range pairs {
 		if opts.DefaultVolumeMode != "" && pairs[i].Destination.VolumeMode == "" {
 			pairs[i].Destination.VolumeMode = corev1.PersistentVolumeMode(opts.DefaultVolumeMode)
@@ -42,33 +42,19 @@ func ApplyOffloadToPairs(pairs []forkliftv1beta1.StoragePair, opts StorageMappin
 		}
 
 		if opts.DefaultOffloadPlugin != "" && opts.DefaultOffloadVendor != "" && pairs[i].OffloadPlugin == nil {
-			switch opts.DefaultOffloadPlugin {
-			case "vsphere":
-				xcopyConfig := &forkliftv1beta1.VSphereXcopyPluginConfig{
-					SecretRef:            opts.DefaultOffloadSecret,
-					StorageVendorProduct: forkliftv1beta1.StorageVendorProduct(opts.DefaultOffloadVendor),
-				}
-				if opts.DefaultOffloadMigrationHosts != "" {
-					for _, h := range strings.Split(opts.DefaultOffloadMigrationHosts, "+") {
-						h = strings.TrimSpace(h)
-						if h != "" {
-							xcopyConfig.DedicatedMigrationHosts = append(xcopyConfig.DedicatedMigrationHosts, h)
-						}
-					}
-				}
-				pairs[i].OffloadPlugin = &forkliftv1beta1.OffloadPlugin{
-					VSphereXcopyPluginConfig: xcopyConfig,
-				}
-			case "csiVolumeImport":
-				pairs[i].OffloadPlugin = &forkliftv1beta1.OffloadPlugin{
-					CsiVolumeImport: &forkliftv1beta1.CsiVolumeImport{
-						SecretRef:            opts.DefaultOffloadSecret,
-						StorageVendorProduct: forkliftv1beta1.StorageVendorProduct(opts.DefaultOffloadVendor),
-					},
-				}
+			plugin, err := flags.BuildOffloadPlugin(
+				opts.DefaultOffloadPlugin,
+				opts.DefaultOffloadVendor,
+				opts.DefaultOffloadSecret,
+				opts.DefaultOffloadMigrationHosts,
+				string(pairs[i].Destination.VolumeMode),
+			)
+			if err != nil {
+				return nil, err
 			}
+			pairs[i].OffloadPlugin = plugin
 		}
 	}
 
-	return pairs
+	return pairs, nil
 }

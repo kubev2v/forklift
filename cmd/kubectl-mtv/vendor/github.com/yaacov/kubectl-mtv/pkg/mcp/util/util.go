@@ -11,8 +11,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
-	shellquote "github.com/kballard/go-shellquote"
 	"k8s.io/klog/v2"
 )
 
@@ -449,9 +449,41 @@ func formatShellCommand(cmd string, args []string) string {
 		}
 	}
 
-	// Use shellquote.Join to properly quote all arguments
-	quotedArgs := shellquote.Join(sanitizedArgs...)
-	return cmd + " " + quotedArgs
+	return cmd + " " + joinShellArgs(sanitizedArgs)
+}
+
+// joinShellArgs quotes arguments so a POSIX shell splits them back into the
+// same words. Display only; command execution uses exec.Command.
+func joinShellArgs(args []string) string {
+	quoted := make([]string, len(args))
+	for i, arg := range args {
+		quoted[i] = quoteShellArg(arg)
+	}
+	return strings.Join(quoted, " ")
+}
+
+// quoteShellArg leaves safe tokens unchanged and single-quotes everything else.
+// An embedded single quote is written as '\” so the result stays one shell word.
+func quoteShellArg(arg string) string {
+	if arg == "" {
+		return "''"
+	}
+	if isSafeShellArg(arg) {
+		return arg
+	}
+	return "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
+}
+
+// isSafeShellArg reports whether arg can be copied into a shell command unquoted.
+// Safe runes are letters, digits, and @%_-+=:,./. The same characters
+// go-shellquote treats as special (including a leading ~) fall outside this set.
+func isSafeShellArg(arg string) bool {
+	for _, r := range arg {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune("@%_-+=:,./", r) {
+			return false
+		}
+	}
+	return true
 }
 
 // UnmarshalJSONResponse unmarshals a JSON string response into a native object.

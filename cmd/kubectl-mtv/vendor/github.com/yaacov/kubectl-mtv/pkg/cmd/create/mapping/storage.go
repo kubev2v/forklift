@@ -207,32 +207,10 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 
 			// Set offload plugin if specified
 			if offloadPlugin != "" && offloadVendor != "" {
-				offloadPluginConfig := &forkliftv1beta1.OffloadPlugin{}
-
-				switch offloadPlugin {
-				case "vsphere":
-					xcopyConfig := &forkliftv1beta1.VSphereXcopyPluginConfig{
-						SecretRef:            offloadSecret,
-						StorageVendorProduct: forkliftv1beta1.StorageVendorProduct(offloadVendor),
-					}
-					if offloadMigrationHosts != "" {
-						for _, h := range strings.Split(offloadMigrationHosts, "+") {
-							h = strings.TrimSpace(h)
-							if h != "" {
-								xcopyConfig.DedicatedMigrationHosts = append(xcopyConfig.DedicatedMigrationHosts, h)
-							}
-						}
-					}
-					offloadPluginConfig.VSphereXcopyPluginConfig = xcopyConfig
-				case "csiVolumeImport":
-					offloadPluginConfig.CsiVolumeImport = &forkliftv1beta1.CsiVolumeImport{
-						SecretRef:            offloadSecret,
-						StorageVendorProduct: forkliftv1beta1.StorageVendorProduct(offloadVendor),
-					}
-				default:
-					return nil, fmt.Errorf("unknown offload plugin '%s' for storage pair '%s': supported plugins are: vsphere, csiVolumeImport", offloadPlugin, sourceName)
+				offloadPluginConfig, err := flags.BuildOffloadPlugin(offloadPlugin, offloadVendor, offloadSecret, offloadMigrationHosts, volumeMode)
+				if err != nil {
+					return nil, fmt.Errorf("storage pair '%s': %w", sourceName, err)
 				}
-
 				pair.OffloadPlugin = offloadPluginConfig
 			}
 

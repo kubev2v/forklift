@@ -53,6 +53,9 @@ type PatchPlanOptions struct {
 	Description                    string
 	PreserveClusterCPUModel        bool
 	PreserveStaticIPs              bool
+	OffloadPopulatorPriorityClass  string
+	SkipNicMacAddress              bool
+	SkipNicPciAddress              bool
 	PVCNameTemplate                string
 	VolumeNameTemplate             string
 	NetworkNameTemplate            string
@@ -77,6 +80,8 @@ type PatchPlanOptions struct {
 	UseCompatibilityModeChanged           bool
 	PreserveClusterCPUModelChanged        bool
 	PreserveStaticIPsChanged              bool
+	SkipNicMacAddressChanged              bool
+	SkipNicPciAddressChanged              bool
 	MigrateSharedDisksChanged             bool
 	ArchivedChanged                       bool
 	PVCNameTemplateUseGenerateNameChanged bool
@@ -448,6 +453,24 @@ func PatchPlan(opts PatchPlanOptions) error {
 	if opts.PreserveStaticIPsChanged {
 		patchSpec["preserveStaticIPs"] = opts.PreserveStaticIPs
 		klog.V(2).Infof("Updated preserve static IPs to %t", opts.PreserveStaticIPs)
+		planUpdated = true
+	}
+
+	if opts.OffloadPopulatorPriorityClass != "" {
+		patchSpec["offloadPopulatorPriorityClassName"] = opts.OffloadPopulatorPriorityClass
+		klog.V(2).Infof("Updated offload populator priority class to '%s'", opts.OffloadPopulatorPriorityClass)
+		planUpdated = true
+	}
+
+	if opts.SkipNicMacAddressChanged {
+		patchSpec["skipNicMacAddress"] = opts.SkipNicMacAddress
+		klog.V(2).Infof("Updated skip NIC MAC address to %t", opts.SkipNicMacAddress)
+		planUpdated = true
+	}
+
+	if opts.SkipNicPciAddressChanged {
+		patchSpec["skipNicPciAddress"] = opts.SkipNicPciAddress
+		klog.V(2).Infof("Updated skip NIC PCI address to %t", opts.SkipNicPciAddress)
 		planUpdated = true
 	}
 
