@@ -37,6 +37,11 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 			base.ProviderParam: string(r.UID),
 			VMParam:            id,
 		})
+	case *Workload:
+		path = base.Link(WorkloadRoot, base.Params{
+			base.ProviderParam: string(r.UID),
+			VMParam:            id,
+		})
 	case *Network:
 		path = base.Link(NetworkRoot, base.Params{
 			base.ProviderParam: string(r.UID),
