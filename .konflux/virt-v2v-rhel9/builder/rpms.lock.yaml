@@ -4,13 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/libvirt-libs-11.10.0-12.7.el9_8.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/libvirt-libs-11.10.0-19.el9_9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 5775102
-    checksum: sha256:01045ff8966b4d3a3cf17cbb152407748357b63cc43fb791cecdd8a9a7be959b
+    size: 5775327
+    checksum: sha256:1e7bdb99281adbac499bfa003c52d8b135a16ab4e1aeeed61177ffd954532383
     name: libvirt-libs
-    evr: 11.10.0-12.7.el9_8
-    sourcerpm: libvirt-11.10.0-12.7.el9_8.src.rpm
+    evr: 11.10.0-19.el9_9
+    sourcerpm: libvirt-11.10.0-19.el9_9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/c/cyrus-sasl-gssapi-2.1.27-22.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 25734
@@ -46,12 +46,12 @@ arches:
     name: numactl-libs
     evr: 2.0.19-3.el9
     sourcerpm: numactl-2.0.19-3.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/codeready-builder/os/Packages/l/libvirt-devel-11.10.0-12.7.el9_8.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/codeready-builder/os/Packages/l/libvirt-devel-11.10.0-19.el9_9.x86_64.rpm
     repoid: codeready-builder-for-rhel-9-x86_64-rpms
-    size: 237664
-    checksum: sha256:22cf9cca355911a5da9243c812c93f281401708306e52e5724f172ea0f4ff23b
+    size: 238156
+    checksum: sha256:e5584bddca0dc934cfa8e2f95eac91a7d75f647c73bd1c171c67d0ecd4a8f862
     name: libvirt-devel
-    evr: 11.10.0-12.7.el9_8
-    sourcerpm: libvirt-11.10.0-12.7.el9_8.src.rpm
+    evr: 11.10.0-19.el9_9
+    sourcerpm: libvirt-11.10.0-19.el9_9.src.rpm
   source: []
   module_metadata: []
