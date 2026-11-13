@@ -21,6 +21,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	libvsphere "github.com/kubev2v/forklift/pkg/lib/vsphere"
 	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vapi/tags"
@@ -340,6 +341,10 @@ type Collector struct {
 	// so repeated per-VM upserts can be skipped via in-memory comparison.
 	customFieldDefs   map[int32]model.CustomFieldDef
 	customFieldDefsMu *sync.RWMutex
+	// The datacenter the `datacenter` setting restricts collection to,
+	// resolved to its managed object reference at connect. Nil when the
+	// provider is not restricted.
+	datacenter *types.ManagedObjectReference
 }
 
 // New collector.
@@ -843,6 +848,11 @@ func (r *Collector) connect(ctx context.Context) (status int, err error) {
 		return
 	}
 
+	if err = r.resolveDatacenter(ctx); err != nil {
+		r.close()
+		return
+	}
+
 	if r.client.IsVC() {
 		r.restClient = rest.NewClient(r.client.Client)
 		userInfo := liburl.UserPassword(r.user(), r.password())
@@ -865,6 +875,27 @@ func (r *Collector) validateServerType() error {
 		return liberr.New("provider sdkEndpoint is set to ESXi but the URL points to a vCenter server")
 	}
 	return nil
+}
+
+// resolveDatacenter resolves the `datacenter` setting to the datacenter's
+// managed object reference.
+func (r *Collector) resolveDatacenter(ctx context.Context) (err error) {
+	r.datacenter = nil
+	name := r.provider.Spec.Settings[api.Datacenter]
+	if name == "" {
+		return
+	}
+	dc, err := find.NewFinder(r.client.Client).Datacenter(ctx, name)
+	if err != nil {
+		return liberr.Wrap(
+			err,
+			fmt.Sprintf("datacenter '%s' not found in vCenter", name),
+			"datacenter",
+			name)
+	}
+	ref := dc.Reference()
+	r.datacenter = &ref
+	return
 }
 
 // Build the client.
@@ -929,7 +960,22 @@ func (r *Collector) filter(pc *property.Collector) *property.WaitFilter {
 }
 
 // Build the object Spec.
+// If a datacenter has not been specified, this traverses
+// the entire vCenter/ESXi. Otherwise, it traverses the
+// inventory of the specified datacenter.
 func (r *Collector) objectSpec() types.ObjectSpec {
+	if r.datacenter != nil {
+		return types.ObjectSpec{
+			Obj: *r.datacenter,
+			SelectSet: []types.BaseSelectionSpec{
+				TsDatacenterVM,
+				TsDatacenterHost,
+				TsDatacenterNet,
+				TsDatacenterDatastore,
+				TsRootFolder,
+			},
+		}
+	}
 	return types.ObjectSpec{
 		Obj: r.client.ServiceContent.RootFolder,
 		SelectSet: []types.BaseSelectionSpec{
