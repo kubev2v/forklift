@@ -208,6 +208,13 @@ type PlanSpec struct {
 	// When enabled, legacy drivers are exposed to the virt-v2v conversion process via the VIRTIO_WIN environment variable,
 	// which points to the legacy ISO at /usr/local/virtio-win-legacy.iso.
 	InstallLegacyDrivers *bool `json:"installLegacyDrivers,omitempty"`
+	// EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+	// is enabled on the target VM.
+	// - nil (default): Auto-detect from source VM settings
+	// - true: Force enable nested virtualization on the target VM regardless of source settings
+	// - false: Force disable nested virtualization on the target VM regardless of source settings
+	// +optional
+	EnableNestedVirtualization *bool `json:"enableNestedVirtualization,omitempty"`
 	// Determines if the plan should skip the guest conversion.
 	// +kubebuilder:default:=false
 	SkipGuestConversion bool `json:"skipGuestConversion,omitempty"`
@@ -233,6 +240,18 @@ type PlanSpec struct {
 	// - false: No inspection is performed before disk transfer.
 	// +kubebuilder:default:=true
 	RunPreflightInspection bool `json:"runPreflightInspection,omitempty"`
+	// VirtV2vImage overrides the global virt-v2v container image for this plan.
+	// When set, virt-v2v pods created by this plan will use this image instead
+	// of the cluster-wide VIRT_V2V_IMAGE setting.
+	// Use this to run different virt-v2v builds for specific migration scenarios
+	VirtV2vImage string `json:"virtV2vImage,omitempty"`
+	// XfsCompatibility overrides the global virt-v2v container image for this plan.
+	// When set, virt-v2v pods created by this plan will use the XFS compatible image
+	// VIRT_V2V_IMAGE_XFS instead of the cluster-wide VIRT_V2V_IMAGE setting.
+	// Use this to enable XFSv4 compatibility mode for specific plan.
+	// Warning: Enabling XFSv4 support will drop support for BTRFS for the specific plan. Ensure that the plan only selects VMs with supported filesystem.
+	// +kubebuilder:default:=false
+	XfsCompatibility bool `json:"xfsCompatibility,omitempty"`
 }
 
 // Find a planned VM.
