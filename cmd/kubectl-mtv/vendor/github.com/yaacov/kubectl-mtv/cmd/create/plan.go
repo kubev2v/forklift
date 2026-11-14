@@ -137,7 +137,8 @@ Mapping Pair Formats (when overriding auto-generated mappings):
     source:storageclass               - Basic mapping
     source:sc;volumeMode=Block        - With volume mode (Filesystem|Block)
     source:sc;accessMode=ReadWriteMany - With access mode
-    source:sc;offloadPlugin=vsphere;offloadVendor=ontap - Storage offload (XCOPY)
+    source:sc;offloadPlugin=vsphere;offloadVendor=ontap - Storage offload (XCOPY, VMFS)
+    source:sc;offloadPlugin=vsphereNfs;offloadVendor=pureFlashArray;volumeMode=Filesystem - NFS array offload
     source:sc;offloadPlugin=csiVolumeImport;offloadVendor=primera3par - CSI import offload
     Options are semicolon-separated and can be combined:
     Example: "ds1:fast-ssd,ds2:economy;volumeMode=Block;accessMode=ReadWriteOnce"
@@ -228,7 +229,15 @@ Affinity Syntax (KARL):
   kubectl-mtv create plan --name no-static-ips \
     --source vsphere-prod \
     --vms "quick-vm" \
-    --preserve-static-ips false`,
+    --preserve-static-ips false
+
+  # vSphere: let KubeVirt assign NIC MAC and PCI addresses
+  kubectl-mtv create plan --name legacy-guest \
+    --source vsphere-prod \
+    --vms "win2003" \
+    --skip-nic-mac-address true \
+    --skip-nic-pci-address true \
+    --offload-populator-priority-class migration-high`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -588,7 +597,7 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&networkMapping, "network-mapping", "", "Network mapping name (auto-generated when omitted)")
 	cmd.Flags().StringVar(&storageMapping, "storage-mapping", "", "Storage mapping name (auto-generated when omitted)")
 	cmd.Flags().StringVar(&networkPairs, "network-pairs", "", "Inline network mapping pairs (auto-generated when omitted). Format: 'source:target' (comma-separated)")
-	cmd.Flags().StringVar(&storagePairs, "storage-pairs", "", "Inline storage mapping pairs (auto-generated when omitted). Format: 'source:storage-class[;param=value]' (comma-separated). With offloadPlugin=csiVolumeImport, offloadVendor is primera3par|ontap only")
+	cmd.Flags().StringVar(&storagePairs, "storage-pairs", "", "Inline storage mapping pairs (auto-generated when omitted). Format: 'source:storage-class[;param=value]' (comma-separated). "+flags.StoragePairOffloadNote)
 
 	// Storage enhancement flags
 	cmd.Flags().StringVar(&defaultVolumeMode, "default-volume-mode", "", "Default volume mode for storage pairs (Filesystem|Block)")
@@ -620,7 +629,10 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&planSpec.TargetNamespace, "target-namespace", "", "Target namespace (defaults to plan namespace)")
 	cmd.Flags().StringVar(&transferNetwork, "transfer-network", "", "NAD (NetworkAttachmentDefinition) for disk transfer; namespace/name or name in plan namespace")
 	cmd.Flags().BoolVar(&planSpec.PreserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its oVirt/RHV cluster (oVirt/RHV only)")
-	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.PreserveStaticIPs, "preserve-static-ips", true, "Preserve static IP configurations during migration (vSphere/Hyper-V only; default true) (true/false)")
+	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.PreserveStaticIPs, "preserve-static-ips", true, "Preserve static IP configurations during migration (vSphere/Hyper-V/oVirt/Nutanix; default true) (true/false)")
+	cmd.Flags().StringVar(&planSpec.OffloadPopulatorPriorityClassName, "offload-populator-priority-class", "", "Existing PriorityClass for vSphere XCOPY populator pods (not used by vsphereNfs)")
+	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.SkipNicMacAddress, "skip-nic-mac-address", false, "Do not copy the source NIC MAC address onto the target VM (vSphere only; default false) (true/false)")
+	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.SkipNicPciAddress, "skip-nic-pci-address", false, "Do not copy the source NIC PCI address onto the target VM (vSphere only; default false). Use when a conventional PCI NIC conflicts with OpenShift Virtualization, for example a legacy guest with useVirtioTransitional (true/false)")
 	cmd.Flags().StringVar(&planSpec.PVCNameTemplate, "pvc-name-template", "", "Go template for PVC names (keep rendered name ≤40 chars). Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
 	cmd.Flags().StringVar(&planSpec.VolumeNameTemplate, "volume-name-template", "", "Go template for volume interface names (vSphere only). Variables: {{.PVCName}}, {{.VolumeIndex}}")
 	cmd.Flags().StringVar(&planSpec.NetworkNameTemplate, "network-name-template", "", "Go template for network interface names (vSphere only). Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")

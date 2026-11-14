@@ -115,6 +115,9 @@ func buildSpecSection(b *describe.Builder, plan *unstructured.Unstructured) {
 	description, _, _ := unstructured.NestedString(plan.Object, "spec", "description")
 	preserveCPUModel, _, _ := unstructured.NestedBool(plan.Object, "spec", "preserveClusterCpuModel")
 	preserveStaticIPs, _, _ := unstructured.NestedBool(plan.Object, "spec", "preserveStaticIPs")
+	offloadPriorityClass, _, _ := unstructured.NestedString(plan.Object, "spec", "offloadPopulatorPriorityClassName")
+	skipNicMac, _, _ := unstructured.NestedBool(plan.Object, "spec", "skipNicMacAddress")
+	skipNicPci, _, _ := unstructured.NestedBool(plan.Object, "spec", "skipNicPciAddress")
 	enableNestedVirt, enableNestedVirtExists, _ := unstructured.NestedBool(plan.Object, "spec", "enableNestedVirtualization")
 	xfsCompatibility, _, _ := unstructured.NestedBool(plan.Object, "spec", "xfsCompatibility")
 	scsiReservation, _, _ := unstructured.NestedBool(plan.Object, "spec", "scsiReservation")
@@ -141,6 +144,15 @@ func buildSpecSection(b *describe.Builder, plan *unstructured.Unstructured) {
 	b.SubSection("Advanced Settings")
 	b.FieldC("Preserve CPU Model", fmt.Sprintf("%t", preserveCPUModel), output.ColorizeBooleanString)
 	b.FieldC("Preserve Static IPs", fmt.Sprintf("%t", preserveStaticIPs), output.ColorizeBooleanString)
+	if offloadPriorityClass != "" {
+		b.Field("Offload Populator Priority Class", offloadPriorityClass)
+	}
+	if skipNicMac {
+		b.FieldC("Skip NIC MAC Address", "true", output.ColorizeBooleanString)
+	}
+	if skipNicPci {
+		b.FieldC("Skip NIC PCI Address", "true", output.ColorizeBooleanString)
+	}
 	if enableNestedVirtExists {
 		b.FieldC("Nested Virtualization", fmt.Sprintf("%t", enableNestedVirt), output.ColorizeBooleanString)
 	} else {

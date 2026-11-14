@@ -166,7 +166,13 @@ plugin configuration for optimized data transfer.`,
   kubectl-mtv create mapping storage --name my-csi-map \
     --source vsphere-prod \
     --target host \
-    --storage-pairs "datastore1:hpe-sc;offloadPlugin=csiVolumeImport;offloadVendor=primera3par"`,
+    --storage-pairs "datastore1:hpe-sc;offloadPlugin=csiVolumeImport;offloadVendor=primera3par"
+
+  # NFS array offload (Pure FlashArray, Filesystem destination)
+  kubectl-mtv create mapping storage --name my-nfs-map \
+    --source vsphere-prod \
+    --target host \
+    --storage-pairs "nfs-ds:pure-nfs;offloadPlugin=vsphereNfs;offloadVendor=pureFlashArray;volumeMode=Filesystem"`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -227,7 +233,7 @@ plugin configuration for optimized data transfer.`,
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Storage mapping name")
 	cmd.Flags().StringVarP(&sourceProvider, "source", "S", "", "Source provider name")
 	cmd.Flags().StringVarP(&targetProvider, "target", "T", "", "OpenShift target provider name")
-	cmd.Flags().StringVar(&storagePairs, "storage-pairs", "", "Storage mapping pairs in format 'source:storage-class[;volumeMode=Block|Filesystem][;accessMode=ReadWriteOnce|ReadWriteMany|ReadOnlyMany][;offloadPlugin=vsphere|csiVolumeImport][;offloadSecret=secret-name][;offloadVendor=vantara|ontap|...]' (comma-separated). With offloadPlugin=csiVolumeImport, offloadVendor is primera3par|ontap only")
+	cmd.Flags().StringVar(&storagePairs, "storage-pairs", "", "Storage mapping pairs in format 'source:storage-class[;volumeMode=Block|Filesystem][;accessMode=ReadWriteOnce|ReadWriteMany|ReadOnlyMany][;offloadPlugin=vsphere|vsphereNfs|csiVolumeImport][;offloadSecret=secret-name][;offloadVendor=vantara|ontap|...]' (comma-separated). "+flags.StoragePairOffloadNote)
 	cmd.Flags().StringVar(&defaultVolumeMode, "default-volume-mode", "", "Default volume mode for all storage pairs (Filesystem|Block)")
 	cmd.Flags().StringVar(&defaultAccessMode, "default-access-mode", "", "Default access mode for all storage pairs (ReadWriteOnce|ReadWriteMany|ReadOnlyMany)")
 	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", flags.OffloadPluginHelp)

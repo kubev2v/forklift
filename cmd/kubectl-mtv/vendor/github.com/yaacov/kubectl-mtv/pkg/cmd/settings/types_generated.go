@@ -110,6 +110,13 @@ var AllSettings = map[string]SettingDefinition{
 		Description: "Provision copy appliance templates for vSphere providers",
 		Category:    CategoryFeature,
 	},
+	"feature_split_virt_customize": {
+		Name:        "feature_split_virt_customize",
+		Type:        TypeBool,
+		Default:     true,
+		Description: "Run virt-v2v and virt-customize as separate commands",
+		Category:    CategoryFeature,
+	},
 	"controller_image_fqin": {
 		Name:        "controller_image_fqin",
 		Type:        TypeString,

@@ -171,7 +171,10 @@ func (m *EC2StorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, targetSt
 		}
 		klog.V(4).Infof("EC2 storage mapper - Created %d storage pairs (user default)", len(storagePairs))
 
-		storagePairs = mapper.ApplyOffloadToPairs(storagePairs, opts)
+		storagePairs, err := mapper.ApplyOffloadToPairs(storagePairs, opts)
+		if err != nil {
+			return nil, err
+		}
 		return storagePairs, nil
 	}
 
@@ -219,7 +222,10 @@ func (m *EC2StorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, targetSt
 
 	klog.V(4).Infof("EC2 storage mapper - Created %d storage pairs", len(storagePairs))
 
-	storagePairs = mapper.ApplyOffloadToPairs(storagePairs, opts)
+	storagePairs, err := mapper.ApplyOffloadToPairs(storagePairs, opts)
+	if err != nil {
+		return nil, err
+	}
 	return storagePairs, nil
 }
 
