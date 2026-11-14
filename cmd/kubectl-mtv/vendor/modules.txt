@@ -111,11 +111,8 @@ github.com/json-iterator/go
 ## explicit; go 1.21
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1
-# github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-## explicit
-github.com/kballard/go-shellquote
-# github.com/kubev2v/forklift v0.0.0-20261102084529-17132dcb88bb
-## explicit; go 1.25.0
+# github.com/kubev2v/forklift v0.0.0-20261111190406-31d5e641986b
+## explicit; go 1.26.0
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider
@@ -223,7 +220,7 @@ github.com/xo/terminfo
 # github.com/yaacov/karl-interpreter v0.0.1
 ## explicit; go 1.21
 github.com/yaacov/karl-interpreter/pkg/karl
-# github.com/yaacov/kubectl-mtv v0.3.35
+# github.com/yaacov/kubectl-mtv v0.3.36
 ## explicit; go 1.26.0
 github.com/yaacov/kubectl-mtv/cmd
 github.com/yaacov/kubectl-mtv/cmd/archive

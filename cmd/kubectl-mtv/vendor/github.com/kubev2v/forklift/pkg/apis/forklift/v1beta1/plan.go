@@ -63,6 +63,9 @@ type PlanSpec struct {
 	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
 	ServiceAccount string `json:"serviceAccount,omitempty"`
+	// OffloadPopulatorPriorityClassName sets the existing PriorityClass for vSphere XCOPY populator pods.
+	// +optional
+	OffloadPopulatorPriorityClassName string `json:"offloadPopulatorPriorityClassName,omitempty"`
 	// TargetLabels are labels that should be applied to the target virtual machines.
 	// Note: System-managed labels (migration, plan, vmID, app) will override any user-defined
 	// labels with the same keys to ensure proper system functionality.
@@ -144,6 +147,25 @@ type PlanSpec struct {
 	// Preserve static IPs of VMs in vSphere
 	// +kubebuilder:default:=true
 	PreserveStaticIPs bool `json:"preserveStaticIPs,omitempty"`
+	// SkipNicMacAddress controls whether the source NIC MAC address is copied
+	// onto the target VM interface.
+	// Only applicable to vSphere sources. Ignored for other providers (EC2, Hyper-V, oVirt, OpenStack).
+	// - false (default): copy the source MAC when one is available and the
+	//   destination network allows it
+	// - true: do not set macAddress. KubeVirt assigns a MAC
+	// +optional
+	SkipNicMacAddress bool `json:"skipNicMacAddress,omitempty"`
+	// SkipNicPciAddress controls whether the source NIC PCI address is copied
+	// onto the target VM interface.
+	// Only applicable to vSphere sources. Ignored for other providers (EC2, Hyper-V, oVirt, OpenStack).
+	// A vSphere PCI address can conflict with the OpenShift Virtualization PCI
+	// topology when the NIC is a conventional PCI device rather than PCI Express,
+	// for example when useVirtioTransitional is set for a legacy guest such as
+	// Windows Server 2003. The VM then fails to boot until pciAddress is removed.
+	// - false (default): copy the source PCI address when one is available
+	// - true: do not set pciAddress
+	// +optional
+	SkipNicPciAddress bool `json:"skipNicPciAddress,omitempty"`
 	// PreCopySourceDisks enables two-phase disk transfer for Hyper-V migrations.
 	// When true, an init container converts the source VHDX files to raw format
 	// directly on the target block device using qemu-img, then virt-v2v performs
@@ -306,7 +328,7 @@ type PlanSpec struct {
 	// DeleteVmOnFailMigration controls whether the target VM created by this Plan is deleted when a migration fails.
 	// When true and the migration fails after the target VM has been created, the controller
 	// will delete the target VM (and related target-side resources) during failed-migration cleanup
-	// and when the Plan is deleted. When false (default), the target VM is preserved to aid
+	// and when the Plan is deleted. When false the target VM is preserved to aid
 	// troubleshooting. The source VM is never modified.
 	//
 	// Note: If the Plan-level option is set to true, the VM-level option will be ignored.
@@ -613,7 +635,8 @@ func (r *Plan) IsUsingOffloadPlugin() bool {
 	}
 	dsMapIn := r.Map.Storage.Spec.Map
 	for _, m := range dsMapIn {
-		if m.OffloadPlugin != nil && (m.OffloadPlugin.VSphereXcopyPluginConfig != nil || m.OffloadPlugin.CsiVolumeImport != nil) {
+		if m.OffloadPlugin != nil && (m.OffloadPlugin.VSphereXcopyPluginConfig != nil ||
+			m.OffloadPlugin.VSphereNfsCopyPluginConfig != nil || m.OffloadPlugin.CsiVolumeImport != nil) {
 			return true
 		}
 	}

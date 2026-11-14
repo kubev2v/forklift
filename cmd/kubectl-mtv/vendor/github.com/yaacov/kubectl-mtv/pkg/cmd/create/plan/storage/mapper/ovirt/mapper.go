@@ -42,7 +42,10 @@ func (m *OvirtStorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, target
 
 	klog.V(4).Infof("DEBUG: Created %d storage pairs", len(storagePairs))
 
-	storagePairs = mapper.ApplyOffloadToPairs(storagePairs, opts)
+	storagePairs, err := mapper.ApplyOffloadToPairs(storagePairs, opts)
+	if err != nil {
+		return nil, err
+	}
 
 	return storagePairs, nil
 }

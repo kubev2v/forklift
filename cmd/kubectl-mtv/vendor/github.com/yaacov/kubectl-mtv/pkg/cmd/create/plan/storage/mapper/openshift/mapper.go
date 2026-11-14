@@ -40,7 +40,10 @@ func (m *OpenShiftStorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, ta
 		if err != nil {
 			return nil, err
 		}
-		pairs = mapper.ApplyOffloadToPairs(pairs, opts)
+		pairs, err = mapper.ApplyOffloadToPairs(pairs, opts)
+		if err != nil {
+			return nil, err
+		}
 		return pairs, nil
 	}
 
@@ -54,7 +57,10 @@ func (m *OpenShiftStorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, ta
 		if err != nil {
 			return nil, err
 		}
-		pairs = mapper.ApplyOffloadToPairs(pairs, opts)
+		pairs, err = mapper.ApplyOffloadToPairs(pairs, opts)
+		if err != nil {
+			return nil, err
+		}
 		return pairs, nil
 	}
 
@@ -63,7 +69,10 @@ func (m *OpenShiftStorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, ta
 	if err != nil {
 		return nil, err
 	}
-	pairs = mapper.ApplyOffloadToPairs(pairs, opts)
+	pairs, err = mapper.ApplyOffloadToPairs(pairs, opts)
+	if err != nil {
+		return nil, err
+	}
 	return pairs, nil
 }
 

@@ -29,7 +29,7 @@ func (m *StorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, targetStora
 			Destination: defaultStorageClass,
 		})
 	}
-	return mapper.ApplyOffloadToPairs(storagePairs, opts), nil
+	return mapper.ApplyOffloadToPairs(storagePairs, opts)
 }
 
 func findDefaultStorageClass(targetStorages []forkliftv1beta1.DestinationStorage, opts mapper.StorageMappingOptions) forkliftv1beta1.DestinationStorage {

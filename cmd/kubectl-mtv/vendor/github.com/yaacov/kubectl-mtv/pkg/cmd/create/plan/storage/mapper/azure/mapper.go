@@ -139,7 +139,10 @@ func (m *AzureStorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, target
 		}
 		klog.V(4).Infof("Azure storage mapper - Created %d storage pairs (user default)", len(storagePairs))
 
-		storagePairs = mapper.ApplyOffloadToPairs(storagePairs, opts)
+		storagePairs, err := mapper.ApplyOffloadToPairs(storagePairs, opts)
+		if err != nil {
+			return nil, err
+		}
 		return storagePairs, nil
 	}
 
@@ -187,7 +190,10 @@ func (m *AzureStorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, target
 
 	klog.V(4).Infof("Azure storage mapper - Created %d storage pairs", len(storagePairs))
 
-	storagePairs = mapper.ApplyOffloadToPairs(storagePairs, opts)
+	storagePairs, err := mapper.ApplyOffloadToPairs(storagePairs, opts)
+	if err != nil {
+		return nil, err
+	}
 	return storagePairs, nil
 }
 

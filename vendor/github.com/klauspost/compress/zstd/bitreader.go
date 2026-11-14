@@ -5,11 +5,13 @@
 package zstd
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"math/bits"
+
+	"github.com/klauspost/compress/internal/le"
+	"github.com/klauspost/compress/internal/regmask"
 )
 
 // bitReader reads a bitstream in reverse.
@@ -17,8 +19,8 @@ import (
 // for aligning the input.
 type bitReader struct {
 	in       []byte
-	off      uint   // next byte to read is at in[off - 1]
 	value    uint64 // Maybe use [16]byte, but shifting is awkward.
+	cursor   int    // offset where next read should end
 	bitsRead uint8
 }
 
@@ -28,12 +30,12 @@ func (b *bitReader) init(in []byte) error {
 		return errors.New("corrupt stream: too short")
 	}
 	b.in = in
-	b.off = uint(len(in))
 	// The highest bit of the last byte indicates where to start
 	v := in[len(in)-1]
 	if v == 0 {
 		return errors.New("corrupt stream, did not find end of stream")
 	}
+	b.cursor = len(in)
 	b.bitsRead = 64
 	b.value = 0
 	if len(in) >= 8 {
@@ -63,27 +65,11 @@ func (b *bitReader) get32BitsFast(n uint8) uint32 {
 	return v
 }
 
-// fillFast() will make sure at least 32 bits are available.
-// There must be at least 4 bytes available.
-func (b *bitReader) fillFast() {
-	if b.bitsRead < 32 {
-		return
-	}
-	// 2 bounds checks.
-	v := b.in[b.off-4:]
-	v = v[:4]
-	low := (uint32(v[0])) | (uint32(v[1]) << 8) | (uint32(v[2]) << 16) | (uint32(v[3]) << 24)
-	b.value = (b.value << 32) | uint64(low)
-	b.bitsRead -= 32
-	b.off -= 4
-}
-
 // fillFastStart() assumes the bitreader is empty and there is at least 8 bytes to read.
 func (b *bitReader) fillFastStart() {
-	// Do single re-slice to avoid bounds checks.
-	b.value = binary.LittleEndian.Uint64(b.in[b.off-8:])
+	b.cursor -= 8
+	b.value = le.Load64(b.in, b.cursor)
 	b.bitsRead = 0
-	b.off -= 8
 }
 
 // fill() will make sure at least 32 bits are available.
@@ -91,25 +77,74 @@ func (b *bitReader) fill() {
 	if b.bitsRead < 32 {
 		return
 	}
-	if b.off >= 4 {
-		v := b.in[b.off-4:]
-		v = v[:4]
-		low := (uint32(v[0])) | (uint32(v[1]) << 8) | (uint32(v[2]) << 16) | (uint32(v[3]) << 24)
-		b.value = (b.value << 32) | uint64(low)
+	if b.cursor >= 4 {
+		b.cursor -= 4
+		b.value = (b.value << 32) | uint64(le.Load32(b.in, b.cursor))
 		b.bitsRead -= 32
-		b.off -= 4
 		return
 	}
-	for b.off > 0 {
-		b.value = (b.value << 8) | uint64(b.in[b.off-1])
-		b.bitsRead -= 8
-		b.off--
+
+	b.bitsRead -= uint8(8 * b.cursor)
+	for b.cursor > 0 {
+		b.cursor -= 1
+		b.value = (b.value << 8) | uint64(b.in[b.cursor])
 	}
+}
+
+// bitReadState is the part of a bitReader that changes while reading.
+// Decode loops hold it by value so it stays in registers.
+type bitReadState struct {
+	value    uint64
+	cursor   int
+	bitsRead uint8
+}
+
+func (b *bitReader) state() bitReadState {
+	return bitReadState{value: b.value, cursor: b.cursor, bitsRead: b.bitsRead}
+}
+
+func (b *bitReader) setState(s bitReadState) {
+	b.value, b.cursor, b.bitsRead = s.value, s.cursor, s.bitsRead
+}
+
+// getBits is bitReader.getBits.
+func (s bitReadState) getBits(n uint8) (bitReadState, int) {
+	if n == 0 {
+		return s, 0
+	}
+	s, v := s.get32BitsFast(n)
+	return s, int(v)
+}
+
+// get32BitsFast is bitReader.get32BitsFast.
+func (s bitReadState) get32BitsFast(n uint8) (bitReadState, uint32) {
+	v := uint32((s.value << (s.bitsRead & regmask.Shift64ByUint8)) >> ((64 - n) & regmask.Shift64ByUint8))
+	s.bitsRead += n
+	return s, v
+}
+
+// fill is bitReader.fill reading from in.
+func (s bitReadState) fill(in []byte) bitReadState {
+	if s.bitsRead < 32 {
+		return s
+	}
+	if s.cursor >= 4 {
+		s.cursor -= 4
+		s.value = (s.value << 32) | uint64(le.Load32(in, s.cursor))
+		s.bitsRead -= 32
+		return s
+	}
+	s.bitsRead -= uint8(8 * s.cursor)
+	for s.cursor > 0 {
+		s.cursor--
+		s.value = (s.value << 8) | uint64(in[s.cursor])
+	}
+	return s
 }
 
 // finished returns true if all bits have been read from the bit stream.
 func (b *bitReader) finished() bool {
-	return b.off == 0 && b.bitsRead >= 64
+	return b.cursor == 0 && b.bitsRead >= 64
 }
 
 // overread returns true if more bits have been requested than is on the stream.
@@ -119,13 +154,14 @@ func (b *bitReader) overread() bool {
 
 // remain returns the number of bits remaining.
 func (b *bitReader) remain() uint {
-	return b.off*8 + 64 - uint(b.bitsRead)
+	return 8*uint(b.cursor) + 64 - uint(b.bitsRead)
 }
 
 // close the bitstream and returns an error if out-of-buffer reads occurred.
 func (b *bitReader) close() error {
 	// Release reference.
 	b.in = nil
+	b.cursor = 0
 	if !b.finished() {
 		return fmt.Errorf("%d extra bits on block, should be 0", b.remain())
 	}

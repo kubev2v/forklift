@@ -67,6 +67,9 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var description string
 	var preserveClusterCPUModel bool
 	var preserveStaticIPs bool
+	var offloadPopulatorPriorityClass string
+	var skipNicMacAddress bool
+	var skipNicPciAddress bool
 	var pvcNameTemplate string
 	var volumeNameTemplate string
 	var networkNameTemplate string
@@ -86,6 +89,8 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var useCompatibilityModeChanged bool
 	var preserveClusterCPUModelChanged bool
 	var preserveStaticIPsChanged bool
+	var skipNicMacAddressChanged bool
+	var skipNicPciAddressChanged bool
 	var migrateSharedDisksChanged bool
 	var archivedChanged bool
 	var pvcNameTemplateUseGenerateNameChanged bool
@@ -126,6 +131,12 @@ Affinity Syntax (KARL):
   # Disable static IP preservation (vSphere/Hyper-V/oVirt/Nutanix)
   kubectl-mtv patch plan --plan-name my-migration --preserve-static-ips false
 
+  # vSphere: let KubeVirt assign NIC MAC and PCI addresses
+  kubectl-mtv patch plan --plan-name my-migration \
+    --skip-nic-mac-address true \
+    --skip-nic-pci-address true \
+    --offload-populator-priority-class migration-high
+
   # Enable raw disk copy with VirtIO devices (skip guest conversion)
   kubectl-mtv patch plan --plan-name my-migration \
     --skip-guest-conversion true \
@@ -151,6 +162,8 @@ Affinity Syntax (KARL):
 			useCompatibilityModeChanged = cmd.Flags().Changed("use-compatibility-mode")
 			preserveClusterCPUModelChanged = cmd.Flags().Changed("preserve-cluster-cpu-model")
 			preserveStaticIPsChanged = cmd.Flags().Changed("preserve-static-ips")
+			skipNicMacAddressChanged = cmd.Flags().Changed("skip-nic-mac-address")
+			skipNicPciAddressChanged = cmd.Flags().Changed("skip-nic-pci-address")
 			migrateSharedDisksChanged = cmd.Flags().Changed("migrate-shared-disks")
 			archivedChanged = cmd.Flags().Changed("archived")
 			pvcNameTemplateUseGenerateNameChanged = cmd.Flags().Changed("pvc-name-template-use-generate-name")
@@ -207,6 +220,9 @@ Affinity Syntax (KARL):
 				Description:                    description,
 				PreserveClusterCPUModel:        preserveClusterCPUModel,
 				PreserveStaticIPs:              preserveStaticIPs,
+				OffloadPopulatorPriorityClass:  offloadPopulatorPriorityClass,
+				SkipNicMacAddress:              skipNicMacAddress,
+				SkipNicPciAddress:              skipNicPciAddress,
 				PVCNameTemplate:                pvcNameTemplate,
 				VolumeNameTemplate:             volumeNameTemplate,
 				NetworkNameTemplate:            networkNameTemplate,
@@ -230,6 +246,8 @@ Affinity Syntax (KARL):
 				UseCompatibilityModeChanged:           useCompatibilityModeChanged,
 				PreserveClusterCPUModelChanged:        preserveClusterCPUModelChanged,
 				PreserveStaticIPsChanged:              preserveStaticIPsChanged,
+				SkipNicMacAddressChanged:              skipNicMacAddressChanged,
+				SkipNicPciAddressChanged:              skipNicPciAddressChanged,
 				MigrateSharedDisksChanged:             migrateSharedDisksChanged,
 				ArchivedChanged:                       archivedChanged,
 				PVCNameTemplateUseGenerateNameChanged: pvcNameTemplateUseGenerateNameChanged,
@@ -284,6 +302,9 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&description, "description", "", "Plan description")
 	flags.ExplicitBoolVar(cmd.Flags(), &preserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its oVirt/RHV cluster (oVirt/RHV only) (true/false)")
 	flags.ExplicitBoolVar(cmd.Flags(), &preserveStaticIPs, "preserve-static-ips", false, "Preserve static IP configurations during migration (vSphere/Hyper-V/oVirt/Nutanix) (true/false)")
+	cmd.Flags().StringVar(&offloadPopulatorPriorityClass, "offload-populator-priority-class", "", "Existing PriorityClass for vSphere XCOPY populator pods (not used by vsphereNfs)")
+	flags.ExplicitBoolVar(cmd.Flags(), &skipNicMacAddress, "skip-nic-mac-address", false, "Do not copy the source NIC MAC address onto the target VM (vSphere only; default false) (true/false)")
+	flags.ExplicitBoolVar(cmd.Flags(), &skipNicPciAddress, "skip-nic-pci-address", false, "Do not copy the source NIC PCI address onto the target VM (vSphere only; default false). Use when a conventional PCI NIC conflicts with OpenShift Virtualization, for example a legacy guest with useVirtioTransitional (true/false)")
 	cmd.Flags().StringVar(&pvcNameTemplate, "pvc-name-template", "", "Go template for PVC names (keep rendered name ≤40 chars). Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
 	cmd.Flags().StringVar(&volumeNameTemplate, "volume-name-template", "", "Go template for volume interface names (vSphere only). Variables: {{.PVCName}}, {{.VolumeIndex}}")
 	cmd.Flags().StringVar(&networkNameTemplate, "network-name-template", "", "Go template for network interface names (vSphere only). Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
