@@ -53,6 +53,8 @@ type Condition struct {
 	Category string `json:"category"`
 	// The human readable description of the condition.
 	Message string `json:"message,omitempty"`
+	// A suggested action or resolution for the condition.
+	Suggestion string `json:"suggestion,omitempty"`
 	// When the last status transition occurred.
 	LastTransitionTime v1.Time `json:"lastTransitionTime"`
 	// The condition is durable - never un-staged.
@@ -74,6 +76,7 @@ func (r *Condition) Update(other Condition) (updated bool) {
 	r.Reason = other.Reason
 	r.Category = other.Category
 	r.Message = other.Message
+	r.Suggestion = other.Suggestion
 	r.Durable = other.Durable
 	r.Items = other.Items
 	r.LastTransitionTime = v1.NewTime(time.Now())
@@ -88,6 +91,7 @@ func (r *Condition) Equal(other Condition) bool {
 		r.Category == other.Category &&
 		r.Reason == other.Reason &&
 		r.Message == other.Message &&
+		r.Suggestion == other.Suggestion &&
 		r.Durable == other.Durable &&
 		reflect.DeepEqual(r.Items, other.Items)
 }
