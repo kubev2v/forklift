@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cnv "kubevirt.io/api/core/v1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	libvirtxml "libvirt.org/go/libvirtxml"
 )
 
@@ -416,6 +417,22 @@ func TestBuildImportCertBundleMergesProviderAndFetch(t *testing.T) {
 	}
 	if bytes.Count(bundle, []byte("BEGIN CERTIFICATE")) < 2 {
 		t.Fatalf("expected at least two certificates, got %q", bundle)
+	}
+}
+
+func TestSetInsecureSkipVerify(t *testing.T) {
+	insecure := &core.Secret{Data: map[string][]byte{"insecureSkipVerify": []byte("true")}}
+	source := &cdi.DataVolumeSourceHTTP{}
+	setInsecureSkipVerify(source, insecure)
+	if source.InsecureSkipVerify == nil || !*source.InsecureSkipVerify {
+		t.Fatalf("expected insecureSkipVerify on the HTTP source, got %v", source.InsecureSkipVerify)
+	}
+
+	secure := &core.Secret{Data: map[string][]byte{"ca.crt": []byte("ca")}}
+	source = &cdi.DataVolumeSourceHTTP{}
+	setInsecureSkipVerify(source, secure)
+	if source.InsecureSkipVerify != nil {
+		t.Fatalf("expected verification left on for a secure provider, got %v", *source.InsecureSkipVerify)
 	}
 }
 
