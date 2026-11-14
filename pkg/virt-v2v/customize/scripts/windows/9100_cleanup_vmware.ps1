@@ -511,7 +511,7 @@ try {
     $publishedNames = @(
         Get-WindowsDriver -Online -ErrorAction Stop |
             Where-Object {
-                $_.OriginalFileName -notmatch '(?i)^pvscsi\.inf$' -and
+                $_.OriginalFileName -notmatch '(?i)(^|\\)pvscsi\.inf$' -and
                 (
                     $_.ProviderName -match 'VMware' -or
                     $_.OriginalFileName -match "(?i)($VMwareInfNames)"
