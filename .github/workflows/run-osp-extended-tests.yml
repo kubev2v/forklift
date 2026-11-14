@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get PR branch
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
         if: github.event_name == 'issue_comment'
       - name: Set latest commit status as pending
@@ -102,7 +102,7 @@ jobs:
 
       - name: Get PR branch
         if: always() && github.event_name == 'issue_comment'
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
       - name: Set latest commit status as ${{ job.status }}
