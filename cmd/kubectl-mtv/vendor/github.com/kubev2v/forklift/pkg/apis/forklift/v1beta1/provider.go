@@ -71,6 +71,12 @@ const (
 	ESXiCloneMethod        = "esxiCloneMethod"
 )
 
+// ESXi clone method values.
+const (
+	ESXiCloneMethodVIB = "vib"
+	ESXiCloneMethodSSH = "ssh"
+)
+
 const OvaProviderFinalizer = "forklift/ova-provider"
 
 // Defines the desired state of Provider.
