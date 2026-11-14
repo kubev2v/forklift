@@ -19,7 +19,7 @@ ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha2
 
 ARG COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE="registry.redhat.io/mtv-candidate/mtv-copy-appliance-builder-rhel9@sha256:b3a13e2aa91cf9d5f12077df6103a5ae5d7603a1e1e1b6ce90b36da53dc06c9b"
 
-ARG DEEP_INSPECTION_IMAGE="registry.redhat.io/mtv-candidate/mtv-deep-inspection-rhel10@sha256:616707c96bde12ae9642437c4d64611ef8b3436674038b7394377b3dced503cf"
+ARG DEEP_INSPECTION_IMAGE="registry.redhat.io/mtv-candidate/mtv-deep-inspection-rhel10@sha256:2b0700b3b42144be60a89633475cf52fe192197c6c57a31d567e1cacc92992f2"
 
 ARG DEEP_INSPECTION_IMAGE_RHEL9="registry.redhat.io/mtv-candidate/mtv-deep-inspection-rhel9@sha256:0255ca351644ecfae9da96a2f3f52107c01898aed03211dcd3dfb9e6b620d547"
 
