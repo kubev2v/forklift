@@ -1,22 +1,23 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"strconv"
+	"path/filepath"
 	"strings"
 
-	"github.com/google/uuid"
-
+	"github.com/vmware/govmomi/crypto"
 	"github.com/vmware/govmomi/internal"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
+	"github.com/vmware/govmomi/vmdk"
 )
 
 type VirtualDiskManager struct {
@@ -38,94 +39,144 @@ func vdmNames(name string) []string {
 	}
 }
 
-func vdmCreateVirtualDisk(ctx *Context, op types.VirtualDeviceConfigSpecFileOperation, req *types.CreateVirtualDisk_Task) types.BaseMethodFault {
+func vdmCreateVirtualDisk(
+	ctx *Context,
+	op types.VirtualDeviceConfigSpecFileOperation,
+	req *types.CreateVirtualDisk_Task) (*vmdk.Descriptor, types.BaseMethodFault) {
+
 	fm := ctx.Map.FileManager()
 
 	file, fault := fm.resolve(ctx, req.Datacenter, req.Name)
 	if fault != nil {
-		return fault
+		return nil, fault
 	}
 
 	shouldReplace := op == types.VirtualDeviceConfigSpecFileOperationReplace
 	shouldExist := op == ""
-	for _, name := range vdmNames(file) {
-		_, err := os.Stat(name)
-		if err == nil {
-			if shouldExist {
-				return nil
-			}
-			if shouldReplace {
-				if err = os.Truncate(file, 0); err != nil {
-					return fm.fault(name, err, new(types.CannotCreateFile))
-				}
-				return nil
-			}
-			return fm.fault(name, nil, new(types.FileAlreadyExists))
-		} else if shouldExist {
-			return fm.fault(name, nil, new(types.FileNotFound))
+
+	_, err := os.Stat(file)
+	if err == nil {
+		if shouldExist {
+			return nil, nil // TODO
 		}
-
-		f, err := os.Create(name)
-		if err != nil {
-			return fm.fault(name, err, new(types.CannotCreateFile))
+		if !shouldReplace {
+			return nil, fm.fault(file, nil, new(types.FileAlreadyExists))
 		}
-
-		if req.Spec != nil {
-			var spec any = req.Spec
-			fileBackedSpec, ok := spec.(*types.FileBackedVirtualDiskSpec)
-
-			if !ok {
-				return fm.fault(name, nil, new(types.FileFault))
-			}
-
-			if _, err = f.WriteString(strconv.FormatInt(fileBackedSpec.CapacityKb, 10)); err != nil {
-				return fm.fault(name, err, new(types.FileFault))
-			}
-		}
-
-		_ = f.Close()
+	} else if shouldExist {
+		return nil, fm.fault(file, nil, new(types.FileNotFound))
 	}
 
-	return nil
+	backing := VirtualDiskBackingFileName(file)
+
+	extent := vmdk.Extent{
+		Info: filepath.Base(backing),
+	}
+
+	f, err := os.Create(file)
+	if err != nil {
+		return nil, fm.fault(file, err, new(types.CannotCreateFile))
+	}
+
+	defer f.Close()
+
+	if req.Spec != nil {
+		spec, ok := req.Spec.(types.BaseFileBackedVirtualDiskSpec)
+		if !ok {
+			return nil, fm.fault(file, nil, new(types.FileFault))
+		}
+
+		fileSpec := spec.GetFileBackedVirtualDiskSpec()
+		extent.Size = fileSpec.CapacityKb * 1024 / vmdk.SectorSize
+	}
+
+	desc := vmdk.NewDescriptor(extent)
+
+	if req != nil && req.Spec != nil {
+		if s, ok := req.Spec.(*types.FileBackedVirtualDiskSpec); ok {
+			var (
+				providerID string
+				keyID      string
+			)
+
+			switch c := s.Crypto.(type) {
+			case *types.CryptoSpecEncrypt:
+				keyID = c.CryptoKeyId.KeyId
+				if c.CryptoKeyId.ProviderId != nil {
+					providerID = c.CryptoKeyId.ProviderId.Id
+				}
+
+			case *types.CryptoSpecDeepRecrypt:
+				keyID = c.NewKeyId.KeyId
+				if c.NewKeyId.ProviderId != nil {
+					providerID = c.NewKeyId.ProviderId.Id
+				}
+			case *types.CryptoSpecShallowRecrypt:
+				keyID = c.NewKeyId.KeyId
+				if c.NewKeyId.ProviderId != nil {
+					providerID = c.NewKeyId.ProviderId.Id
+				}
+			}
+
+			if providerID != "" || keyID != "" {
+				desc.EncryptionKeys = &crypto.KeyLocator{
+					Type: crypto.KeyLocatorTypeList,
+					List: []*crypto.KeyLocator{
+						{
+							Type: crypto.KeyLocatorTypePair,
+							Pair: &crypto.KeyLocatorPair{
+								CryptoMAC:  "HMAC-SHA-256",
+								LockedData: []byte("Cg=="),
+								Locker: &crypto.KeyLocator{
+									Type: crypto.KeyLocatorTypeFQID,
+									Indirect: &crypto.KeyLocatorIndirect{
+										Type: crypto.KeyLocatorTypeFQID,
+										FQID: crypto.KeyLocatorFQIDParams{
+											KeyServerID: providerID,
+											KeyID:       keyID,
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+			}
+		}
+	}
+	if err := desc.Write(f); err != nil {
+		return nil, fm.fault(file, err, new(types.FileFault))
+	}
+
+	b, err := os.Create(backing)
+	if err != nil {
+		return nil, fm.fault(backing, err, new(types.CannotCreateFile))
+	}
+	_ = b.Close()
+
+	return desc, nil
 }
 
 func vdmExtendVirtualDisk(ctx *Context, req *types.ExtendVirtualDisk_Task) types.BaseMethodFault {
 	fm := ctx.Map.FileManager()
 
-	file, fault := fm.resolve(ctx, req.Datacenter, req.Name)
+	desc, file, fault := fm.DiskDescriptor(ctx, req.Datacenter, req.Name)
 	if fault != nil {
 		return fault
 	}
 
-	for _, name := range vdmNames(file) {
-		_, err := os.Stat(name)
-		if err == nil {
-			content, err := os.ReadFile(name)
-			if err != nil {
-				return fm.fault(name, err, new(types.FileFault))
-			}
-
-			capacity, err := strconv.Atoi(string(content))
-			if err != nil {
-				return fm.fault(name, err, new(types.FileFault))
-			}
-
-			if int64(capacity) > req.NewCapacityKb {
-				// cannot shrink disk
-				return fm.fault(name, nil, new(types.FileFault))
-			}
-			return nil
-		} else {
-			return fm.fault(name, nil, new(types.FileNotFound))
-		}
+	newCapacity := req.NewCapacityKb * 1024
+	if desc.Capacity() > newCapacity {
+		return fm.fault(req.Name, errors.New("cannot shrink disk"), new(types.FileFault))
 	}
 
-	return nil
+	desc.Extent[0].Size = newCapacity / vmdk.SectorSize
+
+	return fm.SaveDiskDescriptor(ctx, desc, file)
 }
 
 func (m *VirtualDiskManager) CreateVirtualDiskTask(ctx *Context, req *types.CreateVirtualDisk_Task) soap.HasFault {
 	task := CreateTask(m, "createVirtualDisk", func(*Task) (types.AnyType, types.BaseMethodFault) {
-		if err := vdmCreateVirtualDisk(ctx, types.VirtualDeviceConfigSpecFileOperationCreate, req); err != nil {
+		if _, err := vdmCreateVirtualDisk(ctx, types.VirtualDeviceConfigSpecFileOperationCreate, req); err != nil {
 			return "", err
 		}
 		return req.Name, nil
@@ -210,25 +261,81 @@ func (m *VirtualDiskManager) MoveVirtualDiskTask(ctx *Context, req *types.MoveVi
 
 func (m *VirtualDiskManager) CopyVirtualDiskTask(ctx *Context, req *types.CopyVirtualDisk_Task) soap.HasFault {
 	task := CreateTask(m, "copyVirtualDisk", func(*Task) (types.AnyType, types.BaseMethodFault) {
-		if req.DestSpec != nil {
-			// TODO: apply to destination vmdk.Descriptor
-		}
 
 		fm := ctx.Map.FileManager()
 
 		dest := vdmNames(req.DestName)
 
 		for i, name := range vdmNames(req.SourceName) {
-			err := fm.copyDatastoreFile(ctx, &types.CopyDatastoreFile_Task{
+
+			if fault := fm.copyDatastoreFile(ctx, &types.CopyDatastoreFile_Task{
 				SourceName:            name,
 				SourceDatacenter:      req.SourceDatacenter,
 				DestinationName:       dest[i],
 				DestinationDatacenter: req.DestDatacenter,
 				Force:                 req.Force,
-			})
+			}); fault != nil {
+				return nil, fault
+			}
 
-			if err != nil {
-				return nil, err
+			if req.DestSpec != nil {
+				desc, descPath, fault := fm.DiskDescriptor(ctx, req.DestDatacenter, dest[i])
+				if fault != nil {
+					return nil, fault
+				}
+				if s, ok := req.DestSpec.(*types.FileBackedVirtualDiskSpec); ok {
+
+					var (
+						keyID      string
+						providerID string
+					)
+					switch c := s.Crypto.(type) {
+					case *types.CryptoSpecEncrypt:
+						keyID = c.CryptoKeyId.KeyId
+						if c.CryptoKeyId.ProviderId != nil {
+							providerID = c.CryptoKeyId.ProviderId.Id
+						}
+					case *types.CryptoSpecDeepRecrypt:
+						keyID = c.NewKeyId.KeyId
+						if c.NewKeyId.ProviderId != nil {
+							providerID = c.NewKeyId.ProviderId.Id
+						}
+					case *types.CryptoSpecShallowRecrypt:
+						keyID = c.NewKeyId.KeyId
+						if c.NewKeyId.ProviderId != nil {
+							providerID = c.NewKeyId.ProviderId.Id
+						}
+					}
+
+					if providerID != "" || keyID != "" {
+						desc.EncryptionKeys = &crypto.KeyLocator{
+							Type: crypto.KeyLocatorTypeList,
+							List: []*crypto.KeyLocator{
+								{
+									Type: crypto.KeyLocatorTypePair,
+									Pair: &crypto.KeyLocatorPair{
+										CryptoMAC:  "HMAC-SHA-256",
+										LockedData: []byte("Cg=="),
+										Locker: &crypto.KeyLocator{
+											Type: crypto.KeyLocatorTypeFQID,
+											Indirect: &crypto.KeyLocatorIndirect{
+												Type: crypto.KeyLocatorTypeFQID,
+												FQID: crypto.KeyLocatorFQIDParams{
+													KeyServerID: providerID,
+													KeyID:       keyID,
+												},
+											},
+										},
+									},
+								},
+							},
+						}
+					}
+				}
+
+				if fault := fm.SaveDiskDescriptor(ctx, desc, descPath); fault != nil {
+					return nil, fault
+				}
 			}
 		}
 
@@ -246,7 +353,7 @@ func virtualDiskUUID(dc *types.ManagedObjectReference, file string) string {
 	if dc != nil {
 		file = dc.String() + file
 	}
-	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(file)).String()
+	return newUUID(file)
 }
 
 func (m *VirtualDiskManager) QueryVirtualDiskUuid(ctx *Context, req *types.QueryVirtualDiskUuid) soap.HasFault {
