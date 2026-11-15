@@ -681,6 +681,47 @@ func TestPendingPopulationNotPromotedOnWarmMigration(t *testing.T) {
 	g.Expect(dvPhase).To(gomega.Equal(cdi.PendingPopulation))
 }
 
+func TestPermanentDataVolumeBoundFailure(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	g.Expect(permanentDataVolumeBoundFailure(nil)).To(gomega.BeEmpty())
+	g.Expect(permanentDataVolumeBoundFailure(&libcnd.Conditions{})).To(gomega.BeEmpty())
+
+	conds := &libcnd.Conditions{}
+	conds.SetCondition(libcnd.Condition{Type: "Bound", Status: True, Reason: "Bound"})
+	g.Expect(permanentDataVolumeBoundFailure(conds)).To(gomega.BeEmpty())
+
+	conds = &libcnd.Conditions{}
+	conds.SetCondition(libcnd.Condition{
+		Type: "Bound", Status: False, Reason: "NotFound", Message: "PVC not found",
+	})
+	g.Expect(permanentDataVolumeBoundFailure(conds)).To(gomega.BeEmpty())
+
+	conds = &libcnd.Conditions{}
+	conds.SetCondition(libcnd.Condition{
+		Type: "Bound", Status: False, Reason: "ErrClaimNotValid",
+		Message: "no volumeMode matching the volumeMode filesystem",
+	})
+	msg := permanentDataVolumeBoundFailure(conds)
+	g.Expect(msg).To(gomega.ContainSubstring("ErrClaimNotValid"))
+	g.Expect(msg).To(gomega.ContainSubstring("volumeMode"))
+
+	conds = &libcnd.Conditions{}
+	conds.SetCondition(libcnd.Condition{Type: "Bound", Status: False, Reason: "ClaimLost"})
+	g.Expect(permanentDataVolumeBoundFailure(conds)).To(gomega.ContainSubstring("ClaimLost"))
+}
+
+func TestShouldMarkCopyStepCompleted(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	// MTV-7538: dvs present but idle, pvcs nil → must not treat 0==0 as completed.
+	g.Expect(shouldMarkCopyStepCompleted(0, 1, 0)).To(gomega.BeFalse())
+	g.Expect(shouldMarkCopyStepCompleted(0, 0, 0)).To(gomega.BeFalse())
+	g.Expect(shouldMarkCopyStepCompleted(1, 1, 0)).To(gomega.BeTrue())
+	g.Expect(shouldMarkCopyStepCompleted(2, 0, 2)).To(gomega.BeTrue())
+	g.Expect(shouldMarkCopyStepCompleted(0, 0, 1)).To(gomega.BeFalse())
+}
+
 func newTestMigration(objects ...runtime.Object) *Migration {
 	scheme := runtime.NewScheme()
 	_ = core.AddToScheme(scheme)

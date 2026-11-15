@@ -397,6 +397,7 @@ func (r *Builder) mapDataVolume(vm *model.VM, disk hyperv.Disk, diskIndex int, d
 		StorageClassName: &storageClass,
 	}
 	if r.Plan.Spec.PreCopySourceDisks {
+		// qemu-img writes to a raw block device during SMB pre-copy, destination storage-class must support Block.
 		blockMode := core.PersistentVolumeBlock
 		storageSpec.VolumeMode = &blockMode
 	}

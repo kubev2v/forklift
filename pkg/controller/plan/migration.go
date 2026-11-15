@@ -2282,6 +2282,35 @@ func (r *Migration) verifyImporterReady(
 	return true, ""
 }
 
+// permanentDataVolumeBoundFailure returns an error message when the DataVolume Bound
+func permanentDataVolumeBoundFailure(conditions *libcnd.Conditions) string {
+	if conditions == nil {
+		return ""
+	}
+	cnd := conditions.FindCondition("Bound")
+	if cnd == nil || cnd.Status != False {
+		return ""
+	}
+	switch cnd.Reason {
+	case "ErrClaimNotValid", "ClaimLost":
+		msg := cnd.Message
+		if msg == "" {
+			msg = cnd.Reason
+		}
+		return fmt.Sprintf("DataVolume Bound=False (%s): %s", cnd.Reason, msg)
+	}
+	return ""
+}
+
+// shouldMarkCopyStepCompleted reports whether the copy step's DV/PVC counters indicate
+// completion. When DVs are present, only DV counts count, nil PVCs must not yield 0==0.
+func shouldMarkCopyStepCompleted(completed, dvCount, pvcCount int) bool {
+	if dvCount > 0 {
+		return completed == dvCount
+	}
+	return pvcCount > 0 && completed == pvcCount
+}
+
 // Update the progress of the appropriate disk copy step. (DiskTransfer, Cutover)
 func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
 	var pendingReason string
@@ -2324,6 +2353,13 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			if !found {
 				continue
 			}
+			conditions := dv.Conditions()
+			// Fail fast on permanent Bound failures (e.g. Block requested but SC is Filesystem-only).
+			if msg := permanentDataVolumeBoundFailure(conditions); msg != "" {
+				task.AddError(msg)
+				task.MarkCompleted()
+				continue
+			}
 			if dv.Status.Phase == cdi.PendingPopulation && r.Source.Provider.RequiresConversion() && !r.Plan.IsWarm() {
 				// Cold conversion migrations: the conversion pod is the first consumer of
 				// the PVCs, so PendingPopulation can be treated as Succeeded. Warm migrations
@@ -2332,7 +2368,6 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				r.setTaskCompleted(task)
 				continue
 			}
-			conditions := dv.Conditions()
 			switch dv.Status.Phase {
 			case cdi.Succeeded:
 				canMarkCompleted, reason := r.verifyDataVolumeCompletion(dv.DataVolume, vm)
@@ -2524,7 +2559,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 	} else if running > 0 {
 		step.Phase = api.StepRunning
 		step.Reason = ""
-	} else if (len(dvs) > 0 && completed == len(dvs)) || completed == len(pvcs) {
+	} else if shouldMarkCopyStepCompleted(completed, len(dvs), len(pvcs)) {
 		step.Phase = api.StepCompleted
 		step.Reason = ""
 	}

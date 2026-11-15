@@ -42,6 +42,7 @@ import (
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -127,6 +128,9 @@ const (
 	// but its source datastore is NFS.
 	XcopyOffloadDiskNotVMFS = "XcopyOffloadDiskNotVMFS"
 	ConversionResumable     = "ConversionResumable"
+	// PreCopyRequiresBlockStorage (Critical) blocks Hyper-V preCopySourceDisks when a mapped
+	// destination StorageClass has no Block claim property on its CDI StorageProfile.
+	PreCopyRequiresBlockStorage = "PreCopyRequiresBlockStorage"
 )
 
 // Categories
@@ -291,6 +295,10 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	if err = r.validatePreCopySourceDisks(ctx); err != nil {
+		return err
+	}
+
 	// Validate pod security policies (non-blocking warning)
 	if err = r.validatePodSecurity(plan); err != nil {
 		// Log error but don't block validation
@@ -384,6 +392,65 @@ func (r *Reconciler) ensureSecretForProvider(plan *api.Plan) error {
 	}
 
 	return nil
+}
+
+// validatePreCopySourceDisks requires mapped destination StorageClasses to support Block
+// volume mode when Hyper-V preCopySourceDisks is enabled (blank Block DataVolumes).
+func (r *Reconciler) validatePreCopySourceDisks(ctx *plancontext.Context) error {
+	plan := ctx.Plan
+	if !plan.Spec.PreCopySourceDisks || !plan.IsSourceProviderHyperV() || plan.Map.Storage == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var unsupported []string
+	for _, pair := range plan.Map.Storage.Spec.Map {
+		sc := pair.Destination.StorageClass
+		if sc == "" || seen[sc] {
+			continue
+		}
+		seen[sc] = true
+		supports, err := storageProfileSupportsBlock(ctx.Destination.Client, sc)
+		if err != nil {
+			if k8serr.IsNotFound(err) {
+				unsupported = append(unsupported, fmt.Sprintf("%s (StorageProfile not found)", sc))
+				continue
+			}
+			return liberr.Wrap(err, "check StorageProfile for Block support", "storageClass", sc)
+		}
+		if !supports {
+			unsupported = append(unsupported, sc)
+		}
+	}
+	if len(unsupported) == 0 {
+		return nil
+	}
+	plan.Status.SetCondition(libcnd.Condition{
+		Type:     PreCopyRequiresBlockStorage,
+		Status:   True,
+		Category: api.CategoryCritical,
+		Reason:   NotSupported,
+		Message: fmt.Sprintf(
+			"preCopySourceDisks requires destination StorageClass(es) that support Block volume mode, not supported: %s",
+			strings.Join(unsupported, ", ")),
+		Items: unsupported,
+	})
+	return nil
+}
+
+// storageProfileSupportsBlock is true when the CDI StorageProfile for the StorageClass
+// advertises at least one ClaimPropertySet with VolumeMode=Block.
+func storageProfileSupportsBlock(c client.Client, storageClassName string) (bool, error) {
+	sp := &cdi.StorageProfile{}
+	err := c.Get(context.TODO(), client.ObjectKey{Name: storageClassName}, sp)
+	if err != nil {
+		return false, err
+	}
+	for _, cps := range sp.Status.ClaimPropertySets {
+		if cps.VolumeMode != nil && *cps.VolumeMode == core.PersistentVolumeBlock {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // validateNetAppShift checks plan-level NetApp Shift constraints (warm migration blocker)
