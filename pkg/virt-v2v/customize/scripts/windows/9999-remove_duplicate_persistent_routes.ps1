@@ -43,6 +43,80 @@ function Remove-PersistentRoute($route) {
     }
 }
 
+# CLM-safe check: is an IPv4 next-hop within a given subnet?
+function Test-IPv4OnLink($nextHop, $ifAddress, $prefixLength) {
+    $hopParts = $nextHop.Split('.')
+    $addrParts = $ifAddress.Split('.')
+    if ($hopParts.Count -ne 4 -or $addrParts.Count -ne 4) { return $false }
+    $maskParts = (Convert-PrefixToMask $prefixLength).Split('.')
+    for ($i = 0; $i -lt 4; $i++) {
+        if (([int]$hopParts[$i] -band [int]$maskParts[$i]) -ne `
+            ([int]$addrParts[$i] -band [int]$maskParts[$i])) {
+            return $false
+        }
+    }
+    return $true
+}
+
+# IPv4 only. Match NextHop, or destination when NextHop is 0.0.0.0 (on-link).
+# Returns @{ Index: LookupFailed } — any failed lookup with no match => LookupFailed.
+# Only Status=Up adapters (disconnected source NICs often still have stale IPs).
+function Find-LiveInterfaceForNextHop($route, $liveAdapters) {
+    if ($route.AddressFamily -ne "IPv4") {
+        return @{ Index = $null; LookupFailed = $false }
+    }
+    $hop = $route.NextHop
+    if ($hop -eq "0.0.0.0") {
+        $hop = $route.DestinationPrefix.Split("/")[0]
+    }
+    $lookupFailed = $false
+    foreach ($adapter in $liveAdapters) {
+        if ($adapter.Status -ne "Up") { continue }
+        try {
+            $addresses = Get-NetIPAddress -InterfaceIndex $adapter.InterfaceIndex `
+                -AddressFamily IPv4 -ErrorAction Stop
+        } catch {
+            $lookupFailed = $true
+            continue
+        }
+        foreach ($addr in $addresses) {
+            if ($addr.IPAddress -eq "127.0.0.1" -or $addr.IPAddress.StartsWith("169.254")) { continue }
+            if (Test-IPv4OnLink $hop $addr.IPAddress $addr.PrefixLength) {
+                return @{ Index = $adapter.InterfaceIndex; LookupFailed = $false }
+            }
+        }
+    }
+    return @{ Index = $null; LookupFailed = $lookupFailed }
+}
+
+# Add a persistent route on the given interface, with route.exe fallback for IPv4.
+# Returns $true on success.
+function Add-PersistentRouteToInterface($dest, $nextHop, $metric, $interfaceIndex, $isIPv4) {
+    $ok = $false
+    try {
+        $null = New-NetRoute -DestinationPrefix $dest -InterfaceIndex $interfaceIndex `
+            -NextHop $nextHop -RouteMetric $metric -PolicyStore PersistentStore -ErrorAction Stop
+        $ok = $true
+    } catch {
+        Write-Host "      New-NetRoute failed: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+    if (-not $ok -and $isIPv4) {
+        $parts = $dest.Split("/")
+        $network = $parts[0]
+        $netmask = Convert-PrefixToMask ([int]$parts[1])
+        # Windows requires METRIC before IF
+        $metricStr = if ($null -ne $metric) { " METRIC $([int]$metric)" } else { "" }
+        $command = "route -p ADD $network MASK $netmask $nextHop$metricStr IF $interfaceIndex"
+        $result = cmd /c $command 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            $ok = $true
+        } else {
+            Write-Host "      route.exe add failed (exit $LASTEXITCODE): $result" -ForegroundColor Yellow
+        }
+    }
+    return $ok
+}
+
 # Get persistent routes
 try {
     $routes = Get-NetRoute -PolicyStore PersistentStore -ErrorAction Stop
@@ -140,8 +214,9 @@ if (-not $groupedRoutes) {
             # Fallback to route.exe if PolicyStore failed (IPv4 only)
             if (-not $reAddSucceeded -and $dest -eq "0.0.0.0/0") {
                 try {
-                    $metricStr = if ($null -ne $metric) { "METRIC $([int]$metric)" } else { "" }
-                    $command = "route -p ADD 0.0.0.0 MASK 0.0.0.0 $gateway IF $($toKeep.InterfaceIndex) $metricStr"
+                    # Windows requires METRIC before IF
+                    $metricStr = if ($null -ne $metric) { " METRIC $([int]$metric)" } else { "" }
+                    $command = "route -p ADD 0.0.0.0 MASK 0.0.0.0 $gateway$metricStr IF $($toKeep.InterfaceIndex)"
                     Write-Host "      Trying route.exe: $command" -ForegroundColor Gray
                     cmd /c $command
                     if ($LASTEXITCODE -ne 0) {
@@ -235,11 +310,9 @@ if (-not $groupedRoutes) {
             $network = $parts[0]
             $prefix = [int]$parts[1]
             $netmask = Convert-PrefixToMask $prefix
-            $metricStr = if ($null -ne $metric) { "METRIC $([int]$metric)" } else { "" }
-            $command = "route -p ADD $network MASK $netmask $gateway IF $interfaceIndex"
-            if ($metricStr -ne "") {
-                $command += " $metricStr"
-            }
+            # Windows requires METRIC before IF
+            $metricStr = if ($null -ne $metric) { " METRIC $([int]$metric)" } else { "" }
+            $command = "route -p ADD $network MASK $netmask $gateway$metricStr IF $interfaceIndex"
 
             try {
                 cmd /c $command
@@ -255,29 +328,100 @@ if (-not $groupedRoutes) {
     }
 }
 
-# Step 3: Remove persistent routes bound to interfaces that no longer exist (stale after migration)
-Write-Host "Removing stale persistent routes on dead interfaces..." -ForegroundColor Yellow
+# Step 3: rebind routes on dead IF indexes to a live NIC if the
+# next-hop is on-link, remove orphans. Skip unbound (IF <= 0).
+Write-Host "Reconciling persistent routes on obsolete interface indexes..." -ForegroundColor Yellow
 # Re-read persistent routes after Step 2 cleanup (both IPv4 and IPv6)
 $allPersistent = Get-NetRoute -PolicyStore PersistentStore -ErrorAction SilentlyContinue
 # Collect interface indexes that are actually present on this machine (including hidden adapters like loopback)
 $activeIndexes = @(Get-NetAdapter -IncludeHidden -ErrorAction SilentlyContinue | ForEach-Object { $_.InterfaceIndex })
 if ($activeIndexes.Count -eq 0) {
-    Write-Host "  WARNING: Could not enumerate active adapters; skipping stale route sweep." -ForegroundColor Yellow
+    Write-Host "  WARNING: Could not enumerate active adapters; skipping stale route reconciliation." -ForegroundColor Yellow
 } else {
-    $staleCount = 0
+    $liveAdaptersStep3 = Get-NetAdapter
+    $reboundCount = 0
+    $removedCount = 0
+    $failedCount = 0
+
     foreach ($route in $allPersistent) {
-        # If the route's interface doesn't exist, it's leftover from the source VM's old adapters
-        if ($activeIndexes -notcontains $route.InterfaceIndex) {
+        # Unbound routes (IF 0 or negative) are not tied to any adapter — leave them alone
+        if ($route.InterfaceIndex -le 0) { continue }
+
+        # Route is on a live adapter — nothing to do
+        if ($activeIndexes -contains $route.InterfaceIndex) { continue }
+
+        # --- dead interface index ---
+        $dest     = $route.DestinationPrefix
+        $nextHop  = $route.NextHop
+        $metric   = $route.RouteMetric
+        $deadIF   = $route.InterfaceIndex
+        $isIPv4   = $route.AddressFamily -eq "IPv4"
+
+        # Check whether an identical dest+nextHop already exists on a live interface
+        $liveCopy = Get-NetRoute -DestinationPrefix $dest -PolicyStore PersistentStore `
+            -ErrorAction SilentlyContinue |
+            Where-Object { $_.NextHop -eq $nextHop -and ($activeIndexes -contains $_.InterfaceIndex) }
+
+        if ($liveCopy) {
+            # A live copy exists — this dead-IF entry is a leftover duplicate; just delete it
             Remove-PersistentRoute $route
-            Write-Host "  Removed stale: $($route.DestinationPrefix) via $($route.NextHop) on dead IF $($route.InterfaceIndex)" -ForegroundColor Red
-            $staleCount++
+            $still = Get-NetRoute -DestinationPrefix $dest -InterfaceIndex $deadIF `
+                -PolicyStore PersistentStore -ErrorAction SilentlyContinue |
+                Where-Object { $_.NextHop -eq $nextHop }
+            if (-not $still) {
+                Write-Host "  Removed duplicate: $dest via $nextHop on dead IF $deadIF (live copy on IF $($liveCopy[0].InterfaceIndex))" -ForegroundColor Yellow
+                $removedCount++
+            } else {
+                Write-Host "  FAILED to remove duplicate: $dest via $nextHop on dead IF $deadIF" -ForegroundColor Red
+                $failedCount++
+            }
+            continue
+        }
+
+        # No live copy — try to rebind to a live adapter whose subnet covers the route
+        $find = Find-LiveInterfaceForNextHop $route $liveAdaptersStep3
+        if ($find.LookupFailed) {
+            Write-Host "  FAILED address lookup (left on dead IF $deadIF): $dest via $nextHop" -ForegroundColor Red
+            $failedCount++
+            continue
+        }
+        $targetIF = $find.Index
+
+        if ($null -ne $targetIF) {
+            # Rebind: add on live IF first so a failed re-add cannot drop the only copy
+            $added = Add-PersistentRouteToInterface $dest $nextHop $metric $targetIF $isIPv4
+            if (-not $added) {
+                Write-Host "  FAILED to rebind (left on dead IF $deadIF): $dest via $nextHop -> IF $targetIF" -ForegroundColor Red
+                $failedCount++
+                continue
+            }
+            Remove-PersistentRoute $route
+            $still = Get-NetRoute -DestinationPrefix $dest -InterfaceIndex $deadIF `
+                -PolicyStore PersistentStore -ErrorAction SilentlyContinue |
+                Where-Object { $_.NextHop -eq $nextHop }
+            if (-not $still) {
+                Write-Host "  Rebound: $dest via $nextHop from dead IF $deadIF -> live IF $targetIF" -ForegroundColor Green
+                $reboundCount++
+            } else {
+                Write-Host "  Added on IF $targetIF but FAILED to remove dead IF ${deadIF}: $dest via $nextHop" -ForegroundColor Yellow
+                $reboundCount++
+            }
+        } else {
+            # True orphan: not on-link on any live adapter — remove
+            Remove-PersistentRoute $route
+            $still = Get-NetRoute -DestinationPrefix $dest -InterfaceIndex $deadIF `
+                -PolicyStore PersistentStore -ErrorAction SilentlyContinue |
+                Where-Object { $_.NextHop -eq $nextHop }
+            if (-not $still) {
+                Write-Host "  Removed orphan: $dest via $nextHop on dead IF $deadIF (next-hop unreachable)" -ForegroundColor Red
+                $removedCount++
+            } else {
+                Write-Host "  FAILED to remove orphan: $dest via $nextHop on dead IF $deadIF" -ForegroundColor Red
+                $failedCount++
+            }
         }
     }
-    if ($staleCount -eq 0) {
-        Write-Host "  No stale routes found." -ForegroundColor Green
-    } else {
-        Write-Host "  Removed $staleCount stale route(s)." -ForegroundColor Green
-    }
+    Write-Host "  Reconciled: $reboundCount rebound, $removedCount removed, $failedCount failed." -ForegroundColor Cyan
 }
 
 # Step 4: Configure default gateways at NIC/IP configuration level
