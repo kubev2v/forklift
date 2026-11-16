@@ -2,12 +2,88 @@ package vantara
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 )
+
+func TestRetryAddPath(t *testing.T) {
+	conflict := &storageError{raw: "conflict"}
+	conflict.ErrorCode.SSB1, conflict.ErrorCode.SSB2 = lunConflictSSB1, lunConflictSSB2
+	unrelated := errors.New("permission denied")
+	for _, tc := range []struct {
+		name      string
+		errors    []error
+		wantCalls int
+		wantErr   error
+	}{
+		{"success after conflicts", []error{conflict, conflict, nil}, 3, nil},
+		{"unrelated error", []error{unrelated}, 1, unrelated},
+		{"exhausted", []error{conflict}, 6, conflict},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls, sleeps := 0, 0
+			err := retryAddPath(func() error {
+				i := calls
+				calls++
+				if i >= len(tc.errors) {
+					i = len(tc.errors) - 1
+				}
+				return tc.errors[i]
+			}, func(delay time.Duration) {
+				if delay < time.Second || delay > 42800*time.Millisecond {
+					t.Errorf("unexpected delay %v", delay)
+				}
+				sleeps++
+			})
+			if calls != tc.wantCalls || sleeps != calls-1 {
+				t.Errorf("calls=%d sleeps=%d", calls, sleeps)
+			}
+			if !errors.Is(err, tc.wantErr) {
+				t.Errorf("error=%v, want %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestStorageErrorFromHTTP(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{"message":"mapping failed","errorCode":{"SSB1":%q,"SSB2":%q}}`, lunConflictSSB1, lunConflictSSB2)
+	}))
+	defer server.Close()
+	api := &BlockStorageAPI{httpClient: server.Client()}
+	_, err := api.makeHTTPRequest("POST", server.URL, nil, nil)
+	var storageErr *storageError
+	if !errors.As(err, &storageErr) || storageErr.ErrorCode.SSB1 != lunConflictSSB1 || storageErr.ErrorCode.SSB2 != lunConflictSSB2 {
+		t.Fatalf("expected structured conflict, got %v", err)
+	}
+}
+
+func TestStorageErrorFromFailedJob(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			fmt.Fprint(w, `{"jobId":1,"self":"/jobs/1"}`)
+			return
+		}
+		fmt.Fprintf(w, `{"status":"Completed","state":"Failed","error":{"message":"mapping failed","errorCode":{"SSB1":%q,"SSB2":%q}}}`, lunConflictSSB1, lunConflictSSB2)
+	}))
+	defer server.Close()
+	api := &BlockStorageAPI{httpClient: server.Client(), BaseURL: server.URL}
+	_, err := api.InvokeAsyncCommand("POST", server.URL, nil, nil)
+	var storageErr *storageError
+	if !errors.As(err, &storageErr) || storageErr.ErrorCode.SSB1 != lunConflictSSB1 || storageErr.ErrorCode.SSB2 != lunConflictSSB2 {
+		t.Fatalf("expected structured conflict, got %v", err)
+	}
+}
+
+func testServerHostPort(s *httptest.Server) (string, string) {
+	host, port, _ := net.SplitHostPort(s.Listener.Addr().String())
+	return host, port
+}
 
 // TestNewBlockStorageAPI tests the constructor
 func TestNewBlockStorageAPI(t *testing.T) {
