@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/base"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	vspheremodel "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -27,6 +29,7 @@ import (
 	discovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/utils/ptr"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	fakeClient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -735,6 +738,90 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			gomega.Expect(cnd.Message).To(gomega.ContainSubstring("Insufficient space"))
 			gomega.Expect(cnd.Message).To(gomega.ContainSubstring("1Ti"))
 		})
+	})
+})
+
+var _ = ginkgo.Describe("validatePreCopySourceDisks", func() {
+	hyperV := api.HyperV
+	blockMode := core.PersistentVolumeBlock
+	fsMode := core.PersistentVolumeFilesystem
+
+	newCtx := func(plan *api.Plan, objects ...runtime.Object) *plancontext.Context {
+		scheme := runtime.NewScheme()
+		gomega.Expect(cdi.AddToScheme(scheme)).To(gomega.Succeed())
+		client := fakeClient.NewClientBuilder().
+			WithScheme(scheme).
+			WithRuntimeObjects(objects...).
+			Build()
+		return &plancontext.Context{
+			Plan: plan,
+			Destination: plancontext.Destination{
+				Client: client,
+			},
+			Log: planValidationLog,
+		}
+	}
+
+	storageMap := func(storageClasses ...string) *api.StorageMap {
+		pairs := make([]api.StoragePair, 0, len(storageClasses))
+		for i, sc := range storageClasses {
+			pairs = append(pairs, api.StoragePair{
+				Source:      ref.Ref{ID: fmt.Sprintf("disk-%d", i)},
+				Destination: api.DestinationStorage{StorageClass: sc},
+			})
+		}
+		return &api.StorageMap{Spec: api.StorageMapSpec{Map: pairs}}
+	}
+
+	ginkgo.It("should pass when StorageProfile advertises Block", func() {
+		plan := &api.Plan{Spec: api.PlanSpec{PreCopySourceDisks: true}}
+		plan.Provider.Source = &api.Provider{Spec: api.ProviderSpec{Type: &hyperV}}
+		plan.Map.Storage = storageMap("ocs-rbd")
+		sp := &cdi.StorageProfile{
+			ObjectMeta: meta.ObjectMeta{Name: "ocs-rbd"},
+			Status: cdi.StorageProfileStatus{
+				ClaimPropertySets: []cdi.ClaimPropertySet{{
+					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+					VolumeMode:  &blockMode,
+				}},
+			},
+		}
+		r := createFakeReconciler()
+		err := r.validatePreCopySourceDisks(newCtx(plan, sp))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(plan.Status.HasCondition(PreCopyRequiresBlockStorage)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should block when StorageProfile is Filesystem-only", func() {
+		plan := &api.Plan{Spec: api.PlanSpec{PreCopySourceDisks: true}}
+		plan.Provider.Source = &api.Provider{Spec: api.ProviderSpec{Type: &hyperV}}
+		plan.Map.Storage = storageMap("nfs-csi")
+		sp := &cdi.StorageProfile{
+			ObjectMeta: meta.ObjectMeta{Name: "nfs-csi"},
+			Status: cdi.StorageProfileStatus{
+				ClaimPropertySets: []cdi.ClaimPropertySet{{
+					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteMany},
+					VolumeMode:  &fsMode,
+				}},
+			},
+		}
+		r := createFakeReconciler()
+		err := r.validatePreCopySourceDisks(newCtx(plan, sp))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(plan.Status.HasCondition(PreCopyRequiresBlockStorage)).To(gomega.BeTrue())
+		cnd := plan.Status.FindCondition(PreCopyRequiresBlockStorage)
+		gomega.Expect(cnd.Message).To(gomega.ContainSubstring("nfs-csi"))
+		gomega.Expect(cnd.Category).To(gomega.Equal(api.CategoryCritical))
+	})
+
+	ginkgo.It("should skip when preCopySourceDisks is false", func() {
+		plan := &api.Plan{Spec: api.PlanSpec{PreCopySourceDisks: false}}
+		plan.Provider.Source = &api.Provider{Spec: api.ProviderSpec{Type: &hyperV}}
+		plan.Map.Storage = storageMap("nfs-csi")
+		r := createFakeReconciler()
+		err := r.validatePreCopySourceDisks(newCtx(plan))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(plan.Status.HasCondition(PreCopyRequiresBlockStorage)).To(gomega.BeFalse())
 	})
 })
 
