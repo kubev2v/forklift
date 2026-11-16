@@ -30,7 +30,7 @@ FROM registry.access.redhat.com/ubi10:10.2-1792744468 AS runtime
 # RPM (its kernel deps resolve from CS10; it provides btrfs.ko for the
 # libguestfs appliance). UBI is updated before CS10 is enabled so base
 # packages (glibc, systemd, openssl-libs) are not mixed between UBI and CS10.
-COPY build/virt-v2v/prefetch/ /tmp/virt-v2v-prefetch/
+COPY build/virt-v2v/prefetch/kernel-modules-internal-6.12.0-279.el10.x86_64.rpm /tmp/virt-v2v-prefetch/kernel-modules-internal-6.12.0-279.el10.x86_64.rpm
 COPY build/virt-v2v/repos/centos-stream10-runtime.repo /tmp/cs10-repos/centos-stream10-runtime.repo
 COPY build/virt-v2v/scripts/enable-cs10-repos.sh /tmp/enable-cs10-repos.sh
 
@@ -38,7 +38,7 @@ RUN dnf update -y
 
 RUN chmod 755 /tmp/enable-cs10-repos.sh && \
     /tmp/enable-cs10-repos.sh centos-stream10-runtime.repo && \
-    dnf install -y /tmp/virt-v2v-prefetch/kernel-modules-internal-*.rpm
+    dnf install -y /tmp/virt-v2v-prefetch/kernel-modules-internal-6.12.0-279.el10.x86_64.rpm
 
 RUN rm /etc/pki/tls/fips_local.cnf && \
     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
