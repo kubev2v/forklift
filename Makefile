@@ -369,7 +369,6 @@ ensure-virtio-win-legacy:
 
 ensure-kernel-modules-internal:
 	@if [ -s "$(KERNEL_MODULES_INTERNAL_RPM)" ]; then :; \
-	elif ls build/virt-v2v/prefetch/kernel-modules-internal-*.x86_64.rpm >/dev/null 2>&1; then :; \
 	else bash build/virt-v2v/scripts/fetch-kernel-modules-internal.sh || \
 		echo "Note: kernel-modules-internal RPM not prefetched; the runtime stage will fail without it."; fi
 
