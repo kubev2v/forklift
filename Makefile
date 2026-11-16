@@ -129,6 +129,7 @@ OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)
 POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG)
 OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)
 OPENSTACK_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG)
+NUTANIX_HTTP_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/nutanix-http-populator:$(REGISTRY_TAG)
 OVA_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG)
 HYPERV_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-hyperv-provider-server:$(REGISTRY_TAG)
 OVA_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG)
@@ -461,6 +462,12 @@ build-openstack-populator-image: check_container_runtime
 push-openstack-populator-image: build-openstack-populator-image
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
 
+build-nutanix-http-populator-image: check_container_runtime
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(NUTANIX_HTTP_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/nutanix-http-populator/Containerfile .
+
+push-nutanix-http-populator-image: build-nutanix-http-populator-image
+	$(CONTAINER_CMD) push $(NUTANIX_HTTP_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
+
 build-vsphere-copy-offload-populator-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/vsphere-copy-offload-populator/Containerfile .
 
@@ -544,6 +551,7 @@ build-all-images: build-api-image \
                   build-populator-controller-image \
                   build-ovirt-populator-image \
                   build-openstack-populator-image\
+                  build-nutanix-http-populator-image\
                   build-vsphere-copy-offload-populator-image\
                   build-copy-appliance-template-builder-image \
                   build-nbd-container-image \
@@ -564,6 +572,7 @@ push-all-images:  push-api-image \
                   push-populator-controller-image \
                   push-ovirt-populator-image \
                   push-openstack-populator-image\
+                  push-nutanix-http-populator-image\
                   push-vsphere-copy-offload-populator-image\
                   push-copy-appliance-template-builder-image \
                   push-nbd-container-image \

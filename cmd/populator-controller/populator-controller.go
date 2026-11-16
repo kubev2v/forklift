@@ -56,6 +56,13 @@ var populators = map[string]populator{
 		imageVar:        "VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE",
 		metricsEndpoint: ":8082",
 	},
+	"nutanix-http": {
+		kind:            "NutanixHTTPVolumePopulator",
+		resource:        "nutanixhttpvolumepopulators",
+		controllerFunc:  getNutanixHTTPPopulatorPodArgs,
+		imageVar:        "NUTANIX_HTTP_POPULATOR_IMAGE",
+		metricsEndpoint: ":8083",
+	},
 }
 
 func main() {
@@ -148,6 +155,21 @@ func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _
 	args = append(args, "--cr-namespace="+openstackPopulator.Namespace)
 
 	return args, nil
+}
+
+func getNutanixHTTPPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ corev1.PersistentVolumeClaim) ([]string, error) {
+	var populator v1beta1.NutanixHTTPVolumePopulator
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &populator)
+	if err != nil {
+		return nil, err
+	}
+	return []string{
+		"--volume-path=" + getVolumePath(rawBlock),
+		"--url=" + populator.Spec.URL,
+		"--secret-name=" + populator.Spec.SecretName,
+		"--cr-name=" + populator.Name,
+		"--cr-namespace=" + populator.Namespace,
+	}, nil
 }
 
 func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.PersistentVolumeClaim) ([]string, error) {

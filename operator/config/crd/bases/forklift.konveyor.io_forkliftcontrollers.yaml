@@ -751,6 +751,10 @@ spec:
                 description: OpenStack populator image. Optional. If left empty, the
                   operator automatically sets this from the release payload.
                 type: string
+              populator_nutanix_http_image_fqin:
+                description: Nutanix HTTP populator image. Optional. If left empty,
+                  the operator automatically sets this from the release payload.
+                type: string
               populator_ovirt_image_fqin:
                 description: oVirt populator image. Optional. If left empty, the operator
                   automatically sets this from the release payload.
