@@ -512,10 +512,14 @@ type VAppProduct struct {
 
 // Virtual Controller.
 type Controller struct {
-	Key       int32   `json:"key"`
-	BusNumber int32   `json:"busNumber"`
-	Bus       string  `json:"bus"`
-	Disks     []int32 `sql:""`
+	Type       string  `json:"type,omitempty"`
+	BusSharing string  `json:"busSharing,omitempty"`
+	Key        int32   `json:"key"`
+	BusNumber  int32   `json:"busNumber"`
+	Bus        string  `json:"bus"`
+	Disks      []int32 `sql:""`
+	// DiskKeys excludes non-disk devices in Disks; nil identifies historical records.
+	DiskKeys []int32 `json:"diskKeys"`
 }
 
 // Virtual Disk.
@@ -608,11 +612,11 @@ type DiskMountPoint struct {
 	// Total capacity of the disk, in bytes.
 	//
 	// This is part of the virtual machine configuration.
-	Capacity int64 `xml:"capacity,omitempty" json:"capacity,omitempty"`
+	Capacity *int64 `xml:"capacity,omitempty" json:"capacity,omitempty"`
 	// Free space on the disk, in bytes.
 	//
 	// This is retrieved by VMware Tools.
-	FreeSpace int64 `xml:"freeSpace,omitempty" json:"freeSpace,omitempty"`
+	FreeSpace *int64 `xml:"freeSpace,omitempty" json:"freeSpace,omitempty"`
 	// Filesystem type, if known.
 	//
 	// For example NTFS or ext3.

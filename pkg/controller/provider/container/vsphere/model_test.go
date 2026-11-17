@@ -401,6 +401,7 @@ func TestCollectNICs_ExcludesSRIOV(t *testing.T) {
 
 // Test getDiskGuestInfo method
 func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
+	reported := func(value int64) *int64 { return &value }
 	tests := []struct {
 		name        string
 		guestDisks  []model.DiskMountPoint
@@ -414,22 +415,22 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 				{
 					Key:            100,
 					DiskPath:       "C:\\",
-					Capacity:       1000000000,
-					FreeSpace:      500000000,
+					Capacity:       reported(1000000000),
+					FreeSpace:      reported(500000000),
 					FilesystemType: "NTFS",
 				},
 				{
 					Key:            200,
 					DiskPath:       "D:\\",
-					Capacity:       2000000000,
-					FreeSpace:      1500000000,
+					Capacity:       reported(2000000000),
+					FreeSpace:      reported(1500000000),
 					FilesystemType: "NTFS",
 				},
 				{
 					Key:            300,
 					DiskPath:       "/home",
-					Capacity:       3000000000,
-					FreeSpace:      2000000000,
+					Capacity:       reported(3000000000),
+					FreeSpace:      reported(2000000000),
 					FilesystemType: "ext4",
 				},
 			},
@@ -437,8 +438,8 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 			expected: &model.DiskMountPoint{
 				Key:            200,
 				DiskPath:       "D:\\",
-				Capacity:       2000000000,
-				FreeSpace:      1500000000,
+				Capacity:       reported(2000000000),
+				FreeSpace:      reported(1500000000),
 				FilesystemType: "NTFS",
 			},
 			expectFound: true,
@@ -449,15 +450,15 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 				{
 					Key:            100,
 					DiskPath:       "C:\\",
-					Capacity:       1000000000,
-					FreeSpace:      500000000,
+					Capacity:       reported(1000000000),
+					FreeSpace:      reported(500000000),
 					FilesystemType: "NTFS",
 				},
 				{
 					Key:            200,
 					DiskPath:       "D:\\",
-					Capacity:       2000000000,
-					FreeSpace:      1500000000,
+					Capacity:       reported(2000000000),
+					FreeSpace:      reported(1500000000),
 					FilesystemType: "NTFS",
 				},
 			},
@@ -465,8 +466,8 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 			expected: &model.DiskMountPoint{
 				Key:            100,
 				DiskPath:       "C:\\",
-				Capacity:       1000000000,
-				FreeSpace:      500000000,
+				Capacity:       reported(1000000000),
+				FreeSpace:      reported(500000000),
 				FilesystemType: "NTFS",
 			},
 			expectFound: true,
@@ -477,22 +478,22 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 				{
 					Key:            100,
 					DiskPath:       "C:\\",
-					Capacity:       1000000000,
-					FreeSpace:      500000000,
+					Capacity:       reported(1000000000),
+					FreeSpace:      reported(500000000),
 					FilesystemType: "NTFS",
 				},
 				{
 					Key:            200,
 					DiskPath:       "D:\\",
-					Capacity:       2000000000,
-					FreeSpace:      1500000000,
+					Capacity:       reported(2000000000),
+					FreeSpace:      reported(1500000000),
 					FilesystemType: "NTFS",
 				},
 				{
 					Key:            300,
 					DiskPath:       "/home",
-					Capacity:       3000000000,
-					FreeSpace:      2000000000,
+					Capacity:       reported(3000000000),
+					FreeSpace:      reported(2000000000),
 					FilesystemType: "ext4",
 				},
 			},
@@ -500,8 +501,8 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 			expected: &model.DiskMountPoint{
 				Key:            300,
 				DiskPath:       "/home",
-				Capacity:       3000000000,
-				FreeSpace:      2000000000,
+				Capacity:       reported(3000000000),
+				FreeSpace:      reported(2000000000),
 				FilesystemType: "ext4",
 			},
 			expectFound: true,
@@ -512,15 +513,15 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 				{
 					Key:            100,
 					DiskPath:       "C:\\",
-					Capacity:       1000000000,
-					FreeSpace:      500000000,
+					Capacity:       reported(1000000000),
+					FreeSpace:      reported(500000000),
 					FilesystemType: "NTFS",
 				},
 				{
 					Key:            200,
 					DiskPath:       "D:\\",
-					Capacity:       2000000000,
-					FreeSpace:      1500000000,
+					Capacity:       reported(2000000000),
+					FreeSpace:      reported(1500000000),
 					FilesystemType: "NTFS",
 				},
 			},
@@ -548,8 +549,8 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 				{
 					Key:            100,
 					DiskPath:       "C:\\",
-					Capacity:       1000000000,
-					FreeSpace:      500000000,
+					Capacity:       reported(1000000000),
+					FreeSpace:      reported(500000000),
 					FilesystemType: "NTFS",
 				},
 			},
@@ -563,15 +564,15 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 				{
 					Key:            0,
 					DiskPath:       "C:\\",
-					Capacity:       1000000000,
-					FreeSpace:      500000000,
+					Capacity:       reported(1000000000),
+					FreeSpace:      reported(500000000),
 					FilesystemType: "NTFS",
 				},
 				{
 					Key:            100,
 					DiskPath:       "D:\\",
-					Capacity:       2000000000,
-					FreeSpace:      1500000000,
+					Capacity:       reported(2000000000),
+					FreeSpace:      reported(1500000000),
 					FilesystemType: "NTFS",
 				},
 			},
@@ -579,8 +580,8 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 			expected: &model.DiskMountPoint{
 				Key:            0,
 				DiskPath:       "C:\\",
-				Capacity:       1000000000,
-				FreeSpace:      500000000,
+				Capacity:       reported(1000000000),
+				FreeSpace:      reported(500000000),
 				FilesystemType: "NTFS",
 			},
 			expectFound: true,
@@ -609,8 +610,8 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 				// Compare the values (not pointer equality since we're comparing to expected struct)
 				if result.Key != tt.expected.Key ||
 					result.DiskPath != tt.expected.DiskPath ||
-					result.Capacity != tt.expected.Capacity ||
-					result.FreeSpace != tt.expected.FreeSpace ||
+					!reflect.DeepEqual(result.Capacity, tt.expected.Capacity) ||
+					!reflect.DeepEqual(result.FreeSpace, tt.expected.FreeSpace) ||
 					result.FilesystemType != tt.expected.FilesystemType {
 					t.Errorf("getDiskGuestInfo() returned wrong guest disk data.\nExpected: %+v\nGot: %+v", tt.expected, result)
 				}

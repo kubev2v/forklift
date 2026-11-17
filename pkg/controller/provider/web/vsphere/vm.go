@@ -265,8 +265,20 @@ func (r *VM1) SortedDisksAsVmware() []model.Disk {
 	return r.sortedDisksByBusses(r.Disks, buses)
 }
 
+// VMController describes the full collected hardware configuration. Disk keys
+// can also reference disks excluded by a response's existing disk filters.
+type VMController struct {
+	Key        int32   `json:"key"`
+	BusNumber  int32   `json:"busNumber"`
+	Bus        string  `json:"bus"`
+	Type       string  `json:"type,omitempty"`
+	BusSharing string  `json:"busSharing,omitempty"`
+	DiskKeys   []int32 `json:"diskKeys"`
+}
+
 // VM full detail.
 type VM struct {
+	Controllers []VMController `json:"controllers,omitempty"`
 	VM1
 	PolicyVersion            int                    `json:"policyVersion"`
 	UUID                     string                 `json:"uuid"`
@@ -354,6 +366,30 @@ func (r *VM) With(m *model.VM) {
 	r.NICs = m.NICs
 	r.GuestNetworks = m.GuestNetworks
 	r.GuestDisks = m.GuestDisks
+	r.Controllers = nil
+	diskDevices := make(map[int32]bool, len(m.Disks))
+	for _, disk := range m.Disks {
+		diskDevices[disk.Key] = true
+	}
+	for _, c := range m.Controllers {
+		// Older collectors emitted zero-value records for non-controller devices.
+		if c.Bus == "" {
+			continue
+		}
+		diskKeys := append([]int32{}, c.DiskKeys...)
+		if c.DiskKeys == nil {
+			// Historical Disks contains all attached devices, including CD-ROMs.
+			for _, key := range c.Disks {
+				if diskDevices[key] {
+					diskKeys = append(diskKeys, key)
+				}
+			}
+		}
+		r.Controllers = append(r.Controllers, VMController{
+			Key: c.Key, BusNumber: c.BusNumber, Bus: c.Bus, Type: c.Type,
+			BusSharing: c.BusSharing, DiskKeys: diskKeys,
+		})
+	}
 	r.GuestIpStacks = m.GuestIpStacks
 	r.SecureBoot = m.SecureBoot
 	r.ToolsStatus = m.ToolsStatus
