@@ -18,14 +18,16 @@ type Validator struct {
 	*plancontext.Context
 }
 
-// HyperV only supports cold migration
+// HyperV supports cold and warm migration.
 func (r *Validator) WarmMigration() bool {
-	return false
+	return true
 }
 
 func (r *Validator) MigrationType() bool {
 	switch r.Plan.Spec.Type {
 	case api.MigrationCold, "":
+		return true
+	case api.MigrationWarm:
 		return true
 	default:
 		return false
@@ -186,6 +188,10 @@ func (r *Validator) ChangeTrackingEnabled(_ ref.Ref) (bool, error) {
 }
 
 func (r *Validator) HasSnapshot(vmRef ref.Ref) (bool, string, string, error) {
+
+	if !r.Plan.IsWarm() {
+		return true, "", "", nil
+	}
 	vm := &hyperv.VM{}
 	err := r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -193,8 +199,8 @@ func (r *Validator) HasSnapshot(vmRef ref.Ref) (bool, string, string, error) {
 	}
 	if vm.HasCheckpoint {
 		return false,
-			"VM has pre-existing checkpoints (snapshots) which should be removed before migration",
-			"Warning",
+			"VM has pre-existing checkpoints (snapshots) which are incompatible with warm migration",
+			"",
 			nil
 	}
 	return true, "", "", nil

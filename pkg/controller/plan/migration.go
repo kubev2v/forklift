@@ -1497,13 +1497,31 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.MarkStarted()
 			step.Phase = api.StepRunning
 
-			warmJumpStartDone := r.builder.SupportsVolumePopulators() && r.Plan.IsWarm() && vm.Warm.Successes > 0
-
-			if r.builder.SupportsVolumePopulators() && !warmJumpStartDone {
-				err = r.updatePopulatorCopyProgress(vm, step)
+			// HyperV warm: launch a copy pod to transfer disk data from SMB.
+			if vm.Phase == api.PhaseCopyDisks &&
+				r.Source.Provider.Type() == api.HyperV && r.Plan.IsWarm() {
+				ready, podErr := r.kubevirt.EnsureHyperVWarmCopyPod(vm, step)
+				if podErr != nil {
+					step.AddError(podErr.Error())
+					err = nil
+					break
+				}
+				if !ready {
+					break
+				}
+				// Pod completed, clean up and mark step done.
+				_ = r.kubevirt.DeleteHyperVWarmCopyPod(vm)
+				for _, task := range step.Tasks {
+					r.setTaskCompleted(task)
+				}
+				step.ReflectTasks()
 			} else {
-				// Fallback to non-volume populator path
-				err = r.updateCopyProgress(vm, step)
+				warmJumpStartDone := r.builder.SupportsVolumePopulators() && r.Plan.IsWarm() && vm.Warm.Successes > 0
+				if r.builder.SupportsVolumePopulators() && !warmJumpStartDone {
+					err = r.updatePopulatorCopyProgress(vm, step)
+				} else {
+					err = r.updateCopyProgress(vm, step)
+				}
 			}
 			if err != nil {
 				step.AddError(err.Error())
@@ -1761,9 +1779,27 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
 				break
 			}
-			err = r.updateCopyProgress(vm, step)
-			if err != nil {
-				return
+			// HyperV warm: run a final copy pod for the last delta.
+			if r.Source.Provider.Type() == api.HyperV && r.Plan.IsWarm() {
+				ready, podErr := r.kubevirt.EnsureHyperVWarmCopyPod(vm, step)
+				if podErr != nil {
+					step.AddError(podErr.Error())
+					err = nil
+					break
+				}
+				if !ready {
+					break
+				}
+				_ = r.kubevirt.DeleteHyperVWarmCopyPod(vm)
+				for _, task := range step.Tasks {
+					r.setTaskCompleted(task)
+				}
+				step.ReflectTasks()
+			} else {
+				err = r.updateCopyProgress(vm, step)
+				if err != nil {
+					return
+				}
 			}
 			if step.MarkedCompleted() {
 				if !step.HasError() {

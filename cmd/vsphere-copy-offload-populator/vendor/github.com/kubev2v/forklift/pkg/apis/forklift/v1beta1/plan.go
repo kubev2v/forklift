@@ -542,7 +542,12 @@ func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref) (bool, error) {
 			return false, nil
 		}
 		return true, nil
-	case Ova, HyperV:
+	case Ova:
+		return true, nil
+	case HyperV:
+		if p.IsWarm() {
+			return false, nil
+		}
 		return true, nil
 	default:
 		return false, nil
@@ -621,9 +626,11 @@ func (r *Plan) ShouldRunPreflightInspection() bool {
 	if r.IsSourceProviderVSphere() {
 		return r.IsWarm()
 	}
-	// Hyper-V: only with preCopySourceDisks (SMB mount after power-off)
+	// Hyper-V: cold with preCopySourceDisks, or warm.
+	// For warm, the inspection runs after StoreInitialSnapshotDeltas and uses
+	// the frozen parent VHDX.
 	if r.IsSourceProviderHyperV() {
-		return r.Spec.PreCopySourceDisks
+		return r.Spec.PreCopySourceDisks || r.IsWarm()
 	}
 	return false
 }
