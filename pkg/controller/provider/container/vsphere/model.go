@@ -1350,8 +1350,8 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 						}
 						diskMountPoint := model.DiskMountPoint{
 							DiskPath:       info.DiskPath,
-							Capacity:       info.Capacity,
-							FreeSpace:      info.FreeSpace,
+							Capacity:       &info.Capacity,
+							FreeSpace:      &info.FreeSpace,
 							FilesystemType: info.FilesystemType,
 							Key:            guestDiskKey,
 						}
@@ -1719,6 +1719,12 @@ func (v *VmAdapter) collectNICs(devArray types.ArrayOfVirtualDevice) []model.NIC
 
 // Update virtual disk devices.
 func (v *VmAdapter) updateControllers(devArray *types.ArrayOfVirtualDevice) {
+	diskDevices := make(map[int32]bool)
+	for _, dev := range devArray.VirtualDevice {
+		if disk, ok := dev.(*types.VirtualDisk); ok {
+			diskDevices[disk.Key] = true
+		}
+	}
 	controllers := []model.Controller{}
 	for _, dev := range devArray.VirtualDevice {
 		var md model.Controller
@@ -1732,31 +1738,39 @@ func (v *VmAdapter) updateControllers(devArray *types.ArrayOfVirtualDevice) {
 			}
 		case *types.VirtualBusLogicController:
 			md = model.Controller{
-				Bus:       SCSI,
-				Disks:     controller.Device,
-				Key:       controller.Key,
-				BusNumber: controller.BusNumber,
+				Type:       "VirtualBusLogicController",
+				BusSharing: string(controller.SharedBus),
+				Bus:        SCSI,
+				Disks:      controller.Device,
+				Key:        controller.Key,
+				BusNumber:  controller.BusNumber,
 			}
 		case *types.VirtualLsiLogicController:
 			md = model.Controller{
-				Bus:       SCSI,
-				Disks:     controller.Device,
-				Key:       controller.Key,
-				BusNumber: controller.BusNumber,
+				Type:       "VirtualLsiLogicController",
+				BusSharing: string(controller.SharedBus),
+				Bus:        SCSI,
+				Disks:      controller.Device,
+				Key:        controller.Key,
+				BusNumber:  controller.BusNumber,
 			}
 		case *types.VirtualLsiLogicSASController:
 			md = model.Controller{
-				Bus:       SCSI,
-				Disks:     controller.Device,
-				Key:       controller.Key,
-				BusNumber: controller.BusNumber,
+				Type:       "VirtualLsiLogicSASController",
+				BusSharing: string(controller.SharedBus),
+				Bus:        SCSI,
+				Disks:      controller.Device,
+				Key:        controller.Key,
+				BusNumber:  controller.BusNumber,
 			}
 		case *types.ParaVirtualSCSIController:
 			md = model.Controller{
-				Bus:       SCSI,
-				Disks:     controller.Device,
-				Key:       controller.Key,
-				BusNumber: controller.BusNumber,
+				Type:       "ParaVirtualSCSIController",
+				BusSharing: string(controller.SharedBus),
+				Bus:        SCSI,
+				Disks:      controller.Device,
+				Key:        controller.Key,
+				BusNumber:  controller.BusNumber,
 			}
 		case *types.VirtualAHCIController:
 			md = model.Controller{
@@ -1778,6 +1792,14 @@ func (v *VmAdapter) updateControllers(devArray *types.ArrayOfVirtualDevice) {
 				Disks:     controller.Device,
 				Key:       controller.Key,
 				BusNumber: controller.BusNumber,
+			}
+		default:
+			continue
+		}
+		md.DiskKeys = make([]int32, 0)
+		for _, key := range md.Disks {
+			if diskDevices[key] {
+				md.DiskKeys = append(md.DiskKeys, key)
 			}
 		}
 		controllers = append(controllers, md)
