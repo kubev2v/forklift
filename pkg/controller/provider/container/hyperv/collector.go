@@ -331,6 +331,11 @@ func (r *Collector) run(ctx *Context) (err error) {
 			r.log.Info("Disk capacity enriched.", "duration", time.Since(enrichMark))
 		}
 	}
+	if err = r.client.EnrichGuestInfo(); err != nil {
+		r.log.Error(err, "Guest info enrichment failed, will retry in refresh")
+	} else if err = r.updateGuestInfoFromCache(ctx); err != nil {
+		r.log.Error(err, "Failed to update guest info in DB")
+	}
 	r.stateMu.Lock()
 	r.firstRefreshDone = enrichOK
 	r.parity = true
@@ -637,9 +642,8 @@ func (r *Collector) refreshClusterOptimized(ctx *Context) error {
 	}
 	r.client.LightMode = false
 
-	// Phase 2: disk capacity/RCT enrichment runs concurrently with
-	// remaining adapters. EnrichDiskCapacity uses parallel per-node
-	// Get-VHD (~6s) while cluster/host/network/storage run alongside.
+	// Phase 2: disk capacity and guest OS enrichment run concurrently
+	// with remaining adapters. Both use parallel per-node WinRM calls.
 	enrichDone := make(chan error, 1)
 	go func() {
 		if err := r.client.EnrichDiskCapacity(); err != nil {
@@ -647,7 +651,16 @@ func (r *Collector) refreshClusterOptimized(ctx *Context) error {
 			enrichDone <- err
 			return
 		}
-		enrichDone <- r.updateDisksFromCache(ctx)
+		if err := r.updateDisksFromCache(ctx); err != nil {
+			enrichDone <- err
+			return
+		}
+		if err := r.client.EnrichGuestInfo(); err != nil {
+			r.log.Info("Guest info enrichment failed", "error", err)
+			enrichDone <- err
+			return
+		}
+		enrichDone <- r.updateGuestInfoFromCache(ctx)
 	}()
 
 	phase2 := []Adapter{&ClusterAdapter{}, &HostAdapter{}, &NetworkAdapter{}, &StorageAdapter{}}
@@ -738,6 +751,39 @@ func (r *Collector) updateDisksFromCache(ctx *Context) error {
 			}
 		}
 		if changed {
+			if err := tx.Update(vm); err != nil {
+				return err
+			}
+		}
+	}
+	return tx.Commit()
+}
+
+// updateGuestInfoFromCache persists GuestOS from the vmCache into the DB.
+// Called after EnrichGuestInfo to save the guest OS without a full refresh.
+func (r *Collector) updateGuestInfoFromCache(ctx *Context) error {
+	vms, err := r.client.ListVMs()
+	if err != nil {
+		return err
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.End() }()
+	for i := range vms {
+		if vms[i].GuestOS == "" {
+			continue
+		}
+		vm := &model.VM{Base: model.Base{ID: vms[i].UUID}}
+		if err := tx.Get(vm); err != nil {
+			if errors.Is(err, libmodel.NotFound) {
+				continue
+			}
+			return fmt.Errorf("get vm %s: %w", vms[i].UUID, err)
+		}
+		if vm.GuestOS != vms[i].GuestOS {
+			vm.GuestOS = vms[i].GuestOS
 			if err := tx.Update(vm); err != nil {
 				return err
 			}

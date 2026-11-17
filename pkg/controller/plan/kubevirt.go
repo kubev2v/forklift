@@ -36,10 +36,12 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/ensurer"
 	migbase "github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
+	hvmodel "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	hvwebmodel "github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	ctrlutil "github.com/kubev2v/forklift/pkg/controller/util"
+	ocpclient "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
@@ -60,6 +62,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	cnv "kubevirt.io/api/core/v1"
 	instancetypeapi "kubevirt.io/api/instancetype"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
@@ -159,6 +162,11 @@ const (
 	HyperVPVLabel  = "smb-pv"
 )
 
+// hypervWarmCopyBinary is built from cmd/hyperv-warm-copy into the
+// virt-v2v image, the controller and that image ship together, so the
+// path is a fixed contract, as with forklift-wait-for-reboot.
+const hypervWarmCopyBinary = "/usr/local/bin/hyperv-warm-copy"
+
 // Vddk v2v conf
 const (
 	ExtraV2vConf         = "extra-v2v-conf"
@@ -251,7 +259,7 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 			return
 		}
 		res.inPlace = !useV2v || r.IsCopyOffload(res.pvcs)
-		if r.Source.Provider.Type() == api.HyperV && r.Plan.Spec.PreCopySourceDisks {
+		if r.Source.Provider.Type() == api.HyperV && (r.Plan.Spec.PreCopySourceDisks || r.Plan.IsWarm()) {
 			// The init container converts the VHDX to raw on the target block
 			// device, so virt-v2v only needs in-place guest customization.
 			res.inPlace = true
@@ -346,8 +354,9 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 
 	// Pre-copy init container only applies to conversion pods (not inspection
 	// pods) because inspection pods skip VM volumes/PVCs and have no devices.
+	// Warm HyperV uses copy pods during CopyDisks/Finalize, skip init container.
 	if podType == convctx.VirtV2vConversionPod &&
-		r.Source.Provider.Type() == api.HyperV && r.Plan.Spec.PreCopySourceDisks {
+		r.Source.Provider.Type() == api.HyperV && r.Plan.Spec.PreCopySourceDisks && !r.Plan.IsWarm() {
 		var initContainer core.Container
 		initContainer, err = r.buildHyperVPreCopyInitContainer(&res)
 		if err != nil {
@@ -391,7 +400,7 @@ func (r *KubeVirt) checkProviderReady(vmID string) (ready bool, err error) {
 // should use InPlace or Remote conversion based on the plan transfer mode
 // and PVC copy-offload annotations.
 func (r *KubeVirt) ResolveConversionType(vm *plan.VMStatus) (api.ConversionType, error) {
-	if r.Source.Provider.Type() == api.HyperV && r.Plan.Spec.PreCopySourceDisks {
+	if r.Source.Provider.Type() == api.HyperV && (r.Plan.Spec.PreCopySourceDisks || r.Plan.IsWarm()) {
 		return api.InPlace, nil
 	}
 	useV2v, err := r.Plan.ShouldUseV2vForTransfer(vm.Ref)
@@ -763,6 +772,62 @@ func (r *KubeVirt) getHyperVDiskPaths(vm *plan.VMStatus) ([]string, error) {
 	return paths, nil
 }
 
+// getHyperVParentDiskPaths returns frozen parent VHDX paths from the first
+// precopy deltas (inventory paths point at the AVHDX after checkpoint).
+// Nil means no deltas yet, so the caller falls back to inventory. Missing
+// parent on any disk is an error (partial lists would inspect the wrong disks).
+func (r *KubeVirt) getHyperVParentDiskPaths(vm *plan.VMStatus) ([]string, error) {
+	if vm.Warm == nil || len(vm.Warm.Precopies) == 0 {
+		return nil, nil
+	}
+	deltas := vm.Warm.Precopies[0].Deltas
+	if len(deltas) == 0 {
+		return nil, nil
+	}
+	srcVM, err := r.Source.Inventory.VM(&vm.Ref)
+	if err != nil {
+		return nil, liberr.Wrap(err, "vm", vm.String())
+	}
+	hvVM, ok := srcVM.(*hvwebmodel.VM)
+	if !ok {
+		return nil, liberr.New("unexpected VM type for Hyper-V provider")
+	}
+	// Walk inventory disk order (same as getHyperVDiskPaths).
+	deltaByDisk := vm.Warm.Precopies[0].DeltaMap()
+	if len(deltaByDisk) != len(hvVM.Disks) {
+		return nil, fmt.Errorf("VM %s has %d disks but %d recorded deltas",
+			vm.Name, len(hvVM.Disks), len(deltaByDisk))
+	}
+	paths := make([]string, 0, len(hvVM.Disks))
+	for _, disk := range hvVM.Disks {
+		deltaID, ok := deltaByDisk[disk.ID]
+		if !ok {
+			return nil, fmt.Errorf("no recorded delta for disk %s of VM %s",
+				disk.ID, vm.Name)
+		}
+		var info struct {
+			DiskPaths struct {
+				Parent string `json:"Parent"`
+			} `json:"diskPaths"`
+		}
+		if err := json.Unmarshal([]byte(deltaID), &info); err != nil {
+			return nil, fmt.Errorf("parsing delta of disk %s for VM %s: %w",
+				disk.ID, vm.Name, err)
+		}
+		if info.DiskPaths.Parent == "" {
+			return nil, fmt.Errorf("no parent VHDX recorded for disk %s of VM %s",
+				disk.ID, vm.Name)
+		}
+		smbPath := smbPathFromReference(info.DiskPaths.Parent, disk)
+		if smbPath == "" {
+			return nil, fmt.Errorf("cannot map %s of disk %s onto the SMB mount",
+				info.DiskPaths.Parent, disk.ID)
+		}
+		paths = append(paths, smbPath)
+	}
+	return paths, nil
+}
+
 // CreateDeepInspectionConversionHyperV creates a DeepInspection Conversion CR
 // for a Hyper-V VM. disks are accessed directly via SMB after power-off.
 func (r *KubeVirt) CreateDeepInspectionConversionHyperV(
@@ -787,10 +852,21 @@ func (r *KubeVirt) CreateDeepInspectionConversionHyperV(
 		return nil, liberr.Wrap(err)
 	}
 
-	// Get disk paths from inventory
-	diskPaths, err := r.getHyperVDiskPaths(vm)
-	if err != nil {
-		return nil, liberr.Wrap(err)
+	// Get disk paths. For warm, the inventory paths point to the AVHDX
+	// (which virt-inspector can't open on Linux), so use the frozen parent
+	// VHDX paths from the stored deltas instead.
+	var diskPaths []string
+	if r.Plan.IsWarm() {
+		diskPaths, err = r.getHyperVParentDiskPaths(vm)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+	}
+	if len(diskPaths) == 0 {
+		diskPaths, err = r.getHyperVDiskPaths(vm)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
 	}
 
 	// Connection secret must live next to the inspection pod so the
@@ -3996,7 +4072,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 			},
 		}
 
-		if r.Source.Provider.Type() == api.HyperV && r.Plan.Spec.PreCopySourceDisks {
+		if r.Source.Provider.Type() == api.HyperV && (r.Plan.Spec.PreCopySourceDisks || r.Plan.IsWarm()) {
 			volumes = append(volumes, providerVol)
 			extraVolumes = append(extraVolumes, providerVol)
 		} else {
@@ -5058,6 +5134,465 @@ func validatePreCopyLists(diskPaths, devicePaths []string) error {
 		}
 	}
 	return nil
+}
+
+// hyperVWarmCopyLabels returns labels for a HyperV warm copy pod.
+func (r *KubeVirt) hyperVWarmCopyLabels(vmID string) map[string]string {
+	labels := map[string]string{
+		"app":       "forklift",
+		"plan":      string(r.Plan.UID),
+		kVM:         vmID,
+		"warm-copy": "true",
+	}
+	if r.Migration != nil {
+		labels[kMigration] = string(r.Migration.UID)
+	}
+	return labels
+}
+
+// GetHyperVWarmCopyPod finds the warm copy pod for the given VM's current iteration.
+// When several pods match (stale leftover), the newest by creation time wins.
+func (r *KubeVirt) GetHyperVWarmCopyPod(vm *plan.VMStatus) (*core.Pod, error) {
+	labels := r.hyperVWarmCopyLabels(vm.ID)
+	if vm.Warm != nil {
+		labels["iteration"] = strconv.Itoa(vm.Warm.Successes)
+	}
+	list := &core.PodList{}
+	err := r.Destination.List(context.TODO(), list,
+		client.InNamespace(r.Plan.Spec.TargetNamespace),
+		client.MatchingLabels(labels),
+	)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if len(list.Items) == 0 {
+		return nil, nil //nolint:nilnil
+	}
+	sort.Slice(list.Items, func(i, j int) bool {
+		return list.Items[i].CreationTimestamp.After(list.Items[j].CreationTimestamp.Time)
+	})
+	return &list.Items[0], nil
+}
+
+// DeleteHyperVWarmCopyPod deletes the warm copy pod for a VM if it exists.
+func (r *KubeVirt) DeleteHyperVWarmCopyPod(vm *plan.VMStatus) error {
+	pod, err := r.GetHyperVWarmCopyPod(vm)
+	if err != nil || pod == nil {
+		return err
+	}
+	return r.Destination.Delete(context.TODO(), pod)
+}
+
+// EnsureHyperVWarmCopyPod creates or monitors the Hyper-V warm copy pod.
+// First iteration: full qemu-img convert of the frozen base VHDX.
+// Later iterations: AVHDX delta only. Returns (true, nil) when the pod succeeds.
+func (r *KubeVirt) EnsureHyperVWarmCopyPod(vm *plan.VMStatus, step *plan.Step) (bool, error) {
+	pod, err := r.GetHyperVWarmCopyPod(vm)
+	if err != nil {
+		return false, err
+	}
+	if pod != nil {
+		switch pod.Status.Phase {
+		case core.PodSucceeded:
+			return true, nil
+		case core.PodFailed:
+			msg := "warm copy pod failed"
+			if len(pod.Status.ContainerStatuses) > 0 {
+				if t := pod.Status.ContainerStatuses[0].State.Terminated; t != nil {
+					msg = fmt.Sprintf("warm copy pod failed: %s", t.Message)
+				}
+			}
+			// Delete the failed pod so the next reconcile doesn't loop on it.
+			_ = r.Destination.Delete(context.TODO(), pod)
+			step.AddError(msg)
+			return false, nil
+		default:
+			// Still running — parse qemu-img progress from pod logs.
+			r.updateWarmCopyProgress(pod, step)
+			return false, nil
+		}
+	}
+
+	// Build and create the copy pod.
+	newPod, err := r.buildHyperVWarmCopyPod(vm)
+	if err != nil {
+		return false, err
+	}
+	err = r.Destination.Create(context.TODO(), newPod)
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+	r.Log.Info("Created HyperV warm copy pod",
+		"pod", path.Join(newPod.Namespace, newPod.Name),
+		"vm", vm.Name,
+		"iteration", vm.Warm.Successes)
+	return false, nil
+}
+
+// destinationClientset builds a typed client for the plan destination
+// (local host or remote provider). Needed for pod log streaming.
+func (r *KubeVirt) destinationClientset() (*kubernetes.Clientset, error) {
+	if r.Destination.Provider == nil {
+		return nil, liberr.New("destination provider is nil")
+	}
+	var secret *core.Secret
+	if !r.Destination.Provider.IsHost() {
+		ref := r.Destination.Provider.Spec.Secret
+		secret = &core.Secret{}
+		if err := r.Get(context.TODO(), client.ObjectKey{
+			Namespace: ref.Namespace,
+			Name:      ref.Name,
+		}, secret); err != nil {
+			return nil, liberr.Wrap(err)
+		}
+	}
+	cfg := ocpclient.RestCfg(r.Destination.Provider, secret)
+	if cfg == nil {
+		return nil, liberr.New("failed to build destination REST config")
+	}
+	return kubernetes.NewForConfig(cfg)
+}
+
+// updateWarmCopyProgress parses qemu-img progress from destination pod logs.
+func (r *KubeVirt) updateWarmCopyProgress(pod *core.Pod, step *plan.Step) {
+	cs, err := r.destinationClientset()
+	if err != nil {
+		r.Log.Info("Warm copy progress: failed to get clientset", "error", err)
+		return
+	}
+	tailLines := int64(1)
+	logOpts := &core.PodLogOptions{TailLines: &tailLines}
+	stream, err := cs.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, logOpts).Stream(context.TODO())
+	if err != nil {
+		r.Log.Info("Warm copy progress: failed to stream logs", "pod", pod.Name, "error", err)
+		return
+	}
+	defer stream.Close()
+	buf := make([]byte, 512)
+	n, _ := stream.Read(buf)
+	if n == 0 {
+		return
+	}
+	line := string(buf[:n])
+	// qemu-img outputs "   (XX.XX/100%)" — find the last percentage.
+	var pct float64
+	for i := len(line) - 1; i >= 0; i-- {
+		if line[i] == '(' {
+			fmt.Sscanf(line[i:], "(%f/100%%)", &pct)
+			break
+		}
+	}
+	if pct <= 0 || len(step.Tasks) == 0 {
+		return
+	}
+	// One copy pod handles all disks sequentially. Apply the reported
+	// percentage to every task so multi-disk plans show progress on all
+	// disks (not only the first task).
+	for _, task := range step.Tasks {
+		task.Progress.Completed = int64(pct / 100.0 * float64(task.Progress.Total))
+	}
+	step.ReflectTasks()
+}
+
+// buildHyperVWarmCopyPod constructs a Pod that copies disk data from the
+// Hyper-V SMB share to the target block PVC.
+func (r *KubeVirt) buildHyperVWarmCopyPod(vm *plan.VMStatus) (*core.Pod, error) {
+	vmLookup := &hvwebmodel.VM{}
+	if err := r.Source.Inventory.Find(vmLookup, vm.Ref); err != nil {
+		return nil, err
+	}
+
+	// Ensure the SMB PV/PVC exists for this VM.
+	smbPVC, err := r.ensureSMBPVC(vm)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve target block PVC and device path.
+	pvcs, err := r.getPVCs(vm.Ref)
+	if err != nil {
+		return nil, err
+	}
+	if len(pvcs) == 0 {
+		return nil, fmt.Errorf("no PVCs found for VM %s", vm.Name)
+	}
+	if len(vmLookup.Disks) == 0 {
+		return nil, fmt.Errorf("no disks found for VM %s", vm.Name)
+	}
+
+	// First iteration: full copy of the frozen base VHDX. Later: changed
+	// blocks only from the frozen AVHDX (pkg/lib/hyperv/vhdx). Checkpoints
+	// stay stacked so the AVHDX chain can track deltas (like VMware CBT).
+	isFirstCopy := vm.Warm.Successes == 0
+	if len(vmLookup.Disks) != len(pvcs) {
+		return nil, fmt.Errorf("VM %s has %d disks but %d PVCs",
+			vm.Name, len(vmLookup.Disks), len(pvcs))
+	}
+	disksByID := make(map[string]hvmodel.Disk, len(vmLookup.Disks))
+	for _, d := range vmLookup.Disks {
+		disksByID[d.ID] = d
+	}
+	var diskArgs []string // "mode|source|parent|device" per disk
+	// Walk PVCs (not inventory disks): /dev/blockN is assigned from this
+	// same list, and each PVC names its disk via disk-source.
+	for i, pvc := range pvcs {
+		diskID := pvc.Annotations[planbase.AnnDiskSource]
+		disk, found := disksByID[diskID]
+		if !found {
+			return nil, fmt.Errorf("PVC %s of VM %s has no matching disk %q",
+				pvc.Name, vm.Name, diskID)
+		}
+		devPath := fmt.Sprintf("/dev/block%d", i)
+		if isFirstCopy {
+			// Parent from the first precopy delta is the frozen base VHDX.
+			// Do not fall back to disk.SMBPath: after the initial checkpoint
+			// inventory points at the active AVHDX which still takes writes.
+			basePath := r.resolveFirstCopyPath(vm, disk)
+			if basePath == "" {
+				// A missing disk must fail the copy, not silently leave
+				// its block device blank while the pod reports success.
+				return nil, fmt.Errorf("no frozen base VHDX recorded for disk %s of VM %s",
+					disk.ID, vm.Name)
+			}
+			diskArgs = append(diskArgs, fmt.Sprintf("full|%s||%s", basePath, devPath))
+		} else {
+			// Delta: copy only changed blocks from the frozen AVHDX.
+			avhdxPath, parentPath := r.resolveWarmDeltaPaths(vm, disk)
+			if avhdxPath == "" {
+				// No delta on a later pass must never fall back to a full
+				// copy: that would rewrite the whole device from the base
+				// image and erase the deltas already on the target.
+				return nil, fmt.Errorf("no AVHDX delta recorded for disk %s of VM %s on warm iteration %d",
+					disk.ID, vm.Name, vm.Warm.Successes)
+			}
+			diskArgs = append(diskArgs, fmt.Sprintf("delta|%s|%s|%s", avhdxPath, parentPath, devPath))
+		}
+	}
+	if len(diskArgs) == 0 {
+		return nil, fmt.Errorf("no disk copy arguments for VM %s", vm.Name)
+	}
+
+	// Build pod spec.
+	allowEsc := false
+	labels := r.hyperVWarmCopyLabels(vm.ID)
+	labels["iteration"] = strconv.Itoa(vm.Warm.Successes)
+
+	var volumeDevices []core.VolumeDevice
+	var volumes []core.Volume
+	// SMB volume
+	volumes = append(volumes, core.Volume{
+		Name: "hyperv-storage",
+		VolumeSource: core.VolumeSource{
+			PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+				ClaimName: smbPVC.Name,
+				ReadOnly:  true,
+			},
+		},
+	})
+	// Target PVC volumes as block devices
+	for i, pvc := range pvcs {
+		volName := fmt.Sprintf("target-%d", i)
+		volumes = append(volumes, core.Volume{
+			Name: volName,
+			VolumeSource: core.VolumeSource{
+				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.Name,
+				},
+			},
+		})
+		volumeDevices = append(volumeDevices, core.VolumeDevice{
+			Name:       volName,
+			DevicePath: fmt.Sprintf("/dev/block%d", i),
+		})
+	}
+
+	pod := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			// Same namespace as disk PVCs and the SMB PVC (BuildPVCForSMB).
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			GenerateName: r.Plan.Name + "-warm-copy-",
+			Labels:       labels,
+		},
+		Spec: core.PodSpec{
+			RestartPolicy: core.RestartPolicyNever,
+			Containers: []core.Container{
+				{
+					Name:            "copy",
+					Image:           getVirtV2vImage(r.Plan),
+					ImagePullPolicy: core.PullAlways,
+					// Shipped in the virt-v2v image, see
+					// cmd/hyperv-warm-copy. It runs qemu-img for the
+					// full pass and parses the AVHDX itself for deltas.
+					Command: []string{hypervWarmCopyBinary},
+					Env: []core.EnvVar{
+						{Name: "DISK_ARGS", Value: strings.Join(diskArgs, "\n")},
+					},
+					VolumeMounts: []core.VolumeMount{
+						{
+							Name:      "hyperv-storage",
+							MountPath: "/hyperv",
+							ReadOnly:  true,
+						},
+					},
+					VolumeDevices: volumeDevices,
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceCPU:    resource.MustParse("100m"),
+							core.ResourceMemory: resource.MustParse("256Mi"),
+						},
+						Limits: core.ResourceList{
+							core.ResourceCPU:    resource.MustParse("2"),
+							core.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+					SecurityContext: &core.SecurityContext{
+						AllowPrivilegeEscalation: &allowEsc,
+					},
+				},
+			},
+			Volumes: volumes,
+		},
+	}
+	return pod, nil
+}
+
+// resolveFirstCopyPath returns the frozen base VHDX for the first full copy
+// (Parent in the first precopy delta). Inventory paths point at the AVHDX.
+func (r *KubeVirt) resolveFirstCopyPath(vm *plan.VMStatus, disk hvmodel.Disk) string {
+	if vm.Warm == nil || len(vm.Warm.Precopies) == 0 {
+		return ""
+	}
+	for _, d := range vm.Warm.Precopies[0].Deltas {
+		if d.Disk != disk.ID {
+			continue
+		}
+		var info struct {
+			DiskPaths struct {
+				Parent string `json:"Parent"`
+			} `json:"diskPaths"`
+		}
+		if err := json.Unmarshal([]byte(d.DeltaID), &info); err != nil {
+			return ""
+		}
+		return smbPathFromReference(info.DiskPaths.Parent, disk)
+	}
+	return ""
+}
+
+// resolveWarmDeltaPaths returns the frozen AVHDX and its parent for a delta
+// copy. Stacked checkpoints keep the chain:
+//
+//	base.vhdx → AVHDX-0 → AVHDX-1 → ... → AVHDX-N (active)
+//
+// The previous precopy's Active is the frozen AVHDX to copy. Its Parent is
+// used so depth=0 ranges can be identified.
+func (r *KubeVirt) resolveWarmDeltaPaths(vm *plan.VMStatus, disk hvmodel.Disk) (avhdxPath, parentPath string) {
+	n := len(vm.Warm.Precopies)
+	if n < 2 {
+		return "", ""
+	}
+	prev := vm.Warm.Precopies[n-2]
+	for _, d := range prev.Deltas {
+		if d.Disk != disk.ID {
+			continue
+		}
+		var info struct {
+			DiskPaths struct {
+				Active string `json:"Active"`
+				Parent string `json:"Parent"`
+			} `json:"diskPaths"`
+		}
+		if err := json.Unmarshal([]byte(d.DeltaID), &info); err != nil {
+			return "", ""
+		}
+		avhdxPath = smbPathFromReference(info.DiskPaths.Active, disk)
+		parentPath = smbPathFromReference(info.DiskPaths.Parent, disk)
+		return
+	}
+	return "", ""
+}
+
+// uncToSMBMount maps a UNC path (\\server\share\file.vhdx) to an SMB mount
+// path (/hyperv/file.vhdx). Drive-letter paths are rejected (empty string)
+// because the share root cannot be inferred. Use smbPathFromReference for
+// host-local paths where inventory already has the mapping.
+func uncToSMBMount(uncPath string) string {
+	if uncPath == "" {
+		return ""
+	}
+	// Normalize backslashes.
+	p := strings.ReplaceAll(uncPath, "\\", "/")
+	if !strings.HasPrefix(p, "//") {
+		return ""
+	}
+	// UNC: //server/share/path/to/file → extract after share name
+	p = strings.TrimPrefix(p, "//")
+	parts := strings.SplitN(p, "/", 3) // [server, share, rest]
+	if len(parts) < 3 || parts[2] == "" {
+		return ""
+	}
+	return "/hyperv/" + parts[2]
+}
+
+// smbPathFromReference maps a Windows path onto the SMB mount via a disk's
+// inventory WindowsPath/SMBPath pair. Checkpoint AVHDX files live beside
+// their base disk so the same directory mapping applies (UNC or local).
+// Falls back to uncToSMBMount when the reference pair does not cover the path.
+func smbPathFromReference(winPath string, ref hvmodel.Disk) string {
+	if winPath == "" {
+		return ""
+	}
+	if ref.WindowsPath != "" && ref.SMBPath != "" {
+		refWin := strings.ReplaceAll(ref.WindowsPath, "\\", "/")
+		target := strings.ReplaceAll(winPath, "\\", "/")
+		if strings.EqualFold(path.Dir(refWin), path.Dir(target)) {
+			return path.Join(path.Dir(ref.SMBPath), path.Base(target))
+		}
+	}
+	return uncToSMBMount(winPath)
+}
+
+// findSMBPVC finds the HyperV SMB PVC for the given VM.
+// Returns (nil, nil) when no matching claim exists yet.
+func (r *KubeVirt) findSMBPVC(vm *plan.VMStatus) (*core.PersistentVolumeClaim, error) {
+	list := &core.PersistentVolumeClaimList{}
+	err := r.Destination.List(context.TODO(), list,
+		client.InNamespace(r.Plan.Spec.TargetNamespace),
+		client.MatchingLabels(r.smbPVCLabels(vm.ID)),
+	)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if len(list.Items) == 0 {
+		return nil, nil //nolint:nilnil
+	}
+	return &list.Items[0], nil
+}
+
+// ensureSMBPVC finds or creates the HyperV SMB PV/PVC for the given VM.
+func (r *KubeVirt) ensureSMBPVC(vm *plan.VMStatus) (*core.PersistentVolumeClaim, error) {
+	pvc, err := r.findSMBPVC(vm)
+	if err != nil {
+		return nil, err
+	}
+	if pvc != nil {
+		return pvc, nil
+	}
+	secretName, secretNS, err := r.EnsureSMBCSISecret(vm)
+	if err != nil {
+		return nil, err
+	}
+	pv := r.BuildPVForSMB(vm, secretName, secretNS)
+	pv, err = r.EnsurePVForSMB(pv)
+	if err != nil {
+		return nil, err
+	}
+	pvc = r.BuildPVCForSMB(pv, vm)
+	pvc, err = r.EnsureProviderStoragePVC(pvc, r.Source.Provider.Type())
+	if err != nil {
+		return nil, err
+	}
+	return pvc, nil
 }
 
 // smbPVLabels returns labels for HyperV SMB PV.

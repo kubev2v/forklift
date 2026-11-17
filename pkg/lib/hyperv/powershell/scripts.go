@@ -167,6 +167,42 @@ const (
 if($vhd -and $vhd.RctId){'true'}else{'false'}`
 )
 
+// Warm migration checkpoint scripts.
+// Standard checkpoints (not production/backup) freeze the base VHDX and create
+// an AVHDX differencing disk. The AVHDX contains only blocks written after the
+// checkpoint, providing incremental change tracking without RCT.
+const (
+	// CreateVMCheckpoint creates a standard checkpoint on a VM.
+	// This freezes the current disk chain and creates a new AVHDX differencing disk.
+	// Parameters: vmName, checkpointName
+	CreateVMCheckpoint = `Checkpoint-VM -VMName '%s' -SnapshotName '%s' -Confirm:$false -ErrorAction Stop; 'ok'`
+
+	// RemoveVMCheckpoint removes a named checkpoint. Hyper-V merges the AVHDX
+	// back into its parent asynchronously.
+	// Parameters: vmName, checkpointName
+	RemoveVMCheckpoint = `Remove-VMSnapshot -VMName '%s' -Name '%s' -Confirm:$false -ErrorAction SilentlyContinue; 'ok'`
+
+	// RemoveStaleForkliftCheckpoints removes any forklift-warm-* checkpoints
+	// left over from a previous migration. This prevents stale AVHDX chains.
+	// Parameters: vmName
+	RemoveStaleForkliftCheckpoints = `$removed=@();Get-VMSnapshot -VMName '%s' -EA SilentlyContinue|Where-Object{$_.Name-like'forklift-warm-*'}|ForEach-Object{$removed+=$_.Name;Remove-VMSnapshot -VMSnapshot $_ -Confirm:$false};if($removed){$removed-join','}`
+
+	// GetCheckpointDiskPaths returns the AVHDX paths created by a checkpoint.
+	// After a checkpoint, Get-VMHardDiskDrive returns the AVHDX (active disk),
+	// while the checkpoint's SettingData contains the frozen parent disk path.
+	// Root walks the parent chain to the base VHDX, which identifies the
+	// drive: it equals the disk path the inventory recorded pre-checkpoint.
+	// Returns JSON: [{"Active":"<avhdx>","Parent":"<parent>","Root":"<base-vhdx>"}]
+	// Parameters: vmName
+	GetCheckpointDiskPaths = `$drives=Get-VMHardDiskDrive -VMName '%s' -EA Stop
+$r=@();foreach($d in $drives){if(-not $d.Path){continue}
+$root=$d.Path;$vhd=Get-VHD -Path $root -EA 0
+$parent='';if($vhd -and $vhd.ParentPath){$parent=$vhd.ParentPath}
+while($vhd -and $vhd.ParentPath){$root=$vhd.ParentPath;$vhd=Get-VHD -Path $root -EA 0}
+$r+=@{Active=$d.Path;Parent=$parent;Root=$root}}
+$r|ConvertTo-Json -Compress`
+)
+
 // Failover Clustering scripts.
 // Cluster-level scripts run on the CNO (Cluster Name Object) entry node.
 // Per-node scripts run on direct WinRM connections to individual cluster nodes.

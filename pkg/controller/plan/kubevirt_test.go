@@ -4,6 +4,8 @@ package plan
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strconv"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -40,6 +42,15 @@ type hypervInventoryStub struct {
 
 func (s *hypervInventoryStub) VM(_ *webbase.Ref) (interface{}, error) {
 	return s.vm, nil
+}
+
+func (s *hypervInventoryStub) Find(resource interface{}, _ webbase.Ref) error {
+	vm, ok := resource.(*hvweb.VM)
+	if !ok {
+		return fmt.Errorf("hypervInventoryStub: unsupported resource %T", resource)
+	}
+	*vm = *s.vm
+	return nil
 }
 
 var _ = ginkgo.Describe("kubevirt tests", func() {
@@ -1107,6 +1118,249 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			Expect(k8serr.IsNotFound(err)).To(BeTrue())
 			Expect(mgmtClient.Get(context.TODO(), client.ObjectKey{Namespace: planNamespace, Name: mgmtLeftover.Name}, &v1.Pod{})).
 				To(Succeed())
+		})
+	})
+
+	ginkgo.Describe("buildHyperVWarmCopyPod", func() {
+		const (
+			vmID          = "hv-vm-1"
+			planNamespace = "openshift-mtv"
+			targetNS      = "migrations"
+		)
+
+		// newWarmCopyKubevirt builds a KubeVirt whose source inventory holds
+		// the given disks and whose destination carries one labeled disk PVC
+		// per entry of diskSources. Each diskSources entry is the disk ID the
+		// PVC's disk-source annotation names, as the real builder writes it;
+		// the order of that slice is the /dev/blockN order.
+		newWarmCopyKubevirt := func(disks []hvmodel.Disk, diskSources []string) *KubeVirt {
+			scheme := runtime.NewScheme()
+			_ = v1.AddToScheme(scheme)
+			_ = v1beta1.SchemeBuilder.AddToScheme(scheme)
+			mgmtClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+			destClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+			hvType := v1beta1.HyperV
+			srcProvider := &v1beta1.Provider{
+				ObjectMeta: metav1.ObjectMeta{Name: "hyperv", Namespace: planNamespace},
+				Spec:       v1beta1.ProviderSpec{Type: &hvType},
+			}
+			destProvider := &v1beta1.Provider{
+				ObjectMeta: metav1.ObjectMeta{Name: "host", Namespace: planNamespace},
+			}
+
+			kubevirt := &KubeVirt{
+				Context: &plancontext.Context{
+					Client: mgmtClient,
+					Destination: plancontext.Destination{
+						Client:   destClient,
+						Provider: destProvider,
+					},
+					Log:       KubeVirtLog,
+					Migration: createMigration(),
+					Plan:      createPlanKubevirt(nil),
+					Source: plancontext.Source{
+						Provider: srcProvider,
+						Secret: &v1.Secret{
+							Data: map[string][]byte{"smbUrl": []byte("//hyperv.example/share")},
+						},
+						Inventory: &hypervInventoryStub{
+							vm: &hvweb.VM{
+								VM1: hvweb.VM1{Disks: disks},
+							},
+						},
+					},
+				},
+			}
+			kubevirt.Plan.ObjectMeta = metav1.ObjectMeta{
+				Name:      "hv-plan",
+				Namespace: planNamespace,
+				UID:       "plan-uid",
+			}
+			kubevirt.Plan.Spec.TargetNamespace = targetNS
+			kubevirt.Plan.Provider.Source = srcProvider
+
+			// Seed the SMB PVC the copy pod mounts (TargetNamespace, same as
+			// disk PVCs / BuildPVCForSMB), plus one target block PVC per disk.
+			smbPVC := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "smb-pvc",
+					Namespace: targetNS,
+					Labels: map[string]string{
+						"provider":     "hyperv",
+						"app":          "forklift",
+						"migration":    "test",
+						"plan":         "plan-uid",
+						kPlanName:      "hv-plan",
+						kPlanNamespace: planNamespace,
+						"hyperv":       HyperVPVCLabel,
+						kVM:            vmID,
+					},
+				},
+			}
+			Expect(destClient.Create(context.TODO(), smbPVC)).To(Succeed())
+			for i, src := range diskSources {
+				pvc := &v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fmt.Sprintf("target-%d", i),
+						Namespace: targetNS,
+						Labels: map[string]string{
+							kVM:        vmID,
+							kMigration: "test",
+						},
+						Annotations: map[string]string{
+							planbase.AnnDiskSource: src,
+							planbase.AnnDiskIndex:  strconv.Itoa(i),
+						},
+					},
+				}
+				Expect(destClient.Create(context.TODO(), pvc)).To(Succeed())
+			}
+			return kubevirt
+		}
+
+		newWarmVM := func(successes int, deltas []plan.DiskDelta) *plan.VMStatus {
+			vm := &plan.VMStatus{}
+			vm.ID = vmID
+			vm.Ref = ref.Ref{ID: vmID}
+			vm.Name = "win2019"
+			vm.Warm = &plan.Warm{Successes: successes}
+			vm.Warm.Precopies = []plan.Precopy{{Deltas: deltas}}
+			return vm
+		}
+
+		parentDelta := plan.DiskDelta{
+			Disk:    "disk-0",
+			DeltaID: `{"diskPaths":{"Parent":"\\\\hyperv.example\\share\\base.vhdx"}}`,
+		}
+
+		ginkgo.It("fails when a disk has no recorded base VHDX instead of falling back to SMBPath", func() {
+			disks := []hvmodel.Disk{
+				{Base: hvmodel.Base{ID: "disk-0"}},
+				// disk-1 has an SMBPath — after the initial checkpoint it
+				// would point at the active AVHDX, so it must not be used.
+				{Base: hvmodel.Base{ID: "disk-1"}, SMBPath: "/hyperv/disk1.avhdx"},
+			}
+			kv := newWarmCopyKubevirt(disks, []string{"disk-0", "disk-1"})
+			vm := newWarmVM(0, []plan.DiskDelta{parentDelta})
+
+			_, err := kv.buildHyperVWarmCopyPod(vm)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("disk-1"))
+			Expect(err.Error()).To(ContainSubstring("no frozen base VHDX"))
+		})
+
+		ginkgo.It("fails when the PVC count does not match the disk count", func() {
+			disks := []hvmodel.Disk{
+				{Base: hvmodel.Base{ID: "disk-0"}},
+				{Base: hvmodel.Base{ID: "disk-1"}},
+			}
+			kv := newWarmCopyKubevirt(disks, []string{"disk-0"}) // one PVC short
+			vm := newWarmVM(0, []plan.DiskDelta{parentDelta})
+
+			_, err := kv.buildHyperVWarmCopyPod(vm)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("2 disks but 1 PVCs"))
+		})
+
+		ginkgo.It("fails when a later iteration has no delta instead of falling back to full copy", func() {
+			disks := []hvmodel.Disk{{Base: hvmodel.Base{ID: "disk-0"}, SMBPath: "/hyperv/active.avhdx"}}
+			kv := newWarmCopyKubevirt(disks, []string{"disk-0"})
+			// One completed iteration, one recorded delta for another disk:
+			// disk-0 has no AVHDX to copy.
+			vm := newWarmVM(1, []plan.DiskDelta{parentDelta})
+
+			_, err := kv.buildHyperVWarmCopyPod(vm)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("no AVHDX delta recorded"))
+			Expect(err.Error()).To(ContainSubstring("disk-0"))
+		})
+
+		ginkgo.It("pairs each device with its own disk when PVC order differs from inventory order", func() {
+			disks := []hvmodel.Disk{
+				{Base: hvmodel.Base{ID: "disk-0"}},
+				{Base: hvmodel.Base{ID: "disk-1"}},
+			}
+			// Hyper-V PVCs carry no disk-index annotation, so getPVCs cannot
+			// sort them and returns whatever the API server listed. Here the
+			// data disk comes first; pairing by position would copy disk-1's
+			// base onto disk-0's block device.
+			kv := newWarmCopyKubevirt(disks, []string{"disk-1", "disk-0"})
+			vm := newWarmVM(0, []plan.DiskDelta{
+				parentDelta,
+				{Disk: "disk-1", DeltaID: `{"diskPaths":{"Parent":"\\\\hyperv.example\\share\\data.vhdx"}}`},
+			})
+
+			pod, err := kv.buildHyperVWarmCopyPod(vm)
+			Expect(err).ToNot(HaveOccurred())
+			env := envValue(pod.Spec.Containers[0].Env, "DISK_ARGS")
+			Expect(env).To(Equal(
+				"full|/hyperv/data.vhdx||/dev/block0\n" +
+					"full|/hyperv/base.vhdx||/dev/block1"))
+		})
+
+		ginkgo.It("fails when a PVC names a disk the inventory does not have", func() {
+			disks := []hvmodel.Disk{{Base: hvmodel.Base{ID: "disk-0"}}}
+			kv := newWarmCopyKubevirt(disks, []string{"disk-9"})
+			vm := newWarmVM(0, []plan.DiskDelta{parentDelta})
+
+			_, err := kv.buildHyperVWarmCopyPod(vm)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("no matching disk"))
+		})
+
+		ginkgo.It("builds a full-copy job from the frozen base VHDX on iteration zero", func() {
+			disks := []hvmodel.Disk{
+				{Base: hvmodel.Base{ID: "disk-0"}},
+				{Base: hvmodel.Base{ID: "disk-1"}},
+			}
+			kv := newWarmCopyKubevirt(disks, []string{"disk-0", "disk-1"})
+			vm := newWarmVM(0, []plan.DiskDelta{
+				parentDelta,
+				{Disk: "disk-1", DeltaID: `{"diskPaths":{"Parent":"\\\\hyperv.example\\share\\data.vhdx"}}`},
+			})
+
+			pod, err := kv.buildHyperVWarmCopyPod(vm)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pod.Namespace).To(Equal(targetNS))
+			env := envValue(pod.Spec.Containers[0].Env, "DISK_ARGS")
+			Expect(env).To(Equal(
+				"full|/hyperv/base.vhdx||/dev/block0\n" +
+					"full|/hyperv/data.vhdx||/dev/block1"))
+		})
+	})
+
+	ginkgo.Describe("getHyperVParentDiskPaths", func() {
+		ginkgo.It("returns parent paths in inventory disk order, not delta-slice order", func() {
+			disks := []hvmodel.Disk{
+				{Base: hvmodel.Base{ID: "disk-0"}, WindowsPath: `\\hyperv.example\share\base.vhdx`, SMBPath: "/hyperv/base.vhdx"},
+				{Base: hvmodel.Base{ID: "disk-1"}, WindowsPath: `\\hyperv.example\share\data.vhdx`, SMBPath: "/hyperv/data.vhdx"},
+			}
+			kv := &KubeVirt{
+				Context: &plancontext.Context{
+					Source: plancontext.Source{
+						Inventory: &hypervInventoryStub{
+							vm: &hvweb.VM{VM1: hvweb.VM1{Disks: disks}},
+						},
+					},
+				},
+			}
+			// Delta slice deliberately reversed vs inventory order (map-style
+			// WithDeltas can produce either order).
+			vm := &plan.VMStatus{
+				Warm: &plan.Warm{
+					Precopies: []plan.Precopy{{
+						Deltas: []plan.DiskDelta{
+							{Disk: "disk-1", DeltaID: `{"diskPaths":{"Parent":"\\\\hyperv.example\\share\\data.vhdx"}}`},
+							{Disk: "disk-0", DeltaID: `{"diskPaths":{"Parent":"\\\\hyperv.example\\share\\base.vhdx"}}`},
+						},
+					}},
+				},
+			}
+
+			paths, err := kv.getHyperVParentDiskPaths(vm)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(paths).To(Equal([]string{"/hyperv/base.vhdx", "/hyperv/data.vhdx"}))
 		})
 	})
 
