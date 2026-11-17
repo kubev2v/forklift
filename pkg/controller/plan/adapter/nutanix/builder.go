@@ -25,6 +25,7 @@ import (
 	libutil "github.com/kubev2v/forklift/pkg/lib/util"
 	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	core "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +37,8 @@ import (
 	libvirtxml "libvirt.org/go/libvirtxml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	populator_machinery "github.com/kubev2v/forklift/pkg/lib-volume-populator/populator-machinery"
 )
 
 // Firmware boot types (model.VM.BootType).
@@ -65,6 +68,8 @@ const (
 	labelDownloadCookie      = "forklift.konveyor.io/nutanix-download-cookie"
 	labelHTTPPopulatorCookie = "forklift.konveyor.io/nutanix-http-populator"
 	cookieHeaderKey          = "cookie"
+	populatorServiceAccount  = "populator"
+	populatorLeaseRoleName   = "nutanix-http-populator-lease"
 )
 
 // adapterPriority maps Nutanix adapter types to sort priority (lower = first).
@@ -1329,6 +1334,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 	baseURL := strings.TrimRight(r.Source.Provider.Spec.URL, "/")
 	namespace := r.Plan.Spec.TargetNamespace
+	if err = r.ensureHTTPPopulatorLeaseRBAC(namespace); err != nil {
+		return nil, err
+	}
 	diskIndex := 0
 	for _, disk := range dataDisks(vm) {
 		destination, mapped := storageMap[disk.StorageContainerUUID]
@@ -1353,13 +1361,20 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		}
 		pvcAnnotations[planbase.AnnDiskSource] = disk.UUID
 		pvcAnnotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
+		pvcAnnotations[populator_machinery.AnnPopulatorServiceAccount] = populatorServiceAccount
 
 		sum := sha256.Sum256([]byte(fmt.Sprintf("%s-%s-%s", r.Migration.UID, vmRef.ID, disk.UUID)))
 		name := fmt.Sprintf("nhvp-%x", sum[:12])
+		endpoint := api.NutanixEndpointCentral
+		if element {
+			endpoint = api.NutanixEndpointElement
+		}
 		labels := map[string]string{
-			"migration": string(r.Migration.UID),
-			"plan":      string(r.Plan.GetUID()),
-			"vmID":      vmRef.ID,
+			"migration":              string(r.Migration.UID),
+			"plan":                   string(r.Plan.GetUID()),
+			"vmID":                   vmRef.ID,
+			api.LabelSourceHost:      string(r.Source.Provider.UID),
+			api.LabelNutanixEndpoint: endpoint,
 		}
 
 		volumeMode := core.PersistentVolumeFilesystem
@@ -1537,6 +1552,67 @@ func (r *Builder) ensureHTTPPopulatorCookieSecret(
 		return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", diskUUID)
 	}
 	return secret, nil
+}
+
+// ensureHTTPPopulatorLeaseRBAC creates the populator ServiceAccount and lease
+// Role/RoleBinding used by nutanix-http-populator pods (same pattern as xcopy).
+func (r *Builder) ensureHTTPPopulatorLeaseRBAC(namespace string) error {
+	sa := &core.ServiceAccount{
+		ObjectMeta: meta.ObjectMeta{Name: populatorServiceAccount, Namespace: namespace},
+	}
+	if err := r.Destination.Create(context.TODO(), sa, &client.CreateOptions{}); err != nil && !k8serr.IsAlreadyExists(err) {
+		return liberr.Wrap(err, "serviceAccount", populatorServiceAccount)
+	}
+
+	leaseNS := "openshift-mtv"
+	role := &rbacv1.Role{
+		ObjectMeta: meta.ObjectMeta{Name: populatorLeaseRoleName, Namespace: leaseNS},
+		Rules: []rbacv1.PolicyRule{{
+			APIGroups: []string{"coordination.k8s.io"},
+			Resources: []string{"leases"},
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+		}},
+	}
+	if _, err := controllerutil.CreateOrPatch(context.TODO(), r.Destination.Client, role, func() error {
+		role.Rules = []rbacv1.PolicyRule{{
+			APIGroups: []string{"coordination.k8s.io"},
+			Resources: []string{"leases"},
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+		}}
+		return nil
+	}); err != nil {
+		return liberr.Wrap(err, "role", populatorLeaseRoleName)
+	}
+
+	binding := &rbacv1.RoleBinding{
+		ObjectMeta: meta.ObjectMeta{Name: populatorLeaseRoleName + "-binding", Namespace: leaseNS},
+	}
+	subject := rbacv1.Subject{
+		Kind:      "ServiceAccount",
+		Name:      populatorServiceAccount,
+		Namespace: namespace,
+	}
+	if _, err := controllerutil.CreateOrPatch(context.TODO(), r.Destination.Client, binding, func() error {
+		binding.RoleRef = rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     populatorLeaseRoleName,
+			APIGroup: "rbac.authorization.k8s.io",
+		}
+		found := false
+		for _, s := range binding.Subjects {
+			if s.Kind == subject.Kind && s.Name == subject.Name && s.Namespace == subject.Namespace {
+				found = true
+				break
+			}
+		}
+		if !found {
+			binding.Subjects = append(binding.Subjects, subject)
+		}
+		return nil
+	}); err != nil {
+		return liberr.Wrap(err, "roleBinding", populatorLeaseRoleName+"-binding")
+	}
+	return nil
 }
 
 func (r *Builder) ensureHTTPPopulatorPVCAndCR(pvc *core.PersistentVolumeClaim, populator *api.NutanixHTTPVolumePopulator) error {

@@ -571,6 +571,18 @@ type ForkliftControllerSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	ControllerMaxPopulatorInflight *int32 `json:"controller_max_populator_inflight,omitempty"`
+	// Max concurrent Nutanix HTTP populator downloads per Prism Central provider.
+	// +optional
+	// +kubebuilder:default=2
+	// +kubebuilder:validation:Minimum=1
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	ControllerNutanixHTTPMaxInflightCentral *int32 `json:"controller_nutanix_http_max_inflight_central,omitempty"`
+	// Max concurrent Nutanix HTTP populator downloads per Prism Element provider.
+	// +optional
+	// +kubebuilder:default=10
+	// +kubebuilder:validation:Minimum=1
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	ControllerNutanixHTTPMaxInflightElement *int32 `json:"controller_nutanix_http_max_inflight_element,omitempty"`
 	// Precopy interval in minutes.
 	// +optional
 	// +kubebuilder:default=60
@@ -933,7 +945,7 @@ type ForkliftControllerSpec struct {
 	PopulatorContainerLimitsCPU string `json:"populator_container_limits_cpu,omitempty"`
 	// Volume Populator memory limit.
 	// +optional
-	// +kubebuilder:default="1Gi"
+	// +kubebuilder:default="512Mi"
 	// +kubebuilder:validation:Pattern=`^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$`
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	PopulatorContainerLimitsMemory string `json:"populator_container_limits_memory,omitempty"`
@@ -945,7 +957,7 @@ type ForkliftControllerSpec struct {
 	PopulatorContainerRequestsCPU string `json:"populator_container_requests_cpu,omitempty"`
 	// Volume Populator memory request.
 	// +optional
-	// +kubebuilder:default="512Mi"
+	// +kubebuilder:default="128Mi"
 	// +kubebuilder:validation:Pattern=`^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$`
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	PopulatorContainerRequestsMemory string `json:"populator_container_requests_memory,omitempty"`

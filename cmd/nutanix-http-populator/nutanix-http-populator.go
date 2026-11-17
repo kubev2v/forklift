@@ -4,10 +4,15 @@
 // Auth comes from the EnvFrom secret wired by the populator machinery:
 //   - Basic Auth: user + password (Prism Element)
 //   - Cookie header: Cookie env (Prism Central entity_download)
+//
 // TLS: cacert env (mapped from ca.crt) and insecureSkipVerify.
+//
+// Concurrent downloads against one Prism are limited with k8s Leases (same
+// slot pattern as the vSphere copy-offload populator).
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
@@ -24,13 +29,17 @@ import (
 )
 
 type config struct {
-	volumePath string
-	url        string
-	pvcSize    int64
-	crName     string
-	crNS       string
-	ownerUID   string
-	secretName string
+	volumePath           string
+	url                  string
+	pvcSize              int64
+	crName               string
+	crNS                 string
+	ownerUID             string
+	secretName           string
+	leaseKey             string
+	leaseNamespace       string
+	leaseDurationSeconds int
+	downloadSlots        int
 }
 
 func main() {
@@ -42,6 +51,10 @@ func main() {
 	flag.StringVar(&cfg.crNS, "cr-namespace", "", "Custom Resource namespace")
 	flag.StringVar(&cfg.ownerUID, "owner-uid", "", "Owner UID (target PVC UID), used as the progress label")
 	flag.StringVar(&cfg.secretName, "secret-name", "", "Secret name (credentials via EnvFrom)")
+	flag.StringVar(&cfg.leaseKey, "lease-key", "", "DNS label identifying the Prism provider for download leases")
+	flag.StringVar(&cfg.leaseNamespace, "lease-namespace", "openshift-mtv", "Namespace for download lease objects")
+	flag.IntVar(&cfg.leaseDurationSeconds, "lease-duration-seconds", 30, "Lease duration in seconds (renewed while downloading)")
+	flag.IntVar(&cfg.downloadSlots, "download-slots", 2, "Max concurrent downloads for this lease key")
 	flag.Parse()
 
 	if cfg.volumePath == "" || cfg.url == "" {
@@ -68,16 +81,33 @@ func main() {
 		klog.Error("progress gauge not registered: ", err)
 	}
 
-	klog.Infof("Downloading %s -> %s", cfg.url, cfg.volumePath)
-	if err := download(cfg, progress); err != nil {
-		klog.Fatal(err)
+	ctx := context.Background()
+	run := func(ctx context.Context) error {
+		klog.Infof("Downloading %s -> %s", cfg.url, cfg.volumePath)
+		return download(ctx, cfg, progress)
+	}
+
+	if cfg.leaseKey != "" {
+		locker, err := newDownloadLeaseLocker(cfg.downloadSlots, cfg.leaseNamespace, cfg.leaseDurationSeconds)
+		if err != nil {
+			klog.Fatal(err)
+		}
+		klog.Infof("Waiting for download lease key=%s slots=%d ns=%s", cfg.leaseKey, cfg.downloadSlots, cfg.leaseNamespace)
+		err = locker.withLock(ctx, cfg.leaseKey, run)
+		if err != nil {
+			klog.Fatal(err)
+		}
+	} else {
+		if err := run(ctx); err != nil {
+			klog.Fatal(err)
+		}
 	}
 	progress.WithLabelValues(cfg.ownerUID).Set(100)
 	klog.Info("Finished populating the volume. Progress: 100%")
 }
 
-func download(cfg *config, progress *prometheus.GaugeVec) error {
-	req, err := http.NewRequest(http.MethodGet, cfg.url, nil)
+func download(ctx context.Context, cfg *config, progress *prometheus.GaugeVec) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.url, nil)
 	if err != nil {
 		return err
 	}
@@ -141,6 +171,10 @@ func download(cfg *config, progress *prometheus.GaugeVec) error {
 
 	buf := make([]byte, 1<<20)
 	for {
+		if err := ctx.Err(); err != nil {
+			close(done)
+			return err
+		}
 		n, rerr := resp.Body.Read(buf)
 		if n > 0 {
 			if _, werr := file.Write(buf[:n]); werr != nil {

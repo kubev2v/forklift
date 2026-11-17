@@ -686,6 +686,16 @@ func (in *ForkliftControllerSpec) DeepCopyInto(out *ForkliftControllerSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.ControllerNutanixHTTPMaxInflightCentral != nil {
+		in, out := &in.ControllerNutanixHTTPMaxInflightCentral, &out.ControllerNutanixHTTPMaxInflightCentral
+		*out = new(int32)
+		**out = **in
+	}
+	if in.ControllerNutanixHTTPMaxInflightElement != nil {
+		in, out := &in.ControllerNutanixHTTPMaxInflightElement, &out.ControllerNutanixHTTPMaxInflightElement
+		*out = new(int32)
+		**out = **in
+	}
 	if in.ControllerPrecopyInterval != nil {
 		in, out := &in.ControllerPrecopyInterval, &out.ControllerPrecopyInterval
 		*out = new(int32)

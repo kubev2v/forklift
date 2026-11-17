@@ -16,9 +16,9 @@ const (
 
 var (
 	DefaultPopulatorContainerLimitsCpu      = resource.NewMilliQuantity(1000, resource.DecimalSI)
-	DefaultPopulatorContainerLimitsMemory   = resource.NewQuantity(1<<30, resource.BinarySI)
+	DefaultPopulatorContainerLimitsMemory   = resource.NewQuantity(512<<20, resource.BinarySI)
 	DefaultPopulatorContainerRequestsCpu    = resource.NewMilliQuantity(100, resource.DecimalSI)
-	DefaultPopulatorContainerRequestsMemory = resource.NewQuantity(512<<20, resource.BinarySI)
+	DefaultPopulatorContainerRequestsMemory = resource.NewQuantity(128<<20, resource.BinarySI)
 )
 
 type Populator struct {

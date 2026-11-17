@@ -209,6 +209,20 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
+              controller_nutanix_http_max_inflight_central:
+                default: 2
+                description: Max concurrent Nutanix HTTP populator downloads per
+                  Prism Central provider.
+                format: int32
+                minimum: 1
+                type: integer
+              controller_nutanix_http_max_inflight_element:
+                default: 10
+                description: Max concurrent Nutanix HTTP populator downloads per
+                  Prism Element provider.
+                format: int32
+                minimum: 1
+                type: integer
               controller_max_vm_inflight:
                 default: 20
                 description: Max concurrent VM migrations.
@@ -729,7 +743,7 @@ spec:
                 pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               populator_container_limits_memory:
-                default: 1Gi
+                default: 512Mi
                 description: Volume Populator memory limit.
                 pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
@@ -739,7 +753,7 @@ spec:
                 pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               populator_container_requests_memory:
-                default: 512Mi
+                default: 128Mi
                 description: Volume Populator memory request.
                 pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string

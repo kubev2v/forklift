@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
@@ -24,6 +25,11 @@ const (
 	groupName               = "forklift.konveyor.io"
 	apiVersion              = "v1beta1"
 	maxPopulatorInFlightEnv = "MAX_POPULATOR_INFLIGHT"
+
+	nutanixHTTPMaxInflightCentralEnv = "NUTANIX_HTTP_MAX_INFLIGHT_CENTRAL"
+	nutanixHTTPMaxInflightElementEnv = "NUTANIX_HTTP_MAX_INFLIGHT_ELEMENT"
+	defaultNutanixHTTPMaxCentral     = 2
+	defaultNutanixHTTPMaxElement     = 10
 )
 
 type populator struct {
@@ -122,6 +128,15 @@ func getEnvInt(name string, def int) int {
 	return def
 }
 
+func nutanixHTTPDownloadSlots(endpoint string) int {
+	switch endpoint {
+	case v1beta1.NutanixEndpointElement:
+		return getEnvInt(nutanixHTTPMaxInflightElementEnv, defaultNutanixHTTPMaxElement)
+	default:
+		return getEnvInt(nutanixHTTPMaxInflightCentralEnv, defaultNutanixHTTPMaxCentral)
+	}
+}
+
 func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ corev1.PersistentVolumeClaim) ([]string, error) {
 	var ovirtVolumePopulator v1beta1.OvirtVolumePopulator
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &ovirtVolumePopulator)
@@ -163,13 +178,26 @@ func getNutanixHTTPPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured,
 	if err != nil {
 		return nil, err
 	}
-	return []string{
+	endpoint, _, _ := unstructured.NestedString(u.Object, "metadata", "labels", v1beta1.LabelNutanixEndpoint)
+	leaseKey, _, _ := unstructured.NestedString(u.Object, "metadata", "labels", v1beta1.LabelSourceHost)
+	args := []string{
 		"--volume-path=" + getVolumePath(rawBlock),
 		"--url=" + populator.Spec.URL,
 		"--secret-name=" + populator.Spec.SecretName,
 		"--cr-name=" + populator.Name,
 		"--cr-namespace=" + populator.Namespace,
-	}, nil
+		"--download-slots=" + strconv.Itoa(nutanixHTTPDownloadSlots(endpoint)),
+	}
+	if leaseKey != "" {
+		args = append(args, "--lease-key="+leaseKey)
+	}
+	if ns := os.Getenv("HOST_LEASE_NAMESPACE"); ns != "" {
+		args = append(args, "--lease-namespace="+ns)
+	}
+	if dur := os.Getenv("HOST_LEASE_DURATION_SECONDS"); dur != "" {
+		args = append(args, fmt.Sprintf("--lease-duration-seconds=%s", dur))
+	}
+	return args, nil
 }
 
 func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.PersistentVolumeClaim) ([]string, error) {
