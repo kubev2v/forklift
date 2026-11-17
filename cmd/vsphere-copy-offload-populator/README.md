@@ -361,6 +361,15 @@ VVol datastores use CSI import in the same migration plan.
 | Vendor | `storageVendorProduct` value | Annotation |
 | ------ | ---------------------------- | ---------- |
 | HPE Primera/3PAR/Alletra | `primera3par` | `csi.hpe.com/importVolAsClone` |
+| Dell PowerStore (RDM only) | `powerstore` | `import.storage.dell.com/volumeName` |
+
+For Dell PowerStore, the destination StorageClass must set
+`import.storage.dell.com/enabled: "true"` and
+`import.storage.dell.com/allowedNamespaces` (comma-separated, including the plan's
+target namespace), and the PowerStore CSI driver must run with the
+csi-metadata-retriever. Because the RDM LUN stays mapped to the ESXi host after the
+VM is powered off, also set `import.storage.dell.com/allowMappedSource: "true"` on a
+StorageClass used only for cold migration. VVol disks are not supported.
 
 ### Setup CSI Volume Import
 

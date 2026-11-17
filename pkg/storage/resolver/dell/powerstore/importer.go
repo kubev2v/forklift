@@ -42,23 +42,31 @@ func NewPowerstoreImporter(host, user, pass string, skipSSL bool) (*PowerstoreIm
 	}, nil
 }
 
-const annotationKey = "csi.dell.com/importVolAsClone"
+// annotationKey is the PVC annotation the Dell CSI PowerStore driver reads to import a
+// source volume (ER-K8S-BR47246-001). Provisional until confirmed with the MTV team.
+const annotationKey = "import.storage.dell.com/volumeName"
 
 // Resolve returns the PVC annotations the Dell CSI PowerStore driver needs to import the source array volume.
+// Only RDM disks are supported.
 func (p *PowerstoreImporter) Resolve(backing *resolver.DiskBacking) (map[string]string, error) {
 	if backing == nil {
 		return nil, fmt.Errorf("nil disk backing")
 	}
-	if diskType := resolver.DetectDiskType(backing); diskType != resolver.DiskTypeRDM {
-		return nil, fmt.Errorf("PowerStore CSI import supports only RDM disks, got %s", diskType)
+	switch resolver.DetectDiskType(backing) {
+	case resolver.DiskTypeVVol:
+		return nil, fmt.Errorf("PowerStore CSI import does not support VVol-backed disks: the PowerStore REST API does not expose a VVol clone endpoint (see ER-K8S-BR47246-001)")
+	case resolver.DiskTypeRDM:
+		return p.resolveRDM(backing.DeviceName)
+	default:
+		return nil, fmt.Errorf("PowerStore CSI import does not support VMDK disks")
 	}
-	return p.resolveRDM(backing.DeviceName)
 }
 
 // resolveRDM maps a vSphere RDM device name to a PowerStore volume name via its WWN.
-// DeviceName can be "naa.<hex>" or VML format "vml.<hex>". For VML, the WWN is embedded
-// at hex positions 10–42 (NAA type 6 = IEEE Registered Extended). PowerStore volumes store
-// the WWN with the "naa." prefix, so the extracted value keeps it.
+// DeviceName can be "naa.<hex>", VML format "vml.<hex>" (optionally as a full
+// "/vmfs/devices/disks/..." path) or a bare NAA. For VML, the WWN is embedded at hex
+// positions 10–42 (NAA type 6 = IEEE Registered Extended). PowerStore volumes store the
+// WWN with the "naa." prefix, so the extracted value keeps it.
 func (p *PowerstoreImporter) resolveRDM(deviceName string) (map[string]string, error) {
 	wwn, err := extractWWN(deviceName)
 	if err != nil {
@@ -71,14 +79,15 @@ func (p *PowerstoreImporter) resolveRDM(deviceName string) (map[string]string, e
 	return map[string]string{annotationKey: name}, nil
 }
 
-// extractWWN returns the lowercase, "naa."-prefixed PowerStore WWN from either NAA or
-// VML vSphere device name format.
+// extractWWN returns the lowercase, "naa."-prefixed PowerStore WWN from a NAA, VML or
+// bare-NAA vSphere device name, which may be given as a full device path.
 func extractWWN(deviceName string) (string, error) {
-	switch {
-	case strings.HasPrefix(deviceName, "naa."):
-		return strings.ToLower(deviceName), nil
-	case strings.HasPrefix(deviceName, "vml."):
-		hex := strings.TrimPrefix(deviceName, "vml.")
+	lower := strings.ToLower(strings.TrimSpace(deviceName))
+	if i := strings.LastIndex(lower, "naa."); i >= 0 {
+		return lower[i:], nil
+	}
+	if i := strings.LastIndex(lower, "vml."); i >= 0 {
+		hex := lower[i+4:]
 		if len(hex) < 42 {
 			return "", fmt.Errorf("VML string too short to contain NAA: %s", deviceName)
 		}
@@ -86,10 +95,12 @@ func extractWWN(deviceName string) (string, error) {
 		if !strings.HasPrefix(naa, "6") {
 			return "", fmt.Errorf("VML does not contain NAA type 6 identifier: %s", deviceName)
 		}
-		return "naa." + strings.ToLower(naa), nil
-	default:
-		return strings.ToLower(deviceName), nil
+		return "naa." + naa, nil
 	}
+	if len(lower) == 32 && strings.HasPrefix(lower, "6") {
+		return "naa." + lower, nil
+	}
+	return "", fmt.Errorf("unrecognized RDM device name %q: expected naa.<hex> or vml.<hex>", deviceName)
 }
 
 // volumeNameByField queries GET /api/rest/volume?<field>=eq.<value>&select=name and

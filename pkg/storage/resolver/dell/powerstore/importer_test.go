@@ -77,17 +77,15 @@ func TestNewPowerstoreImporter(t *testing.T) {
 	}
 }
 
-func TestResolveVVol(t *testing.T) {
+func TestResolveVVolRejected(t *testing.T) {
 	srv, imp := mockPowerstoreAPI(t, map[string]string{})
 	defer srv.Close()
 
-	backing := &resolver.DiskBacking{VVolID: "vvol:e8307953-a6a3-4adb-bce1-098c210ca53c"}
-	_, err := imp.Resolve(backing)
-	if err == nil {
-		t.Fatal("expected error for VVol, got nil")
-	}
-	if !strings.Contains(err.Error(), "supports only RDM") {
-		t.Errorf("unexpected error message: %v", err)
+	for _, id := range []string{"vvol:e8307953-a6a3-4adb-bce1-098c210ca53c", "naa.68ccf098000a2415fa5c15f00000000f"} {
+		_, err := imp.Resolve(&resolver.DiskBacking{VVolID: id})
+		if err == nil || !strings.Contains(err.Error(), "does not support VVol-backed disks") {
+			t.Errorf("Resolve(VVolID=%q) error = %v, want VVol rejection", id, err)
+		}
 	}
 }
 
@@ -136,7 +134,7 @@ func TestResolveVMDK(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for VMDK, got nil")
 	}
-	if !strings.Contains(err.Error(), "supports only RDM") {
+	if !strings.Contains(err.Error(), "does not support VMDK") {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }
@@ -179,9 +177,24 @@ func TestExtractWWN(t *testing.T) {
 			wantErr:    true,
 		},
 		{
-			name:       "bare device name",
+			name:       "vml device path",
+			deviceName: "/vmfs/devices/disks/vml.020001000068ccf098000a2415fa5c15f00000000f565620202020",
+			want:       "naa.68ccf098000a2415fa5c15f00000000f",
+		},
+		{
+			name:       "naa device path",
+			deviceName: "/vmfs/devices/disks/naa.68ccf098000a2415fa5c15f00000000f",
+			want:       "naa.68ccf098000a2415fa5c15f00000000f",
+		},
+		{
+			name:       "bare naa",
+			deviceName: "68CCF098000A2415FA5C15F00000000F",
+			want:       "naa.68ccf098000a2415fa5c15f00000000f",
+		},
+		{
+			name:       "unrecognized device name",
 			deviceName: "SOME-DEVICE",
-			want:       "some-device",
+			wantErr:    true,
 		},
 	}
 	for _, tt := range tests {
