@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
@@ -1250,7 +1251,7 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			Expect(err.Error()).To(ContainSubstring("no frozen base VHDX"))
 		})
 
-		ginkgo.It("fails when the PVC count does not match the disk count", func() {
+		ginkgo.It("waits when CDI has created only some disk PVCs", func() {
 			disks := []hvmodel.Disk{
 				{Base: hvmodel.Base{ID: "disk-0"}},
 				{Base: hvmodel.Base{ID: "disk-1"}},
@@ -1259,16 +1260,53 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			vm := newWarmVM(0, []plan.DiskDelta{parentDelta})
 
 			_, err := kv.buildHyperVWarmCopyPod(vm)
+			Expect(err).To(MatchError(errWarmCopyPVCsPending))
+		})
+
+		ginkgo.It("retries EnsureHyperVWarmCopyPod while disk PVCs are still partial", func() {
+			disks := []hvmodel.Disk{
+				{Base: hvmodel.Base{ID: "disk-0"}},
+				{Base: hvmodel.Base{ID: "disk-1"}},
+			}
+			kv := newWarmCopyKubevirt(disks, []string{"disk-0"})
+			vm := newWarmVM(0, []plan.DiskDelta{parentDelta})
+			step := &plan.Step{}
+			step.Name = "DiskTransfer"
+
+			ready, err := kv.EnsureHyperVWarmCopyPod(vm, step)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ready).To(BeFalse())
+			Expect(step.HasError()).To(BeFalse())
+			Expect(step.MarkedCompleted()).To(BeFalse())
+		})
+
+		ginkgo.It("fails when there are more PVCs than disks", func() {
+			disks := []hvmodel.Disk{{Base: hvmodel.Base{ID: "disk-0"}}}
+			kv := newWarmCopyKubevirt(disks, []string{"disk-0", "disk-1"})
+			vm := newWarmVM(0, []plan.DiskDelta{parentDelta})
+
+			_, err := kv.buildHyperVWarmCopyPod(vm)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("2 disks but 1 PVCs"))
+			Expect(err.Error()).To(ContainSubstring("1 disks but 2 PVCs"))
 		})
 
 		ginkgo.It("fails when a later iteration has no delta instead of falling back to full copy", func() {
 			disks := []hvmodel.Disk{{Base: hvmodel.Base{ID: "disk-0"}, SMBPath: "/hyperv/active.avhdx"}}
 			kv := newWarmCopyKubevirt(disks, []string{"disk-0"})
-			// One completed iteration, one recorded delta for another disk:
-			// disk-0 has no AVHDX to copy.
-			vm := newWarmVM(1, []plan.DiskDelta{parentDelta})
+			// Two precopies so resolveWarmDeltaPaths past n < 2. Preceding
+			// precopy has a delta for a different disk only.
+			vm := &plan.VMStatus{}
+			vm.ID = vmID
+			vm.Ref = ref.Ref{ID: vmID}
+			vm.Name = "win2019"
+			vm.Warm = &plan.Warm{Successes: 1}
+			vm.Warm.Precopies = []plan.Precopy{
+				{Deltas: []plan.DiskDelta{{
+					Disk:    "other-disk",
+					DeltaID: `{"diskPaths":{"Active":"\\\\hyperv.example\\share\\other.avhdx","Parent":"\\\\hyperv.example\\share\\other.vhdx"}}`,
+				}}},
+				{Deltas: []plan.DiskDelta{}},
+			}
 
 			_, err := kv.buildHyperVWarmCopyPod(vm)
 			Expect(err).To(HaveOccurred())
@@ -1309,6 +1347,21 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			Expect(err.Error()).To(ContainSubstring("no matching disk"))
 		})
 
+		ginkgo.It("fails first copy when the frozen parent is a differencing AVHDX", func() {
+			disks := []hvmodel.Disk{{Base: hvmodel.Base{ID: "disk-0"}}}
+			kv := newWarmCopyKubevirt(disks, []string{"disk-0"})
+			vm := newWarmVM(0, []plan.DiskDelta{{
+				Disk: "disk-0",
+				DeltaID: `{"diskPaths":{"Active":"\\\\hyperv.example\\share\\child_A1.avhdx",` +
+					`"Parent":"\\\\hyperv.example\\share\\child.avhdx",` +
+					`"Root":"\\\\hyperv.example\\share\\template.vhdx"}}`,
+			}})
+
+			_, err := kv.buildHyperVWarmCopyPod(vm)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("differencing"))
+		})
+
 		ginkgo.It("builds a full-copy job from the frozen base VHDX on iteration zero", func() {
 			disks := []hvmodel.Disk{
 				{Base: hvmodel.Base{ID: "disk-0"}},
@@ -1327,6 +1380,97 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			Expect(env).To(Equal(
 				"full|/hyperv/base.vhdx||/dev/block0\n" +
 					"full|/hyperv/data.vhdx||/dev/block1"))
+		})
+
+		ginkgo.It("records permanent setup errors on the step instead of retrying", func() {
+			disks := []hvmodel.Disk{{Base: hvmodel.Base{ID: "disk-0"}, SMBPath: "/hyperv/active.avhdx"}}
+			kv := newWarmCopyKubevirt(disks, []string{"disk-0"})
+			vm := &plan.VMStatus{}
+			vm.ID = vmID
+			vm.Ref = ref.Ref{ID: vmID}
+			vm.Name = "win2019"
+			vm.Warm = &plan.Warm{Successes: 1, Precopies: []plan.Precopy{
+				{Deltas: []plan.DiskDelta{}},
+				{Deltas: []plan.DiskDelta{}},
+			}}
+			step := &plan.Step{}
+			step.Name = "DiskTransfer"
+
+			ready, err := kv.EnsureHyperVWarmCopyPod(vm, step)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ready).To(BeFalse())
+			Expect(step.HasError()).To(BeTrue())
+			Expect(step.MarkedCompleted()).To(BeTrue())
+			Expect(step.Error.Reasons[0]).To(ContainSubstring("no AVHDX delta recorded"))
+		})
+	})
+
+	ginkgo.Describe("warmCopyScratchSizes", func() {
+		ginkgo.It("sets SizeLimit to capacity plus VHDX metadata overhead", func() {
+			cap := resource.MustParse("20Gi")
+			pvcs := []*v1.PersistentVolumeClaim{{
+				Status: v1.PersistentVolumeClaimStatus{
+					Capacity: v1.ResourceList{v1.ResourceStorage: cap},
+				},
+			}}
+			limit, request := warmCopyScratchSizes(pvcs)
+			Expect(limit).ToNot(BeNil())
+			Expect(request).ToNot(BeNil())
+			Expect(limit.Value()).To(Equal(cap.Value() + warmCopyScratchMetaOverhead(cap.Value())))
+			// 20Gi bitmaps ≈ 5Mi; floor keeps 256Mi margin.
+			Expect(warmCopyScratchMetaOverhead(cap.Value())).To(Equal(hypervWarmCopyScratchMetaFloor))
+			Expect(request.Value()).To(BeNumerically(">", 0))
+			Expect(request.Value()).To(BeNumerically("<", limit.Value()))
+		})
+		ginkgo.It("scales metadata overhead with BAT and bitmaps on large disks", func() {
+			// 64 TiB / 2 MiB blocks → 2^25 entries: BAT 256 MiB + bitmaps 16 GiB
+			// + 4 MiB headers. SizeLimit = capacity + that bound.
+			cap := resource.MustParse("64Ti")
+			want := hypervWarmCopyScratchHeaderOverhead +
+				cap.Value()/hypervWarmCopyScratchBATDivisor +
+				cap.Value()/hypervWarmCopyScratchBitmapDivisor
+			Expect(want).To(BeNumerically(">", hypervWarmCopyScratchMetaFloor))
+			// BAT alone at this size is the old 256 MiB floor.
+			Expect(cap.Value() / hypervWarmCopyScratchBATDivisor).To(Equal(hypervWarmCopyScratchMetaFloor))
+			overhead := warmCopyScratchMetaOverhead(cap.Value())
+			Expect(overhead).To(Equal(want))
+			pvcs := []*v1.PersistentVolumeClaim{{
+				Status: v1.PersistentVolumeClaimStatus{
+					Capacity: v1.ResourceList{v1.ResourceStorage: cap},
+				},
+			}}
+			limit, _ := warmCopyScratchSizes(pvcs)
+			Expect(limit.Value()).To(Equal(cap.Value() + overhead))
+		})
+	})
+
+	ginkgo.Describe("rejectDifferencingFullCopy", func() {
+		ginkgo.It("allows a standalone base VHDX", func() {
+			Expect(rejectDifferencingFullCopy("disk-0", "vm",
+				`C:\VHDX\base.vhdx`, `C:\VHDX\base.vhdx`, "")).To(Succeed())
+		})
+		ginkgo.It("rejects an AVHDX parent", func() {
+			err := rejectDifferencingFullCopy("disk-0", "vm",
+				`C:\VHDX\child.avhdx`, `C:\VHDX\template.vhdx`, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("differencing"))
+		})
+		ginkgo.It("rejects a legacy AVHD parent", func() {
+			err := rejectDifferencingFullCopy("disk-0", "vm",
+				`C:\VHD\child.avhd`, `C:\VHD\base.vhd`, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("differencing"))
+		})
+		ginkgo.It("rejects when Root has its own parent", func() {
+			err := rejectDifferencingFullCopy("disk-0", "vm",
+				`C:\VHDX\child.vhdx`, `C:\VHDX\child.vhdx`, `C:\VHDX\template.vhdx`)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("differencing"))
+		})
+		ginkgo.It("rejects when Parent and Root disagree", func() {
+			err := rejectDifferencingFullCopy("disk-0", "vm",
+				`C:\VHDX\child.avhdx`, `C:\VHDX\template.vhdx`, "")
+			Expect(err).To(HaveOccurred())
 		})
 	})
 

@@ -72,13 +72,20 @@ func (r *Client) Finalize(vms []*planapi.VMStatus, _ string) {
 	if !r.Plan.IsWarm() {
 		return
 	}
-	// Safety net after PhaseRemoveFinalSnapshot. Clears leftover forklift
-	// checkpoints if the migration failed before that phase.
-	drv, err := r.connect()
-	if err != nil {
+	// Own connection: Finalize runs in a goroutine while Migration may Close
+	// the shared driver as soon as Run returns.
+	username, password := hvutil.HyperVCredentials(r.Source.Secret)
+	host := r.Source.Provider.Spec.URL
+	port := hvutil.WinRMPort(r.Source.Provider.Spec.Settings)
+	drv := driver.NewWinRMDriver(host, port, username, password, true, nil)
+	if err := drv.Connect(); err != nil {
 		log.Error(err, "Failed to connect for checkpoint cleanup")
 		return
 	}
+	defer func() { _ = drv.Close() }()
+
+	// Safety net after PhaseRemoveFinalSnapshot. Clears leftover forklift
+	// checkpoints if the migration failed before that phase.
 	for _, vm := range vms {
 		vmLookup := &hyperv.VM{}
 		if err := r.Source.Inventory.Find(vmLookup, vm.Ref); err != nil {
@@ -253,27 +260,34 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, _ util.HostsFunc) (string, string
 	if err != nil {
 		return "", "", err
 	}
-	computerName := vm.Host
+	r.cleanupStaleWarmCheckpoints(drv, vm)
+	cpName := r.warmCheckpointName(vmRef)
+	cmd := ps.BuildCommand(ps.CreateVMCheckpoint, vm.Name, cpName)
+	if _, err = drv.RunOnNode(cmd, vm.Host); err != nil {
+		return "", "", fmt.Errorf("creating checkpoint on %s: %w", vm.Name, err)
+	}
+	log.Info("Created checkpoint", "vm", vm.Name, "checkpoint", cpName)
+	return cpName, cpName, nil
+}
 
-	// First checkpoint of this migration: drop stale forklift-* leftovers
-	// from a prior run whose Finalize never finished (e.g. controller restart).
-	isFirst := true
+// cleanupStaleWarmCheckpoints drops leftover forklift-* checkpoints before the
+// first precopy of a migration (e.g. after a controller restart).
+func (r *Client) cleanupStaleWarmCheckpoints(drv driver.HyperVDriver, vm *hyperv.VM) {
 	for _, vmStatus := range r.Plan.Status.Migration.VMs {
-		if vmStatus.ID == vmRef.ID && vmStatus.Warm != nil && len(vmStatus.Warm.Precopies) > 0 {
-			isFirst = false
-			break
+		if vmStatus.ID == vm.ID && vmStatus.Warm != nil && len(vmStatus.Warm.Precopies) > 0 {
+			return
 		}
 	}
-	if isFirst {
-		cleanCmd := ps.BuildCommand(ps.RemoveStaleForkliftCheckpoints, vm.Name)
-		if out, cleanErr := drv.RunOnNode(cleanCmd, computerName); cleanErr != nil {
-			log.Info("Stale checkpoint cleanup failed (non-fatal)", "vm", vm.Name, "error", cleanErr)
-		} else if out != "" {
-			log.Info("Cleaned up stale checkpoints", "vm", vm.Name, "removed", out)
-		}
+	cleanCmd := ps.BuildCommand(ps.RemoveStaleForkliftCheckpoints, vm.Name)
+	if out, cleanErr := drv.RunOnNode(cleanCmd, vm.Host); cleanErr != nil {
+		log.Info("Stale checkpoint cleanup failed (non-fatal)", "vm", vm.Name, "error", cleanErr)
+	} else if out != "" {
+		log.Info("Cleaned up stale checkpoints", "vm", vm.Name, "removed", out)
 	}
+}
 
-	// Name: forklift-warm-<mig8>-<precopyIndex>. Migration UID + index is enough.
+// warmCheckpointName returns forklift-warm-<mig8>-<precopyIndex>.
+func (r *Client) warmCheckpointName(vmRef ref.Ref) string {
 	mig := "nomig"
 	if r.Migration != nil && r.Migration.UID != "" {
 		mig = string(r.Migration.UID)
@@ -288,13 +302,7 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, _ util.HostsFunc) (string, string
 			break
 		}
 	}
-	cpName := fmt.Sprintf("forklift-warm-%s-%d", mig, idx)
-	cmd := ps.BuildCommand(ps.CreateVMCheckpoint, vm.Name, cpName)
-	if _, err = drv.RunOnNode(cmd, computerName); err != nil {
-		return "", "", fmt.Errorf("creating checkpoint on %s: %w", vm.Name, err)
-	}
-	log.Info("Created checkpoint", "vm", vm.Name, "checkpoint", cpName)
-	return cpName, cpName, nil
+	return fmt.Sprintf("forklift-warm-%s-%d", mig, idx)
 }
 
 func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshotName string, _ util.HostsFunc) (string, error) {
@@ -324,11 +332,11 @@ func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshotName string, _ util.Hosts
 	if err != nil {
 		return "", err
 	}
+	// Best-effort after disk copy; Client.Finalize retries if this fails.
 	cleanCmd := ps.BuildCommand(ps.RemoveStaleForkliftCheckpoints, vm.Name)
 	if out, err := drv.RunOnNode(cleanCmd, vm.Host); err != nil {
-		log.Info("Final checkpoint cleanup failed", "vm", vm.Name, "error", err)
-		return "", err
-	} else {
+		log.Info("Final checkpoint cleanup failed (non-fatal)", "vm", vm.Name, "error", err)
+	} else if out != "" {
 		log.Info("Removed all forklift checkpoints", "vm", vm.Name, "removed", out)
 	}
 	return "", nil
@@ -357,7 +365,7 @@ func (r *Client) PreTransferActions(_ ref.Ref) (bool, error) {
 // The warm-copy binary reads changed ranges from those AVHDX files (like CBT).
 func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, _ string, _ util.HostsFunc) (map[string]string, error) {
 	if !r.Plan.IsWarm() {
-		return nil, nil
+		return map[string]string{}, nil
 	}
 	vm := &hyperv.VM{}
 	if err := r.Source.Inventory.Find(vm, vmRef); err != nil {
@@ -382,16 +390,19 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, _ string, _ util.HostsFunc) (m
 	deltas := map[string]string{}
 	for _, rec := range diskPaths {
 		var info struct {
-			Active string `json:"Active"`
-			Parent string `json:"Parent"`
-			Root   string `json:"Root"`
+			Active string   `json:"Active"`
+			Parent string   `json:"Parent"`
+			Root   string   `json:"Root"`
+			Chain  []string `json:"Chain"`
 		}
 		if err := json.Unmarshal(rec, &info); err != nil {
 			return nil, fmt.Errorf("parsing checkpoint disk paths for %s: %w", vm.Name, err)
 		}
 		diskID := ""
 		for _, disk := range vm.Disks {
-			if sameWindowsPath(disk.WindowsPath, info.Root) {
+			// Match Root/Parent/Active or any Chain entry — inventory may still
+			// name a mid-chain AVHDX after later checkpoints reparent Active.
+			if checkpointDiskMatchesInventory(disk.WindowsPath, info.Root, info.Parent, info.Active, info.Chain) {
 				diskID = disk.ID
 				break
 			}
@@ -422,4 +433,20 @@ func sameWindowsPath(a, b string) bool {
 		return strings.ToLower(strings.ReplaceAll(p, "\\", "/"))
 	}
 	return norm(a) != "" && norm(a) == norm(b)
+}
+
+// checkpointDiskMatchesInventory reports whether inventoryPath is the Root,
+// Parent, Active, or any ancestor in Chain for a checkpoint disk record.
+func checkpointDiskMatchesInventory(inventoryPath, root, parent, active string, chain []string) bool {
+	if sameWindowsPath(inventoryPath, root) ||
+		sameWindowsPath(inventoryPath, parent) ||
+		sameWindowsPath(inventoryPath, active) {
+		return true
+	}
+	for _, p := range chain {
+		if sameWindowsPath(inventoryPath, p) {
+			return true
+		}
+	}
+	return false
 }

@@ -32,6 +32,8 @@ type builder struct {
 
 	// Overrides for malformed-input tests, zero means "derive correctly".
 	metaLengthOverride int64
+	// rawBAT writes declared entries without ChunkRatio padding (malformed tests).
+	rawBAT bool
 }
 
 func newBuilder() *builder {
@@ -73,9 +75,14 @@ func (b *builder) build() []byte {
 		itemDataBase     = 64 * kiB
 	)
 
-	// BAT: entries in the order the fixture declared them.
-	bat := make([]byte, 0, len(b.entries)*batEntrySize)
-	for _, e := range b.entries {
+	batEntries := b.entries
+	if !b.rawBAT {
+		// Expand to the MS-VHDX chunk layout (payload slots padded to
+		// ChunkRatio, then one sector-bitmap entry per chunk).
+		batEntries = b.expandBAT()
+	}
+	bat := make([]byte, 0, len(batEntries)*batEntrySize)
+	for _, e := range batEntries {
 		bat = binary.LittleEndian.AppendUint64(bat, batEntry(e.state, e.offset))
 	}
 	batLength := roundUpMiB(int64(len(bat)))
@@ -128,12 +135,76 @@ func (b *builder) build() []byte {
 
 	img := make([]byte, payloadStart+len(b.payload))
 	copy(img[0:8], "vhdxfile")
+	writeHeader(img, headerOffset)
+	writeHeader(img, headerBackupOffset)
 	writeRegionTable(img, regionTableOffset, regions)
 	writeRegionTable(img, regionTableBackupOffset, regions)
 	copy(img[metaRegionOffset:], metaRegion)
 	copy(img[batRegionOffset:], bat)
 	copy(img[payloadStart:], b.payload)
 	return img
+}
+
+// expandBAT rewrites declared payload/bitmap entries into the fixed
+// ChunkRatio+bitmap chunk layout walkBAT expects.
+func (b *builder) expandBAT() []entry {
+	chunkRatio := (maxSectorsPerBitmapBlock * b.sectorSize) / b.blockSize
+	totalBlocks := (b.virtSize + b.blockSize - 1) / b.blockSize
+	chunks := (totalBlocks + chunkRatio - 1) / chunkRatio
+
+	var payloads, bitmaps []entry
+	for _, e := range b.entries {
+		if e.isSB {
+			bitmaps = append(bitmaps, e)
+		} else {
+			payloads = append(payloads, e)
+		}
+	}
+	for int64(len(payloads)) < totalBlocks {
+		payloads = append(payloads, entry{state: blockNotPresent})
+	}
+
+	out := make([]entry, 0, chunks*(chunkRatio+1))
+	bi := 0
+	for c := int64(0); c < chunks; c++ {
+		start := c * chunkRatio
+		end := start + chunkRatio
+		if end > totalBlocks {
+			end = totalBlocks
+		}
+		for i := start; i < end; i++ {
+			out = append(out, payloads[i])
+		}
+		for i := end; i < start+chunkRatio; i++ {
+			out = append(out, entry{state: blockNotPresent})
+		}
+		if bi < len(bitmaps) {
+			out = append(out, bitmaps[bi])
+			bi++
+		} else {
+			out = append(out, entry{state: 0, isSB: true})
+		}
+	}
+	return out
+}
+
+// writeHeader writes a fixture header (empty log, valid CRC, seq=1).
+func writeHeader(img []byte, at int64) {
+	writeHeaderSeq(img, at, 1)
+}
+
+func writeHeaderSeq(img []byte, at int64, seq uint64) {
+	hdr := make([]byte, headerSize)
+	copy(hdr[0:4], "head")
+	binary.LittleEndian.PutUint64(hdr[8:16], seq)
+	sealHeader(hdr)
+	copy(img[at:], hdr)
+}
+
+// sealHeader writes CRC-32C with the checksum field zeroed during the hash.
+func sealHeader(hdr []byte) {
+	copy(hdr[4:8], []byte{0, 0, 0, 0})
+	binary.LittleEndian.PutUint32(hdr[4:8], crc32.Checksum(hdr, castagnoli))
 }
 
 func writeRegionTable(img []byte, at int64, regions []byte) {
@@ -290,13 +361,11 @@ func TestNotPresentSkipped(t *testing.T) {
 	}
 }
 
-// TestParentResolvedStatesSkipped covers the three non-zero states that,
-// like NOT_PRESENT, must resolve through the parent chain. Copying them
-// would overwrite valid parent data on the target.
+// TestParentResolvedStatesSkipped covers states that must resolve through
+// the parent chain (leave the target untouched).
 func TestParentResolvedStatesSkipped(t *testing.T) {
 	for name, state := range map[string]uint64{
 		"undefined": blockUndefined,
-		"zero":      blockZero,
 		"unmapped":  blockUnmapped,
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -308,6 +377,129 @@ func TestParentResolvedStatesSkipped(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestZeroBlockClearsTarget reports PAYLOAD_BLOCK_ZERO as an explicit
+// zero-fill range so a prior full copy's stale data is overwritten.
+func TestZeroBlockClearsTarget(t *testing.T) {
+	b := newBuilder()
+	b.addBlock(blockZero, 0)
+	ranges, _ := parse(t, b.build())
+	wantRanges(t, ranges, []Range{
+		{VirtualOffset: 0, FileOffset: zeroFileOffset, Length: 2 * miB},
+	})
+
+	dst := &writerAt{buf: bytes.Repeat([]byte{0xFF}, 2*miB)}
+	written, err := Copy(dst, bytes.NewReader(b.build()), ranges, 0)
+	if err != nil {
+		t.Fatalf("Copy: %v", err)
+	}
+	if written != 2*miB {
+		t.Fatalf("written = %d, want %d", written, 2*miB)
+	}
+	if !bytes.Equal(dst.buf, make([]byte, 2*miB)) {
+		t.Fatal("ZERO block did not clear the target")
+	}
+}
+
+func TestVirtualSizeClampsFinalBlock(t *testing.T) {
+	b := newBuilder()
+	b.virtSize = 3 * miB // not block-aligned
+	off1 := b.addPayload(bytes.Repeat([]byte{0xAA}, 2*miB))
+	off2 := b.addPayload(bytes.Repeat([]byte{0xBB}, 2*miB))
+	b.addBlock(blockFullyPresent, off1)
+	b.addBlock(blockFullyPresent, off2)
+
+	ranges, geo := parse(t, b.build())
+	if geo.VirtualSize != 3*miB {
+		t.Fatalf("VirtualSize = %d, want %d", geo.VirtualSize, 3*miB)
+	}
+	wantRanges(t, ranges, []Range{
+		{VirtualOffset: 0, FileOffset: off1, Length: 2 * miB},
+		{VirtualOffset: 2 * miB, FileOffset: off2, Length: 1 * miB},
+	})
+}
+
+func TestPartialBlockMissingBitmapRejected(t *testing.T) {
+	b := newBuilder()
+	dataOff := b.addPayload(bytes.Repeat([]byte{0xCC}, 2*miB))
+	b.addBlock(blockPartiallyPresent, dataOff)
+	// No bitmap entry — expandBAT inserts a zero-state bitmap.
+	mustFail(t, b.build(), "no valid sector bitmap")
+}
+
+func TestActiveLogRejected(t *testing.T) {
+	b := newBuilder()
+	b.addBlock(blockNotPresent, 0)
+	img := b.build()
+	// Non-zero LogGuid on the current header marks an active log.
+	active := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+	copy(img[headerOffset+48:headerOffset+64], active)
+	sealHeader(img[headerOffset : headerOffset+headerSize])
+	copy(img[headerBackupOffset+48:headerBackupOffset+64], active)
+	sealHeader(img[headerBackupOffset : headerBackupOffset+headerSize])
+	mustFail(t, img, "active VHDX log")
+}
+
+func TestAllocatedInactiveLogAccepted(t *testing.T) {
+	// LogLength=1MiB with LogGuid=0 is normal (allocated, inactive).
+	b := newBuilder()
+	off := b.addPayload(bytes.Repeat([]byte{0xAB}, 2*miB))
+	b.addBlock(blockFullyPresent, off)
+	img := b.build()
+	binary.LittleEndian.PutUint32(img[headerOffset+68:headerOffset+72], uint32(miB))
+	sealHeader(img[headerOffset : headerOffset+headerSize])
+	binary.LittleEndian.PutUint32(img[headerBackupOffset+68:headerBackupOffset+72], uint32(miB))
+	sealHeader(img[headerBackupOffset : headerBackupOffset+headerSize])
+	ranges, _ := parse(t, img)
+	wantRanges(t, ranges, []Range{
+		{VirtualOffset: 0, FileOffset: off, Length: 2 * miB},
+	})
+}
+
+func TestCurrentHeaderIgnoresStaleActiveLog(t *testing.T) {
+	// Older primary has an active log; newer backup is clean — accept.
+	b := newBuilder()
+	off := b.addPayload(bytes.Repeat([]byte{0xCD}, 2*miB))
+	b.addBlock(blockFullyPresent, off)
+	img := b.build()
+	writeHeaderSeq(img, headerOffset, 10)
+	copy(img[headerOffset+48:headerOffset+64], []byte{
+		1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+	})
+	sealHeader(img[headerOffset : headerOffset+headerSize])
+	writeHeaderSeq(img, headerBackupOffset, 11)
+	ranges, _ := parse(t, img)
+	wantRanges(t, ranges, []Range{
+		{VirtualOffset: 0, FileOffset: off, Length: 2 * miB},
+	})
+}
+
+func TestCurrentHeaderRejectsActiveLogOnNewerHeader(t *testing.T) {
+	b := newBuilder()
+	b.addBlock(blockNotPresent, 0)
+	img := b.build()
+	writeHeaderSeq(img, headerOffset, 10) // clean, older
+	writeHeaderSeq(img, headerBackupOffset, 11)
+	copy(img[headerBackupOffset+48:headerBackupOffset+64], []byte{
+		1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+	})
+	sealHeader(img[headerBackupOffset : headerBackupOffset+headerSize])
+	mustFail(t, img, "active VHDX log")
+}
+
+func TestOversizedMetadataItemRejected(t *testing.T) {
+	// Craft a metadata entry whose Length exceeds 1 MiB but still fits in
+	// a large declared region so only the item-size check fires.
+	b := newBuilder()
+	b.addBlock(blockNotPresent, 0)
+	b.metaLengthOverride = 4 * miB
+	img := b.build()
+	// First metadata entry Length is at region+32+20.
+	const metaRegionOffset = 2 * miB
+	entryLenAt := metaRegionOffset + 32 + 20
+	binary.LittleEndian.PutUint32(img[entryLenAt:entryLenAt+4], uint32(2*miB))
+	mustFail(t, img, "exceeds")
 }
 
 func TestCorruptRegionTableRejected(t *testing.T) {
@@ -393,6 +585,7 @@ func TestTruncatedBATRejected(t *testing.T) {
 	// emits. Without the up-front size check the walk would read ~4 MiB
 	// past the region before noticing.
 	b.virtSize = 1024 * 1024 * miB
+	b.rawBAT = true
 	b.addBlock(blockNotPresent, 0)
 	mustFail(t, b.build(), "BAT needs")
 }

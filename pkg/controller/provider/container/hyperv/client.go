@@ -1423,6 +1423,8 @@ func (r *Client) EnrichDiskCapacity() error {
 // EnrichGuestInfo runs BatchGetVMGuest on each node and updates the vmCache
 // with GuestOS for running VMs. Called after LightMode Phase 1 so that
 // guest OS detection works even though the light script skips it.
+// Successful nodes are written into the cache even when another node fails.
+// callers must still persist the cache (updateGuestInfoFromCache) on error.
 func (r *Client) EnrichGuestInfo() error {
 	if !r.vmCached || len(r.vmCache) == 0 {
 		return nil
@@ -1446,51 +1448,66 @@ func (r *Client) EnrichGuestInfo() error {
 	type nodeGuestResult struct {
 		node  string
 		guest map[string]*batchVMDetail
+		err   error
 	}
 	ch := make(chan nodeGuestResult, len(nodeVMs))
+	launched := 0
 	for node := range nodeVMs {
+		if node != "__local__" && !r.isNodeAvailable(node) {
+			r.Log.Info("Skipping guest info enrichment (circuit breaker)", "node", node)
+			continue
+		}
+		launched++
 		go func(n string) {
-			var out string
-			var err error
-			if n == "__local__" {
-				out, err = r.driver.ExecuteCommandWithTimeout(ps.BatchGetVMGuest, longCommandTimeout)
-			} else {
-				out, err = r.driver.RunOnNodeWithTimeout(ps.BatchGetVMGuest, n, longCommandTimeout)
-			}
-			if err != nil {
-				r.Log.Info("Guest info enrichment failed", "node", n, "error", err)
-				ch <- nodeGuestResult{node: n}
-				return
-			}
-			out = strings.TrimSpace(out)
-			if out == "" || out == "{}" || out == "null" {
-				ch <- nodeGuestResult{node: n}
-				return
-			}
-			var guest map[string]*batchVMDetail
-			if err := json.Unmarshal([]byte(out), &guest); err != nil {
-				r.Log.Info("Parse guest info failed", "node", n, "error", err)
-				ch <- nodeGuestResult{node: n}
-				return
-			}
-			ch <- nodeGuestResult{node: n, guest: guest}
+			guest, err := r.fetchNodeGuestInfo(n)
+			ch <- nodeGuestResult{node: n, guest: guest, err: err}
 		}(node)
 	}
 
-	for range nodeVMs {
+	var firstErr error
+	for i := 0; i < launched; i++ {
 		res := <-ch
+		if res.err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("guest info on node %s: %w", res.node, res.err)
+			}
+			continue
+		}
 		if res.guest == nil {
 			continue
 		}
 		for _, idx := range nodeVMs[res.node] {
-			if g, ok := res.guest[r.vmCache[idx].Name]; ok {
-				if g.GuestOS != "" {
-					r.vmCache[idx].GuestOS = g.GuestOS
-				}
+			if g, ok := res.guest[r.vmCache[idx].Name]; ok && g.GuestOS != "" {
+				r.vmCache[idx].GuestOS = g.GuestOS
 			}
 		}
 	}
-	return nil
+	return firstErr
+}
+
+// fetchNodeGuestInfo runs BatchGetVMGuest on one node (or local).
+func (r *Client) fetchNodeGuestInfo(node string) (map[string]*batchVMDetail, error) {
+	var out string
+	var err error
+	if node == "__local__" {
+		out, err = r.driver.ExecuteCommandWithTimeout(ps.BatchGetVMGuest, longCommandTimeout)
+	} else {
+		out, err = r.driver.RunOnNodeWithTimeout(ps.BatchGetVMGuest, node, longCommandTimeout)
+	}
+	if err != nil {
+		r.Log.Info("Guest info enrichment failed", "node", node, "error", err)
+		return nil, err
+	}
+	out = strings.TrimSpace(out)
+	if out == "" || out == "{}" || out == "null" {
+		return map[string]*batchVMDetail{}, nil
+	}
+	var guest map[string]*batchVMDetail
+	if err := json.Unmarshal([]byte(out), &guest); err != nil {
+		r.Log.Info("Parse guest info failed", "node", node, "error", err)
+		return nil, fmt.Errorf("parse guest info: %w", err)
+	}
+	return guest, nil
 }
 
 // ListDisks returns all disks from all VMs.

@@ -70,10 +70,11 @@ func TestPowerStateFromInventory(t *testing.T) {
 type deltaStubDriver struct {
 	driver.HyperVDriver
 	out string
+	err error
 }
 
 func (d *deltaStubDriver) IsAlive() (bool, error)                { return true, nil }
-func (d *deltaStubDriver) RunOnNode(_, _ string) (string, error) { return d.out, nil }
+func (d *deltaStubDriver) RunOnNode(_, _ string) (string, error) { return d.out, d.err }
 
 // deltaStubInventory serves a fixed VM through Find.
 type deltaStubInventory struct {
@@ -165,6 +166,100 @@ func TestGetSnapshotDeltasRejectsUnknownRoot(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "matches no inventory disk") {
 		t.Errorf("error %q does not mention the unmatched disk", err)
+	}
+}
+
+func TestGetSnapshotDeltasPropagatesRootGetVHDFailure(t *testing.T) {
+	c := newDeltaTestClient([]model.Disk{
+		{Base: model.Base{ID: "disk-0"}, WindowsPath: `C:\VHDX\os.vhdx`},
+	}, "")
+	c.driver = &deltaStubDriver{err: fmt.Errorf("Get-VHD failed for root disk C:\\VHDX\\os.vhdx")}
+
+	_, err := c.GetSnapshotDeltas(ref.Ref{ID: "vm-1"}, "", nil)
+	if err == nil {
+		t.Fatal("expected Get-VHD root failure to propagate")
+	}
+	if !strings.Contains(err.Error(), "getting checkpoint disk paths") {
+		t.Errorf("error %q missing GetSnapshotDeltas wrap", err)
+	}
+	if !strings.Contains(err.Error(), "Get-VHD failed for root disk") {
+		t.Errorf("error %q missing root Get-VHD cause", err)
+	}
+}
+
+func TestGetSnapshotDeltasPropagatesChainGetVHDFailure(t *testing.T) {
+	c := newDeltaTestClient([]model.Disk{
+		{Base: model.Base{ID: "disk-0"}, WindowsPath: `C:\VHDX\os.vhdx`},
+	}, "")
+	c.driver = &deltaStubDriver{err: fmt.Errorf("Get-VHD failed for chain disk C:\\VHDX\\os.vhdx")}
+
+	_, err := c.GetSnapshotDeltas(ref.Ref{ID: "vm-1"}, "", nil)
+	if err == nil {
+		t.Fatal("expected Get-VHD chain failure to propagate")
+	}
+	if !strings.Contains(err.Error(), "getting checkpoint disk paths") {
+		t.Errorf("error %q missing GetSnapshotDeltas wrap", err)
+	}
+	if !strings.Contains(err.Error(), "Get-VHD failed for chain disk") {
+		t.Errorf("error %q missing chain Get-VHD cause", err)
+	}
+}
+
+// Pre-existing differencing disk: inventory records the attached child.vhdx,
+// not the oldest template. Root must be that attached identity.
+func TestGetSnapshotDeltasMatchesDifferencingAttachedPath(t *testing.T) {
+	vmRef := ref.Ref{ID: "vm-1"}
+	psOutput := `{"Active":"C:\\VHDX\\child_A1.avhdx","Parent":"C:\\VHDX\\child.vhdx","Root":"C:\\VHDX\\child.vhdx"}`
+
+	c := newDeltaTestClient([]model.Disk{
+		{Base: model.Base{ID: "disk-0"}, WindowsPath: `C:\VHDX\child.vhdx`},
+	}, psOutput)
+
+	deltas, err := c.GetSnapshotDeltas(vmRef, "", nil)
+	if err != nil {
+		t.Fatalf("GetSnapshotDeltas: %v", err)
+	}
+	if _, ok := deltas["disk-0"]; !ok {
+		t.Fatalf("disk-0 missing from deltas: %v", deltas)
+	}
+}
+
+// Inventory path is an attached AVHDX; Root walked to the base .vhdx —
+// Parent must still match.
+func TestGetSnapshotDeltasMatchesAttachedAVHDXInventoryPath(t *testing.T) {
+	vmRef := ref.Ref{ID: "vm-1"}
+	psOutput := `{"Active":"C:\\VHDX\\child_A2.avhdx","Parent":"C:\\VHDX\\child.avhdx","Root":"C:\\VHDX\\template.vhdx"}`
+
+	c := newDeltaTestClient([]model.Disk{
+		{Base: model.Base{ID: "disk-0"}, WindowsPath: `C:\VHDX\child.avhdx`},
+	}, psOutput)
+
+	deltas, err := c.GetSnapshotDeltas(vmRef, "", nil)
+	if err != nil {
+		t.Fatalf("GetSnapshotDeltas: %v", err)
+	}
+	if _, ok := deltas["disk-0"]; !ok {
+		t.Fatalf("disk-0 missing from deltas: %v", deltas)
+	}
+}
+
+// Later checkpoint: Parent is a forklift AVHDX, inventory still names the
+// originally attached mid-chain AVHDX — match via Chain.
+func TestGetSnapshotDeltasMatchesAVHDXViaChainAcrossCheckpoints(t *testing.T) {
+	vmRef := ref.Ref{ID: "vm-1"}
+	psOutput := `{"Active":"C:\\VHDX\\child_A3.avhdx","Parent":"C:\\VHDX\\child_A2.avhdx","Root":"C:\\VHDX\\template.vhdx",` +
+		`"Chain":["C:\\VHDX\\child_A3.avhdx","C:\\VHDX\\child_A2.avhdx","C:\\VHDX\\child.avhdx","C:\\VHDX\\template.vhdx"]}`
+
+	c := newDeltaTestClient([]model.Disk{
+		{Base: model.Base{ID: "disk-0"}, WindowsPath: `C:\VHDX\child.avhdx`},
+	}, psOutput)
+
+	deltas, err := c.GetSnapshotDeltas(vmRef, "", nil)
+	if err != nil {
+		t.Fatalf("GetSnapshotDeltas: %v", err)
+	}
+	if _, ok := deltas["disk-0"]; !ok {
+		t.Fatalf("disk-0 missing from deltas: %v", deltas)
 	}
 }
 
