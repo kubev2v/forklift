@@ -2,17 +2,12 @@ package powermax
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
-	storagev1 "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 const testSymID = "000197900046"
@@ -69,7 +64,7 @@ func TestNewPowermaxImporter(t *testing.T) {
 		{"host:8443", "https://host:8443"},
 	}
 	for _, tt := range validTests {
-		imp, err := NewPowermaxImporter(tt.input, "user", "pass", testSymID, true, nil, "")
+		imp, err := NewPowermaxImporter(tt.input, "user", "pass", testSymID, true)
 		if err != nil {
 			t.Fatalf("NewPowermaxImporter(%q) unexpected error: %v", tt.input, err)
 		}
@@ -78,10 +73,10 @@ func TestNewPowermaxImporter(t *testing.T) {
 		}
 	}
 
-	if _, err := NewPowermaxImporter("", "user", "pass", testSymID, true, nil, ""); err == nil {
+	if _, err := NewPowermaxImporter("", "user", "pass", testSymID, true); err == nil {
 		t.Error("expected error for empty host, got nil")
 	}
-	if _, err := NewPowermaxImporter("https://host", "user", "pass", "", true, nil, ""); err == nil {
+	if _, err := NewPowermaxImporter("https://host", "user", "pass", "", true); err == nil {
 		t.Error("expected error for missing symmetrix ID, got nil")
 	}
 }
@@ -272,6 +267,21 @@ func TestExtractWWN(t *testing.T) {
 			want:       "60000970000197900046533030334545",
 		},
 		{
+			name:       "naa with device path",
+			deviceName: "/vmfs/devices/disks/naa.60000970000197900046533030334545",
+			want:       "60000970000197900046533030334545",
+		},
+		{
+			name:       "vml with device path",
+			deviceName: "/vmfs/devices/disks/vml.020001000060000970000197900046533030334545535946202020",
+			want:       "60000970000197900046533030334545",
+		},
+		{
+			name:       "bare LUN UUID",
+			deviceName: "020001000060000970000197900046533030334545535946202020",
+			want:       "60000970000197900046533030334545",
+		},
+		{
 			name:       "vml too short",
 			deviceName: "vml.0200010000",
 			wantErr:    true,
@@ -301,253 +311,7 @@ func TestExtractWWN(t *testing.T) {
 }
 
 func TestNewPowermaxImporterRejectsHTTP(t *testing.T) {
-	if _, err := NewPowermaxImporter("http://host:8443", "user", "pass", testSymID, true, nil, ""); err == nil {
+	if _, err := NewPowermaxImporter("http://host:8443", "user", "pass", testSymID, true); err == nil {
 		t.Error("expected error for http endpoint, got nil")
-	}
-}
-
-// fakeArray is a minimal Unisphere sloprovisioning model for Prepare tests.
-type fakeArray struct {
-	sgs       map[string][]string // device ID -> storage groups
-	mv        map[string][]string // storage group -> masking view names
-	parents   map[string][]string // storage group -> parent storage groups
-	ids       map[string]string   // device ID -> volume identifier
-	calls     []string            // "remove:<sg>" / "add:<sg>" in order
-	failAddSG string              // add to this storage group returns 500
-}
-
-func importClass(groups string) *storagev1.StorageClass {
-	return &storagev1.StorageClass{
-		ObjectMeta: metav1.ObjectMeta{Name: "powermax-import"},
-		Parameters: map[string]string{"importSourceStorageGroups": groups},
-	}
-}
-
-func newFakeArray(t *testing.T, a *fakeArray) (*httptest.Server, *PowermaxImporter) {
-	t.Helper()
-	base := "/univmax/restapi/100/sloprovisioning/symmetrix/" + testSymID
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if u, p, ok := r.BasicAuth(); !ok || u != "test" || p != "test" {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		path := strings.TrimPrefix(r.URL.Path, base)
-		switch {
-		case r.Method == http.MethodGet && strings.HasPrefix(path, "/volume/"):
-			dev := strings.TrimPrefix(path, "/volume/")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"storageGroupId": a.sgs[dev], "volume_identifier": a.ids[dev]})
-		case r.Method == http.MethodGet && strings.HasPrefix(path, "/storagegroup/"):
-			sg := strings.TrimPrefix(path, "/storagegroup/")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"maskingview": a.mv[sg], "parent_storage_group": a.parents[sg]})
-		case r.Method == http.MethodPut && strings.HasPrefix(path, "/storagegroup/"):
-			sg := strings.TrimPrefix(path, "/storagegroup/")
-			body, _ := io.ReadAll(r.Body)
-			var req struct {
-				Edit struct {
-					Remove *struct {
-						IDs []string `json:"volumeId"`
-					} `json:"removeVolumeParam"`
-					Expand *struct {
-						Add *struct {
-							IDs []string `json:"volumeId"`
-						} `json:"addVolumeParam"`
-					} `json:"expandStorageGroupParam"`
-				} `json:"editStorageGroupActionParam"`
-			}
-			if err := json.Unmarshal(body, &req); err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			if req.Edit.Remove != nil {
-				a.calls = append(a.calls, "remove:"+sg)
-				for _, dev := range req.Edit.Remove.IDs {
-					a.sgs[dev] = removeString(a.sgs[dev], sg)
-				}
-			}
-			if req.Edit.Expand != nil && req.Edit.Expand.Add != nil {
-				a.calls = append(a.calls, "add:"+sg)
-				if sg == a.failAddSG {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				for _, dev := range req.Edit.Expand.Add.IDs {
-					a.sgs[dev] = append(a.sgs[dev], sg)
-				}
-			}
-			_, _ = w.Write([]byte(`{}`))
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	t.Cleanup(srv.Close)
-	var k8s client.Client = fake.NewClientBuilder().WithObjects(importClass("stage-SG")).Build()
-	imp := &PowermaxImporter{baseURL: srv.URL, user: "test", pass: "test", symmetrixID: testSymID, storageClass: "powermax-import", k8sClient: k8s, client: srv.Client()}
-	return srv, imp
-}
-
-func removeString(list []string, v string) []string {
-	var out []string
-	for _, x := range list {
-		if x != v {
-			out = append(out, x)
-		}
-	}
-	return out
-}
-
-var rdm = &resolver.DiskBacking{IsRDM: true, DeviceName: "naa.x"}
-
-func rdmAnnotation() map[string]string {
-	return map[string]string{annotationKey: testSymID + "/003EE"}
-}
-
-func TestPrepareMovesMappedDeviceToStaging(t *testing.T) {
-	a := &fakeArray{sgs: map[string][]string{"003EE": {"esxi-SG"}}, mv: map[string][]string{"esxi-SG": {"esxi-MV"}}}
-	_, imp := newFakeArray(t, a)
-	if err := imp.Prepare(rdm, rdmAnnotation()); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if strings.Join(a.calls, ",") != "remove:esxi-SG,add:stage-SG" {
-		t.Errorf("unexpected array calls: %v", a.calls)
-	}
-	if len(a.sgs["003EE"]) != 1 || a.sgs["003EE"][0] != "stage-SG" {
-		t.Errorf("device not only in staging: %v", a.sgs["003EE"])
-	}
-}
-
-func TestPrepareCascadedMaskingViewOnParent(t *testing.T) {
-	a := &fakeArray{
-		sgs:     map[string][]string{"003EE": {"esxi-child-SG"}},
-		mv:      map[string][]string{"esxi-parent-SG": {"esxi-MV"}},
-		parents: map[string][]string{"esxi-child-SG": {"esxi-parent-SG"}},
-	}
-	_, imp := newFakeArray(t, a)
-	if err := imp.Prepare(rdm, rdmAnnotation()); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if strings.Join(a.calls, ",") != "remove:esxi-child-SG,add:stage-SG" {
-		t.Errorf("unexpected array calls: %v", a.calls)
-	}
-}
-
-func TestPrepareSkipsAdoptedDevice(t *testing.T) {
-	a := &fakeArray{
-		sgs: map[string][]string{"003EE": {"stage-SG", "csi-node-SG"}},
-		mv:  map[string][]string{"csi-node-SG": {"csi-node-MV"}},
-		ids: map[string]string{"003EE": "csi-ABC-imp_-pvc-ns"},
-	}
-	_, imp := newFakeArray(t, a)
-	if err := imp.Prepare(rdm, rdmAnnotation()); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(a.calls) != 0 {
-		t.Errorf("an adopted device must not be touched, got %v", a.calls)
-	}
-}
-
-func TestPrepareRefusesSharedDevice(t *testing.T) {
-	a := &fakeArray{
-		sgs: map[string][]string{"003EE": {"host1-SG", "host2-SG"}},
-		mv:  map[string][]string{"host1-SG": {"host1-MV"}, "host2-SG": {"host2-MV"}},
-	}
-	_, imp := newFakeArray(t, a)
-	err := imp.Prepare(rdm, rdmAnnotation())
-	if err == nil || !strings.Contains(err.Error(), "shared") {
-		t.Fatalf("expected shared-device error, got %v", err)
-	}
-	if len(a.calls) != 0 {
-		t.Errorf("array changed for a shared device: %v", a.calls)
-	}
-}
-
-func TestPrepareRefusesMaskedStagingGroup(t *testing.T) {
-	a := &fakeArray{sgs: map[string][]string{"003EE": {"stage-SG"}}, mv: map[string][]string{"stage-SG": {"some-MV"}}}
-	_, imp := newFakeArray(t, a)
-	if err := imp.Prepare(rdm, rdmAnnotation()); err == nil {
-		t.Fatal("expected error for a masked staging group")
-	}
-	if len(a.calls) != 0 {
-		t.Errorf("array changed: %v", a.calls)
-	}
-}
-
-func TestPrepareIsIdempotentWhenAlreadyStaged(t *testing.T) {
-	a := &fakeArray{sgs: map[string][]string{"003EE": {"stage-SG"}}}
-	_, imp := newFakeArray(t, a)
-	if err := imp.Prepare(rdm, rdmAnnotation()); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(a.calls) != 0 {
-		t.Errorf("expected no array changes, got %v", a.calls)
-	}
-}
-
-func TestPrepareAddsUnmappedDeviceToStaging(t *testing.T) {
-	a := &fakeArray{sgs: map[string][]string{"003EE": {}}}
-	_, imp := newFakeArray(t, a)
-	if err := imp.Prepare(rdm, rdmAnnotation()); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if strings.Join(a.calls, ",") != "add:stage-SG" {
-		t.Errorf("unexpected array calls: %v", a.calls)
-	}
-}
-
-func TestPrepareRollsBackWhenStagingAddFails(t *testing.T) {
-	a := &fakeArray{sgs: map[string][]string{"003EE": {"esxi-SG"}}, mv: map[string][]string{"esxi-SG": {"esxi-MV"}}, failAddSG: "stage-SG"}
-	_, imp := newFakeArray(t, a)
-	err := imp.Prepare(rdm, rdmAnnotation())
-	if err == nil || !strings.Contains(err.Error(), "manual recovery") {
-		t.Fatalf("expected staging failure with recovery message, got %v", err)
-	}
-	if len(a.sgs["003EE"]) != 1 || a.sgs["003EE"][0] != "esxi-SG" {
-		t.Errorf("device not restored to esxi-SG after failed add: %v", a.sgs["003EE"])
-	}
-}
-
-func TestPrepareStagingGroupFromStorageClass(t *testing.T) {
-	for name, tc := range map[string]struct {
-		class   *storagev1.StorageClass
-		sc      string
-		want    string
-		wantErr bool
-	}{
-		"one group":      {class: importClass("stage-SG"), sc: "powermax-import", want: "stage-SG"},
-		"spaces trimmed": {class: importClass(" stage-SG "), sc: "powermax-import", want: "stage-SG"},
-		"empty":          {class: importClass(""), sc: "powermax-import", wantErr: true},
-		"several groups": {class: importClass("a-SG,b-SG"), sc: "powermax-import", wantErr: true},
-		"missing class":  {sc: "powermax-import", wantErr: true},
-		"no class name":  {class: importClass("stage-SG"), wantErr: true},
-	} {
-		t.Run(name, func(t *testing.T) {
-			b := fake.NewClientBuilder()
-			if tc.class != nil {
-				b = b.WithObjects(tc.class)
-			}
-			imp := &PowermaxImporter{k8sClient: b.Build(), storageClass: tc.sc}
-			got, err := imp.stagingStorageGroup()
-			if (err != nil) != tc.wantErr || got != tc.want {
-				t.Fatalf("got %q, %v; want %q, wantErr %v", got, err, tc.want, tc.wantErr)
-			}
-		})
-	}
-}
-
-func TestPrepareRejectsWrongAnnotation(t *testing.T) {
-	a := &fakeArray{sgs: map[string][]string{}}
-	_, imp := newFakeArray(t, a)
-	if err := imp.Prepare(rdm, map[string]string{annotationKey: "000000000000/003EE"}); err == nil {
-		t.Fatal("expected error for annotation on another array")
-	}
-}
-
-func TestPrepareSkipsVVol(t *testing.T) {
-	a := &fakeArray{sgs: map[string][]string{}}
-	_, imp := newFakeArray(t, a)
-	if err := imp.Prepare(&resolver.DiskBacking{VVolID: "vvol:x"}, nil); err != nil {
-		t.Fatalf("unexpected error for VVol: %v", err)
-	}
-	if len(a.calls) != 0 {
-		t.Errorf("expected no array changes for VVol, got %v", a.calls)
 	}
 }

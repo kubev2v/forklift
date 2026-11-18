@@ -2,7 +2,6 @@ package powermax
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
@@ -10,15 +9,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"github.com/vmware/govmomi/vim25/types"
-	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // annotationKey is the PVC annotation the csi-powermax driver reads (import.storage.dell.com/volumeName).
@@ -31,20 +27,17 @@ const (
 	emcNAAPrefix = "60000970"
 )
 
-// PowermaxImporter implements CsiImportPlugin and CsiImportPreparer for Dell PowerMax via Unisphere.
+// PowermaxImporter implements CsiImportPlugin for Dell PowerMax via Unisphere.
 type PowermaxImporter struct {
-	baseURL      string
-	user         string
-	pass         string
-	symmetrixID  string
-	storageClass string
-	k8sClient    client.Client
-	client       *http.Client
+	baseURL     string
+	user        string
+	pass        string
+	symmetrixID string
+	client      *http.Client
 }
 
 // NewPowermaxImporter validates the endpoint. Only https is accepted; skipSSL only skips certificate checks.
-// The StorageClass is read in Prepare for importSourceStorageGroups, the value the csi-powermax driver checks.
-func NewPowermaxImporter(host, user, pass, symmetrixID string, skipSSL bool, k8sClient client.Client, storageClass string) (*PowermaxImporter, error) {
+func NewPowermaxImporter(host, user, pass, symmetrixID string, skipSSL bool) (*PowermaxImporter, error) {
 	host = resolver.EnsureScheme(host)
 	parsedURL, err := url.Parse(host)
 	if err != nil || parsedURL.Scheme != "https" || parsedURL.Host == "" {
@@ -54,12 +47,10 @@ func NewPowermaxImporter(host, user, pass, symmetrixID string, skipSSL bool, k8s
 		return nil, fmt.Errorf("storage secret missing required key: POWERMAX_SYMMETRIX_ID")
 	}
 	return &PowermaxImporter{
-		baseURL:      strings.TrimRight(host, "/"),
-		user:         user,
-		pass:         pass,
-		symmetrixID:  symmetrixID,
-		storageClass: storageClass,
-		k8sClient:    k8sClient,
+		baseURL:     strings.TrimRight(host, "/"),
+		user:        user,
+		pass:        pass,
+		symmetrixID: symmetrixID,
 		client: &http.Client{
 			Timeout:   30 * time.Second,
 			Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: skipSSL}}, //nolint:gosec
@@ -115,128 +106,6 @@ func (p *PowermaxImporter) Resolve(backing *resolver.DiskBacking) (map[string]st
 	return map[string]string{annotationKey: p.symmetrixID + "/" + ids[0]}, nil
 }
 
-// Prepare removes the device from the Storage Groups behind its ESXi Masking View, including a Masking View on
-// a parent of a cascaded group, and places it in the staging Storage Group. It refuses a device reached by more
-// than one Masking View (shared RDM) before changing anything, and is idempotent.
-func (p *PowermaxImporter) Prepare(backing *resolver.DiskBacking, annotations map[string]string) error {
-	if backing == nil || resolver.DetectDiskType(backing) != resolver.DiskTypeRDM {
-		return nil
-	}
-	staging, err := p.stagingStorageGroup()
-	if err != nil {
-		return err
-	}
-	symID, devID, ok := strings.Cut(annotations[annotationKey], "/")
-	if !ok || symID != p.symmetrixID || devID == "" {
-		return fmt.Errorf("unexpected import annotation %q", annotations[annotationKey])
-	}
-	// Prepare runs on every reconcile of the phase. Once the driver has adopted the device, the Masking View
-	// belongs to the Kubernetes node, so it must not be touched.
-	if identifier, _, err := p.volume(devID); err != nil || strings.HasPrefix(identifier, "csi-") {
-		return err
-	}
-	mapped, views, err := p.mappedStorageGroups(devID)
-	if err != nil {
-		return err
-	}
-	if slices.Contains(mapped, staging) {
-		return fmt.Errorf("staging Storage Group %s is part of a Masking View; use a Storage Group that is not masked", staging)
-	}
-	if len(views) > 1 {
-		return fmt.Errorf("device %s is mapped through %d Masking Views %v, indicating a shared or clustered RDM; shared devices are not supported for import", devID, len(views), views)
-	}
-	for _, sg := range mapped {
-		if err := p.editStorageGroup(sg, devID, false); err != nil {
-			return fmt.Errorf("could not remove device %s from masking-view Storage Group %s: %w", devID, sg, err)
-		}
-	}
-	_, sgs, err := p.volume(devID)
-	if err != nil {
-		return err
-	}
-	if !slices.Contains(sgs, staging) {
-		if err := p.editStorageGroup(staging, devID, true); err != nil {
-			for _, sg := range mapped {
-				_ = p.editStorageGroup(sg, devID, true)
-			}
-			return fmt.Errorf("device %s could not be added to staging Storage Group %s; it may be unmapped and not in any approved group, manual recovery required: %w", devID, staging, err)
-		}
-	}
-	mapped, _, err = p.mappedStorageGroups(devID)
-	if err != nil {
-		return err
-	}
-	if len(mapped) > 0 {
-		return fmt.Errorf("device %s is still mapped through Storage Group %s", devID, mapped[0])
-	}
-	if _, sgs, err = p.volume(devID); err != nil {
-		return err
-	}
-	if !slices.Contains(sgs, staging) {
-		return fmt.Errorf("device %s is not in staging Storage Group %s after Prepare", devID, staging)
-	}
-	return nil
-}
-
-// stagingStorageGroup returns the single importSourceStorageGroups entry of the destination StorageClass.
-// Forklift must not choose between several groups.
-func (p *PowermaxImporter) stagingStorageGroup() (string, error) {
-	if p.k8sClient == nil || p.storageClass == "" {
-		return "", fmt.Errorf("PowerMax CSI import requires the destination StorageClass to read importSourceStorageGroups")
-	}
-	sc := &storagev1.StorageClass{}
-	if err := p.k8sClient.Get(context.Background(), client.ObjectKey{Name: p.storageClass}, sc); err != nil {
-		return "", fmt.Errorf("could not read StorageClass %s: %w", p.storageClass, err)
-	}
-	var groups []string
-	for _, g := range strings.Split(sc.Parameters["importSourceStorageGroups"], ",") {
-		if g = strings.TrimSpace(g); g != "" {
-			groups = append(groups, g)
-		}
-	}
-	if len(groups) != 1 {
-		return "", fmt.Errorf("StorageClass %s must list exactly one importSourceStorageGroups entry for PowerMax import, found %d", p.storageClass, len(groups))
-	}
-	return groups[0], nil
-}
-
-// mappedStorageGroups returns the device's Storage Groups that are masked, directly or through a parent group,
-// and the names of the Masking Views involved. The group-level count alone misses a Masking View on a parent.
-func (p *PowermaxImporter) mappedStorageGroups(devID string) (mapped, views []string, err error) {
-	_, sgs, err := p.volume(devID)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, name := range sgs {
-		var sg struct {
-			MaskingView []string `json:"maskingview"`
-			Parents     []string `json:"parent_storage_group"`
-		}
-		if err := p.call(http.MethodGet, "/storagegroup/"+url.PathEscape(name), nil, &sg); err != nil {
-			return nil, nil, err
-		}
-		found := sg.MaskingView
-		for _, parent := range sg.Parents {
-			var ps struct {
-				MaskingView []string `json:"maskingview"`
-			}
-			if err := p.call(http.MethodGet, "/storagegroup/"+url.PathEscape(parent), nil, &ps); err != nil {
-				return nil, nil, err
-			}
-			found = append(found, ps.MaskingView...)
-		}
-		if len(found) > 0 {
-			mapped = append(mapped, name)
-		}
-		for _, v := range found {
-			if !slices.Contains(views, v) {
-				views = append(views, v)
-			}
-		}
-	}
-	return mapped, views, nil
-}
-
 // checkNAA validates a 32-hex NAA and, for a PowerMax device, its layout: vendor prefix, 12-digit Symmetrix ID,
 // 'S' marker and a device ID encoded as ASCII hex.
 func checkNAA(wwn string) error {
@@ -255,8 +124,10 @@ func checkNAA(wwn string) error {
 	return nil
 }
 
-// extractWWN returns the uppercase PowerMax WWN from an NAA or VML device name.
+// extractWWN returns the uppercase PowerMax WWN from an NAA or VML device name, with or without a
+// /vmfs/devices/disks/ path, or from a bare LUN UUID (the VML name without its "vml." prefix).
 func extractWWN(deviceName string) (string, error) {
+	deviceName = deviceName[strings.LastIndex(deviceName, "/")+1:]
 	switch {
 	case strings.HasPrefix(deviceName, "naa."):
 		return strings.ToUpper(strings.TrimPrefix(deviceName, "naa.")), nil
@@ -270,6 +141,8 @@ func extractWWN(deviceName string) (string, error) {
 			return "", fmt.Errorf("VML does not contain NAA type 6 identifier: %s", deviceName)
 		}
 		return strings.ToUpper(naa), nil
+	case len(deviceName) >= 42 && strings.HasPrefix(deviceName, "02"):
+		return extractWWN("vml." + deviceName)
 	default:
 		return strings.ToUpper(deviceName), nil
 	}
@@ -293,26 +166,6 @@ func (p *PowermaxImporter) deviceIDsByWWN(field, wwn string) ([]string, error) {
 		ids = append(ids, r.VolumeID)
 	}
 	return ids, nil
-}
-
-func (p *PowermaxImporter) volume(devID string) (identifier string, sgs []string, err error) {
-	var out struct {
-		Identifier         string   `json:"volume_identifier"`
-		StorageGroupIDList []string `json:"storageGroupId"`
-	}
-	err = p.call(http.MethodGet, "/volume/"+url.PathEscape(devID), nil, &out)
-	return out.Identifier, out.StorageGroupIDList, err
-}
-
-func (p *PowermaxImporter) editStorageGroup(sg, devID string, add bool) error {
-	action := map[string]interface{}{"removeVolumeParam": map[string]interface{}{"volumeId": []string{devID}}}
-	if add {
-		action = map[string]interface{}{"expandStorageGroupParam": map[string]interface{}{
-			"addVolumeParam": map[string]interface{}{"volumeId": []string{devID}, "create_new_volumes": false},
-		}}
-	}
-	body := map[string]interface{}{"executionOption": "SYNCHRONOUS", "editStorageGroupActionParam": action}
-	return p.call(http.MethodPut, "/storagegroup/"+url.PathEscape(sg), body, nil)
 }
 
 // call performs one Unisphere sloprovisioning request and decodes the JSON response into out.
