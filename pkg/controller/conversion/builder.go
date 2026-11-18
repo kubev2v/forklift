@@ -533,16 +533,32 @@ func (b *Builder) appendDiskEncryptionEnv(env []core.EnvVar) []core.EnvVar {
 	return env
 }
 
-// NetAppShiftDiskPermsInitContainer returns an init container that runs as root
+// NetAppShiftDiskPermsInitContainer returns an init container that runs as root,
+// moves visible directories into .ntaptrash for ONTAP async delete, stages
+// visible files in shift_temp_dir and moves that directory into .ntaptrash,
 // and sets ownership/permissions on NetApp Shift-migrated disk images so that
-// virt-v2v can access them as the QEMU user.
+// virt-v2v can access them as the QEMU user. Hidden names are left in place.
 func NetAppShiftDiskPermsInitContainer(mounts []core.VolumeMount, image string) core.Container {
 	script := fmt.Sprintf(`
 set -e
 for m in /mnt/disks/disk*; do
   if [ -f "$m/disk.img" ]; then
-    chown %d:%d "$m/disk.img"
-    chmod 660 "$m/disk.img"
+    cd "$m"
+    mkdir -p shift_temp_dir
+    for entry in *; do
+      [ -e "$entry" ] || continue
+      case "$entry" in
+        .*|disk.img|shift_temp_dir) continue ;;
+      esac
+      if [ -d "$entry" ]; then
+        mv "$entry" .ntaptrash
+      else
+        mv "$entry" "shift_temp_dir/$entry"
+      fi
+    done
+    mv shift_temp_dir .ntaptrash
+    chown %d:%d disk.img
+    chmod 660 disk.img
   fi
 done
 `, qemuUser, qemuGroup)
