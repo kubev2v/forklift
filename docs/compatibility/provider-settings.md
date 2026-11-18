@@ -2,7 +2,7 @@
 
 | Metadata | Value |
 |----------|-------|
-| **Last Updated** | January 22, 2026 |
+| **Last Updated** | November 10, 2026 |
 | **Applies To** | Forklift v2.11 |
 | **Maintainer** | Forklift Team |
 
@@ -38,6 +38,7 @@ vSphere has the most extensive settings options for optimizing disk transfer.
 |---------|--------|---------|-------------|
 | `vddkInitImage` | Container image FQIN | None | VDDK container image for disk transfers. Required for production migrations. Overrides global `VDDK_IMAGE`. |
 | `sdkEndpoint` | `vcenter`, `esxi` | `vcenter` | SDK endpoint type. Use `esxi` for direct ESXi host connections. |
+| `datacenter` | Datacenter name | None | Restricts the provider's inventory to a single datacenter. See [Datacenter Restriction](#datacenter-restriction). |
 | `useVddkAioOptimization` | `"true"`, `"false"` | `"false"` | Enable VDDK AIO (Async I/O) optimization for improved performance. |
 | `vddkConfig` | JSON string | None | Advanced VDDK configuration options. |
 | `esxiCloneMethod` | `vib`, `ssh` | `ssh` | Method for direct ESXi disk cloning. `vib` uses VIB package, `ssh` uses SSH transfer. |
@@ -70,6 +71,25 @@ spec:
   settings:
     sdkEndpoint: esxi
 ```
+
+### Datacenter Restriction
+
+Use `datacenter` to scope a vCenter provider to a single datacenter. When set, Forklift only collects inventory for that datacenter's resources:
+
+```yaml
+spec:
+  type: vsphere
+  url: https://vcenter.example.com/sdk
+  settings:
+    datacenter: my-datacenter
+```
+
+**Value semantics:**
+- The value is the datacenter's name, unique within the vCenter.
+
+**Validation:**
+- A datacenter name that cannot be resolved fails provider validation with a `ConnectionTestFailed` condition.
+- The combination of `datacenter` with `sdkEndpoint: esxi` is rejected: the restriction is meaningless on a direct ESXi connection.
 
 ### AIO Optimization
 
@@ -188,6 +208,7 @@ kubectl get nodes -o jsonpath='{.items[*].metadata.labels.topology\.kubernetes\.
 |---------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|:-------:|
 | `vddkInitImage` | Yes | - | - | - | - | - | - | - |
 | `sdkEndpoint` | Yes | - | - | - | - | - | - | - |
+| `datacenter` | Opt | - | - | - | - | - | - | - |
 | `useVddkAioOptimization` | Yes | - | - | - | - | - | - | - |
 | `vddkConfig` | Yes | - | - | - | - | - | - | - |
 | `esxiCloneMethod` | Yes | - | - | - | - | - | - | - |
