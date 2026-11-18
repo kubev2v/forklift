@@ -12,6 +12,8 @@
 // (with its interleaved sector-bitmap entries) says which blocks the
 // differencing disk holds. Blocks that still live in the parent chain are
 // reported as absent so the caller leaves the target untouched there.
+// PAYLOAD_BLOCK_ZERO is reported as an explicit zero range so a prior full
+// copy's stale data is cleared.
 //
 // [MS-VHDX]: https://learn.microsoft.com/openspecs/windows_protocols/ms-vhdx
 package vhdx
@@ -22,6 +24,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"sort"
 )
 
 const (
@@ -31,6 +34,9 @@ const (
 
 // Fixed header-section layout (MS-VHDX 3.1).
 const (
+	headerOffset            = 64 * kiB
+	headerBackupOffset      = 128 * kiB
+	headerSize              = 4096
 	regionTableOffset       = 192 * kiB
 	regionTableBackupOffset = 256 * kiB
 	regionTableSize         = 64 * kiB
@@ -38,9 +44,9 @@ const (
 	regionTableEntrySize    = 32
 )
 
-// PAYLOAD_BLOCK_STATUS values (MS-VHDX 2.3.3.1). Only the two "present"
-// states carry data in a differencing disk, the rest resolve through the
-// parent chain, which the full copy pass already wrote to the target.
+// PAYLOAD_BLOCK_STATUS values (MS-VHDX 2.3.3.1). Present states carry data
+// in the differencing disk. ZERO must clear the target. The rest resolve
+// through the parent chain already written by the full copy pass.
 const (
 	blockNotPresent       = 0
 	blockUndefined        = 1
@@ -64,9 +70,14 @@ const maxSectorsPerBitmapBlock = 1 << 23
 // Table entry-count ceilings from the spec, used to reject malformed files
 // before any size-derived allocation.
 const (
-	maxRegionEntries   = 2047
-	maxMetadataEntries = 2047
+	maxRegionEntries     = 2047
+	maxMetadataEntries   = 2047
+	maxMetadataItemBytes = miB // MS-VHDX 3.5
 )
+
+// zeroFileOffset marks a Range that must zero the target instead of reading
+// from the AVHDX (PAYLOAD_BLOCK_ZERO).
+const zeroFileOffset = int64(-1)
 
 // Region GUIDs (MS-VHDX 3.2), in stored little-endian byte order.
 var (
@@ -97,7 +108,8 @@ var castagnoli = crc32.MakeTable(crc32.Castagnoli)
 
 // Range is a contiguous extent present in the differencing disk.
 // VirtualOffset is where it belongs on the target (its offset within the
-// virtual disk), FileOffset is where to read it from in the AVHDX.
+// virtual disk). FileOffset is where to read it from in the AVHDX, or
+// zeroFileOffset when the extent must be zeroed on the target.
 type Range struct {
 	VirtualOffset int64
 	FileOffset    int64
@@ -123,11 +135,13 @@ func errf(format string, a ...any) error {
 // ChangedRanges returns the extents that the differencing disk holds, in
 // ascending virtual-offset order, together with the disk geometry.
 //
-// Blocks in state NOT_PRESENT, UNDEFINED, ZERO or UNMAPPED are omitted: in a
-// differencing disk their contents resolve through the parent chain, which
-// the preceding full copy already placed on the target. Writing them here
-// would be redundant at best and would clobber parent data at worst.
+// Blocks in state NOT_PRESENT, UNDEFINED or UNMAPPED are omitted: their
+// contents resolve through the parent chain. ZERO blocks are returned as
+// zero-fill ranges so stale target data from a prior full copy is cleared.
 func ChangedRanges(r io.ReaderAt) (ranges []Range, geo Geometry, err error) {
+	if err := checkLogEmpty(r); err != nil {
+		return nil, geo, err
+	}
 	regions, err := readRegionTable(r)
 	if err != nil {
 		return nil, geo, err
@@ -146,17 +160,34 @@ func ChangedRanges(r io.ReaderAt) (ranges []Range, geo Geometry, err error) {
 		return nil, geo, err
 	}
 
-	fully, partial, bitmaps, err := walkBAT(r, batRegion, geo)
+	fully, partial, zeros, bitmaps, err := walkBAT(r, batRegion, geo)
 	if err != nil {
 		return nil, geo, err
 	}
 
-	ranges = make([]Range, 0, len(fully)+len(partial))
+	ranges = make([]Range, 0, len(fully)+len(partial)+len(zeros))
 	for _, idx := range fully {
+		off := idx.block * geo.BlockSize
+		length := clampLength(off, geo.BlockSize, geo.VirtualSize)
+		if length <= 0 {
+			continue
+		}
 		ranges = append(ranges, Range{
-			VirtualOffset: idx.block * geo.BlockSize,
+			VirtualOffset: off,
 			FileOffset:    idx.fileOffset,
-			Length:        geo.BlockSize,
+			Length:        length,
+		})
+	}
+	for _, idx := range zeros {
+		off := idx.block * geo.BlockSize
+		length := clampLength(off, geo.BlockSize, geo.VirtualSize)
+		if length <= 0 {
+			continue
+		}
+		ranges = append(ranges, Range{
+			VirtualOffset: off,
+			FileOffset:    zeroFileOffset,
+			Length:        length,
 		})
 	}
 	for _, idx := range partial {
@@ -168,6 +199,84 @@ func ChangedRanges(r io.ReaderAt) (ranges []Range, geo Geometry, err error) {
 	}
 	sortByVirtualOffset(ranges)
 	return ranges, geo, nil
+}
+
+// clampLength returns how many bytes of a block starting at off fit inside
+// VirtualSize. VHDX virtual sizes are sector-aligned, not block-aligned.
+func clampLength(off, blockSize, virtualSize int64) int64 {
+	if off >= virtualSize {
+		return 0
+	}
+	length := blockSize
+	if off+length > virtualSize {
+		length = virtualSize - off
+	}
+	return length
+}
+
+// checkLogEmpty rejects a VHDX whose current header has a non-zero LogGuid
+// (MS-VHDX 2.2.1). We do not replay. LogLength is only the allocated region
+// size (often 1 MiB) — ignore it for activity.
+func checkLogEmpty(r io.ReaderAt) error {
+	hdr, err := currentHeader(r)
+	if err != nil {
+		return err
+	}
+	var logGuid guid
+	copy(logGuid[:], hdr[48:64]) // LogGuid @ header+48
+	if logGuid != (guid{}) {
+		return errf("active VHDX log (LogGuid non-zero); replay is not supported")
+	}
+	return nil
+}
+
+// currentHeader picks the valid header (signature + CRC-32C) with the
+// higher SequenceNumber (MS-VHDX "current" header).
+func currentHeader(r io.ReaderAt) ([]byte, error) {
+	var (
+		best     []byte
+		bestSeq  uint64
+		found    bool
+		firstErr error
+	)
+	for _, at := range []int64{headerOffset, headerBackupOffset} {
+		hdr := make([]byte, headerSize)
+		if _, err := r.ReadAt(hdr, at); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		if string(hdr[0:4]) != "head" {
+			if firstErr == nil {
+				firstErr = errf("bad header signature at %d", at)
+			}
+			continue
+		}
+		stored := binary.LittleEndian.Uint32(hdr[4:8])
+		zeroed := make([]byte, headerSize)
+		copy(zeroed, hdr)
+		copy(zeroed[4:8], []byte{0, 0, 0, 0})
+		if crc32.Checksum(zeroed, castagnoli) != stored {
+			if firstErr == nil {
+				firstErr = errf("header CRC mismatch at %d", at)
+			}
+			continue
+		}
+		seq := binary.LittleEndian.Uint64(hdr[8:16])
+		if !found || seq > bestSeq {
+			best = hdr
+			bestSeq = seq
+			found = true
+		}
+	}
+	if !found {
+		if firstErr != nil {
+			return nil, errf("no valid header: %v", firstErr)
+		}
+		return nil, errf("no valid header")
+	}
+	return best, nil
 }
 
 // region is a located region-table entry.
@@ -316,6 +425,10 @@ func readMetadata(r io.ReaderAt, meta region) (map[guid][]byte, error) {
 		copy(g[:], entry[0:16])
 		itemOff := int64(binary.LittleEndian.Uint32(entry[16:20]))
 		itemLen := int64(binary.LittleEndian.Uint32(entry[20:24]))
+		if itemLen > maxMetadataItemBytes {
+			return nil, errf("metadata item %d length %d exceeds %d-byte limit",
+				i, itemLen, maxMetadataItemBytes)
+		}
 		if itemOff < 0 || itemLen < 0 || itemOff+itemLen > meta.length {
 			return nil, errf("metadata item %d (offset %d length %d) runs past the %d-byte region",
 				i, itemOff, itemLen, meta.length)
@@ -342,20 +455,17 @@ type bitmapRef struct {
 	fileOffset int64
 }
 
-// walkBAT walks the Block Allocation Table, which interleaves payload-block
-// entries with sector-bitmap entries: after every chunkRatio-th payload
-// entry the next 8-byte entry describes that chunk's sector bitmap
-// (MS-VHDX 2.3.2).
+// walkBAT walks the Block Allocation Table. Differencing BATs use a fixed
+// chunk layout: ChunkRatio payload entries (zero-padded in the final
+// incomplete chunk) followed by one sector-bitmap entry (MS-VHDX 2.3.2).
 func walkBAT(r io.ReaderAt, bat region, geo Geometry) (
-	fully, partial []blockRef, bitmaps map[int64]bitmapRef, err error) {
+	fully, partial, zeros []blockRef, bitmaps map[int64]bitmapRef, err error) {
 
-	// Size the walk up front so a malformed virtual size cannot drive a
-	// long read before the length check catches it.
 	chunks := (geo.TotalBlocks + geo.ChunkRatio - 1) / geo.ChunkRatio
-	need := (geo.TotalBlocks + chunks) * batEntrySize
+	need := chunks * (geo.ChunkRatio + 1) * batEntrySize
 	if need > bat.length {
-		return nil, nil, nil, errf(
-			"BAT needs %d bytes for %d blocks + %d bitmap entries but the region is %d bytes",
+		return nil, nil, nil, nil, errf(
+			"BAT needs %d bytes for %d blocks in %d chunks but the region is %d bytes",
 			need, geo.TotalBlocks, chunks, bat.length)
 	}
 
@@ -370,46 +480,48 @@ func walkBAT(r io.ReaderAt, bat region, geo Geometry) (
 	}
 
 	bitmaps = make(map[int64]bitmapRef, chunks)
-	for idx := int64(0); idx < geo.TotalBlocks; idx++ {
-		raw, err := readEntry()
-		if err != nil {
-			return nil, nil, nil, err
+	for chunk := int64(0); chunk < chunks; chunk++ {
+		start := chunk * geo.ChunkRatio
+		end := start + geo.ChunkRatio
+		if end > geo.TotalBlocks {
+			end = geo.TotalBlocks
 		}
-		ref := blockRef{block: idx, fileOffset: int64(raw & batFileOffsetMask)}
-		switch raw & batStateMask {
-		case blockFullyPresent:
-			fully = append(fully, ref)
-		case blockPartiallyPresent:
-			partial = append(partial, ref)
-		case blockNotPresent, blockUndefined, blockZero, blockUnmapped:
-			// Resolved through the parent chain, nothing to copy.
-		default:
-			return nil, nil, nil, errf("block %d has reserved BAT state %d",
-				idx, raw&batStateMask)
-		}
-		if (idx+1)%geo.ChunkRatio == 0 {
+		for idx := start; idx < end; idx++ {
 			raw, err := readEntry()
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
-			bitmaps[idx/geo.ChunkRatio] = bitmapRef{
-				state:      raw & batStateMask,
-				fileOffset: int64(raw & batFileOffsetMask),
+			ref := blockRef{block: idx, fileOffset: int64(raw & batFileOffsetMask)}
+			switch raw & batStateMask {
+			case blockFullyPresent:
+				fully = append(fully, ref)
+			case blockPartiallyPresent:
+				partial = append(partial, ref)
+			case blockZero:
+				zeros = append(zeros, ref)
+			case blockNotPresent, blockUndefined, blockUnmapped:
+				// Resolved through the parent chain, nothing to copy.
+			default:
+				return nil, nil, nil, nil, errf("block %d has reserved BAT state %d",
+					idx, raw&batStateMask)
 			}
 		}
-	}
-	if geo.TotalBlocks%geo.ChunkRatio != 0 {
-		// Trailing sector-bitmap entry for the final, incomplete chunk.
+		// Incomplete final chunk: remaining payload slots are present and zero.
+		for idx := end; idx < start+geo.ChunkRatio; idx++ {
+			if _, err := readEntry(); err != nil {
+				return nil, nil, nil, nil, err
+			}
+		}
 		raw, err := readEntry()
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
-		bitmaps[geo.TotalBlocks/geo.ChunkRatio] = bitmapRef{
+		bitmaps[chunk] = bitmapRef{
 			state:      raw & batStateMask,
 			fileOffset: int64(raw & batFileOffsetMask),
 		}
 	}
-	return fully, partial, bitmaps, nil
+	return fully, partial, zeros, bitmaps, nil
 }
 
 // bitmapRanges expands a partially-present block into the extents its
@@ -420,8 +532,8 @@ func bitmapRanges(r io.ReaderAt, blk blockRef, bitmaps map[int64]bitmapRef,
 	chunk := blk.block / geo.ChunkRatio
 	bm, ok := bitmaps[chunk]
 	if !ok || bm.state != blockFullyPresent {
-		// No bitmap for this chunk: nothing in the block is present.
-		return nil, nil
+		return nil, errf("block %d is partially present but chunk %d has no valid sector bitmap",
+			blk.block, chunk)
 	}
 
 	sectorsPerBlock := geo.BlockSize / geo.SectorSize
@@ -433,6 +545,7 @@ func bitmapRanges(r io.ReaderAt, blk blockRef, bitmaps map[int64]bitmapRef,
 		return nil, errf("read sector bitmap for block %d: %w", blk.block, err)
 	}
 
+	blockOff := blk.block * geo.BlockSize
 	var ranges []Range
 	for s := int64(0); s < sectorsPerBlock; {
 		if bits[s/8]&(1<<uint(s%8)) == 0 {
@@ -443,30 +556,25 @@ func bitmapRanges(r io.ReaderAt, blk blockRef, bitmaps map[int64]bitmapRef,
 		for s < sectorsPerBlock && bits[s/8]&(1<<uint(s%8)) != 0 {
 			s++
 		}
+		off := blockOff + start*geo.SectorSize
+		length := clampLength(off, (s-start)*geo.SectorSize, geo.VirtualSize)
+		if length <= 0 {
+			break
+		}
 		ranges = append(ranges, Range{
-			VirtualOffset: blk.block*geo.BlockSize + start*geo.SectorSize,
+			VirtualOffset: off,
 			FileOffset:    blk.fileOffset + start*geo.SectorSize,
-			Length:        (s - start) * geo.SectorSize,
+			Length:        length,
 		})
 	}
 	return ranges, nil
 }
 
-// sortByVirtualOffset orders ranges ascending. Fully-present blocks are
-// collected before partially-present ones, so the two groups interleave:
-// sequential target writes are faster than seeking back and forth.
+// sortByVirtualOffset orders ranges ascending for sequential target writes.
 func sortByVirtualOffset(ranges []Range) {
-	// Insertion sort over an almost-sorted two-run slice beats the
-	// comparison-function overhead of sort.Slice at these sizes.
-	for i := 1; i < len(ranges); i++ {
-		v := ranges[i]
-		j := i - 1
-		for j >= 0 && ranges[j].VirtualOffset > v.VirtualOffset {
-			ranges[j+1] = ranges[j]
-			j--
-		}
-		ranges[j+1] = v
-	}
+	sort.Slice(ranges, func(i, j int) bool {
+		return ranges[i].VirtualOffset < ranges[j].VirtualOffset
+	})
 }
 
 // TotalBytes sums the length of the ranges.
@@ -483,8 +591,9 @@ const DefaultCopyBuffer = 2 * miB
 
 // Copy transfers each range from src to dst, reading at the range's
 // FileOffset and writing at its VirtualOffset, and returns the bytes
-// written. Ranges outside the map are never written, so data that lives in
-// the parent chain stays as the full copy left it.
+// written. Ranges with FileOffset == zeroFileOffset zero the target.
+// Ranges outside the map are never written, so data that lives in the
+// parent chain stays as the full copy left it.
 func Copy(dst io.WriterAt, src io.ReaderAt, ranges []Range, bufSize int) (int64, error) {
 	if bufSize <= 0 {
 		bufSize = DefaultCopyBuffer
@@ -498,8 +607,12 @@ func Copy(dst io.WriterAt, src io.ReaderAt, ranges []Range, bufSize int) (int64,
 				n = int64(len(buf))
 			}
 			chunk := buf[:n]
-			if _, err := src.ReadAt(chunk, rg.FileOffset+done); err != nil {
-				return written, errf("read %d bytes at %d: %w", n, rg.FileOffset+done, err)
+			if rg.FileOffset == zeroFileOffset {
+				clear(chunk)
+			} else {
+				if _, err := src.ReadAt(chunk, rg.FileOffset+done); err != nil {
+					return written, errf("read %d bytes at %d: %w", n, rg.FileOffset+done, err)
+				}
 			}
 			if _, err := dst.WriteAt(chunk, rg.VirtualOffset+done); err != nil {
 				return written, errf("write %d bytes at %d: %w", n, rg.VirtualOffset+done, err)

@@ -30,7 +30,9 @@ RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldfl
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o forklift-wait-for-reboot github.com/kubev2v/forklift/cmd/forklift-wait-for-reboot
-RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o hyperv-warm-copy github.com/kubev2v/forklift/cmd/hyperv-warm-copy
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 \
+    go build -buildvcs=false -ldflags="-w -s" \
+    -o hyperv-warm-copy github.com/kubev2v/forklift/cmd/hyperv-warm-copy
 
 FROM registry.access.redhat.com/ubi9:9.6-1760340943
 

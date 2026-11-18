@@ -211,9 +211,29 @@ func (r *Validator) PowerState(vmRef ref.Ref) (bool, error) {
 	return true, nil
 }
 
-// NO-OP
-func (r *Validator) VMMigrationType(_ ref.Ref) (bool, error) {
+// VMMigrationType rejects legacy VHD/AVHD disks for warm migration. Delta
+// copy parses VHDX only, and the first-copy guard expects a VHDX root walk.
+func (r *Validator) VMMigrationType(vmRef ref.Ref) (bool, error) {
+	if !r.Plan.IsWarm() {
+		return true, nil
+	}
+	vm := &hyperv.VM{}
+	err := r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef.String())
+	}
+	for _, disk := range vm.Disks {
+		if isLegacyVHDPath(disk.WindowsPath) || isLegacyVHDPath(disk.SMBPath) {
+			return false, nil
+		}
+	}
 	return true, nil
+}
+
+func isLegacyVHDPath(path string) bool {
+	lower := strings.ToLower(path)
+	// HasSuffix(".vhd") does not match ".vhdx"; same for ".avhd" vs ".avhdx".
+	return strings.HasSuffix(lower, ".vhd") || strings.HasSuffix(lower, ".avhd")
 }
 
 func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {

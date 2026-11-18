@@ -124,16 +124,22 @@ func parseDiskArgs(raw string) ([]diskJob, error) {
 	return jobs, nil
 }
 
-// fullCopy converts a whole base disk onto the target device. qemu-img
-// handles the dynamic-VHDX and legacy-VHD formats, so it stays in charge
-// of the first pass.
+// fullCopy: qemu-img convert of a standalone VHDX/VHD. Rejects .avhdx/.avhd
+// (qemu-img cannot follow Hyper-V differencing parents).
 func fullCopy(job diskJob) error {
+	ext := strings.ToLower(filepath.Ext(job.src))
+	if ext == ".avhdx" || ext == ".avhd" {
+		return fmt.Errorf("full copy refuses differencing disk %s; qemu-img cannot merge Hyper-V VHDX parent chains",
+			job.src)
+	}
 	// qemu-img names the legacy fixed/dynamic VHD format "vpc".
 	format := "vhdx"
-	if strings.EqualFold(filepath.Ext(job.src), ".vhd") {
+	if ext == ".vhd" {
 		format = "vpc"
 	}
-	cmd := exec.Command("qemu-img", "convert",
+	// Absolute path: the virt-v2v image installs qemu-img here, and using PATH
+	// would trip Sonar S4036 (untrusted PATH directories).
+	cmd := exec.Command("/usr/bin/qemu-img", "convert",
 		"-p", // progress, surfaced in the pod log
 		"-f", format,
 		"-O", "raw",

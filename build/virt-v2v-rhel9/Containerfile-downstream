@@ -35,7 +35,9 @@ RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o virt-v2
 RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
 RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o forklift-wait-for-reboot github.com/kubev2v/forklift/cmd/forklift-wait-for-reboot
-RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o hyperv-warm-copy github.com/kubev2v/forklift/cmd/hyperv-warm-copy
+RUN GOOS=linux GOARCH=amd64 \
+    go build -buildvcs=false -ldflags="-w -s" \
+    -o hyperv-warm-copy github.com/kubev2v/forklift/cmd/hyperv-warm-copy
 
 FROM registry.redhat.io/ubi9:9.8-1794186345 AS runtime
 

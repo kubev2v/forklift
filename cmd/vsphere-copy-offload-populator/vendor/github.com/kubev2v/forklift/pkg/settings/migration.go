@@ -3,6 +3,7 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -80,7 +81,12 @@ const (
 	WaitForFinalSnapshotConsolidation      = "WAIT_FOR_FINAL_SNAPSHOT_CONSOLIDATION"
 	ConversionPodPendingTimeout            = "CONVERSION_POD_PENDING_TIMEOUT"
 	StaleConversionTimeout                 = "STALE_CONVERSION_TIMEOUT"
+	HyperVWarmCopyScratchFactor            = "HYPERV_WARM_COPY_SCRATCH_FACTOR"
 )
+
+// DefaultHyperVWarmCopyScratchFactor is the ephemeral-storage *request*
+// fraction of PVC capacity for delta staging (~30% daily churn).
+const DefaultHyperVWarmCopyScratchFactor = 0.3
 
 // DefaultPendingPodTimeoutMinutes is the default number of minutes a
 // conversion pod may stay in Pending before the controller fails it.
@@ -207,6 +213,9 @@ type Migration struct {
 	// conversion pod/CR to finish terminating before force-deleting it
 	// during resume-conversion. Default 180s (3 minutes).
 	StaleConversionTimeout int
+	// HyperVWarmCopyScratchFactor is the delta-staging ephemeral-storage
+	// request as a fraction of largest PVC capacity (default 0.3).
+	HyperVWarmCopyScratchFactor float64
 }
 
 // Load settings.
@@ -445,6 +454,14 @@ func (r *Migration) Load() (err error) {
 	}
 	if r.StaleConversionTimeout, err = getPositiveEnvLimit(StaleConversionTimeout, DefaultStaleConversionTimeoutSeconds); err != nil {
 		return liberr.Wrap(err)
+	}
+	if r.HyperVWarmCopyScratchFactor, err = getEnvFloat(HyperVWarmCopyScratchFactor, DefaultHyperVWarmCopyScratchFactor); err != nil {
+		return liberr.Wrap(err)
+	}
+	if r.HyperVWarmCopyScratchFactor <= 0 ||
+		math.IsNaN(r.HyperVWarmCopyScratchFactor) ||
+		math.IsInf(r.HyperVWarmCopyScratchFactor, 0) {
+		return liberr.New(HyperVWarmCopyScratchFactor + " must be a finite number > 0")
 	}
 	return
 }

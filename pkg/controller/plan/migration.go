@@ -459,6 +459,10 @@ func (r *Migration) Cancel() error {
 				}
 				return false
 			}
+			// Stop the warm-copy pod before cleanup removes snapshots/PVCs.
+			if err := r.kubevirt.DeleteHyperVWarmCopyPod(vm); err != nil {
+				r.Log.Error(err, "Couldn't delete the warm copy pod.", "vm", vm.String())
+			}
 			_ = r.cleanup(vm, dontFailOnError, true)
 			if vm.RestorePowerState == plan.VMPowerStateOn {
 				if err := r.provider.PowerOn(vm.Ref); err != nil {
@@ -1502,11 +1506,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				r.Source.Provider.Type() == api.HyperV && r.Plan.IsWarm() {
 				ready, podErr := r.kubevirt.EnsureHyperVWarmCopyPod(vm, step)
 				if podErr != nil {
-					step.AddError(podErr.Error())
-					err = nil
-					break
+					// Transient API/list/create errors — retry next reconcile.
+					return podErr
 				}
 				if !ready {
+					// Pod still running, or step.HasError after PodFailed.
 					break
 				}
 				// Pod completed, clean up and mark step done.
@@ -1783,11 +1787,10 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			if r.Source.Provider.Type() == api.HyperV && r.Plan.IsWarm() {
 				ready, podErr := r.kubevirt.EnsureHyperVWarmCopyPod(vm, step)
 				if podErr != nil {
-					step.AddError(podErr.Error())
-					err = nil
-					break
+					return podErr
 				}
 				if !ready {
+					// Pod still running, or step.HasError after PodFailed.
 					break
 				}
 				_ = r.kubevirt.DeleteHyperVWarmCopyPod(vm)

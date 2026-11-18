@@ -333,7 +333,10 @@ func (r *Collector) run(ctx *Context) (err error) {
 	}
 	if err = r.client.EnrichGuestInfo(); err != nil {
 		r.log.Error(err, "Guest info enrichment failed, will retry in refresh")
-	} else if err = r.updateGuestInfoFromCache(ctx); err != nil {
+	}
+	// Persist whatever EnrichGuestInfo wrote — healthy nodes update the cache
+	// even when another node fails.
+	if err = r.updateGuestInfoFromCache(ctx); err != nil {
 		r.log.Error(err, "Failed to update guest info in DB")
 	}
 	r.stateMu.Lock()
@@ -657,9 +660,9 @@ func (r *Collector) refreshClusterOptimized(ctx *Context) error {
 		}
 		if err := r.client.EnrichGuestInfo(); err != nil {
 			r.log.Info("Guest info enrichment failed", "error", err)
-			enrichDone <- err
-			return
 		}
+		// Persist partial GuestOS updates from healthy nodes even when
+		// EnrichGuestInfo returned an error for a failed node.
 		enrichDone <- r.updateGuestInfoFromCache(ctx)
 	}()
 
