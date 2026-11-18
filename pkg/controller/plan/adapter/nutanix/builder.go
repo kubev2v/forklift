@@ -1572,14 +1572,14 @@ func (r *Builder) ensureHTTPPopulatorLeaseRBAC(namespace string) error {
 		Rules: []rbacv1.PolicyRule{{
 			APIGroups: []string{"coordination.k8s.io"},
 			Resources: []string{"leases"},
-			Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
 		}},
 	}
 	if _, err := controllerutil.CreateOrPatch(context.TODO(), r.Destination.Client, role, func() error {
 		role.Rules = []rbacv1.PolicyRule{{
 			APIGroups: []string{"coordination.k8s.io"},
 			Resources: []string{"leases"},
-			Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
 		}}
 		return nil
 	}); err != nil {
