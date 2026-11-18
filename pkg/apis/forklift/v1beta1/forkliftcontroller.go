@@ -945,7 +945,7 @@ type ForkliftControllerSpec struct {
 	PopulatorContainerLimitsCPU string `json:"populator_container_limits_cpu,omitempty"`
 	// Volume Populator memory limit.
 	// +optional
-	// +kubebuilder:default="512Mi"
+	// +kubebuilder:default="1Gi"
 	// +kubebuilder:validation:Pattern=`^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$`
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	PopulatorContainerLimitsMemory string `json:"populator_container_limits_memory,omitempty"`
@@ -957,10 +957,22 @@ type ForkliftControllerSpec struct {
 	PopulatorContainerRequestsCPU string `json:"populator_container_requests_cpu,omitempty"`
 	// Volume Populator memory request.
 	// +optional
-	// +kubebuilder:default="128Mi"
+	// +kubebuilder:default="512Mi"
 	// +kubebuilder:validation:Pattern=`^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$`
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	PopulatorContainerRequestsMemory string `json:"populator_container_requests_memory,omitempty"`
+	// Nutanix HTTP Volume Populator memory limit.
+	// +optional
+	// +kubebuilder:default="512Mi"
+	// +kubebuilder:validation:Pattern=`^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	PopulatorNutanixHTTPContainerLimitsMemory string `json:"populator_nutanix_http_container_limits_memory,omitempty"`
+	// Nutanix HTTP Volume Populator memory request.
+	// +optional
+	// +kubebuilder:default="128Mi"
+	// +kubebuilder:validation:Pattern=`^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	PopulatorNutanixHTTPContainerRequestsMemory string `json:"populator_nutanix_http_container_requests_memory,omitempty"`
 
 	// Logging & General Settings
 

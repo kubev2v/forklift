@@ -89,6 +89,7 @@ func main() {
 	var populatorSettings settings.Populator
 	populatorSettings.Load()
 	resources := buildResources(&populatorSettings)
+	nutanixHTTPResources := buildNutanixHTTPResources(&populatorSettings)
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -98,7 +99,7 @@ func main() {
 		stop <- true
 	}()
 
-	for _, populator := range populators {
+	for name, populator := range populators {
 		imageName, ok := os.LookupEnv(populator.imageVar)
 		if !ok {
 			klog.Warning("Couldn't find", "imageVar", populator.imageVar)
@@ -109,9 +110,13 @@ func main() {
 		gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: populator.resource}
 		controllerFunc := populator.controllerFunc
 		metricsEndpoint := populator.metricsEndpoint
+		res := resources
+		if name == "nutanix-http" {
+			res = nutanixHTTPResources
+		}
 		go func() {
 			populator_machinery.RunController(masterURL, kubeconfig, imageName, metricsEndpoint, metricsPath,
-				prefix, gk, gvr, mountPath, devicePath, controllerFunc, resources, maxInFlight)
+				prefix, gk, gvr, mountPath, devicePath, controllerFunc, res, maxInFlight)
 			<-stop
 		}()
 	}
@@ -239,6 +244,19 @@ func buildResources(s *settings.Populator) *corev1.ResourceRequirements {
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    s.ContainerRequestsCpu,
 			corev1.ResourceMemory: s.ContainerRequestsMemory,
+		},
+	}
+}
+
+func buildNutanixHTTPResources(s *settings.Populator) *corev1.ResourceRequirements {
+	return &corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    s.ContainerLimitsCpu,
+			corev1.ResourceMemory: s.NutanixHTTPContainerLimitsMemory,
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    s.ContainerRequestsCpu,
+			corev1.ResourceMemory: s.NutanixHTTPContainerRequestsMemory,
 		},
 	}
 }

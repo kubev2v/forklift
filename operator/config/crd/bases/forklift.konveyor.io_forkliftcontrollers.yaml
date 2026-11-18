@@ -743,7 +743,7 @@ spec:
                 pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               populator_container_limits_memory:
-                default: 512Mi
+                default: 1Gi
                 description: Volume Populator memory limit.
                 pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
@@ -753,7 +753,7 @@ spec:
                 pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               populator_container_requests_memory:
-                default: 128Mi
+                default: 512Mi
                 description: Volume Populator memory request.
                 pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
@@ -761,13 +761,23 @@ spec:
                 description: Volume populator controller image. Optional. If left
                   empty, the operator automatically sets this from the release payload.
                 type: string
-              populator_openstack_image_fqin:
-                description: OpenStack populator image. Optional. If left empty, the
-                  operator automatically sets this from the release payload.
+              populator_nutanix_http_container_limits_memory:
+                default: 512Mi
+                description: Nutanix HTTP Volume Populator memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
+                type: string
+              populator_nutanix_http_container_requests_memory:
+                default: 128Mi
+                description: Nutanix HTTP Volume Populator memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               populator_nutanix_http_image_fqin:
                 description: Nutanix HTTP populator image. Optional. If left empty,
                   the operator automatically sets this from the release payload.
+                type: string
+              populator_openstack_image_fqin:
+                description: OpenStack populator image. Optional. If left empty, the
+                  operator automatically sets this from the release payload.
                 type: string
               populator_ovirt_image_fqin:
                 description: oVirt populator image. Optional. If left empty, the operator
