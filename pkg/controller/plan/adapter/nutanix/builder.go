@@ -1303,10 +1303,12 @@ func (r *Builder) LunPersistentVolumeClaims(_ ref.Ref) ([]core.PersistentVolumeC
 	return nil, nil
 }
 
-// SupportsVolumePopulators reports that Nutanix disk transfer uses
-// NutanixHTTPVolumePopulator.
+// SupportsVolumePopulators reports that Nutanix cold disk transfer uses
+// NutanixHTTPVolumePopulator on the host destination. Remote destinations
+// keep the CDI HTTP-import DataVolume path, because the volume-populator
+// controller only runs on the MTV host cluster.
 func (r *Builder) SupportsVolumePopulators() bool {
-	return true
+	return !r.Plan.IsWarm() && r.Plan.Provider.Destination.IsHost()
 }
 
 // PopulatorVolumes builds one target PVC per non-CDROM disk, each backed by a

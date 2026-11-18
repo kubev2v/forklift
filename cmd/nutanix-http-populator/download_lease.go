@@ -108,8 +108,9 @@ func (h *downloadLeaseLocker) withLock(ctx context.Context, leaseKey string, wor
 			}
 			existing, getErr := leaseClient.Get(ctx, leaseName, metav1.GetOptions{})
 			if getErr != nil {
+				// Lost the race with a delete; try the next slot (or the
+				// outer retry) instead of tight-looping on this index.
 				if apierrors.IsNotFound(getErr) {
-					slot--
 					continue
 				}
 				return fmt.Errorf("get lease %s: %w", leaseName, getErr)
@@ -196,6 +197,11 @@ func (h *downloadLeaseLocker) execute(
 			log.Info("download cancelled after lease renewal failure", "slot", slot, "key", leaseKey)
 		}
 	default:
+	}
+	// Delete so the next waiter can Create immediately instead of waiting
+	// for LeaseDurationSeconds (~30s) after we stop renewing.
+	if delErr := leaseClient.Delete(context.Background(), lease.Name, metav1.DeleteOptions{}); delErr != nil && !apierrors.IsNotFound(delErr) {
+		log.Error(delErr, "failed to delete download lease", "slot", slot, "key", leaseKey)
 	}
 	log.Info("download lease released", "slot", slot, "key", leaseKey)
 	return workErr

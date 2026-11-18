@@ -15,9 +15,11 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -26,6 +28,11 @@ import (
 	"github.com/kubev2v/forklift/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/klog/v2"
+)
+
+const (
+	maxDownloadAttempts = 8
+	downloadRetryBase   = 2 * time.Second
 )
 
 type config struct {
@@ -83,7 +90,7 @@ func main() {
 
 	ctx := context.Background()
 	run := func(ctx context.Context) error {
-		klog.Infof("Downloading %s -> %s", cfg.url, cfg.volumePath)
+		klog.Infof("Downloading %s -> %s (pvc-size=%d)", cfg.url, cfg.volumePath, cfg.pvcSize)
 		return download(ctx, cfg, progress)
 	}
 
@@ -107,6 +114,37 @@ func main() {
 }
 
 func download(ctx context.Context, cfg *config, progress *prometheus.GaugeVec) error {
+	var lastErr error
+	for attempt := 1; attempt <= maxDownloadAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if attempt > 1 {
+			progress.WithLabelValues(cfg.ownerUID).Set(0)
+			delay := time.Duration(attempt-1) * downloadRetryBase
+			klog.Infof("Retrying download attempt %d/%d after %v (last error: %v)",
+				attempt, maxDownloadAttempts, delay, lastErr)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+
+		lastErr = downloadOnce(ctx, cfg, progress, attempt)
+		if lastErr == nil {
+			return nil
+		}
+		if !isRetryable(lastErr) {
+			return lastErr
+		}
+		klog.Warningf("Transient download failure on attempt %d/%d: %v",
+			attempt, maxDownloadAttempts, lastErr)
+	}
+	return fmt.Errorf("download failed after %d attempts: %w", maxDownloadAttempts, lastErr)
+}
+
+func downloadOnce(ctx context.Context, cfg *config, progress *prometheus.GaugeVec, attempt int) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.url, nil)
 	if err != nil {
 		return err
@@ -131,11 +169,17 @@ func download(ctx context.Context, cfg *config, progress *prometheus.GaugeVec) e
 		},
 	}
 
+	klog.Infof("Connecting to Prism (attempt %d/%d)...", attempt, maxDownloadAttempts)
+	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	klog.Infof("HTTP %d in %v (Content-Length=%s Transfer-Encoding=%s)",
+		resp.StatusCode, time.Since(start).Round(time.Millisecond),
+		resp.Header.Get("Content-Length"), resp.Header.Get("Transfer-Encoding"))
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		return fmt.Errorf("download failed: status=%d body=%q", resp.StatusCode, string(body))
@@ -146,6 +190,9 @@ func download(ctx context.Context, cfg *config, progress *prometheus.GaugeVec) e
 		return err
 	}
 	defer func() { _ = file.Close() }()
+	if err := resetVolume(file); err != nil {
+		return err
+	}
 
 	done := make(chan struct{})
 	var read int64
@@ -163,13 +210,14 @@ func download(ctx context.Context, cfg *config, progress *prometheus.GaugeVec) e
 						pct = 100
 					}
 					progress.WithLabelValues(cfg.ownerUID).Set(pct)
-					klog.Infof("Progress: %.0f%%", pct)
+					klog.Infof("Progress: %.0f%% (%d/%d bytes)", pct, read, cfg.pvcSize)
 				}
 			}
 		}
 	}()
 
 	buf := make([]byte, 1<<20)
+	firstByte := true
 	for {
 		if err := ctx.Err(); err != nil {
 			close(done)
@@ -177,6 +225,10 @@ func download(ctx context.Context, cfg *config, progress *prometheus.GaugeVec) e
 		}
 		n, rerr := resp.Body.Read(buf)
 		if n > 0 {
+			if firstByte {
+				klog.Infof("First byte after %v", time.Since(start).Round(time.Millisecond))
+				firstByte = false
+			}
 			if _, werr := file.Write(buf[:n]); werr != nil {
 				close(done)
 				return werr
@@ -192,7 +244,31 @@ func download(ctx context.Context, cfg *config, progress *prometheus.GaugeVec) e
 		}
 	}
 	close(done)
+	klog.Infof("Download complete: %d bytes in %v", read, time.Since(start).Round(time.Millisecond))
 	return nil
+}
+
+func isRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	s := err.Error()
+	return strings.Contains(s, "status=429") ||
+		strings.Contains(s, "status=503") ||
+		strings.Contains(s, "connection reset") ||
+		strings.Contains(s, "broken pipe") ||
+		strings.Contains(s, "Server closed idle connection") ||
+		strings.Contains(s, "use of closed network connection")
 }
 
 func openVolume(volumePath string) (*os.File, error) {
@@ -201,6 +277,18 @@ func openVolume(volumePath string) (*os.File, error) {
 		flags |= os.O_CREATE
 	}
 	return os.OpenFile(volumePath, flags, 0650)
+}
+
+// resetVolume rewinds the target so a retry overwrites from offset 0 instead of appending.
+func resetVolume(file *os.File) error {
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	if err := file.Truncate(0); err != nil {
+		// Block devices often reject Truncate; seeking to 0 is enough there.
+		klog.V(2).Infof("Truncate skipped: %v", err)
+	}
+	return nil
 }
 
 func tlsConfigFromEnv() *tls.Config {
