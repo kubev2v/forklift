@@ -616,14 +616,40 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 	return nil
 }
 
+// rest.IsStatusError is a bare type assertion, so any wrapping defeats it.
+// That's why we added the deliberate string check.
+func isRestUnauthorized(err error) bool {
+	return rest.IsStatusError(err, http.StatusUnauthorized) ||
+		(err != nil && strings.Contains(err.Error(), "401 Unauthorized"))
+}
+
+func (r *Collector) withRestRetry(ctx context.Context, restClient *rest.Client, fn func() error) error {
+	err := fn()
+	if err == nil || !isRestUnauthorized(err) {
+		return err
+	}
+	r.log.Info("CIS REST session unauthorized, re-authenticating")
+	restClient.SessionID("")
+	if loginErr := restClient.Login(ctx, liburl.UserPassword(r.user(), r.password())); loginErr != nil {
+		return liberr.Wrap(loginErr)
+	}
+	return fn()
+}
+
 func (r *Collector) getVMsWithTags(ctx context.Context) (map[string][]model.Tag, error) {
-	if r.restClient == nil {
+	restClient := r.restClient
+	if restClient == nil {
 		return make(map[string][]model.Tag), nil
 	}
-	tagManager := tags.NewManager(r.restClient)
+	tagManager := tags.NewManager(restClient)
 
 	// Step 1: List all tag IDs (single API call).
-	tagIDs, err := tagManager.ListTags(ctx)
+	var tagIDs []string
+	err := r.withRestRetry(ctx, restClient, func() error {
+		var listErr error
+		tagIDs, listErr = tagManager.ListTags(ctx)
+		return listErr
+	})
 	if err != nil {
 		r.log.Error(err, "Failed to list tags")
 		return nil, err
@@ -635,7 +661,12 @@ func (r *Collector) getVMsWithTags(ctx context.Context) (map[string][]model.Tag,
 
 	// Step 2: Get attached objects in a single batch API call and filter to
 	// only tags that are attached to at least one VirtualMachine.
-	attachedObjectsList, err := tagManager.ListAttachedObjectsOnTags(ctx, tagIDs)
+	var attachedObjectsList []tags.AttachedObjects
+	err = r.withRestRetry(ctx, restClient, func() error {
+		var listErr error
+		attachedObjectsList, listErr = tagManager.ListAttachedObjectsOnTags(ctx, tagIDs)
+		return listErr
+	})
 	if err != nil {
 		r.log.Error(err, "Failed to retrieve attached objects for tags", "tagCount", len(tagIDs))
 		return nil, err
@@ -699,6 +730,7 @@ func (r *Collector) getVMsWithTags(ctx context.Context) (map[string][]model.Tag,
 			}
 			defer func() { <-sem }()
 
+			// No re-auth here: concurrent 401s would flood login. Next cycle recovers.
 			tag, err := tagManager.GetTag(fetchCtx, tagID)
 			if err != nil {
 				firstErrOnce.Do(func() {
