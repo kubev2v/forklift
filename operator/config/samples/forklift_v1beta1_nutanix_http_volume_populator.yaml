@@ -1,0 +1,9 @@
+apiVersion: forklift.konveyor.io/v1beta1
+kind: NutanixHTTPVolumePopulator
+metadata:
+  name: example-nhvp
+  namespace: ${NAMESPACE}
+spec:
+  url: ""
+  secretName: ""
+  diskSizeBytes: 0

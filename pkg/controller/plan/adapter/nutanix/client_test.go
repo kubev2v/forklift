@@ -1035,3 +1035,81 @@ func TestMigrationImageNameWithinLimit(t *testing.T) {
 		t.Fatalf("expected name length < %d, got %d", migrationImageNameMaxLen, len(name))
 	}
 }
+
+func TestPrismClusterUUIDForLease_Element(t *testing.T) {
+	const wantUUID = "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
+	var hits int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == prismCentralPath:
+			w.WriteHeader(http.StatusNotFound)
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/PrismGateway/services/rest/v1/cluster"):
+			hits++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"uuid":"` + wantUUID + `"}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	client := newConnectedTestClient(t, server.URL)
+	got, err := client.prismClusterUUIDForLease(true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := strings.ToLower(wantUUID)
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+	// Memoized: a second call must not hit /v1/cluster again.
+	got2, err := client.prismClusterUUIDForLease(true)
+	if err != nil {
+		t.Fatalf("unexpected error on memoized call: %v", err)
+	}
+	if got2 != want {
+		t.Fatalf("expected memoized %q, got %q", want, got2)
+	}
+	if hits != 1 {
+		t.Fatalf("expected one /v1/cluster fetch, got %d", hits)
+	}
+}
+
+func TestPrismClusterUUIDForLease_Central(t *testing.T) {
+	const wantUUID = "2AED830E-1111-2222-3333-444444444444"
+	var hits int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == prismCentralPath:
+			hits++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"resources":{"cluster_uuid":"` + wantUUID + `"}}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	client := newConnectedTestClient(t, server.URL)
+	afterConnect := hits
+	got, err := client.prismClusterUUIDForLease(false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := strings.ToLower(wantUUID)
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+	if _, err := client.prismClusterUUIDForLease(false); err != nil {
+		t.Fatalf("unexpected error on memoized call: %v", err)
+	}
+	if hits != afterConnect+1 {
+		t.Fatalf("expected one lease fetch after connect, got %d (connect hits %d)", hits-afterConnect, afterConnect)
+	}
+}
