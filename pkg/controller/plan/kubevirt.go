@@ -329,19 +329,19 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 	}
 	res.podConfig.Environment = providerEnv
 	if vm.RootDisk != "" {
-		res.podConfig.Environment = append(res.podConfig.Environment, core.EnvVar{Name: "V2V_RootDisk", Value: vm.RootDisk})
+		res.podConfig.Environment = append(res.podConfig.Environment, core.EnvVar{Name: v2vconfig.EnvRootDiskName, Value: vm.RootDisk})
 	}
 	if vm.NewName != "" {
-		res.podConfig.Environment = append(res.podConfig.Environment, core.EnvVar{Name: "V2V_NewName", Value: r.getNewVMName(vm)})
+		res.podConfig.Environment = append(res.podConfig.Environment, core.EnvVar{Name: v2vconfig.EnvNewNameName, Value: r.getNewVMName(vm)})
 	}
 	if r.SelinuxRelabelAtBoot(vm.Ref) {
 		res.podConfig.Environment = append(res.podConfig.Environment,
-			core.EnvVar{Name: "V2V_selinuxRelabelAtBoot", Value: "true"})
+			core.EnvVar{Name: v2vconfig.EnvSelinuxRelabelAtBootName, Value: "true"})
 	}
 	if dirs := r.SelinuxRelabelExclude(vm.Ref); len(dirs) > 0 {
 		b, _ := json.Marshal(dirs)
 		res.podConfig.Environment = append(res.podConfig.Environment,
-			core.EnvVar{Name: "V2V_selinuxRelabelExclude", Value: string(b)})
+			core.EnvVar{Name: v2vconfig.EnvSelinuxRelabelExcludeName, Value: string(b)})
 	}
 
 	// Pre-copy init container only applies to conversion pods (not inspection
@@ -3829,7 +3829,7 @@ func netAppShiftDiskPermsInitContainer(mounts []core.VolumeMount, image string) 
 func (r *KubeVirt) buildInspectionPodEnvironment(env []core.EnvVar, vm *plan.VMStatus, step *plan.Step) (newEnv []core.EnvVar, success bool, err error) {
 	newEnv = append(env,
 		core.EnvVar{
-			Name:  "V2V_remoteInspection",
+			Name:  v2vconfig.EnvRemoteInspection,
 			Value: "true",
 		})
 

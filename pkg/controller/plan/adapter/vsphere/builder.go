@@ -39,6 +39,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/settings"
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"github.com/kubev2v/forklift/pkg/templateutil"
+	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
@@ -247,7 +248,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 
 	if useLegacyDrivers {
 		env = append(env, core.EnvVar{
-			Name:  "VIRTIO_WIN",
+			Name:  v2vconfig.EnvVirtIoWinLegacyDriversName,
 			Value: "/usr/local/virtio-win-legacy.iso",
 		})
 	} else if isWindows(vm) {
@@ -262,7 +263,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		}
 		if planbase.HasMultipleIPsPerMAC(manualMACs) {
 			env = append(env, core.EnvVar{
-				Name:  "V2V_multipleIPsPerNic",
+				Name:  v2vconfig.EnvMultipleIpsPerNicName,
 				Value: "true",
 			})
 		}
@@ -270,20 +271,20 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 
 	if vm.HostName != "" {
 		env = append(env, core.EnvVar{
-			Name:  "V2V_HOSTNAME",
+			Name:  v2vconfig.EnvHostName,
 			Value: vm.HostName,
 		})
 	}
 	planVM := r.getPlanVM(vm)
 	if planVM != nil && planVM.NbdeClevis {
 		env = append(env, core.EnvVar{
-			Name:  "V2V_NBDE_CLEVIS",
+			Name:  v2vconfig.EnvNbdeClevis,
 			Value: "true",
 		})
 	}
 	if planVM != nil && len(planVM.ExcludeDisks) > 0 {
 		env = append(env, core.EnvVar{
-			Name:  "V2V_excludeDiskBusAddresses",
+			Name:  v2vconfig.EnvExcludeDiskBusAddressesName,
 			Value: strings.Join(planVM.ExcludeDisks, ","),
 		})
 	}
@@ -296,29 +297,29 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	env = append(
 		env,
 		core.EnvVar{
-			Name:  "V2V_vmName",
+			Name:  v2vconfig.EnvVmNameName,
 			Value: vm.Name,
 		},
 		core.EnvVar{
-			Name:  "V2V_libvirtURL",
+			Name:  v2vconfig.EnvLibvirtUrlName,
 			Value: libvirtURL.String(),
 		},
 		core.EnvVar{
-			Name:  "V2V_source",
+			Name:  v2vconfig.EnvSourceName,
 			Value: "vSphere",
 		},
 		// The fingerpint/thumbprint is not confidential since one can retrieve
 		// it from the server as we do, so we don't have to place it in a secret
 		core.EnvVar{
-			Name:  "V2V_fingerprint",
+			Name:  v2vconfig.EnvFingerprintName,
 			Value: fingerprint,
 		},
 		core.EnvVar{
-			Name:  "V2V_extra_args",
+			Name:  v2vconfig.EnvExtraArgsName,
 			Value: settings.Settings.VirtV2vExtraArgs,
 		},
 		core.EnvVar{
-			Name:  "V2V_inspector_extra_args",
+			Name:  v2vconfig.EnvInspectorExtraArgsName,
 			Value: settings.Settings.VirtV2vInspectorExtraArgs,
 		},
 	)
@@ -326,7 +327,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		if shouldPreserve {
 			env = append(env, core.EnvVar{Name: "V2V_preserveStaticIPs", Value: "true"})
 		}
-		env = append(env, core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps})
+		env = append(env, core.EnvVar{Name: v2vconfig.EnvStaticIPsName, Value: macsToIps})
 	}
 
 	// Only collect Pod-network MACs for masquerade interfaces on IPv6-enabled
@@ -346,7 +347,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 				})
 				if len(podMacs) > 0 {
 					env = append(env, core.EnvVar{
-						Name:  "V2V_podNetworkIPv6MACs",
+						Name:  v2vconfig.EnvPodNetworkIPv6MACsName,
 						Value: strings.Join(podMacs, ","),
 					})
 				}
@@ -361,7 +362,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	}
 	if len(nbdURIs) > 0 {
 		env = append(env, core.EnvVar{
-			Name:  "V2V_nbdDisks",
+			Name:  v2vconfig.EnvNbdDisksName,
 			Value: strings.Join(nbdURIs, ","),
 		})
 	}
