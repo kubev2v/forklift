@@ -2,7 +2,7 @@
 // writes it into the target volume.
 //
 // Auth comes from the EnvFrom secret wired by the populator machinery:
-//   - Basic Auth: user + password (Prism Element)
+//   - Basic Auth: user + password (Prism Element, or PC fallback to v3 /file)
 //   - Cookie header: Cookie env (Prism Central entity_download)
 //
 // TLS: cacert env (mapped from ca.crt) and insecureSkipVerify.
@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -31,8 +32,9 @@ import (
 )
 
 const (
-	maxDownloadAttempts = 8
-	downloadRetryBase   = 2 * time.Second
+	maxDownloadAttempts      = 8
+	downloadRetryBase        = 2 * time.Second
+	entityDownloadPathPrefix = "/entity_download/"
 )
 
 type config struct {
@@ -113,7 +115,23 @@ func main() {
 	klog.Info("Finished populating the volume. Progress: 100%")
 }
 
+// download tries the configured URL first. If that fails and the URL is a PC
+// entity_download Location, it rewrites to PE v3 /file and retries with Basic
+// Auth — some AOS builds reject entity_download while /file still works.
 func download(ctx context.Context, cfg *config, progress *prometheus.GaugeVec) error {
+	err := downloadRetries(ctx, cfg, progress, cfg.url, false)
+	if err == nil {
+		return nil
+	}
+	fileURL, ok := entityDownloadToV3FileURL(cfg.url)
+	if !ok {
+		return err
+	}
+	klog.Warningf("entity_download failed (%v); falling back to %s with Basic Auth", err, fileURL)
+	return downloadRetries(ctx, cfg, progress, fileURL, true)
+}
+
+func downloadRetries(ctx context.Context, cfg *config, progress *prometheus.GaugeVec, url string, forceBasic bool) error {
 	var lastErr error
 	for attempt := 1; attempt <= maxDownloadAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
@@ -131,7 +149,7 @@ func download(ctx context.Context, cfg *config, progress *prometheus.GaugeVec) e
 			}
 		}
 
-		lastErr = downloadOnce(ctx, cfg, progress, attempt)
+		lastErr = downloadOnce(ctx, cfg, progress, url, forceBasic, attempt)
 		if lastErr == nil {
 			return nil
 		}
@@ -144,12 +162,18 @@ func download(ctx context.Context, cfg *config, progress *prometheus.GaugeVec) e
 	return fmt.Errorf("download failed after %d attempts: %w", maxDownloadAttempts, lastErr)
 }
 
-func downloadOnce(ctx context.Context, cfg *config, progress *prometheus.GaugeVec, attempt int) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.url, nil)
+func downloadOnce(ctx context.Context, cfg *config, progress *prometheus.GaugeVec, url string, forceBasic bool, attempt int) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
-	if cookie := os.Getenv("Cookie"); cookie != "" {
+	if forceBasic {
+		user := os.Getenv("user")
+		password := os.Getenv("password")
+		if user != "" || password != "" {
+			req.SetBasicAuth(user, password)
+		}
+	} else if cookie := os.Getenv("Cookie"); cookie != "" {
 		req.Header.Set("Cookie", cookie)
 	} else if header := os.Getenv("cookie"); strings.HasPrefix(header, "Cookie: ") {
 		req.Header.Set("Cookie", strings.TrimPrefix(header, "Cookie: "))
@@ -246,6 +270,27 @@ func downloadOnce(ctx context.Context, cfg *config, progress *prometheus.GaugeVe
 	close(done)
 	klog.Infof("Download complete: %d bytes in %v", read, time.Since(start).Round(time.Millisecond))
 	return nil
+}
+
+// entityDownloadToV3FileURL rewrites a PE entity_download Location to the
+// documented v3 image /file URL on the same host.
+func entityDownloadToV3FileURL(raw string) (string, bool) {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return "", false
+	}
+	if !strings.HasPrefix(u.Path, entityDownloadPathPrefix) {
+		return "", false
+	}
+	imageUUID := strings.TrimPrefix(u.Path, entityDownloadPathPrefix)
+	if imageUUID == "" || strings.Contains(imageUUID, "/") {
+		return "", false
+	}
+	u.Path = "/api/nutanix/v3/images/" + imageUUID + "/file"
+	u.RawPath = ""
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String(), true
 }
 
 func isRetryable(err error) bool {

@@ -1500,6 +1500,14 @@ func (r *Builder) ensureHTTPPopulatorCookieSecret(
 	data := map[string][]byte{
 		"Cookie": []byte(cookie),
 	}
+	// Basic Auth credentials for in-populator fallback to PE v3 /file when
+	// entity_download is unusable (cookie auth does not work on that path).
+	if user, ok := r.Source.Secret.Data["user"]; ok {
+		data["user"] = user
+	}
+	if password, ok := r.Source.Secret.Data["password"]; ok {
+		data["password"] = password
+	}
 	if ca, ok := libutil.GetCACert(r.Source.Secret); ok {
 		data["ca.crt"] = ca
 	}

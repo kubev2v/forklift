@@ -633,6 +633,8 @@ func TestEnsureHTTPPopulatorCookieSecret_UsesGetCACert(t *testing.T) {
 				// Legacy cacert key must be written as ca.crt on the cookie secret.
 				Data: map[string][]byte{
 					"cacert":             []byte("legacy-ca"),
+					"user":               []byte("admin"),
+					"password":           []byte("secret"),
 					"insecureSkipVerify": []byte("true"),
 				},
 			},
@@ -661,5 +663,11 @@ func TestEnsureHTTPPopulatorCookieSecret_UsesGetCACert(t *testing.T) {
 	}
 	if got := string(secret.Data["insecureSkipVerify"]); got != "true" {
 		t.Fatalf("insecureSkipVerify: got %q", got)
+	}
+	if got := string(secret.Data["user"]); got != "admin" {
+		t.Fatalf("user: got %q", got)
+	}
+	if got := string(secret.Data["password"]); got != "secret" {
+		t.Fatalf("password: got %q", got)
 	}
 }
