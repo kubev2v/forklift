@@ -18,6 +18,7 @@ package plan
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"sort"
@@ -29,6 +30,8 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
+	"github.com/kubev2v/forklift/pkg/controller/validation"
+	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
@@ -44,6 +47,7 @@ import (
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -56,7 +60,13 @@ const (
 	Name = "plan"
 	// Annotation for populator Labels set
 	AnnPopulatorLabels = "populatorLabels"
+	// How long Plan deletion waits for destination cleanup before giving up.
+	planTeardownTimeout = 3 * time.Minute
 )
+
+// Returned when the destination Provider or Secret is missing or unset.
+// Distinct from list/delete NotFound errors during the destination sweep.
+var errDestinationUnavailable = errors.New("destination provider or secret not found")
 
 // Package logger.
 var log = logging.WithName(Name)
@@ -206,7 +216,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			r.Log.Info("Plan deleted, cleaning up orphaned resources.")
-			r.cleanupOrphanedResources(request.Name, request.Namespace)
+			r.cleanupHostOrphanedResources(request.Name, request.Namespace)
 			err = nil
 			return
 		}
@@ -215,6 +225,21 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	defer func() {
 		r.Log.V(2).Info("Conditions.", "all", plan.Status.Conditions)
 	}()
+
+	// Deletion teardown (do not add finalizers once deleting).
+	if !plan.DeletionTimestamp.IsZero() {
+		r.cancelInFlightMigration(plan)
+		result, err = r.handlePlanDeletion(ctx, plan)
+		return
+	}
+
+	// Ensure finalizer so delete is blocked until teardown runs.
+	if !controllerutil.ContainsFinalizer(plan, api.PlanFinalizer) {
+		patch := client.MergeFrom(plan.DeepCopy())
+		controllerutil.AddFinalizer(plan, api.PlanFinalizer)
+		err = r.Patch(ctx, plan, patch)
+		return
+	}
 
 	// Don't reconcile if the plan is archived.
 	if plan.Spec.Archived && plan.Status.HasCondition(Archived) {
@@ -899,42 +924,246 @@ func (r *Reconciler) postpone() (postpone bool, err error) {
 	return
 }
 
-// cleanupOrphanedResources removes migration resources left behind when a Plan
-// is deleted. Resources are found by plan-name and plan-namespace labels.
-func (r *Reconciler) cleanupOrphanedResources(planName, planNamespace string) {
+// cancelInFlightMigration marks active VMs canceled and runs Cancel so
+// importers/pods stop before leftover GC. Best-effort when refs are unavailable.
+func (r *Reconciler) cancelInFlightMigration(plan *api.Plan) {
+	snapshot := plan.Status.Migration.ActiveSnapshot()
+	// Nothing to cancel.
+	if snapshot.Migration.Name == "" && len(plan.Status.Migration.VMs) == 0 {
+		return
+	}
+
+	// Resolve providers/maps needed to build a migration context.
+	pv := validation.ProviderPair{Client: r}
+	if _, err := pv.Validate(plan.Spec.Provider); err != nil {
+		r.Log.Error(err, "Cannot resolve providers to cancel migration on delete.")
+		return
+	}
+	plan.Provider.Source = pv.Referenced.Source
+	plan.Provider.Destination = pv.Referenced.Destination
+	if err := r.validateNetworkMap(plan); err != nil {
+		r.Log.Error(err, "Cannot resolve network map to cancel migration on delete.")
+		return
+	}
+	if plan.Spec.Type != api.MigrationOnlyConversion {
+		if err := r.validateStorageMap(plan); err != nil {
+			r.Log.Error(err, "Cannot resolve storage map to cancel migration on delete.")
+			return
+		}
+	}
+
+	// Mark the active snapshot canceled so Cancel() will clean it up.
+	if !snapshot.HasAnyCondition(Canceled, Succeeded, Failed) {
+		snapshot.DeleteCondition(Executing)
+		snapshot.SetCondition(libcnd.Condition{
+			Type:     Canceled,
+			Status:   True,
+			Category: api.CategoryAdvisory,
+			Reason:   Deleted,
+			Message:  "The plan is being deleted.",
+			Durable:  true,
+		})
+	}
+	// Mark incomplete VMs canceled (Cancel only acts on that condition).
+	for _, vm := range plan.Status.Migration.VMs {
+		if vm.HasAnyCondition(Succeeded, Failed, Canceled) {
+			continue
+		}
+		vm.SetCondition(libcnd.Condition{
+			Type:     Canceled,
+			Status:   True,
+			Category: api.CategoryAdvisory,
+			Reason:   Deleted,
+			Message:  "The plan is being deleted.",
+			Durable:  true,
+		})
+	}
+	plan.Status.DeleteCondition(Executing)
+
+	// Build context and stop importers/pods for canceled VMs.
+	ctx, err := plancontext.New(r, plan, r.Log)
+	if err != nil {
+		r.Log.Error(err, "Cannot build context to cancel migration on delete.")
+		return
+	}
+	if snapshot.Migration.UID != "" {
+		migration := &api.Migration{}
+		migration.UID = snapshot.Migration.UID
+		migration.Name = snapshot.Migration.Name
+		migration.Namespace = snapshot.Migration.Namespace
+		ctx.SetMigration(migration)
+	}
+	runner := Migration{Context: ctx}
+	if err := runner.Cancel(); err != nil {
+		r.Log.Error(err, "Migration cancel failed during plan delete.")
+	}
+	// Persist canceled status before leftover GC.
+	if err := r.updatePlanStatus(plan); err != nil {
+		r.Log.Error(err, "Failed to persist canceled status during plan delete.")
+	}
+}
+
+// handlePlanDeletion cleans destination then host leftovers and removes the finalizer.
+func (r *Reconciler) handlePlanDeletion(ctx context.Context, plan *api.Plan) (reconcile.Result, error) {
+	destErr := r.cleanupDestinationOrphanedResources(plan)
+	if destErr != nil {
+		// Provider/secret gone or unset cannot recover. Skip dest sweep.
+		// Do not treat list/delete NotFound the same way.
+		if errors.Is(destErr, errDestinationUnavailable) {
+			r.Log.Info("Destination provider or secret not found, skipping destination sweep.",
+				"plan", plan.Name, "error", destErr)
+		} else if controllerutil.ContainsFinalizer(plan, api.PlanFinalizer) {
+			elapsed := time.Since(plan.DeletionTimestamp.Time)
+			if elapsed < planTeardownTimeout {
+				r.Log.Error(destErr, "Destination cleanup failed, will retry.",
+					"plan", plan.Name, "elapsed", elapsed)
+				return reconcile.Result{RequeueAfter: base.SlowReQ}, nil
+			}
+			msg := fmt.Sprintf(
+				"Destination cleanup failed after %s, deleting Plan anyway. Leftover PVCs/DataVolumes/pods may remain in target namespace %q: %v",
+				planTeardownTimeout, plan.Spec.TargetNamespace, destErr)
+			r.Log.Error(destErr, "Destination cleanup timed out, abandoning destination sweep.",
+				"plan", plan.Name, "targetNamespace", plan.Spec.TargetNamespace)
+			if r.EventRecorder != nil {
+				r.Event(plan, core.EventTypeWarning, "DestinationCleanupFailed", msg)
+			}
+		} else {
+			r.Log.Error(destErr, "Destination cleanup failed without PlanFinalizer, continuing.",
+				"plan", plan.Name, "targetNamespace", plan.Spec.TargetNamespace)
+		}
+	}
+
+	r.cleanupHostOrphanedResources(plan.Name, plan.Namespace)
+
+	if !controllerutil.ContainsFinalizer(plan, api.PlanFinalizer) {
+		return reconcile.Result{}, nil
+	}
+	patch := client.MergeFrom(plan.DeepCopy())
+	controllerutil.RemoveFinalizer(plan, api.PlanFinalizer)
+	if err := r.Patch(ctx, plan, patch); err != nil {
+		return reconcile.Result{}, liberr.Wrap(err)
+	}
+	return reconcile.Result{}, nil
+}
+
+// destinationClient builds a client for the Plan's destination provider.
+func (r *Reconciler) destinationClient(plan *api.Plan) (client.Client, error) {
+	ref := plan.Spec.Provider.Destination
+	if ref.Name == "" {
+		return nil, errDestinationUnavailable
+	}
+	provider := &api.Provider{}
+	key := client.ObjectKey{Namespace: ref.Namespace, Name: ref.Name}
+	if key.Namespace == "" {
+		key.Namespace = plan.Namespace
+	}
+	if err := r.Get(context.TODO(), key, provider); err != nil {
+		if k8serr.IsNotFound(err) {
+			return nil, errDestinationUnavailable
+		}
+		return nil, liberr.Wrap(err)
+	}
+	// Host destination is the management cluster, reuse the controller client.
+	if provider.IsHost() {
+		return r.Client, nil
+	}
+	secretRef := provider.Spec.Secret
+	secretNS := secretRef.Namespace
+	if secretNS == "" {
+		secretNS = provider.Namespace
+	}
+	if secretNS == "" {
+		secretNS = plan.Namespace
+	}
+	secret := &core.Secret{}
+	if err := r.Get(context.TODO(), client.ObjectKey{
+		Namespace: secretNS,
+		Name:      secretRef.Name,
+	}, secret); err != nil {
+		if k8serr.IsNotFound(err) {
+			return nil, errDestinationUnavailable
+		}
+		return nil, liberr.Wrap(err)
+	}
+	return ocp.Client(provider, secret)
+}
+
+// cleanupDestinationOrphanedResources deletes namespaced migration leftovers
+// on the destination cluster (PVCs, DVs, pods, secrets, configmaps).
+func (r *Reconciler) cleanupDestinationOrphanedResources(plan *api.Plan) error {
+	dest, err := r.destinationClient(plan)
+	if err != nil {
+		return err
+	}
+	labels := client.MatchingLabels{
+		kPlanName:      plan.Name,
+		kPlanNamespace: plan.Namespace,
+	}
+	opts := []client.ListOption{labels}
+	if plan.Spec.TargetNamespace != "" {
+		opts = append(opts, client.InNamespace(plan.Spec.TargetNamespace))
+	}
+	// Sweep every kind even if one fails, so a stuck DV list cannot
+	// strand pods/secrets until timeout.
+	var sweepErr error
+	for _, err := range []error{
+		r.deleteOrphanedResources(dest, &core.PersistentVolumeClaimList{}, opts, "PVC", true),
+		r.deleteOrphanedResources(dest, &cdi.DataVolumeList{}, opts, "DataVolume", true),
+		r.deleteOrphanedResources(dest, &core.PodList{}, opts, "Pod", false),
+		r.deleteOrphanedResources(dest, &core.SecretList{}, opts, "Secret", false),
+		r.deleteOrphanedResources(dest, &core.ConfigMapList{}, opts, "ConfigMap", false),
+	} {
+		if err != nil && sweepErr == nil {
+			sweepErr = err
+		}
+	}
+	return sweepErr
+}
+
+func (r *Reconciler) cleanupHostOrphanedResources(planName, planNamespace string) {
 	labels := client.MatchingLabels{
 		kPlanName:      planName,
 		kPlanNamespace: planNamespace,
 	}
-
-	r.deleteOrphanedResources(&core.PersistentVolumeClaimList{}, labels, "PVC", true)
-	r.deleteOrphanedResources(&cdi.DataVolumeList{}, labels, "DataVolume", true)
-	r.deleteOrphanedResources(&core.PodList{}, labels, "Pod", false)
-	r.deleteOrphanedResources(&core.SecretList{}, labels, "Secret", false)
-	r.deleteOrphanedResources(&core.ConfigMapList{}, labels, "ConfigMap", false)
-	r.deleteOrphanedResources(&core.PersistentVolumeList{}, labels, "PV", false)
-	r.deleteOrphanedResources(&api.CopyApplianceList{}, labels, "CopyAppliance", false)
-
+	opts := []client.ListOption{labels}
+	_ = r.deleteOrphanedResources(r.Client, &core.PersistentVolumeClaimList{}, opts, "PVC", true)
+	_ = r.deleteOrphanedResources(r.Client, &cdi.DataVolumeList{}, opts, "DataVolume", true)
+	_ = r.deleteOrphanedResources(r.Client, &core.PodList{}, opts, "Pod", false)
+	_ = r.deleteOrphanedResources(r.Client, &core.SecretList{}, opts, "Secret", false)
+	_ = r.deleteOrphanedResources(r.Client, &core.ConfigMapList{}, opts, "ConfigMap", false)
+	_ = r.deleteOrphanedResources(r.Client, &core.PersistentVolumeList{}, opts, "PV", false)
+	_ = r.deleteOrphanedResources(r.Client, &api.CopyApplianceList{}, opts, "CopyAppliance", false)
 	r.Log.Info(
-		"Orphaned resource cleanup completed.",
+		"Host orphaned resource cleanup completed.",
 		"plan", planName,
 		"namespace", planNamespace)
 }
 
-// deleteOrphanedResources lists resources matching labels and deletes them.
+// cleanupOrphanedResources wraps host cleanup for existing tests.
+func (r *Reconciler) cleanupOrphanedResources(planName, planNamespace string) {
+	r.cleanupHostOrphanedResources(planName, planNamespace)
+}
+
+// deleteOrphanedResources lists resources matching opts and deletes them.
 // When preserveVMOwned is true, resources owned by a VirtualMachine are preserved.
-func (r *Reconciler) deleteOrphanedResources(list client.ObjectList, labels client.MatchingLabels, kind string, preserveVMOwned bool) {
-	if err := r.List(context.TODO(), list, labels); err != nil {
+func (r *Reconciler) deleteOrphanedResources(
+	c client.Client,
+	list client.ObjectList,
+	opts []client.ListOption,
+	kind string,
+	preserveVMOwned bool,
+) error {
+	if err := c.List(context.TODO(), list, opts...); err != nil {
 		r.Log.Error(err, "Failed to list resources for cleanup.", "kind", kind)
-		return
+		return err
 	}
+	var deleteErr error
 	_ = apimeta.EachListItem(list, func(obj runtime.Object) error {
 		resource, ok := obj.(client.Object)
 		if !ok {
 			r.Log.Error(nil, "Unexpected object type during cleanup.", "kind", kind)
 			return nil
 		}
-		// Preserve resources already owned by a migrated VirtualMachine.
 		if preserveVMOwned && hasVMOwner(resource.GetOwnerReferences()) {
 			r.Log.V(1).Info(
 				"Skipping resource owned by VirtualMachine.",
@@ -943,12 +1172,15 @@ func (r *Reconciler) deleteOrphanedResources(list client.ObjectList, labels clie
 				"namespace", resource.GetNamespace())
 			return nil
 		}
-		if err := r.Delete(context.TODO(), resource); err != nil {
+		if err := c.Delete(context.TODO(), resource); err != nil {
 			if !k8serr.IsNotFound(err) {
 				r.Log.Error(err, "Failed to delete resource.",
 					"kind", kind,
 					"name", resource.GetName(),
 					"namespace", resource.GetNamespace())
+				if deleteErr == nil {
+					deleteErr = err
+				}
 			}
 		} else {
 			r.Log.Info("Deleted orphaned resource.",
@@ -958,6 +1190,7 @@ func (r *Reconciler) deleteOrphanedResources(list client.ObjectList, labels clie
 		}
 		return nil
 	})
+	return deleteErr
 }
 
 func hasVMOwner(owners []meta.OwnerReference) bool {
