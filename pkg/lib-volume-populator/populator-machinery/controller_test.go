@@ -389,3 +389,26 @@ func TestXcopyPriorityClassName_IgnoredByOtherPopulators(t *testing.T) {
 		t.Errorf("expected other populator priorityClassName to be unset, got %q", pod.Spec.PriorityClassName)
 	}
 }
+
+// Every populator kind the populator-controller registers must have a
+// populatorToResource entry, or updateProgress panics on a nil map value
+// (regression: NutanixNfsVolumePopulator was missing and crash-looped the
+// controller as soon as a populate pod's metrics endpoint answered).
+func TestPopulatorToResource_CoversAllKinds(t *testing.T) {
+	kinds := []string{
+		"OvirtVolumePopulator",
+		"OpenstackVolumePopulator",
+		api.VSphereXcopyVolumePopulatorKind,
+		api.NutanixNfsVolumePopulatorKind,
+	}
+	for _, kind := range kinds {
+		pr, ok := populatorToResource[kind]
+		if !ok || pr == nil {
+			t.Errorf("populatorToResource has no entry for kind %q", kind)
+			continue
+		}
+		if pr.resource == "" {
+			t.Errorf("populatorToResource[%q] has empty resource", kind)
+		}
+	}
+}

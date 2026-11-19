@@ -110,6 +110,11 @@ var (
 			resource:           api.VSphereXcopyVolumePopulatorResource,
 			regexKey:           "vsphere_xcopy_volume_populator",
 		},
+		api.NutanixNfsVolumePopulatorKind: {
+			storageResourceKey: "source_path",
+			resource:           api.NutanixNfsVolumePopulatorResource,
+			regexKey:           "nutanix_nfs_populator",
+		},
 	}
 
 	monitoredPVCs = map[string]interface{}{}
@@ -955,10 +960,16 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		completion = c.parseAndRecordCompletion(bodyStr, pvc, cr)
 	}
 
+	populatorResource, known := populatorToResource[populatorKind]
+	if !known || populatorResource == nil {
+		// Unknown kind: report instead of dereferencing a nil map entry and
+		// crashing the controller.
+		return fmt.Errorf("no resource mapping for populator kind %q", populatorKind)
+	}
 	gvr := schema.GroupVersionResource{
 		Group:    *pvc.Spec.DataSourceRef.APIGroup,
 		Version:  "v1beta1",
-		Resource: populatorToResource[populatorKind].resource,
+		Resource: populatorResource.resource,
 	}
 
 	latestPopulator, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Get(context.TODO(), cr.GetName(), metav1.GetOptions{})
