@@ -1333,6 +1333,10 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	if err != nil {
 		return nil, err
 	}
+	leaseKey, err := client.prismClusterUUIDForLease(element)
+	if err != nil {
+		return nil, err
+	}
 
 	baseURL := strings.TrimRight(r.Source.Provider.Spec.URL, "/")
 	namespace := r.Plan.Spec.TargetNamespace
@@ -1375,7 +1379,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			"migration":              string(r.Migration.UID),
 			"plan":                   string(r.Plan.GetUID()),
 			"vmID":                   vmRef.ID,
-			api.LabelSourceHost:      string(r.Source.Provider.UID),
+			api.LabelSourceHost:      leaseKey,
 			api.LabelNutanixEndpoint: endpoint,
 		}
 
