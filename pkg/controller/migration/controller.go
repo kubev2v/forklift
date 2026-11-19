@@ -140,6 +140,17 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
+	// Archived plans must not keep refreshing Migration status/conditions; the UI
+	// surfaces those timestamps as migrationFailed alerts.
+	archived, err := r.planArchived(migration)
+	if err != nil {
+		return
+	}
+	if archived {
+		r.Log.Info("Aborting reconcile of migration for archived plan.")
+		return
+	}
+
 	// Detected completed.
 	if migration.Status.MarkedCompleted() {
 		return
@@ -229,6 +240,23 @@ func (r *Reconciler) reflectPlan(plan *api.Plan, migration *api.Migration) {
 		})
 	}
 	migration.Status.VMs = plan.Status.Migration.VMs
+}
+
+// planArchived reports whether the migration's plan is archived.
+func (r *Reconciler) planArchived(migration *api.Migration) (bool, error) {
+	ref := migration.Spec.Plan
+	if !libref.RefSet(&ref) {
+		return false, nil
+	}
+	plan := &api.Plan{}
+	err := r.Get(context.TODO(), client.ObjectKey{Namespace: ref.Namespace, Name: ref.Name}, plan)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return plan.Spec.Archived, nil
 }
 
 // Set owner reference for Migration.

@@ -39,15 +39,11 @@ type PlanPredicate struct {
 }
 
 func (r PlanPredicate) Create(e event.TypedCreateEvent[*api.Plan]) bool {
-	p := e.Object
-	reconciled := p.Status.ObservedGeneration == p.Generation
-	return reconciled
+	return r.enqueue(e.Object)
 }
 
 func (r PlanPredicate) Update(e event.TypedUpdateEvent[*api.Plan]) bool {
-	p := e.ObjectNew
-	reconciled := p.Status.ObservedGeneration == p.Generation
-	return reconciled
+	return r.enqueue(e.ObjectNew)
 }
 
 func (r PlanPredicate) Delete(e event.TypedDeleteEvent[*api.Plan]) bool {
@@ -55,7 +51,10 @@ func (r PlanPredicate) Delete(e event.TypedDeleteEvent[*api.Plan]) bool {
 }
 
 func (r PlanPredicate) Generic(e event.TypedGenericEvent[*api.Plan]) bool {
-	p := e.Object
-	reconciled := p.Status.ObservedGeneration == p.Generation
-	return reconciled
+	return r.enqueue(e.Object)
+}
+
+// enqueue is true when a reconciled, non-archived plan should wake Migrations.
+func (r PlanPredicate) enqueue(p *api.Plan) bool {
+	return !p.Spec.Archived && p.Status.ObservedGeneration == p.Generation
 }
