@@ -1496,7 +1496,7 @@ func (r *Builder) ensureHTTPPopulatorCookieSecret(
 	data := map[string][]byte{
 		"Cookie": []byte(cookie),
 	}
-	if ca := r.Source.Secret.Data["ca.crt"]; len(ca) > 0 {
+	if ca, ok := libutil.GetCACert(r.Source.Secret); ok {
 		data["ca.crt"] = ca
 	}
 	if insecure, ok := r.Source.Secret.Data["insecureSkipVerify"]; ok {
