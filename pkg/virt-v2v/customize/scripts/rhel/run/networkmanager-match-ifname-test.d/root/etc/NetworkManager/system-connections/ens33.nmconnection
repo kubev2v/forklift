@@ -1,0 +1,10 @@
+[connection]
+id=ens33
+type=ethernet
+
+[match]
+interface-name=ens33;enp1s0;
+
+[ipv4]
+method=manual
+address1=172.30.10.142/24
