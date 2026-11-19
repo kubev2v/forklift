@@ -1,6 +1,7 @@
 package vsphere
 
 import (
+	"encoding/json"
 	"testing"
 
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
@@ -298,4 +299,35 @@ func TestVMWithCopiesToolsFields(t *testing.T) {
 		t.Fatalf("With() did not copy tools fields: got %q/%q/%q",
 			r.ToolsStatus, r.ToolsRunningStatus, r.ToolsVersionStatus)
 	}
+}
+
+func TestNetworkTeaming(t *testing.T) {
+	g := NewGomegaWithT(t)
+	inherited := false
+	network := &model.Network{
+		Base: model.Base{ID: "dvs-1", Variant: model.NetDvSwitch},
+		Teaming: model.TeamingPolicy{
+			Policy:    "loadbalance_srcid",
+			Inherited: &inherited,
+		},
+		LACP: []model.LACPGroup{
+			{Name: "lag1", Mode: "active", LoadBalanceAlgorithm: "srcDestIp"},
+		},
+	}
+	var resource Network
+	resource.With(network)
+	data, err := json.Marshal(resource)
+	g.Expect(err).NotTo(HaveOccurred())
+	var response map[string]json.RawMessage
+	g.Expect(json.Unmarshal(data, &response)).To(Succeed())
+	g.Expect(response["teaming"]).To(MatchJSON(`{"policy":"loadbalance_srcid","inherited":false}`))
+	g.Expect(response["lacp"]).To(MatchJSON(`[{"name":"lag1","mode":"active","loadBalanceAlgorithm":"srcDestIp"}]`))
+
+	var unknown Network
+	unknown.With(&model.Network{Base: model.Base{Variant: model.NetDvPortGroup}})
+	data, err = json.Marshal(unknown)
+	g.Expect(err).NotTo(HaveOccurred())
+	response = nil
+	g.Expect(json.Unmarshal(data, &response)).To(Succeed())
+	g.Expect(response).NotTo(HaveKey("teaming"))
 }

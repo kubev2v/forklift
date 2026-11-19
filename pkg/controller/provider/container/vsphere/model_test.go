@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sync"
 	"testing"
 
@@ -777,6 +778,256 @@ func TestVmAdapter_Apply_CustomFields(t *testing.T) {
 				if !reflect.DeepEqual(v.model.CustomValues, tt.expectedValues) {
 					t.Errorf("CustomValues mismatch\ngot:  %+v\nwant: %+v", v.model.CustomValues, tt.expectedValues)
 				}
+			}
+		})
+	}
+}
+
+func TestHostNetworkConfiguration(t *testing.T) {
+	adapter := HostAdapter{model: model.Host{Base: model.Base{ID: "host-1"}}}
+	switchPolicy := &types.HostNicTeamingPolicy{
+		Policy: "failover_explicit",
+		NicOrder: &types.HostNicOrderPolicy{
+			ActiveNic: []string{"vmnic0"},
+		},
+	}
+	portGroupPolicy := &types.HostNicTeamingPolicy{
+		Policy: "loadbalance_ip",
+		NicOrder: &types.HostNicOrderPolicy{
+			ActiveNic:  []string{"vmnic1"},
+			StandbyNic: []string{"vmnic0"},
+		},
+	}
+	adapter.Apply(types.ObjectUpdate{ChangeSet: []types.PropertyChange{
+		{
+			Name: fPNIC, Op: Assign,
+			Val: types.ArrayOfPhysicalNic{PhysicalNic: []types.PhysicalNic{
+				{Key: "physical-key", Device: "vmnic0"},
+			}},
+		},
+		{
+			Name: fVSwitch, Op: Assign,
+			Val: types.ArrayOfHostVirtualSwitch{HostVirtualSwitch: []types.HostVirtualSwitch{
+				{
+					Key: "switch-key", Name: "vSwitch0", Pnic: []string{"physical-key"},
+					Spec: types.HostVirtualSwitchSpec{Policy: &types.HostNetworkPolicy{NicTeaming: switchPolicy}},
+				},
+			}},
+		},
+		{
+			Name: fPortGroup, Op: Assign,
+			Val: types.ArrayOfHostPortGroup{HostPortGroup: []types.HostPortGroup{
+				{
+					Key: "portgroup-key", Vswitch: "switch-key",
+					Spec: types.HostPortGroupSpec{
+						Name:   "VM Network",
+						Policy: types.HostNetworkPolicy{NicTeaming: portGroupPolicy},
+					},
+				},
+			}},
+		},
+	}})
+	if len(adapter.model.Network.PNICs) != 1 || adapter.model.Network.PNICs[0].Key != "physical-key" || adapter.model.Network.PNICs[0].Device != "vmnic0" {
+		t.Fatalf("physical NIC identity not retained: %+v", adapter.model.Network.PNICs)
+	}
+	if len(adapter.model.Network.Switches) != 1 || len(adapter.model.Network.PortGroups) != 1 {
+		t.Fatalf("missing switch or port group: %+v", adapter.model.Network)
+	}
+	policy := adapter.model.Network.Switches[0].Teaming
+	if policy == nil || policy.Policy != "failover_explicit" || policy.ActiveUplinks == nil || policy.StandbyUplinks == nil {
+		t.Fatalf("switch teaming not retained: %+v", policy)
+	}
+	if !reflect.DeepEqual(*policy.ActiveUplinks, []string{"vmnic0"}) || *policy.StandbyUplinks == nil || len(*policy.StandbyUplinks) != 0 {
+		t.Fatalf("active or explicitly empty standby list not retained: %+v", policy)
+	}
+	policy = adapter.model.Network.PortGroups[0].Teaming
+	if policy == nil || policy.Policy != "loadbalance_ip" || policy.ActiveUplinks == nil || policy.StandbyUplinks == nil {
+		t.Fatalf("port-group override not retained: %+v", policy)
+	}
+	if !reflect.DeepEqual(*policy.ActiveUplinks, []string{"vmnic1"}) || !reflect.DeepEqual(*policy.StandbyUplinks, []string{"vmnic0"}) {
+		t.Fatalf("port-group uplink order not retained: %+v", policy)
+	}
+	if hostTeamingPolicy(nil) != nil || hostTeamingPolicy(&types.HostNetworkPolicy{}) != nil {
+		t.Fatal("missing teaming must remain unknown")
+	}
+
+	db := libmodel.New(filepath.Join(t.TempDir(), "host-network.db"), &model.Host{})
+	err := db.Open(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close(true) })
+	err = db.Insert(&adapter.model)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Close(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Open(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored := model.Host{Base: model.Base{ID: "host-1"}}
+	err = db.Get(&stored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(stored.Network, adapter.model.Network) {
+		t.Fatalf("network changed after reopening SQLite: got %+v, want %+v", stored.Network, adapter.model.Network)
+	}
+
+	server := storageAPIServer(t, db)
+	wantNetworking := storageJSON(t, &stored.Network)
+	storageCheckAPI(t, server, "hosts", "host-1", func(t *testing.T, got map[string]any) {
+		storageFields(t, got, map[string]any{"networking": wantNetworking})
+	})
+
+	for _, op := range []types.PropertyChangeOp{types.PropertyChangeOpRemove, types.PropertyChangeOpIndirectRemove} {
+		t.Run(string(op), func(t *testing.T) {
+			updated := HostAdapter{model: stored}
+			updated.Apply(types.ObjectUpdate{ChangeSet: []types.PropertyChange{
+				{Name: fVSwitch, Op: op},
+				{Name: fPortGroup, Op: op},
+				{Name: fPNIC, Op: op},
+			}})
+			if len(updated.model.Network.Switches) != 0 || len(updated.model.Network.PortGroups) != 0 || len(updated.model.Network.PNICs) != 0 {
+				t.Fatalf("removed network configuration retained: %+v", updated.model.Network)
+			}
+		})
+	}
+}
+
+func TestDistributedNetworkConfiguration(t *testing.T) {
+	host := types.ManagedObjectReference{Type: Host, Value: "host-1"}
+	policy := &types.VmwareUplinkPortTeamingPolicy{
+		Policy: &types.StringPolicy{Value: "loadbalance_srcid"},
+		UplinkPortOrder: &types.VMwareUplinkPortOrderPolicy{
+			InheritablePolicy: types.InheritablePolicy{Inherited: true},
+			ActiveUplinkPort:  []string{"Uplink 2", "Uplink 1"},
+		},
+	}
+	config := types.VMwareDVSConfigInfo{
+		DVSConfigInfo: types.DVSConfigInfo{
+			DefaultPortConfig: &types.VMwareDVSPortSetting{UplinkTeamingPolicy: policy},
+		},
+		LacpGroupConfig: []types.VMwareDvsLacpGroupConfig{
+			{Name: "lag1", Mode: "active", LoadbalanceAlgorithm: "srcDestIp"},
+		},
+	}
+	adapter := DVSwitchAdapter{model: model.Network{Base: model.Base{ID: "dvs-1", Variant: model.NetDvSwitch}}}
+	adapter.Apply(types.ObjectUpdate{ChangeSet: []types.PropertyChange{
+		{
+			Name: fDVSwitchHost, Op: Assign,
+			Val: types.ArrayOfDistributedVirtualSwitchHostMember{DistributedVirtualSwitchHostMember: []types.DistributedVirtualSwitchHostMember{
+				{Config: types.DistributedVirtualSwitchHostMemberConfigInfo{
+					Host: &host,
+					Backing: &types.DistributedVirtualSwitchHostMemberPnicBacking{
+						PnicSpec: []types.DistributedVirtualSwitchHostMemberPnicSpec{
+							{PnicDevice: "vmnic0", UplinkPortKey: "42", UplinkPortgroupKey: "uplink-group"},
+						},
+					},
+				}},
+			}},
+		},
+		{Name: fDVSwitchConfig, Op: Assign, Val: config},
+	}})
+	wantHosts := []model.DVSHost{{
+		Host: model.Ref{Kind: model.HostKind, ID: "host-1"},
+		PNIC: []string{"vmnic0"},
+		PNICLinks: []model.PNICLink{
+			{Device: "vmnic0", UplinkPortKey: "42", UplinkPortGroupKey: "uplink-group"},
+		},
+	}}
+	if !reflect.DeepEqual(adapter.model.Host, wantHosts) {
+		t.Fatalf("uplink connections: got %+v, want %+v", adapter.model.Host, wantHosts)
+	}
+	teaming := adapter.model.Teaming
+	if teaming.Policy != "loadbalance_srcid" || teaming.Inherited == nil || teaming.PolicyInherited == nil || teaming.UplinkOrderInherited == nil || teaming.ActiveUplinks == nil || teaming.StandbyUplinks == nil {
+		t.Fatalf("distributed teaming not retained: %+v", teaming)
+	}
+	if *teaming.Inherited || *teaming.PolicyInherited || !*teaming.UplinkOrderInherited || !reflect.DeepEqual(*teaming.ActiveUplinks, []string{"Uplink 2", "Uplink 1"}) || *teaming.StandbyUplinks == nil || len(*teaming.StandbyUplinks) != 0 {
+		t.Fatalf("inheritance or uplink order changed: %+v", teaming)
+	}
+	wantLACP := []model.LACPGroup{{Name: "lag1", Mode: "active", LoadBalanceAlgorithm: "srcDestIp"}}
+	if !reflect.DeepEqual(adapter.model.LACP, wantLACP) {
+		t.Fatalf("LACP: got %+v, want %+v", adapter.model.LACP, wantLACP)
+	}
+	portGroup := NetworkAdapter{model: model.Network{Base: model.Base{ID: "dvpg-1", Variant: model.NetDvPortGroup}}}
+	portGroup.Apply(types.ObjectUpdate{ChangeSet: []types.PropertyChange{
+		{Name: fDVSwitchVlan, Op: Assign, Val: types.VMwareDVSPortSetting{
+			UplinkTeamingPolicy: &types.VmwareUplinkPortTeamingPolicy{
+				InheritablePolicy: types.InheritablePolicy{Inherited: true},
+			},
+		}},
+	}})
+	if portGroup.model.Teaming.Inherited == nil || !*portGroup.model.Teaming.Inherited || portGroup.model.Teaming.ActiveUplinks != nil {
+		t.Fatalf("port-group inheritance must preserve unknown uplinks: %+v", portGroup.model.Teaming)
+	}
+
+	db := libmodel.New(filepath.Join(t.TempDir(), "distributed-network.db"), &model.Network{})
+	err := db.Open(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close(true) })
+	for _, network := range []*model.Network{&adapter.model, &portGroup.model} {
+		err = db.Insert(network)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = db.Close(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Open(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server := storageAPIServer(t, db)
+
+	for _, network := range []*model.Network{&adapter.model, &portGroup.model} {
+		stored := model.Network{Base: model.Base{ID: network.ID}}
+		err = db.Get(&stored)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(stored.Teaming, network.Teaming) || !slices.Equal(stored.LACP, network.LACP) {
+			t.Fatalf("network %s policies changed after reopening SQLite: %+v", network.ID, stored)
+		}
+		if len(stored.Host) != len(network.Host) || (len(network.Host) > 0 && !reflect.DeepEqual(stored.Host, network.Host)) {
+			t.Fatalf("network %s host connections changed after reopening SQLite: %+v", network.ID, stored.Host)
+		}
+
+		want := storageJSON(t, map[string]any{
+			"teaming": network.Teaming,
+			"lacp":    network.LACP,
+			"host":    network.Host,
+		})
+		storageCheckAPI(t, server, "networks", network.ID, func(t *testing.T, got map[string]any) {
+			storageFields(t, got, want)
+		})
+	}
+
+	for _, op := range []types.PropertyChangeOp{types.PropertyChangeOpRemove, types.PropertyChangeOpIndirectRemove, Assign} {
+		t.Run(string(op), func(t *testing.T) {
+			updatedSwitch := DVSwitchAdapter{model: adapter.model}
+			updatedSwitch.Apply(types.ObjectUpdate{ChangeSet: []types.PropertyChange{
+				{Name: fDVSwitchConfig, Op: op, Val: types.VMwareDVSConfigInfo{}},
+				{Name: fDVSwitchHost, Op: op, Val: types.ArrayOfDistributedVirtualSwitchHostMember{}},
+			}})
+			if updatedSwitch.model.Teaming != (model.TeamingPolicy{}) || len(updatedSwitch.model.LACP) != 0 || len(updatedSwitch.model.Host) != 0 {
+				t.Fatalf("old distributed configuration retained: %+v", updatedSwitch.model)
+			}
+			updatedGroup := NetworkAdapter{model: portGroup.model}
+			updatedGroup.Apply(types.ObjectUpdate{ChangeSet: []types.PropertyChange{
+				{Name: fDVSwitchVlan, Op: op, Val: types.VMwareDVSPortSetting{}},
+			}})
+			if updatedGroup.model.Teaming != (model.TeamingPolicy{}) {
+				t.Fatalf("old port-group policy retained: %+v", updatedGroup.model.Teaming)
 			}
 		})
 	}
@@ -1583,6 +1834,7 @@ func storageAPIServer(t *testing.T, db libmodel.DB) *gin.Engine {
 	(&web.HostHandler{Handler: handler}).AddRoutes(router)
 	(&web.DatastoreHandler{Handler: handler}).AddRoutes(router)
 	(&web.VMHandler{Handler: handler}).AddRoutes(router)
+	(&web.NetworkHandler{Handler: handler}).AddRoutes(router)
 	return router
 }
 
@@ -1617,8 +1869,14 @@ func storageCheckAPI(t *testing.T, server http.Handler, collection, id string, c
 				t.Fatalf("resource %s missing: %s", id, response.Body.String())
 			}
 			if suffix == "" && collection != "vms" {
-				// Host/datastore lists default to summaries; callers must request detail.
+				// Host, network and datastore lists default to summaries; callers must request detail.
 				storageFields(t, resource, map[string]any{"hbaDiskInfo": nil, "hostScsiDisks": nil, "hostScsiTopology": nil, "hostMultipathInfo": nil, "hostNvmeTopology": nil, "filesystemType": nil, "storageArrays": nil, "storageContainerId": nil})
+				storageFields(t, resource, map[string]any{
+					"networking": nil,
+					"teaming":    nil,
+					"lacp":       nil,
+					"host":       nil,
+				})
 				return
 			}
 			check(t, resource)
