@@ -36,7 +36,7 @@ var (
 	CDIDiskCopy                       libitr.Flag = 0x08
 	VirtV2vDiskCopy                   libitr.Flag = 0x10
 	OpenstackImageMigration           libitr.Flag = 0x20
-	VSphere                           libitr.Flag = 0x40
+	HasDeltaTracking                  libitr.Flag = 0x40
 	RunInspection                     libitr.Flag = 0x80
 	WindowsWaitForGuestReboot         libitr.Flag = 0x100
 	WaitForFinalSnapshotConsolidation libitr.Flag = 0x200

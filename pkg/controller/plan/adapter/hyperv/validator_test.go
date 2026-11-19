@@ -324,6 +324,73 @@ func TestPVCNameTemplate_UsesInventoryVMIdentity(t *testing.T) {
 	}
 }
 
+func TestVMMigrationType_RejectsLegacyVHDForWarm(t *testing.T) {
+	vm := &hyperv.VM{}
+	vm.ID = "vm-1"
+	vm.Disks = []model.Disk{{
+		Base:        model.Base{ID: "disk-0"},
+		WindowsPath: `C:\VMs\disk.vhd`,
+	}}
+	plan := &api.Plan{Spec: api.PlanSpec{Warm: true, Type: api.MigrationWarm}}
+	v := &Validator{
+		Context: &plancontext.Context{
+			Source: plancontext.Source{Inventory: &stubInventory{vms: map[string]*hyperv.VM{"vm-1": vm}}},
+			Plan:   plan,
+		},
+	}
+
+	ok, err := v.VMMigrationType(ref.Ref{ID: "vm-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok {
+		t.Fatal("expected warm migration to reject legacy .vhd disks")
+	}
+}
+
+func TestVMMigrationType_AllowsVHDXForWarm(t *testing.T) {
+	vm := &hyperv.VM{}
+	vm.ID = "vm-1"
+	vm.Disks = []model.Disk{{
+		Base:        model.Base{ID: "disk-0"},
+		WindowsPath: `C:\VMs\disk.vhdx`,
+	}}
+	plan := &api.Plan{Spec: api.PlanSpec{Warm: true, Type: api.MigrationWarm}}
+	v := &Validator{
+		Context: &plancontext.Context{
+			Source: plancontext.Source{Inventory: &stubInventory{vms: map[string]*hyperv.VM{"vm-1": vm}}},
+			Plan:   plan,
+		},
+	}
+
+	ok, err := v.VMMigrationType(ref.Ref{ID: "vm-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected warm migration to allow .vhdx disks")
+	}
+}
+
+func TestIsLegacyVHDPath(t *testing.T) {
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{`C:\disk.vhd`, true},
+		{`C:\disk.avhd`, true},
+		{`C:\disk.vhdx`, false},
+		{`C:\disk.avhdx`, false},
+		{`/hyperv/disk.VHD`, true},
+		{"", false},
+	}
+	for _, tc := range cases {
+		if got := isLegacyVHDPath(tc.path); got != tc.want {
+			t.Errorf("isLegacyVHDPath(%q)=%v want %v", tc.path, got, tc.want)
+		}
+	}
+}
+
 func TestPVCNameTemplate_ValidatesDottedVMName(t *testing.T) {
 	vmID := "vm-dotted"
 	vm := &hyperv.VM{}

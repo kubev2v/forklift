@@ -1632,3 +1632,41 @@ func TestEnrichDiskCapacitySkipsMissingDNSHostName(t *testing.T) {
 		t.Errorf("Capacity should remain 0 when fallback is skipped, got %d", client.vmCache[0].Disks[0].Capacity)
 	}
 }
+
+// EnrichGuestInfo must keep GuestOS from healthy nodes when another node fails,
+// so collectors can persist the partial cache.
+func TestEnrichGuestInfoKeepsPartialSuccess(t *testing.T) {
+	md := &mockDriver{
+		runOnNodeFn: func(_, computerName string) (string, error) {
+			switch computerName {
+			case "node-ok":
+				return `{"vm-ok":{"GuestOS":"Windows Server 2019"}}`, nil
+			case "node-bad":
+				return "", fmt.Errorf("winrm timeout")
+			default:
+				return "", fmt.Errorf("unexpected node %s", computerName)
+			}
+		},
+	}
+	client := &Client{
+		driver:   md,
+		provider: newClusterProvider(),
+		vmCache: []types.VM{
+			{Name: "vm-ok", UUID: "u1", PowerState: "On", OwnerNode: "node-ok"},
+			{Name: "vm-bad", UUID: "u2", PowerState: "On", OwnerNode: "node-bad"},
+		},
+		vmCached: true,
+		Log:      testLogger(),
+	}
+
+	err := client.EnrichGuestInfo()
+	if err == nil {
+		t.Fatal("expected error from failed node")
+	}
+	if client.vmCache[0].GuestOS != "Windows Server 2019" {
+		t.Fatalf("healthy node GuestOS not kept in cache: got %q", client.vmCache[0].GuestOS)
+	}
+	if client.vmCache[1].GuestOS != "" {
+		t.Fatalf("failed node should leave GuestOS empty, got %q", client.vmCache[1].GuestOS)
+	}
+}

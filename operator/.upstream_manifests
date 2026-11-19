@@ -13574,6 +13574,7 @@ rules:
   - ""
   resources:
   - pods
+  - pods/log
   - secrets
   - configmaps
   - services
