@@ -1,0 +1,21 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ virt_validation_controller_name }}
+  namespace: {{ app_namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+      component: virt-validation-controller
+  endpoints:
+  - port: https
+    path: /metrics
+    scheme: https
+    tlsConfig:
+      ca: {}
+      cert: {}
+      insecureSkipVerify: false
+      serverName: {{ virt_validation_controller_service_name }}.{{ app_namespace }}.svc
+  scrapeClass: tls-client-certificate-auth

@@ -1,0 +1,65 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ virt_validation_controller_name }}
+  namespace: {{ app_namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+      component: virt-validation-controller
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+        component: virt-validation-controller
+    spec:
+      serviceAccountName: virt-validation-controller
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: manager
+        image: "{{ virt_validation_controller_image_fqin }}"
+        imagePullPolicy: {{ image_pull_policy }}
+        args:
+        - --validator-image={{ virt_cluster_validate_image_fqin }}
+        - --leader-elect=true
+        - --leader-election-namespace={{ app_namespace }}
+        ports:
+        - name: metrics
+          containerPort: 8443
+        - name: healthz
+          containerPort: 8081
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: healthz
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: healthz
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        volumeMounts:
+        - name: metrics-serving-cert
+          mountPath: /etc/tls/private
+          readOnly: true
+      volumes:
+      - name: metrics-serving-cert
+        secret:
+          secretName: {{ virt_validation_controller_tls_secret_name }}

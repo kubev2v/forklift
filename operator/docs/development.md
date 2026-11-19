@@ -26,6 +26,19 @@ These repos must be **publicly accessible** and you must have enough permissions
 
 The [opdev helper](../tools/forklift-opdev.sh) script automates the process of building, publishing and installing operator development builds. It simplifies the most common tasks that would be otherwise manually done using operator-sdk and rest of tooling needed to build and publish operators for testing purposes.
 
+## VirtualizationValidation controller smoke test
+
+After installing MTV on OpenShift, verify the packaged validation controller:
+
+```bash
+./hack/smoke-vcv-packaging.sh openshift-mtv
+```
+
+The check waits for the controller Deployment, then verifies the CRD, serving
+certificate, ServiceMonitor, RBAC, and scoped NetworkPolicies. It does not run
+a remote-cluster validation; that requires a target-cluster credential Secret
+and a `VirtualizationValidation` resource.
+
 Usage:
 
 ```
