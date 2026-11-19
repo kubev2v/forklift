@@ -1,6 +1,9 @@
-// nutanix-nfs-populator reads a Nutanix VM disk directly from the Prism
-// Element storage container over NFS and writes it into the target volume,
-// bypassing the Prism REST Image Service (and its HTTP 429 rate limiting).
+// nutanix-nfs-populator reads a Nutanix VM disk from the storage container
+// export — mounted read-only by kubelet as an in-tree nfs volume at /source —
+// and writes it into the target volume, bypassing the Prism REST Image Service
+// (and its HTTP 429 rate limiting). The binary itself never speaks NFS; the
+// NFS endpoint (server/export) lives in the pod volume spec built by the
+// populator-controller, not in this process.
 //
 // It is launched by the forklift populator-controller (via the lib-volume
 // populator machinery) with the NutanixNfsVolumePopulator spec rendered as CLI
@@ -12,21 +15,24 @@ package main
 import (
 	"bufio"
 	"flag"
-	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/kubev2v/forklift/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/klog/v2"
 )
 
+// sourceMountPath is where the populator pod mounts the Nutanix storage
+// container export (read-only, attached by kubelet).
+const sourceMountPath = "/source"
+
 type config struct {
 	volumePath string
-	serverIP   string
-	export     string
 	sourcePath string
 	pvcSize    int64
 	crName     string
@@ -40,9 +46,7 @@ var progressRE = regexp.MustCompile(`\(([0-9]+\.?[0-9]*)/100%\)`)
 func main() {
 	cfg := &config{}
 	flag.StringVar(&cfg.volumePath, "volume-path", "", "Path to populate (block device or disk.img)")
-	flag.StringVar(&cfg.serverIP, "server-ip", "", "NFS server IP (Prism Element cluster VIP)")
-	flag.StringVar(&cfg.export, "export", "", "NFS export (storage container name)")
-	flag.StringVar(&cfg.sourcePath, "source-path", "", "Path to the disk file within the export")
+	flag.StringVar(&cfg.sourcePath, "source-path", "", "Path to the disk file within the NFS source mount (mounted at "+sourceMountPath+")")
 	flag.Int64Var(&cfg.pvcSize, "pvc-size", 0, "Size of the source disk (bytes)")
 	flag.StringVar(&cfg.crName, "cr-name", "", "Custom Resource name")
 	flag.StringVar(&cfg.crNS, "cr-namespace", "", "Custom Resource namespace")
@@ -52,8 +56,8 @@ func main() {
 	flag.StringVar(&cfg.secretName, "secret-name", "", "Secret name (unused; NFS is unauthenticated)")
 	flag.Parse()
 
-	if cfg.volumePath == "" || cfg.serverIP == "" || cfg.export == "" || cfg.sourcePath == "" {
-		klog.Fatal("volume-path, server-ip, export and source-path are required")
+	if cfg.volumePath == "" || cfg.sourcePath == "" {
+		klog.Fatal("volume-path and source-path are required")
 	}
 
 	certsDir, err := os.MkdirTemp("", "certsdir")
@@ -73,7 +77,7 @@ func main() {
 		klog.Error("progress gauge not registered: ", err)
 	}
 
-	src := fmt.Sprintf("nfs://%s/%s/%s", cfg.serverIP, cfg.export, cfg.sourcePath)
+	src := filepath.Join(sourceMountPath, cfg.sourcePath)
 	klog.Infof("Copying %s -> %s", src, cfg.volumePath)
 
 	if err := convert(src, cfg.volumePath, cfg.ownerUID, progress); err != nil {
@@ -84,11 +88,18 @@ func main() {
 }
 
 // convert runs qemu-img, streaming its -p progress into the Prometheus gauge.
-// The source is read over NFS via qemu-img's built-in libnfs driver (userspace,
-// unprivileged); the target is written as raw.
+// The source is a local file on the kubelet-mounted NFS export (read-only);
+// the target is written as raw. The source format is probed by qemu-img.
+//
+// Image locking is disabled on the source only: qemu takes an fcntl lock even
+// with -U, and on the NFS mount (which cannot use nolock) that becomes an NLM
+// RPC that can block forever on a hard mount. The source is an immutable
+// catalog-image clone that nothing else locks, so the lock protects nothing.
 func convert(src, dst, ownerUID string, progress *prometheus.GaugeVec) error {
+	// Commas are option separators in --image-opts and must be doubled.
+	srcOpts := "file.driver=file,file.locking=off,file.filename=" + strings.ReplaceAll(src, ",", ",,")
 	// #nosec G204 - args are controller-provided populator spec fields.
-	cmd := exec.Command("qemu-img", "convert", "-p", "-O", "raw", src, dst)
+	cmd := exec.Command("qemu-img", "convert", "-p", "-O", "raw", "--image-opts", srcOpts, dst)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err

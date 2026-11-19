@@ -126,6 +126,12 @@ type populatorResource struct {
 	regexKey           string
 }
 
+// PodVolumeHook returns extra volumes and volume mounts (e.g. a read-only
+// NFS source mount) to attach to the populator pod for a given CR instance.
+// It is called once, when the populator pod is created. A nil hook adds no
+// extra volumes.
+type PodVolumeHook func(u *unstructured.Unstructured) ([]corev1.Volume, []corev1.VolumeMount, error)
+
 type controller struct {
 	populatedFromAnno string
 	kubeClient        kubernetes.Interface
@@ -133,6 +139,7 @@ type controller struct {
 	imageName         string
 	devicePath        string
 	mountPath         string
+	podVolumes        PodVolumeHook
 	pvcLister         corelisters.PersistentVolumeClaimLister
 	pvcSynced         cache.InformerSynced
 	pvLister          corelisters.PersistentVolumeLister
@@ -159,6 +166,7 @@ type controller struct {
 func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, prefix string,
 	gk schema.GroupKind, gvr schema.GroupVersionResource, mountPath, devicePath string,
 	populatorArgs func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error),
+	podVolumes PodVolumeHook,
 	resources *corev1.ResourceRequirements,
 	maxInFlight int,
 ) {
@@ -204,6 +212,7 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		imageName:         imageName,
 		devicePath:        devicePath,
 		mountPath:         mountPath,
+		podVolumes:        podVolumes,
 		populatedFromAnno: prefix + "/" + populatedFromAnnoSuffix,
 		pvcLister:         pvcInformer.Lister(),
 		pvcSynced:         pvcInformer.Informer().HasSynced,
@@ -711,6 +720,19 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 						MountPath: c.mountPath,
 					},
 				}
+			}
+
+			// Extra populator-specific volumes (e.g. the Nutanix NFS source
+			// mount). Applied after the target volume so mounts never collide
+			// with the target PVC mount path.
+			if c.podVolumes != nil {
+				extraVolumes, extraMounts, err := c.podVolumes(crInstance)
+				if err != nil {
+					c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodCreationError, "Failed to build populator pod volumes: %s", err)
+					return err
+				}
+				pod.Spec.Volumes = append(pod.Spec.Volumes, extraVolumes...)
+				con.VolumeMounts = append(con.VolumeMounts, extraMounts...)
 			}
 
 			if waitForFirstConsumer {
