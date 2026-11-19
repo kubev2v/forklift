@@ -1379,18 +1379,14 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			api.LabelNutanixEndpoint: endpoint,
 		}
 
-		volumeMode := core.PersistentVolumeFilesystem
-		if destination.VolumeMode != "" {
-			volumeMode = destination.VolumeMode
-		}
-		accessMode := core.ReadWriteOnce
-		if destination.AccessMode != "" {
-			accessMode = destination.AccessMode
-		}
 		storageClass := destination.StorageClass
+		accessModes, volumeMode, err := utils.GetVolumeAndAccessMode(r.Destination.Client, storageClass)
+		if err != nil {
+			return nil, liberr.Wrap(err, "storageClass", storageClass)
+		}
 
 		capacity := disk.DiskSizeBytes
-		if volumeMode == core.PersistentVolumeFilesystem {
+		if volumeMode != nil && *volumeMode == core.PersistentVolumeFilesystem {
 			capacity, err = utils.CalculateSpaceWithCDIOverhead(
 				r.Destination.Client, storageClass, disk.DiskSizeBytes)
 			if err != nil {
@@ -1406,9 +1402,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				Annotations: pvcAnnotations,
 			},
 			Spec: core.PersistentVolumeClaimSpec{
-				AccessModes:      []core.PersistentVolumeAccessMode{accessMode},
+				AccessModes:      accessModes,
 				StorageClassName: &storageClass,
-				VolumeMode:       &volumeMode,
+				VolumeMode:       volumeMode,
 				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceStorage: *resource.NewQuantity(capacity, resource.BinarySI),
