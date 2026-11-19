@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"testing"
 	"time"
 
@@ -247,13 +248,21 @@ func (w *MutatingHandler) End() {
 // Used for cascade delete event testing.
 type DetailHandler struct {
 	StockEventHandler
+	mu      sync.Mutex
 	deleted []string
 }
 
 func (h *DetailHandler) Deleted(e Event) {
-	h.deleted = append(
-		h.deleted,
-		e.Model.Pk())
+	h.mu.Lock()
+	h.deleted = append(h.deleted, e.Model.Pk())
+	h.mu.Unlock()
+}
+
+func (h *DetailHandler) deletedCount() int {
+	h.mu.Lock()
+	n := len(h.deleted)
+	h.mu.Unlock()
+	return n
 }
 
 func TestDefinition(t *testing.T) {
@@ -511,10 +520,10 @@ func TestCascade(t *testing.T) {
 	// Watches apply deletes asynchronously; allow enough time for CI and slow hosts.
 	const wantDeleted = 40
 	deadline := time.Now().Add(5 * time.Second)
-	for len(handler.deleted) != wantDeleted && time.Now().Before(deadline) {
+	for handler.deletedCount() != wantDeleted && time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
 	}
-	g.Expect(handler.deleted).To(gomega.HaveLen(wantDeleted))
+	g.Expect(handler.deletedCount()).To(gomega.Equal(wantDeleted))
 
 }
 
