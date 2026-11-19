@@ -15,6 +15,7 @@ import (
 	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
+	core "k8s.io/api/core/v1"
 
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
@@ -134,6 +135,12 @@ var _ = Describe("Tag fetching", func() {
 		return &Collector{
 			restClient: restClient,
 			log:        log,
+			secret: &core.Secret{
+				Data: map[string][]byte{
+					"user":     []byte("admin"),
+					"password": []byte("pass"),
+				},
+			},
 		}
 	}
 
@@ -252,6 +259,181 @@ var _ = Describe("Tag fetching", func() {
 			result, err := collector.getVMsWithTags(ctx)
 			Expect(err).To(HaveOccurred())
 			Expect(result).To(BeNil())
+		})
+	})
+
+	Describe("CIS REST session re-auth", func() {
+		const tagID = "urn:vmomi:InventoryServiceTag:tag-0:GLOBAL"
+
+		writeTagAssociation := func(w http.ResponseWriter) {
+			type attachedObj struct {
+				Type  string `json:"type"`
+				Value string `json:"id"`
+			}
+			type result struct {
+				TagID     string        `json:"tag_id"`
+				ObjectIDs []attachedObj `json:"object_ids"`
+			}
+			_ = json.NewEncoder(w).Encode(map[string][]result{
+				"value": {{
+					TagID: tagID,
+					ObjectIDs: []attachedObj{
+						{Type: "VirtualMachine", Value: "vm-1"},
+					},
+				}},
+			})
+		}
+
+		writeTag := func(w http.ResponseWriter) {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"value": map[string]interface{}{
+					"id":          tagID,
+					"name":        "name-" + tagID,
+					"description": "desc",
+					"category_id": "urn:vmomi:InventoryServiceCategory:cat-1:GLOBAL",
+					"used_by":     []string{},
+				},
+			})
+		}
+
+		It("re-authenticates and retries when ListTags returns 401", func() {
+			var listTagsHits int32
+			var loginHits int32
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.URL.Path == "/rest/com/vmware/cis/session":
+					if r.Method == http.MethodDelete {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					atomic.AddInt32(&loginHits, 1)
+					_ = json.NewEncoder(w).Encode(map[string]string{"value": fmt.Sprintf("session-%d", loginHits)})
+				case r.URL.Path == "/rest/com/vmware/cis/tagging/tag" && r.Method == http.MethodGet:
+					if atomic.AddInt32(&listTagsHits, 1) == 1 {
+						http.Error(w, "unauthorized", http.StatusUnauthorized)
+						return
+					}
+					_ = json.NewEncoder(w).Encode(map[string][]string{"value": {tagID}})
+				case r.URL.Path == "/rest/com/vmware/cis/tagging/tag-association":
+					writeTagAssociation(w)
+				case r.URL.Path == "/rest/com/vmware/cis/tagging/tag/id:"+tagID:
+					writeTag(w)
+				default:
+					http.NotFound(w, r)
+				}
+			})
+			srv := httptest.NewServer(handler)
+			srv.Config.SetKeepAlivesEnabled(false)
+			server = srv
+			collector = createCollector(server.URL)
+
+			result, err := collector.getVMsWithTags(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(HaveKey("vm-1"))
+			Expect(atomic.LoadInt32(&listTagsHits)).To(Equal(int32(2)))
+			// Initial Login in createCollector + re-auth Login after 401.
+			Expect(atomic.LoadInt32(&loginHits)).To(Equal(int32(2)))
+		})
+
+		It("re-authenticates and retries when ListAttachedObjectsOnTags returns 401", func() {
+			var assocHits int32
+			var loginHits int32
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.URL.Path == "/rest/com/vmware/cis/session":
+					if r.Method == http.MethodDelete {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					atomic.AddInt32(&loginHits, 1)
+					_ = json.NewEncoder(w).Encode(map[string]string{"value": fmt.Sprintf("session-%d", loginHits)})
+				case r.URL.Path == "/rest/com/vmware/cis/tagging/tag" && r.Method == http.MethodGet:
+					_ = json.NewEncoder(w).Encode(map[string][]string{"value": {tagID}})
+				case r.URL.Path == "/rest/com/vmware/cis/tagging/tag-association":
+					if atomic.AddInt32(&assocHits, 1) == 1 {
+						http.Error(w, "unauthorized", http.StatusUnauthorized)
+						return
+					}
+					writeTagAssociation(w)
+				case r.URL.Path == "/rest/com/vmware/cis/tagging/tag/id:"+tagID:
+					writeTag(w)
+				default:
+					http.NotFound(w, r)
+				}
+			})
+			srv := httptest.NewServer(handler)
+			srv.Config.SetKeepAlivesEnabled(false)
+			server = srv
+			collector = createCollector(server.URL)
+
+			result, err := collector.getVMsWithTags(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(HaveKey("vm-1"))
+			Expect(atomic.LoadInt32(&assocHits)).To(Equal(int32(2)))
+			Expect(atomic.LoadInt32(&loginHits)).To(Equal(int32(2)))
+		})
+
+		It("returns error when re-auth Login fails after 401", func() {
+			var loginHits int32
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.URL.Path == "/rest/com/vmware/cis/session":
+					if r.Method == http.MethodDelete {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					if atomic.AddInt32(&loginHits, 1) == 1 {
+						_ = json.NewEncoder(w).Encode(map[string]string{"value": "session-1"})
+						return
+					}
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+				case r.URL.Path == "/rest/com/vmware/cis/tagging/tag" && r.Method == http.MethodGet:
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+				default:
+					http.NotFound(w, r)
+				}
+			})
+			srv := httptest.NewServer(handler)
+			srv.Config.SetKeepAlivesEnabled(false)
+			server = srv
+			collector = createCollector(server.URL)
+
+			result, err := collector.getVMsWithTags(ctx)
+			Expect(err).To(HaveOccurred())
+			Expect(result).To(BeNil())
+			Expect(atomic.LoadInt32(&loginHits)).To(Equal(int32(2)))
+		})
+
+		It("does not re-authenticate on non-401 errors", func() {
+			var listTagsHits int32
+			var loginHits int32
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.URL.Path == "/rest/com/vmware/cis/session":
+					if r.Method == http.MethodDelete {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					atomic.AddInt32(&loginHits, 1)
+					_ = json.NewEncoder(w).Encode(map[string]string{"value": fmt.Sprintf("session-%d", loginHits)})
+				case r.URL.Path == "/rest/com/vmware/cis/tagging/tag" && r.Method == http.MethodGet:
+					atomic.AddInt32(&listTagsHits, 1)
+					http.Error(w, "internal server error", http.StatusInternalServerError)
+				default:
+					http.NotFound(w, r)
+				}
+			})
+			srv := httptest.NewServer(handler)
+			srv.Config.SetKeepAlivesEnabled(false)
+			server = srv
+			collector = createCollector(server.URL)
+
+			result, err := collector.getVMsWithTags(ctx)
+			Expect(err).To(HaveOccurred())
+			Expect(result).To(BeNil())
+			Expect(atomic.LoadInt32(&listTagsHits)).To(Equal(int32(1)))
+			// Only the initial Login from createCollector — no re-auth.
+			Expect(atomic.LoadInt32(&loginHits)).To(Equal(int32(1)))
 		})
 	})
 
