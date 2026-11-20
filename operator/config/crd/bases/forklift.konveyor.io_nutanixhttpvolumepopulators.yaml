@@ -58,6 +58,8 @@ spec:
                 description: |-
                   URL is the HTTP(S) download endpoint for the catalog image
                   (Prism Element v3 /file, or a resolved Prism Central entity_download URL).
+                minLength: 1
+                pattern: ^https?://
                 type: string
             required:
             - diskSizeBytes

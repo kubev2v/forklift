@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +18,13 @@ import (
 	coordinationclientv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+)
+
+const (
+	defaultLeaseDuration = 30 * time.Second
+	leaseRenewInterval   = 3 * time.Second
+	minLeaseDuration     = leaseRenewInterval + 2*time.Second
+	leaseCleanupBound    = 10 * time.Second
 )
 
 // downloadLeaseLocker limits concurrent Nutanix HTTP downloads with the same
@@ -36,9 +45,16 @@ func newDownloadLeaseLocker(slots int, namespace string, leaseDurationSec int) (
 	if namespace == "" {
 		namespace = "openshift-mtv"
 	}
-	duration := 30 * time.Second
+	duration := defaultLeaseDuration
 	if leaseDurationSec > 0 {
+		if leaseDurationSec > math.MaxInt32 {
+			return nil, fmt.Errorf("lease-duration-seconds %d exceeds int32 range", leaseDurationSec)
+		}
 		duration = time.Duration(leaseDurationSec) * time.Second
+		if duration < minLeaseDuration {
+			return nil, fmt.Errorf("lease-duration-seconds %d is below minimum %d",
+				leaseDurationSec, int(minLeaseDuration.Seconds()))
+		}
 	}
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
@@ -53,7 +69,7 @@ func newDownloadLeaseLocker(slots int, namespace string, leaseDurationSec int) (
 		clientset:            cs,
 		leaseDuration:        duration,
 		retryInterval:        10 * time.Second,
-		renewInterval:        3 * time.Second,
+		renewInterval:        leaseRenewInterval,
 		maxConcurrentHolders: slots,
 	}, nil
 }
@@ -83,13 +99,13 @@ func (h *downloadLeaseLocker) withLock(ctx context.Context, leaseKey string, wor
 			return fmt.Errorf("context canceled while waiting for download lease: %w", ctx.Err())
 		}
 		for slot := 0; slot < h.maxConcurrentHolders; slot++ {
-			acquired, err := h.tryAcquireSlot(ctx, leaseClient, holder, leaseKey, slot)
+			lease, ok, err := h.tryAcquireSlot(ctx, leaseClient, holder, leaseKey, slot)
 			if err != nil {
 				return err
 			}
-			if acquired != nil {
+			if ok {
 				log.Info("download lease acquired", "slot", slot, "key", leaseKey)
-				return h.execute(ctx, leaseClient, acquired, leaseKey, slot, work)
+				return h.execute(ctx, leaseClient, lease, leaseKey, slot, work)
 			}
 		}
 		log.Info("all download lease slots taken, waiting", "slots", h.maxConcurrentHolders, "key", leaseKey)
@@ -102,17 +118,17 @@ func (h *downloadLeaseLocker) withLock(ctx context.Context, leaseKey string, wor
 }
 
 // tryAcquireSlot attempts to Create or take over one lease slot.
-// acquired is nil when the slot is held by someone else.
+// ok is false when the slot is held by someone else.
 func (h *downloadLeaseLocker) tryAcquireSlot(
 	ctx context.Context,
 	leaseClient coordinationclientv1.LeaseInterface,
 	holder, leaseKey string,
 	slot int,
-) (acquired *coordinationv1.Lease, err error) {
+) (lease *coordinationv1.Lease, ok bool, err error) {
 	leaseDurationSec := int32(h.leaseDuration.Seconds())
 	leaseName := fmt.Sprintf("nutanix-http-%s-slot-%d", leaseKey, slot)
 	now := metav1.NewMicroTime(time.Now())
-	lease := &coordinationv1.Lease{
+	lease = &coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      leaseName,
 			Namespace: h.namespace,
@@ -126,22 +142,22 @@ func (h *downloadLeaseLocker) tryAcquireSlot(
 	}
 	created, err := leaseClient.Create(ctx, lease, metav1.CreateOptions{})
 	if err == nil {
-		return created, nil
+		return created, true, nil
 	}
 	if !apierrors.IsAlreadyExists(err) {
-		return nil, fmt.Errorf("create lease %s: %w", leaseName, err)
+		return nil, false, fmt.Errorf("create lease %s: %w", leaseName, err)
 	}
 	existing, getErr := leaseClient.Get(ctx, leaseName, metav1.GetOptions{})
 	if getErr != nil {
 		// Lost the race with a delete; try the next slot (or the
 		// outer retry) instead of tight-looping on this index.
 		if apierrors.IsNotFound(getErr) {
-			return nil, nil
+			return nil, false, nil
 		}
-		return nil, fmt.Errorf("get lease %s: %w", leaseName, getErr)
+		return nil, false, fmt.Errorf("get lease %s: %w", leaseName, getErr)
 	}
 	if !h.expired(existing) {
-		return nil, nil
+		return nil, false, nil
 	}
 	existing.Spec.HolderIdentity = &holder
 	now = metav1.NewMicroTime(time.Now())
@@ -149,9 +165,12 @@ func (h *downloadLeaseLocker) tryAcquireSlot(
 	existing.Spec.RenewTime = &now
 	updated, updateErr := leaseClient.Update(ctx, existing, metav1.UpdateOptions{})
 	if updateErr != nil {
-		return nil, nil
+		if apierrors.IsConflict(updateErr) || apierrors.IsNotFound(updateErr) {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("take over lease %s: %w", leaseName, updateErr)
 	}
-	return updated, nil
+	return updated, true, nil
 }
 
 func (h *downloadLeaseLocker) expired(lease *coordinationv1.Lease) bool {
@@ -177,7 +196,10 @@ func (h *downloadLeaseLocker) execute(
 
 	workDone := make(chan struct{})
 	renewalErrors := make(chan error, 1)
+	var renewWG sync.WaitGroup
+	renewWG.Add(1)
 	go func() {
+		defer renewWG.Done()
 		ticker := time.NewTicker(h.renewInterval)
 		defer ticker.Stop()
 		for {
@@ -206,6 +228,7 @@ func (h *downloadLeaseLocker) execute(
 	workErr := work(workCtx)
 	close(workDone)
 	renewCancel()
+	renewWG.Wait()
 	select {
 	case renewErr := <-renewalErrors:
 		if workErr == nil {
@@ -217,9 +240,16 @@ func (h *downloadLeaseLocker) execute(
 	default:
 	}
 	// Delete so the next waiter can Create immediately instead of waiting
-	// for LeaseDurationSeconds (~30s) after we stop renewing.
-	// Use WithoutCancel so release still runs if the work context was canceled.
-	if delErr := leaseClient.Delete(context.WithoutCancel(ctx), lease.Name, metav1.DeleteOptions{}); delErr != nil && !apierrors.IsNotFound(delErr) {
+	// for LeaseDurationSeconds after we stop renewing. Preconditions avoid
+	// deleting a slot another worker has taken over.
+	uid := lease.UID
+	rv := lease.ResourceVersion
+	deleteCtx, deleteCancel := context.WithTimeout(context.WithoutCancel(ctx), leaseCleanupBound)
+	defer deleteCancel()
+	delErr := leaseClient.Delete(deleteCtx, lease.Name, metav1.DeleteOptions{
+		Preconditions: &metav1.Preconditions{UID: &uid, ResourceVersion: &rv},
+	})
+	if delErr != nil && !apierrors.IsNotFound(delErr) && !apierrors.IsConflict(delErr) {
 		log.Error(delErr, "failed to delete download lease", "slot", slot, "key", leaseKey)
 	}
 	log.Info("download lease released", "slot", slot, "key", leaseKey)

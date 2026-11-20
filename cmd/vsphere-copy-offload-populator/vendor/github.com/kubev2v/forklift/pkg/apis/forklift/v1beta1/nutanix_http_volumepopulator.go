@@ -26,6 +26,8 @@ type NutanixHTTPVolumePopulator struct {
 type NutanixHTTPVolumePopulatorSpec struct {
 	// URL is the HTTP(S) download endpoint for the catalog image
 	// (Prism Element v3 /file, or a resolved Prism Central entity_download URL).
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^https?://`
 	URL string `json:"url"`
 	// SecretName references credentials and TLS material for the download.
 	// Prism Element uses Basic Auth (user/password); Prism Central uses a

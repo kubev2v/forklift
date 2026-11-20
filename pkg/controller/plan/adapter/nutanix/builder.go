@@ -23,6 +23,7 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	libutil "github.com/kubev2v/forklift/pkg/lib/util"
+	"github.com/kubev2v/forklift/pkg/settings"
 	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	core "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -1341,7 +1342,11 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 	baseURL := strings.TrimRight(r.Source.Provider.Spec.URL, "/")
 	namespace := r.Plan.Spec.TargetNamespace
-	if err = r.ensureHTTPPopulatorLeaseRBAC(namespace); err != nil {
+	saName := annotations[populator_machinery.AnnPopulatorServiceAccount]
+	if saName == "" {
+		saName = populatorServiceAccount
+	}
+	if err = r.ensureHTTPPopulatorLeaseRBAC(namespace, saName); err != nil {
 		return nil, err
 	}
 	diskIndex := 0
@@ -1368,7 +1373,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		}
 		pvcAnnotations[planbase.AnnDiskSource] = disk.UUID
 		pvcAnnotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
-		pvcAnnotations[populator_machinery.AnnPopulatorServiceAccount] = populatorServiceAccount
+		if pvcAnnotations[populator_machinery.AnnPopulatorServiceAccount] == "" {
+			pvcAnnotations[populator_machinery.AnnPopulatorServiceAccount] = saName
+		}
 
 		sum := sha256.Sum256([]byte(fmt.Sprintf("%s-%s-%s", r.Migration.UID, vmRef.ID, disk.UUID)))
 		name := fmt.Sprintf("nhvp-%x", sum[:12])
@@ -1385,7 +1392,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		}
 
 		storageClass := destination.StorageClass
-		accessModes, volumeMode, err := utils.GetVolumeAndAccessMode(r.Destination.Client, storageClass)
+		accessModes, volumeMode, err := utils.GetVolumeAndAccessMode(r.Destination.Client, destination)
 		if err != nil {
 			return nil, liberr.Wrap(err, "storageClass", storageClass)
 		}
@@ -1473,13 +1480,37 @@ func (r *Builder) resolveHTTPPopulatorSource(
 		return "", "", err
 	}
 	secret, err := r.ensureHTTPPopulatorCookieSecret(vmRef, diskUUID, cookie, map[string]string{
-		"migration": string(r.Migration.UID),
-		"vmID":      vmRef.ID,
+		"migration":      string(r.Migration.UID),
+		"plan":           string(r.Plan.GetUID()),
+		"plan-name":      r.Plan.Name,
+		"plan-namespace": r.Plan.Namespace,
+		"vm":             vmRef.ID,
+		"vmID":           vmRef.ID,
+		"resource":       "vm-config",
 	})
 	if err != nil {
 		return "", "", err
 	}
 	return downloadURL, secret.Name, nil
+}
+
+// httpPopulatorCookieData builds EnvFrom data for the HTTP populator: Cookie
+// plus Basic Auth / TLS material from the provider secret for PE v3 /file fallback.
+func httpPopulatorCookieData(provider *core.Secret, cookie string) map[string][]byte {
+	data := map[string][]byte{"Cookie": []byte(cookie)}
+	if user, ok := provider.Data["user"]; ok {
+		data["user"] = user
+	}
+	if password, ok := provider.Data["password"]; ok {
+		data["password"] = password
+	}
+	if ca, ok := libutil.GetCACert(provider); ok {
+		data["ca.crt"] = ca
+	}
+	if insecure, ok := provider.Data["insecureSkipVerify"]; ok {
+		data["insecureSkipVerify"] = insecure
+	}
+	return data
 }
 
 // ensureHTTPPopulatorCookieSecret creates/updates the per-disk Secret the
@@ -1497,24 +1528,7 @@ func (r *Builder) ensureHTTPPopulatorCookieSecret(
 	for k, v := range labels {
 		secretLabels[k] = v
 	}
-
-	data := map[string][]byte{
-		"Cookie": []byte(cookie),
-	}
-	// Basic Auth credentials for in-populator fallback to PE v3 /file when
-	// entity_download is unusable (cookie auth does not work on that path).
-	if user, ok := r.Source.Secret.Data["user"]; ok {
-		data["user"] = user
-	}
-	if password, ok := r.Source.Secret.Data["password"]; ok {
-		data["password"] = password
-	}
-	if ca, ok := libutil.GetCACert(r.Source.Secret); ok {
-		data["ca.crt"] = ca
-	}
-	if insecure, ok := r.Source.Secret.Data["insecureSkipVerify"]; ok {
-		data["insecureSkipVerify"] = insecure
-	}
+	data := httpPopulatorCookieData(r.Source.Secret, cookie)
 
 	selector := map[string]string{
 		labelHTTPPopulatorCookie: "true",
@@ -1540,6 +1554,12 @@ func (r *Builder) ensureHTTPPopulatorCookieSecret(
 		secret := &list.Items[0]
 		secret.Data = data
 		secret.StringData = nil
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+		for k, v := range secretLabels {
+			secret.Labels[k] = v
+		}
 		if err = r.Destination.Update(context.TODO(), secret); err != nil {
 			return nil, liberr.Wrap(err, "secret", secret.Name, "disk", diskUUID)
 		}
@@ -1565,31 +1585,47 @@ func (r *Builder) ensureHTTPPopulatorCookieSecret(
 	return secret, nil
 }
 
+func populatorLeaseRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{{
+		APIGroups: []string{"coordination.k8s.io"},
+		Resources: []string{"leases"},
+		Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+	}}
+}
+
+func ensureRoleBindingSubject(binding *rbacv1.RoleBinding, subject rbacv1.Subject) {
+	for _, s := range binding.Subjects {
+		if s.Kind == subject.Kind && s.Name == subject.Name && s.Namespace == subject.Namespace {
+			return
+		}
+	}
+	binding.Subjects = append(binding.Subjects, subject)
+}
+
 // ensureHTTPPopulatorLeaseRBAC creates the populator ServiceAccount and lease
 // Role/RoleBinding used by nutanix-http-populator pods (same pattern as xcopy).
-func (r *Builder) ensureHTTPPopulatorLeaseRBAC(namespace string) error {
+func (r *Builder) ensureHTTPPopulatorLeaseRBAC(namespace, saName string) error {
+	if saName == "" {
+		saName = populatorServiceAccount
+	}
 	sa := &core.ServiceAccount{
-		ObjectMeta: meta.ObjectMeta{Name: populatorServiceAccount, Namespace: namespace},
+		ObjectMeta: meta.ObjectMeta{Name: saName, Namespace: namespace},
 	}
 	if err := r.Destination.Create(context.TODO(), sa, &client.CreateOptions{}); err != nil && !k8serr.IsAlreadyExists(err) {
-		return liberr.Wrap(err, "serviceAccount", populatorServiceAccount)
+		return liberr.Wrap(err, "serviceAccount", saName)
 	}
 
-	leaseNS := "openshift-mtv"
+	leaseNS := settings.Settings.HostLeaseNamespace
+	if leaseNS == "" {
+		leaseNS = "openshift-mtv"
+	}
+	rules := populatorLeaseRules()
 	role := &rbacv1.Role{
 		ObjectMeta: meta.ObjectMeta{Name: populatorLeaseRoleName, Namespace: leaseNS},
-		Rules: []rbacv1.PolicyRule{{
-			APIGroups: []string{"coordination.k8s.io"},
-			Resources: []string{"leases"},
-			Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
-		}},
+		Rules:      rules,
 	}
 	if _, err := controllerutil.CreateOrPatch(context.TODO(), r.Destination.Client, role, func() error {
-		role.Rules = []rbacv1.PolicyRule{{
-			APIGroups: []string{"coordination.k8s.io"},
-			Resources: []string{"leases"},
-			Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
-		}}
+		role.Rules = rules
 		return nil
 	}); err != nil {
 		return liberr.Wrap(err, "role", populatorLeaseRoleName)
@@ -1600,7 +1636,7 @@ func (r *Builder) ensureHTTPPopulatorLeaseRBAC(namespace string) error {
 	}
 	subject := rbacv1.Subject{
 		Kind:      "ServiceAccount",
-		Name:      populatorServiceAccount,
+		Name:      saName,
 		Namespace: namespace,
 	}
 	if _, err := controllerutil.CreateOrPatch(context.TODO(), r.Destination.Client, binding, func() error {
@@ -1609,16 +1645,7 @@ func (r *Builder) ensureHTTPPopulatorLeaseRBAC(namespace string) error {
 			Name:     populatorLeaseRoleName,
 			APIGroup: "rbac.authorization.k8s.io",
 		}
-		found := false
-		for _, s := range binding.Subjects {
-			if s.Kind == subject.Kind && s.Name == subject.Name && s.Namespace == subject.Namespace {
-				found = true
-				break
-			}
-		}
-		if !found {
-			binding.Subjects = append(binding.Subjects, subject)
-		}
+		ensureRoleBindingSubject(binding, subject)
 		return nil
 	}); err != nil {
 		return liberr.Wrap(err, "roleBinding", populatorLeaseRoleName+"-binding")

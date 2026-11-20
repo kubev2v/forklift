@@ -200,7 +200,11 @@ func getNutanixHTTPPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured,
 		args = append(args, "--lease-namespace="+ns)
 	}
 	if dur := os.Getenv("HOST_LEASE_DURATION_SECONDS"); dur != "" {
-		args = append(args, fmt.Sprintf("--lease-duration-seconds=%s", dur))
+		seconds, err := strconv.Atoi(dur)
+		if err != nil || seconds < 5 || seconds > 2147483647 {
+			return nil, fmt.Errorf("invalid HOST_LEASE_DURATION_SECONDS %q: want integer seconds in [5, 2147483647]", dur)
+		}
+		args = append(args, fmt.Sprintf("--lease-duration-seconds=%d", seconds))
 	}
 	return args, nil
 }

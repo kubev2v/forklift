@@ -41,23 +41,36 @@ func (r *DestinationClient) SetPopulatorCrOwnership() error {
 	if err != nil {
 		return err
 	}
+	var firstErr error
 	for i := range list.Items {
 		populatorCr := &list.Items[i]
 		pvc := &core.PersistentVolumeClaim{}
-		if r.Destination.Get(context.TODO(), client.ObjectKey{
+		err := r.Destination.Get(context.TODO(), client.ObjectKey{
 			Namespace: populatorCr.Namespace,
 			Name:      populatorCr.Name,
-		}, pvc) != nil {
+		}, pvc)
+		if err != nil {
+			if k8serr.IsNotFound(err) {
+				continue
+			}
+			if firstErr == nil {
+				firstErr = liberr.Wrap(err, "populator", populatorCr.Name)
+			}
 			continue
 		}
 		populatorCrCopy := populatorCr.DeepCopy()
-		if k8sutil.SetOwnerReference(pvc, populatorCr, r.Scheme()) != nil {
+		if err := k8sutil.SetOwnerReference(pvc, populatorCr, r.Scheme()); err != nil {
+			if firstErr == nil {
+				firstErr = liberr.Wrap(err, "populator", populatorCr.Name)
+			}
 			continue
 		}
 		patch := client.MergeFrom(populatorCrCopy)
-		_ = r.Destination.Patch(context.TODO(), populatorCr, patch)
+		if err := r.Destination.Patch(context.TODO(), populatorCr, patch); err != nil && firstErr == nil {
+			firstErr = liberr.Wrap(err, "populator", populatorCr.Name)
+		}
 	}
-	return nil
+	return firstErr
 }
 
 func (r *DestinationClient) getHTTPPopulatorCrList(vmID string) (v1beta1.NutanixHTTPVolumePopulatorList, error) {

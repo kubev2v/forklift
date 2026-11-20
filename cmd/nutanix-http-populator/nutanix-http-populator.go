@@ -32,9 +32,11 @@ import (
 )
 
 const (
-	maxDownloadAttempts      = 8
-	downloadRetryBase        = 2 * time.Second
-	entityDownloadPathPrefix = "/entity_download/"
+	maxDownloadAttempts       = 8
+	downloadRetryBase         = 2 * time.Second
+	entityDownloadPathPrefix  = "/entity_download/"
+	httpDialTimeout           = 30 * time.Second
+	httpResponseHeaderTimeout = 60 * time.Second
 )
 
 type config struct {
@@ -162,15 +164,22 @@ func downloadRetries(ctx context.Context, cfg *config, progress *prometheus.Gaug
 	return fmt.Errorf("download failed after %d attempts: %w", maxDownloadAttempts, lastErr)
 }
 
-func applyDownloadAuth(req *http.Request, forceBasic bool) {
+func applyDownloadAuth(req *http.Request, forceBasic bool) error {
+	if req.URL == nil || !strings.EqualFold(req.URL.Scheme, "https") {
+		scheme := ""
+		if req.URL != nil {
+			scheme = req.URL.Scheme
+		}
+		return fmt.Errorf("refusing to send Prism credentials over %q (HTTPS required)", scheme)
+	}
 	if !forceBasic {
 		if cookie := os.Getenv("Cookie"); cookie != "" {
 			req.Header.Set("Cookie", cookie)
-			return
+			return nil
 		}
 		if header := os.Getenv("cookie"); strings.HasPrefix(header, "Cookie: ") {
 			req.Header.Set("Cookie", strings.TrimPrefix(header, "Cookie: "))
-			return
+			return nil
 		}
 	}
 	user := os.Getenv("user")
@@ -178,20 +187,38 @@ func applyDownloadAuth(req *http.Request, forceBasic bool) {
 	if user != "" || password != "" {
 		req.SetBasicAuth(user, password)
 	}
+	return nil
 }
 
-func downloadOnce(ctx context.Context, cfg *config, progress *prometheus.GaugeVec, url string, forceBasic bool, attempt int) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func downloadOnce(ctx context.Context, cfg *config, progress *prometheus.GaugeVec, rawURL string, forceBasic bool, attempt int) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return err
 	}
-	applyDownloadAuth(req, forceBasic)
+	if err := applyDownloadAuth(req, forceBasic); err != nil {
+		return err
+	}
 
 	client := &http.Client{
 		Timeout: 0,
 		Transport: &http.Transport{
-			TLSClientConfig: tlsConfigFromEnv(),
-			Proxy:           http.ProxyFromEnvironment,
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   httpDialTimeout,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSClientConfig:       tlsConfigFromEnv(),
+			TLSHandshakeTimeout:   httpDialTimeout,
+			ResponseHeaderTimeout: httpResponseHeaderTimeout,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return errors.New("stopped after 10 redirects")
+			}
+			if req.URL == nil || !strings.EqualFold(req.URL.Scheme, "https") {
+				return fmt.Errorf("refusing redirect to non-HTTPS URL")
+			}
+			return nil
 		},
 	}
 
@@ -223,6 +250,9 @@ func downloadOnce(ctx context.Context, cfg *config, progress *prometheus.GaugeVe
 	read, err := copyBodyToVolume(ctx, cfg, progress, resp.Body, file, start)
 	if err != nil {
 		return err
+	}
+	if read == 0 {
+		return fmt.Errorf("download returned empty body")
 	}
 	klog.Infof("Download complete: %d bytes in %v", read, time.Since(start).Round(time.Millisecond))
 	return nil

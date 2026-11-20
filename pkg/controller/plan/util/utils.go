@@ -107,29 +107,48 @@ func CalculateSpaceWithCDIOverhead(client k8sclient.Client, storageClassName str
 	return inflated, nil
 }
 
-// GetVolumeAndAccessMode returns the AccessModes and VolumeMode from the CDI
-// StorageProfile for storageClassName (first ClaimPropertySet). VolumeMode
-// defaults to Filesystem when the profile omits it. Used by volume populators
-// that create PVCs directly (CDI would otherwise apply this for DataVolumes).
-func GetVolumeAndAccessMode(client k8sclient.Client, storageClassName string) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
+// GetVolumeAndAccessMode prefers explicit storage-map AccessMode/VolumeMode,
+// filling any unspecified mode from the CDI StorageProfile (first
+// ClaimPropertySet; VolumeMode defaults to Filesystem). Used by volume
+// populators that create PVCs directly (CDI would otherwise apply this for
+// DataVolumes). Skips the StorageProfile lookup when both modes are set.
+func GetVolumeAndAccessMode(
+	client k8sclient.Client,
+	destination api.DestinationStorage,
+) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
+	var accessModes []core.PersistentVolumeAccessMode
+	var volumeMode *core.PersistentVolumeMode
+	if destination.AccessMode != "" {
+		accessModes = []core.PersistentVolumeAccessMode{destination.AccessMode}
+	}
+	if destination.VolumeMode != "" {
+		volumeMode = &destination.VolumeMode
+	}
+	if len(accessModes) > 0 && volumeMode != nil {
+		return accessModes, volumeMode, nil
+	}
+
 	filesystemMode := core.PersistentVolumeFilesystem
 	storageProfile := &cdi.StorageProfile{}
-	err := client.Get(context.TODO(), k8sclient.ObjectKey{Name: storageClassName}, storageProfile)
+	err := client.Get(context.TODO(), k8sclient.ObjectKey{Name: destination.StorageClass}, storageProfile)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if len(storageProfile.Status.ClaimPropertySets) > 0 &&
-		len(storageProfile.Status.ClaimPropertySets[0].AccessModes) > 0 {
-		accessModes := storageProfile.Status.ClaimPropertySets[0].AccessModes
-		volumeMode := storageProfile.Status.ClaimPropertySets[0].VolumeMode
+	if len(storageProfile.Status.ClaimPropertySets) == 0 ||
+		len(storageProfile.Status.ClaimPropertySets[0].AccessModes) == 0 {
+		return nil, nil, fmt.Errorf("no accessMode defined on StorageProfile for StorageClass %q", destination.StorageClass)
+	}
+	if len(accessModes) == 0 {
+		accessModes = storageProfile.Status.ClaimPropertySets[0].AccessModes
+	}
+	if volumeMode == nil {
+		volumeMode = storageProfile.Status.ClaimPropertySets[0].VolumeMode
 		if volumeMode == nil {
 			volumeMode = &filesystemMode
 		}
-		return accessModes, volumeMode, nil
 	}
-
-	return nil, nil, fmt.Errorf("no accessMode defined on StorageProfile for StorageClass %q", storageClassName)
+	return accessModes, volumeMode, nil
 }
 
 func GetBootDiskNumber(deviceString string) int {
