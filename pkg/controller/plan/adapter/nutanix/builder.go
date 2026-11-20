@@ -1350,6 +1350,17 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		return nil, err
 	}
 	diskIndex := 0
+	endpoint := api.NutanixEndpointCentral
+	if element {
+		endpoint = api.NutanixEndpointElement
+	}
+	labels := map[string]string{
+		"migration":              string(r.Migration.UID),
+		"plan":                   string(r.Plan.GetUID()),
+		"vmID":                   vmRef.ID,
+		api.LabelSourceHost:      leaseKey,
+		api.LabelNutanixEndpoint: endpoint,
+	}
 	for _, disk := range dataDisks(vm) {
 		destination, mapped := storageMap[disk.StorageContainerUUID]
 		if !mapped {
@@ -1379,17 +1390,6 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 		sum := sha256.Sum256([]byte(fmt.Sprintf("%s-%s-%s", r.Migration.UID, vmRef.ID, disk.UUID)))
 		name := fmt.Sprintf("nhvp-%x", sum[:12])
-		endpoint := api.NutanixEndpointCentral
-		if element {
-			endpoint = api.NutanixEndpointElement
-		}
-		labels := map[string]string{
-			"migration":              string(r.Migration.UID),
-			"plan":                   string(r.Plan.GetUID()),
-			"vmID":                   vmRef.ID,
-			api.LabelSourceHost:      leaseKey,
-			api.LabelNutanixEndpoint: endpoint,
-		}
 
 		storageClass := destination.StorageClass
 		accessModes, volumeMode, err := utils.GetVolumeAndAccessMode(r.Destination.Client, destination)
