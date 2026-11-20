@@ -99,7 +99,7 @@ func convert(src, dst, ownerUID string, progress *prometheus.GaugeVec) error {
 	// Commas are option separators in --image-opts and must be doubled.
 	srcOpts := "file.driver=file,file.locking=off,file.filename=" + strings.ReplaceAll(src, ",", ",,")
 	// #nosec G204 - args are controller-provided populator spec fields.
-	cmd := exec.Command("qemu-img", "convert", "-p", "-O", "raw", "--image-opts", srcOpts, dst)
+	cmd := exec.Command("/usr/bin/qemu-img", "convert", "-p", "-O", "raw", "--image-opts", srcOpts, dst)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err

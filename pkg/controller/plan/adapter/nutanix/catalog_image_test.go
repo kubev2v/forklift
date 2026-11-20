@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"testing"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -157,5 +158,105 @@ func TestResolveCatalogImage_HTTPErrorFails(t *testing.T) {
 	_, _, err := builder.resolveCatalogImage(client, catalogImageListURL(server.URL, testCluster(), false), "forklift-migration-x")
 	if err == nil || errors.As(err, &web.ProviderNotReadyError{}) {
 		t.Fatalf("expected a hard error for HTTP 401, got %v", err)
+	}
+}
+
+// newCatalogImagePageServer serves the v2 image list in fixed pages keyed by
+// the 1-based `page` query parameter (absent means page 1), recording every
+// image-list request so tests can assert how resolveCatalogImage paginated.
+func newCatalogImagePageServer(t *testing.T, pages map[int]string, got *[]*http.Request) *httptest.Server {
+	t.Helper()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/nutanix/v3/clusters/list":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/PrismGateway/services/rest/v2.0/images/":
+			if got != nil {
+				*got = append(*got, r.Clone(r.Context()))
+			}
+			page := 1
+			if raw := r.URL.Query().Get("page"); raw != "" {
+				if parsed, err := strconv.Atoi(raw); err == nil {
+					page = parsed
+				}
+			}
+			body, ok := pages[page]
+			if !ok {
+				body = `{"entities":[],"metadata":{"total_entities":0}}`
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(body))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func TestResolveCatalogImage_PaginatesUntilFound(t *testing.T) {
+	// A page size smaller than the collection forces pagination; the
+	// migration image only appears on page 2.
+	pages := map[int]string{
+		1: `{"entities":[
+			{"name":"other-1","vm_disk_id":"vmdisk-other-1","storage_container_uuid":"sc-other"},
+			{"name":"other-2","vm_disk_id":"vmdisk-other-2","storage_container_uuid":"sc-other"}
+		],"metadata":{"total_entities":3}}`,
+		2: `{"entities":[
+			{"name":"forklift-migration-x","vm_disk_id":"vmdisk-1","storage_container_uuid":"sc-1"}
+		],"metadata":{"total_entities":3}}`,
+	}
+	var requests []*http.Request
+	server := newCatalogImagePageServer(t, pages, &requests)
+	builder, client := catalogImageTestSetup(t, server)
+
+	vmDiskID, containerUUID, err := builder.resolveCatalogImage(
+		client, catalogImageListURL(server.URL, testCluster(), false), "forklift-migration-x")
+	if err != nil {
+		t.Fatalf("resolveCatalogImage: %v", err)
+	}
+	if vmDiskID != "vmdisk-1" || containerUUID != "sc-1" {
+		t.Fatalf("got (%q, %q), want (vmdisk-1, sc-1)", vmDiskID, containerUUID)
+	}
+	if len(requests) != 2 {
+		t.Fatalf("expected 2 page requests, got %d", len(requests))
+	}
+	if raw := requests[0].URL.Query().Get("page"); raw != "" {
+		t.Errorf("first request should not carry a page param, got page=%q", raw)
+	}
+	if raw := requests[1].URL.Query().Get("page"); raw != "2" {
+		t.Errorf("second request page = %q, want 2", raw)
+	}
+	for i, req := range requests {
+		if v := req.URL.Query().Get("proxyClusterUuid"); v != testCluster().ID {
+			t.Errorf("request %d proxyClusterUuid = %q, want %q", i, v, testCluster().ID)
+		}
+	}
+}
+
+func TestResolveCatalogImage_MissingOnAllPagesIsNotReady(t *testing.T) {
+	// The image is on no page; the search must cover every entity
+	// reported by total_entities (3) before giving up.
+	pages := map[int]string{
+		1: `{"entities":[
+			{"name":"other-1","vm_disk_id":"vmdisk-other-1","storage_container_uuid":"sc-other"},
+			{"name":"other-2","vm_disk_id":"vmdisk-other-2","storage_container_uuid":"sc-other"}
+		],"metadata":{"total_entities":3}}`,
+		2: `{"entities":[
+			{"name":"other-3","vm_disk_id":"vmdisk-other-3","storage_container_uuid":"sc-other"}
+		],"metadata":{"total_entities":3}}`,
+	}
+	var requests []*http.Request
+	server := newCatalogImagePageServer(t, pages, &requests)
+	builder, client := catalogImageTestSetup(t, server)
+
+	_, _, err := builder.resolveCatalogImage(
+		client, catalogImageListURL(server.URL, testCluster(), false), "forklift-migration-x")
+	if !errors.As(err, &web.ProviderNotReadyError{}) {
+		t.Fatalf("expected ProviderNotReadyError, got %v", err)
+	}
+	if len(requests) != 2 {
+		t.Fatalf("expected 2 page requests, got %d", len(requests))
 	}
 }

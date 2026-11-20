@@ -22,6 +22,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	libutil "github.com/kubev2v/forklift/pkg/lib/util"
 	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
@@ -1336,7 +1337,6 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	// provider is Prism Central, so it needs to know which endpoint type the
 	// provider points at.
 	client := &Client{Context: r.Context}
-	client.Subsystem = "builder"
 	if err = client.connect(); err != nil {
 		return nil, err
 	}
@@ -1500,7 +1500,7 @@ type v2Image struct {
 func catalogImageListURL(providerURL string, cluster *model.Cluster, element bool) string {
 	const imagesPath = "/PrismGateway/services/rest/v2.0/images/"
 	if element {
-		return fmt.Sprintf("https://%s:9440%s?count=4096", cluster.ExternalIP, imagesPath)
+		return fmt.Sprintf("%s%s?count=4096", strings.TrimRight(providerURL, "/"), imagesPath)
 	}
 	query := url.Values{}
 	query.Set("count", "4096")
@@ -1508,12 +1508,21 @@ func catalogImageListURL(providerURL string, cluster *model.Cluster, element boo
 	return fmt.Sprintf("%s%s?%s", strings.TrimRight(providerURL, "/"), imagesPath, query.Encode())
 }
 
+// v2ImageListMaxPages bounds resolveCatalogImage's pagination against a
+// server that keeps returning pages without reaching total_entities.
+const v2ImageListMaxPages = 1000
+
 // resolveCatalogImage finds the catalog image (created by PreTransferActions)
 // by name via the Prism Element v2 image API (see catalogImageListURL) and
 // returns its backing vmdisk UUID and container UUID. The v3/v4 image APIs
 // don't expose the backing vmdisk, and v4-created images still appear in v2
 // on the PE, so v2 is the reliable lookup regardless of how the image was
 // created.
+//
+// The v2 list returns at most `count` entities per request (v2 pages are
+// 1-based), so the lookup pages through the list, following
+// metadata.total_entities, until the image is found or every entity has been
+// searched.
 //
 // PreTransferActions creates the image asynchronously and the migration loop
 // calls PopulatorVolumes before the image is guaranteed ready, so a
@@ -1526,25 +1535,49 @@ func catalogImageListURL(providerURL string, cluster *model.Cluster, element boo
 // metrics as every other Prism call the adapter makes.
 func (r *Builder) resolveCatalogImage(client *Client, endpoint, imageName string) (vmDiskID, containerUUID string, err error) {
 	notReady := web.ProviderNotReadyError{Provider: r.Source.Provider}
-	var out struct {
-		Entities []v2Image `json:"entities"`
-	}
-	status, err := client.Get(endpoint, &out)
-	if err != nil {
-		return "", "", liberr.Wrap(err, "endpoint", endpoint)
-	}
-	if status != http.StatusOK {
-		return "", "", liberr.New("v2 image list failed", "endpoint", endpoint, "status", status)
-	}
-	for _, img := range out.Entities {
-		if img.Name != imageName {
-			continue
+	searched := 0
+	for page := 1; ; page++ {
+		if page > v2ImageListMaxPages {
+			return "", "", liberr.New(
+				"v2 image list pagination limit exceeded",
+				"endpoint", endpoint,
+				"pages", v2ImageListMaxPages)
 		}
-		if img.VmDiskID == "" {
-			// Image exists but its backing clone isn't populated yet.
-			return "", "", notReady
+		var out struct {
+			Entities []v2Image `json:"entities"`
+			Metadata struct {
+				TotalEntities int `json:"total_entities"`
+			} `json:"metadata"`
 		}
-		return img.VmDiskID, img.StorageContainerUUID, nil
+		// The first page is the default (no page param); only advancing
+		// to the next page adds one.
+		var params []libweb.Param
+		if page > 1 {
+			params = append(params, libweb.Param{Key: "page", Value: strconv.Itoa(page)})
+		}
+		status, err := client.Get(endpoint, &out, params...)
+		if err != nil {
+			return "", "", liberr.Wrap(err, "endpoint", endpoint)
+		}
+		if status != http.StatusOK {
+			return "", "", liberr.New("v2 image list failed", "endpoint", endpoint, "status", status)
+		}
+		for _, img := range out.Entities {
+			if img.Name != imageName {
+				continue
+			}
+			if img.VmDiskID == "" {
+				// Image exists but its backing clone isn't populated yet.
+				return "", "", notReady
+			}
+			return img.VmDiskID, img.StorageContainerUUID, nil
+		}
+		searched += len(out.Entities)
+		// Stop once every entity the server reported has been searched,
+		// or when a page past the end of the collection comes back empty.
+		if len(out.Entities) == 0 || searched >= out.Metadata.TotalEntities {
+			break
+		}
 	}
 	// Image not created/visible yet; PreTransferActions is still working.
 	return "", "", notReady
