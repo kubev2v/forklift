@@ -354,6 +354,7 @@ func (n *HostNetwork) PNIC(key string) (nic *PNIC, found bool) {
 
 type PNIC struct {
 	Key       string `json:"key"`
+	Device    string `json:"device,omitempty"`
 	LinkSpeed int32  `json:"linkSpeed"`
 }
 
@@ -369,33 +370,59 @@ type VNIC struct {
 }
 
 type PortGroup struct {
-	Key    string `json:"key"`
-	Name   string `json:"name"`
-	Switch string `json:"vSwitch"`
-	VlanId int32  `json:"vlanId"`
+	Key     string         `json:"key"`
+	Name    string         `json:"name"`
+	Switch  string         `json:"vSwitch"`
+	VlanId  int32          `json:"vlanId"`
+	Teaming *TeamingPolicy `json:"teaming,omitempty"`
 }
 
 type Switch struct {
-	Key        string   `json:"key"`
-	Name       string   `json:"name"`
-	MTU        int32    `json:"mtu"`
-	PortGroups []string `json:"portGroups"`
-	PNICs      []string `json:"pNICs"`
+	Key        string         `json:"key"`
+	Name       string         `json:"name"`
+	MTU        int32          `json:"mtu"`
+	PortGroups []string       `json:"portGroups"`
+	PNICs      []string       `json:"pNICs"`
+	Teaming    *TeamingPolicy `json:"teaming,omitempty"`
+}
+
+type TeamingPolicy struct {
+	Policy               string    `json:"policy,omitempty"`
+	Inherited            *bool     `json:"inherited,omitempty"`
+	PolicyInherited      *bool     `json:"policyInherited,omitempty"`
+	UplinkOrderInherited *bool     `json:"uplinkOrderInherited,omitempty"`
+	ActiveUplinks        *[]string `json:"activeUplinks,omitempty"`
+	StandbyUplinks       *[]string `json:"standbyUplinks,omitempty"`
+}
+
+type LACPGroup struct {
+	Name                 string `json:"name"`
+	Mode                 string `json:"mode"`
+	LoadBalanceAlgorithm string `json:"loadBalanceAlgorithm"`
+}
+
+type PNICLink struct {
+	Device             string `json:"device"`
+	UplinkPortKey      string `json:"uplinkPortKey,omitempty"`
+	UplinkPortGroupKey string `json:"uplinkPortGroupKey,omitempty"`
 }
 
 type Network struct {
 	Base
-	Tag      string    `sql:""`
-	DVSwitch Ref       `sql:""`
-	Key      string    `sql:""`
-	Host     []DVSHost `sql:""`
-	VlanId   string    `sql:""`
-	MaxMTU   int32     `sql:""`
+	Tag      string        `sql:""`
+	DVSwitch Ref           `sql:""`
+	Key      string        `sql:""`
+	Host     []DVSHost     `sql:""`
+	VlanId   string        `sql:""`
+	MaxMTU   int32         `sql:""`
+	Teaming  TeamingPolicy `sql:""`
+	LACP     []LACPGroup   `sql:""`
 }
 
 type DVSHost struct {
-	Host Ref
-	PNIC []string
+	Host      Ref
+	PNIC      []string
+	PNICLinks []PNICLink `json:"pNICLinks,omitempty"`
 }
 
 type Datastore struct {

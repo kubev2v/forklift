@@ -408,6 +408,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 								MTU:        vSwitch.Mtu,
 								PortGroups: vSwitch.Portgroup,
 								PNICs:      vSwitch.Pnic,
+								Teaming:    hostTeamingPolicy(vSwitch.Spec.Policy),
 							})
 					}
 				}
@@ -419,10 +420,11 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 						network.PortGroups = append(
 							network.PortGroups,
 							model.PortGroup{
-								Key:    portGroup.Key,
-								Name:   portGroup.Spec.Name,
-								Switch: portGroup.Vswitch,
-								VlanId: portGroup.Spec.VlanId,
+								Key:     portGroup.Key,
+								Name:    portGroup.Spec.Name,
+								Switch:  portGroup.Vswitch,
+								VlanId:  portGroup.Spec.VlanId,
+								Teaming: hostTeamingPolicy(&portGroup.Spec.Policy),
 							})
 					}
 				}
@@ -439,6 +441,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 							network.PNICs,
 							model.PNIC{
 								Key:       nic.Key,
+								Device:    nic.Device,
 								LinkSpeed: linkSpeed,
 							})
 					}
@@ -606,6 +609,12 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 			}
 		case types.PropertyChangeOpRemove, types.PropertyChangeOpIndirectRemove:
 			switch p.Name {
+			case fVSwitch:
+				v.model.Network.Switches = nil
+			case fPortGroup:
+				v.model.Network.PortGroups = nil
+			case fPNIC:
+				v.model.Network.PNICs = nil
 			case fHostCpuModel:
 				v.model.CpuModel = ""
 			case fHostSystemInfo:
@@ -808,7 +817,9 @@ func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
 					v.model.Key = s.OpaqueNetworkId
 				}
 			case fDVSwitchVlan:
+				v.model.Teaming = model.TeamingPolicy{}
 				if portSettings, cast := p.Val.(types.VMwareDVSPortSetting); cast {
+					v.model.Teaming = distributedTeamingPolicy(portSettings.UplinkTeamingPolicy)
 					switch vlanIdSpec := portSettings.Vlan.(type) {
 					case *types.VmwareDistributedVirtualSwitchVlanIdSpec:
 						if int(vlanIdSpec.VlanId) > 0 {
@@ -822,6 +833,10 @@ func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
 						v.model.VlanId = strings.Join(refList, ",")
 					}
 				}
+			}
+		case types.PropertyChangeOpRemove, types.PropertyChangeOpIndirectRemove:
+			if p.Name == fDVSwitchVlan {
+				v.model.Teaming = model.TeamingPolicy{}
 			}
 		}
 	}
@@ -852,13 +867,30 @@ func (v *DVSwitchAdapter) Apply(u types.ObjectUpdate) {
 				}
 			case fDVSwitchConfig:
 				v.model.MaxMTU = 0
+				v.model.Teaming = model.TeamingPolicy{}
+				v.model.LACP = nil
 				if config, cast := p.Val.(types.VMwareDVSConfigInfo); cast {
 					v.model.MaxMTU = config.MaxMtu
+					if settings, ok := config.DefaultPortConfig.(*types.VMwareDVSPortSetting); ok && settings != nil {
+						v.model.Teaming = distributedTeamingPolicy(settings.UplinkTeamingPolicy)
+					}
+					for _, group := range config.LacpGroupConfig {
+						v.model.LACP = append(v.model.LACP, model.LACPGroup{
+							Name:                 group.Name,
+							Mode:                 group.Mode,
+							LoadBalanceAlgorithm: group.LoadbalanceAlgorithm,
+						})
+					}
 				}
 			}
-		case types.PropertyChangeOpRemove:
-			if p.Name == fDVSwitchConfig {
+		case types.PropertyChangeOpRemove, types.PropertyChangeOpIndirectRemove:
+			switch p.Name {
+			case fDVSwitchConfig:
 				v.model.MaxMTU = 0
+				v.model.Teaming = model.TeamingPolicy{}
+				v.model.LACP = nil
+			case fDVSwitchHost:
+				v.model.Host = nil
 			}
 		}
 	}
@@ -871,13 +903,20 @@ func (v *DVSwitchAdapter) addHost(array types.ArrayOfDistributedVirtualSwitchHos
 		hostRef := v.Ref(*member.Config.Host)
 		if backing, cast := member.Config.Backing.(*types.DistributedVirtualSwitchHostMemberPnicBacking); cast {
 			names := []string{}
+			links := []model.PNICLink{}
 			for _, pn := range backing.PnicSpec {
 				names = append(names, pn.PnicDevice)
+				links = append(links, model.PNICLink{
+					Device:             pn.PnicDevice,
+					UplinkPortKey:      pn.UplinkPortKey,
+					UplinkPortGroupKey: pn.UplinkPortgroupKey,
+				})
 			}
 			list = append(list,
 				model.DVSHost{
-					Host: hostRef,
-					PNIC: names,
+					Host:      hostRef,
+					PNIC:      names,
+					PNICLinks: links,
 				})
 		}
 	}
@@ -1931,4 +1970,39 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 	}
 
 	v.model.Disks = disks
+}
+
+func hostTeamingPolicy(network *types.HostNetworkPolicy) *model.TeamingPolicy {
+	if network == nil || network.NicTeaming == nil {
+		return nil
+	}
+	policy := network.NicTeaming
+	result := &model.TeamingPolicy{Policy: policy.Policy}
+	if policy.NicOrder != nil {
+		active := append([]string{}, policy.NicOrder.ActiveNic...)
+		standby := append([]string{}, policy.NicOrder.StandbyNic...)
+		result.ActiveUplinks = &active
+		result.StandbyUplinks = &standby
+	}
+	return result
+}
+
+func distributedTeamingPolicy(policy *types.VmwareUplinkPortTeamingPolicy) model.TeamingPolicy {
+	if policy == nil {
+		return model.TeamingPolicy{}
+	}
+	result := model.TeamingPolicy{Inherited: &policy.Inherited}
+	if policy.Policy != nil {
+		result.Policy = policy.Policy.Value
+		result.PolicyInherited = &policy.Policy.Inherited
+	}
+	if policy.UplinkPortOrder != nil {
+		order := policy.UplinkPortOrder
+		result.UplinkOrderInherited = &order.Inherited
+		active := append([]string{}, order.ActiveUplinkPort...)
+		standby := append([]string{}, order.StandbyUplinkPort...)
+		result.ActiveUplinks = &active
+		result.StandbyUplinks = &standby
+	}
+	return result
 }
