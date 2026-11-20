@@ -169,7 +169,7 @@ func (p *PowermaxImporter) deviceIDsByWWN(field, wwn string) ([]string, error) {
 }
 
 // call performs one Unisphere sloprovisioning request and decodes the JSON response into out.
-func (p *PowermaxImporter) call(method, path string, body interface{}, out interface{}) error {
+func (p *PowermaxImporter) call(method, path string, body, out interface{}) error {
 	var rd io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
