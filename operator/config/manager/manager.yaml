@@ -78,6 +78,8 @@ spec:
           value: ${OVIRT_POPULATOR_IMAGE}
         - name: OPENSTACK_POPULATOR_IMAGE
           value: ${OPENSTACK_POPULATOR_IMAGE}
+        - name: NUTANIX_NFS_POPULATOR_IMAGE
+          value: ${NUTANIX_NFS_POPULATOR_IMAGE}
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: ${OVA_PROVIDER_SERVER_IMAGE}
         - name: HYPERV_PROVIDER_SERVER_IMAGE

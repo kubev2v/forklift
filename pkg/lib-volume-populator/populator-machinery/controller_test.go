@@ -2,6 +2,7 @@ package populator_machinery
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -387,5 +388,99 @@ func TestXcopyPriorityClassName_IgnoredByOtherPopulators(t *testing.T) {
 	}
 	if pod.Spec.PriorityClassName != "" {
 		t.Errorf("expected other populator priorityClassName to be unset, got %q", pod.Spec.PriorityClassName)
+	}
+}
+
+// PodVolumeHook volumes and mounts are appended to the created pod, both for
+// filesystem and raw-block target PVCs.
+func TestPodVolumeHook_AttachesVolumes(t *testing.T) {
+	for _, rawBlock := range []bool{true, false} {
+		volumeMode := corev1.PersistentVolumeFilesystem
+		if rawBlock {
+			volumeMode = corev1.PersistentVolumeBlock
+		}
+		pvc := makePVC("pvc-1", "test-ns", "cr-1", "test-sc")
+		pvc.Spec.VolumeMode = ptr.To(volumeMode)
+		cr := makeCR("cr-1", "test-ns", "source-host", "")
+		c, fakeClient, _ := buildController(t, 10, nil, []*corev1.PersistentVolumeClaim{pvc}, []*unstructured.Unstructured{cr})
+		c.podVolumes = func(_ *unstructured.Unstructured) ([]corev1.Volume, []corev1.VolumeMount, error) {
+			vol := corev1.Volume{
+				Name: "nfs-source",
+				VolumeSource: corev1.VolumeSource{
+					NFS: &corev1.NFSVolumeSource{Server: "10.0.0.1", Path: "/export", ReadOnly: true},
+				},
+			}
+			return []corev1.Volume{vol}, []corev1.VolumeMount{{Name: "nfs-source", MountPath: "/source", ReadOnly: true}}, nil
+		}
+
+		if err := c.syncPvc(context.Background(), "test-ns/pvc-1", "test-ns", "pvc-1"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		pod := createdPod(fakeClient)
+		if pod == nil {
+			t.Fatal("expected pod to be created")
+		}
+
+		var foundVol, foundMount bool
+		for _, v := range pod.Spec.Volumes {
+			if v.Name == "nfs-source" && v.NFS != nil && v.NFS.Server == "10.0.0.1" {
+				foundVol = true
+			}
+		}
+		for _, m := range pod.Spec.Containers[0].VolumeMounts {
+			if m.Name == "nfs-source" && m.MountPath == "/source" {
+				foundMount = true
+			}
+		}
+		if !foundVol {
+			t.Errorf("rawBlock=%v: expected nfs-source volume on pod", rawBlock)
+		}
+		if !foundMount {
+			t.Errorf("rawBlock=%v: expected /source volume mount on container", rawBlock)
+		}
+		// The target volume must survive the append.
+		if pod.Spec.Volumes[0].Name != "target" {
+			t.Errorf("rawBlock=%v: expected target volume first, got %q", rawBlock, pod.Spec.Volumes[0].Name)
+		}
+	}
+}
+
+// A failing PodVolumeHook surfaces as a sync error and no pod is created.
+func TestPodVolumeHook_ErrorPreventsPodCreation(t *testing.T) {
+	pvc := makePVC("pvc-1", "test-ns", "cr-1", "test-sc")
+	cr := makeCR("cr-1", "test-ns", "source-host", "")
+	c, fakeClient, _ := buildController(t, 10, nil, []*corev1.PersistentVolumeClaim{pvc}, []*unstructured.Unstructured{cr})
+	c.podVolumes = func(_ *unstructured.Unstructured) ([]corev1.Volume, []corev1.VolumeMount, error) {
+		return nil, nil, fmt.Errorf("no NFS endpoint")
+	}
+
+	if err := c.syncPvc(context.Background(), "test-ns/pvc-1", "test-ns", "pvc-1"); err == nil {
+		t.Fatal("expected error from failing pod volume hook")
+	}
+	if pod := createdPod(fakeClient); pod != nil {
+		t.Error("expected no pod to be created when the volume hook fails")
+	}
+}
+
+// Every populator kind the populator-controller registers must have a
+// populatorToResource entry, or updateProgress panics on a nil map value
+// (regression: NutanixNfsVolumePopulator was missing and crash-looped the
+// controller as soon as a populate pod's metrics endpoint answered).
+func TestPopulatorToResource_CoversAllKinds(t *testing.T) {
+	kinds := []string{
+		"OvirtVolumePopulator",
+		"OpenstackVolumePopulator",
+		api.VSphereXcopyVolumePopulatorKind,
+		api.NutanixNfsVolumePopulatorKind,
+	}
+	for _, kind := range kinds {
+		pr, ok := populatorToResource[kind]
+		if !ok || pr == nil {
+			t.Errorf("populatorToResource has no entry for kind %q", kind)
+			continue
+		}
+		if pr.resource == "" {
+			t.Errorf("populatorToResource[%q] has empty resource", kind)
+		}
 	}
 }

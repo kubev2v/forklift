@@ -747,6 +747,10 @@ spec:
                 description: Volume populator controller image. Optional. If left
                   empty, the operator automatically sets this from the release payload.
                 type: string
+              populator_nutanix_nfs_image_fqin:
+                description: Nutanix NFS populator image. Optional. If left empty,
+                  the operator automatically sets this from the release payload.
+                type: string
               populator_openstack_image_fqin:
                 description: OpenStack populator image. Optional. If left empty, the
                   operator automatically sets this from the release payload.

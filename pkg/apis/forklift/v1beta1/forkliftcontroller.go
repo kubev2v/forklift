@@ -176,6 +176,10 @@ type ForkliftControllerSpec struct {
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	PopulatorOpenstackImageFQIN string `json:"populator_openstack_image_fqin,omitempty"`
+	// Nutanix NFS populator image. Optional. If left empty, the operator automatically sets this from the release payload.
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	PopulatorNutanixNfsImageFQIN string `json:"populator_nutanix_nfs_image_fqin,omitempty"`
 	// vSphere xcopy populator image. Optional. If left empty, the operator automatically sets this from the release payload.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}

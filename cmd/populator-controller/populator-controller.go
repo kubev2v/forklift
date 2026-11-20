@@ -2,9 +2,11 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -30,6 +32,7 @@ type populator struct {
 	kind            string
 	resource        string
 	controllerFunc  func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error)
+	volumeFunc      populator_machinery.PodVolumeHook
 	imageVar        string
 	metricsEndpoint string
 }
@@ -55,6 +58,14 @@ var populators = map[string]populator{
 		controllerFunc:  getVXPopulatorPodArgs,
 		imageVar:        "VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE",
 		metricsEndpoint: ":8082",
+	},
+	"nutanix-nfs": {
+		kind:            "NutanixNfsVolumePopulator",
+		resource:        "nutanixnfsvolumepopulators",
+		controllerFunc:  getNutanixNfsPopulatorPodArgs,
+		volumeFunc:      getNutanixNfsPopulatorVolumes,
+		imageVar:        "NUTANIX_NFS_POPULATOR_IMAGE",
+		metricsEndpoint: ":8083",
 	},
 }
 
@@ -95,10 +106,11 @@ func main() {
 		gk := schema.GroupKind{Group: groupName, Kind: populator.kind}
 		gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: populator.resource}
 		controllerFunc := populator.controllerFunc
+		volumeFunc := populator.volumeFunc
 		metricsEndpoint := populator.metricsEndpoint
 		go func() {
 			populator_machinery.RunController(masterURL, kubeconfig, imageName, metricsEndpoint, metricsPath,
-				prefix, gk, gvr, mountPath, devicePath, controllerFunc, resources, maxInFlight)
+				prefix, gk, gvr, mountPath, devicePath, controllerFunc, volumeFunc, resources, maxInFlight)
 			<-stop
 		}()
 	}
@@ -170,6 +182,63 @@ func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.Pers
 		args = append(args, "--migration-host="+xcopy.Spec.MigrationHost)
 	}
 	return args, nil
+}
+
+// nfsSourceMountPath is where the populator pod mounts the Nutanix storage
+// container export (in-tree nfs volume, read-only, attached by kubelet).
+const nfsSourceMountPath = "/source"
+
+func getNutanixNfsPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, pvc corev1.PersistentVolumeClaim) ([]string, error) {
+	var populator v1beta1.NutanixNfsVolumePopulator
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &populator)
+	if err != nil {
+		return nil, err
+	}
+	args := []string{
+		"--volume-path=" + getVolumePath(rawBlock),
+		// SourcePath is resolved within the NFS mount attached by kubelet
+		// (see getNutanixNfsPopulatorVolumes); the binary never speaks NFS.
+		"--source-path=" + populator.Spec.SourcePath,
+		"--cr-name=" + populator.Name,
+		"--cr-namespace=" + populator.Namespace,
+		// The machinery reads --secret-name to wire EnvFrom + cacert into the
+		// copy pod (controller.go). Must be non-empty or the pod is invalid.
+		"--secret-name=" + populator.Spec.SecretName,
+	}
+	return args, nil
+}
+
+// getNutanixNfsPopulatorVolumes attaches the Nutanix storage container export
+// to the populator pod as a read-only in-tree nfs volume. kubelet performs the
+// kernel mount on the node; the populator binary reads the vmdisk as a local
+// file under nfsSourceMountPath, so qemu-img needs no libnfs nfs:// driver
+// (which neither UBI nor RHEL qemu-kvm ships).
+func getNutanixNfsPopulatorVolumes(u *unstructured.Unstructured) ([]corev1.Volume, []corev1.VolumeMount, error) {
+	var populator v1beta1.NutanixNfsVolumePopulator
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &populator)
+	if err != nil {
+		return nil, nil, err
+	}
+	if populator.Spec.ServerIP == "" || populator.Spec.Export == "" {
+		return nil, nil, fmt.Errorf("populator %s/%s has no NFS server/export", populator.Namespace, populator.Name)
+	}
+
+	volume := corev1.Volume{
+		Name: "nfs-source",
+		VolumeSource: corev1.VolumeSource{
+			NFS: &corev1.NFSVolumeSource{
+				Server:   populator.Spec.ServerIP,
+				Path:     "/" + strings.TrimPrefix(populator.Spec.Export, "/"),
+				ReadOnly: true,
+			},
+		},
+	}
+	mount := corev1.VolumeMount{
+		Name:      volume.Name,
+		MountPath: nfsSourceMountPath,
+		ReadOnly:  true,
+	}
+	return []corev1.Volume{volume}, []corev1.VolumeMount{mount}, nil
 }
 
 func getVolumePath(rawBlock bool) string {
