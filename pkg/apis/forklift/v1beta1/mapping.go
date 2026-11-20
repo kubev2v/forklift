@@ -95,7 +95,7 @@ type CsiVolumeImport struct {
 	// SecretRef is the name of the secret with storage credentials, in the source provider's namespace.
 	SecretRef string `json:"secretRef"`
 	// StorageVendorProduct identifies the storage array vendor.
-	// +kubebuilder:validation:Enum=primera3par;ontap
+	// +kubebuilder:validation:Enum=primera3par;ontap;powerstore;powermax
 	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
 }
 
