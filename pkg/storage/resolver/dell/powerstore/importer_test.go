@@ -96,12 +96,48 @@ func TestResolveRDM(t *testing.T) {
 	})
 	defer srv.Close()
 
-	backing := &resolver.DiskBacking{IsRDM: true, DeviceName: naa}
+	backing := &resolver.DiskBacking{IsRDM: true, DeviceName: naa, CompatibilityMode: "physicalMode"}
 	annotations, err := imp.Resolve(backing)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if annotations[annotationKey] != "tshefi-ecosystem-vmware" {
+		t.Errorf("unexpected annotation value: %v", annotations)
+	}
+}
+
+func TestResolveVirtualModeRDMWithSnapshotsRejected(t *testing.T) {
+	srv, imp := mockPowerstoreAPI(t, map[string]string{})
+	defer srv.Close()
+
+	backing := &resolver.DiskBacking{
+		IsRDM:             true,
+		DeviceName:        "naa.68ccf098000a2415fa5c15f00000000f",
+		CompatibilityMode: "virtualMode",
+		VMHasSnapshots:    true,
+	}
+	_, err := imp.Resolve(backing)
+	if err == nil {
+		t.Fatal("expected error for virtual-mode RDM with snapshots, got nil")
+	}
+	if !strings.Contains(err.Error(), "virtual-mode RDMs with snapshots") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestResolveVirtualModeRDMWithoutSnapshots(t *testing.T) {
+	naa := "naa.68ccf098000a2415fa5c15f00000000f"
+	srv, imp := mockPowerstoreAPI(t, map[string]string{
+		"wwn=eq." + naa: "tshefi-virtual-mode-vmware",
+	})
+	defer srv.Close()
+
+	backing := &resolver.DiskBacking{IsRDM: true, DeviceName: naa, CompatibilityMode: "virtualMode"}
+	annotations, err := imp.Resolve(backing)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if annotations[annotationKey] != "tshefi-virtual-mode-vmware" {
 		t.Errorf("unexpected annotation value: %v", annotations)
 	}
 }

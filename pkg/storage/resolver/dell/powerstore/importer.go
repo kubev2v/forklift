@@ -56,6 +56,9 @@ func (p *PowerstoreImporter) Resolve(backing *resolver.DiskBacking) (map[string]
 	case resolver.DiskTypeVVol:
 		return nil, fmt.Errorf("PowerStore CSI import does not support VVol-backed disks: the PowerStore REST API does not expose a VVol clone endpoint (see ER-K8S-BR47246-001)")
 	case resolver.DiskTypeRDM:
+		if backing.CompatibilityMode == "virtualMode" && backing.VMHasSnapshots {
+			return nil, fmt.Errorf("PowerStore CSI import does not support virtual-mode RDMs with snapshots")
+		}
 		return p.resolveRDM(backing.DeviceName)
 	default:
 		return nil, fmt.Errorf("PowerStore CSI import does not support VMDK disks")
