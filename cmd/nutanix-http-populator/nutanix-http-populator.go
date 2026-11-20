@@ -162,28 +162,30 @@ func downloadRetries(ctx context.Context, cfg *config, progress *prometheus.Gaug
 	return fmt.Errorf("download failed after %d attempts: %w", maxDownloadAttempts, lastErr)
 }
 
+func applyDownloadAuth(req *http.Request, forceBasic bool) {
+	if !forceBasic {
+		if cookie := os.Getenv("Cookie"); cookie != "" {
+			req.Header.Set("Cookie", cookie)
+			return
+		}
+		if header := os.Getenv("cookie"); strings.HasPrefix(header, "Cookie: ") {
+			req.Header.Set("Cookie", strings.TrimPrefix(header, "Cookie: "))
+			return
+		}
+	}
+	user := os.Getenv("user")
+	password := os.Getenv("password")
+	if user != "" || password != "" {
+		req.SetBasicAuth(user, password)
+	}
+}
+
 func downloadOnce(ctx context.Context, cfg *config, progress *prometheus.GaugeVec, url string, forceBasic bool, attempt int) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
-	if forceBasic {
-		user := os.Getenv("user")
-		password := os.Getenv("password")
-		if user != "" || password != "" {
-			req.SetBasicAuth(user, password)
-		}
-	} else if cookie := os.Getenv("Cookie"); cookie != "" {
-		req.Header.Set("Cookie", cookie)
-	} else if header := os.Getenv("cookie"); strings.HasPrefix(header, "Cookie: ") {
-		req.Header.Set("Cookie", strings.TrimPrefix(header, "Cookie: "))
-	} else {
-		user := os.Getenv("user")
-		password := os.Getenv("password")
-		if user != "" || password != "" {
-			req.SetBasicAuth(user, password)
-		}
-	}
+	applyDownloadAuth(req, forceBasic)
 
 	client := &http.Client{
 		Timeout: 0,
@@ -218,36 +220,34 @@ func downloadOnce(ctx context.Context, cfg *config, progress *prometheus.GaugeVe
 		return err
 	}
 
+	read, err := copyBodyToVolume(ctx, cfg, progress, resp.Body, file, start)
+	if err != nil {
+		return err
+	}
+	klog.Infof("Download complete: %d bytes in %v", read, time.Since(start).Round(time.Millisecond))
+	return nil
+}
+
+func copyBodyToVolume(
+	ctx context.Context,
+	cfg *config,
+	progress *prometheus.GaugeVec,
+	body io.Reader,
+	file *os.File,
+	start time.Time,
+) (int64, error) {
 	done := make(chan struct{})
 	var read int64
-	go func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-done:
-				return
-			case <-ticker.C:
-				if cfg.pvcSize > 0 {
-					pct := (float64(read) / float64(cfg.pvcSize)) * 100
-					if pct > 100 {
-						pct = 100
-					}
-					progress.WithLabelValues(cfg.ownerUID).Set(pct)
-					klog.Infof("Progress: %.0f%% (%d/%d bytes)", pct, read, cfg.pvcSize)
-				}
-			}
-		}
-	}()
+	go reportDownloadProgress(cfg, progress, &read, done)
 
 	buf := make([]byte, 1<<20)
 	firstByte := true
 	for {
 		if err := ctx.Err(); err != nil {
 			close(done)
-			return err
+			return read, err
 		}
-		n, rerr := resp.Body.Read(buf)
+		n, rerr := body.Read(buf)
 		if n > 0 {
 			if firstByte {
 				klog.Infof("First byte after %v", time.Since(start).Round(time.Millisecond))
@@ -255,7 +255,7 @@ func downloadOnce(ctx context.Context, cfg *config, progress *prometheus.GaugeVe
 			}
 			if _, werr := file.Write(buf[:n]); werr != nil {
 				close(done)
-				return werr
+				return read, werr
 			}
 			read += int64(n)
 		}
@@ -264,12 +264,32 @@ func downloadOnce(ctx context.Context, cfg *config, progress *prometheus.GaugeVe
 		}
 		if rerr != nil {
 			close(done)
-			return rerr
+			return read, rerr
 		}
 	}
 	close(done)
-	klog.Infof("Download complete: %d bytes in %v", read, time.Since(start).Round(time.Millisecond))
-	return nil
+	return read, nil
+}
+
+func reportDownloadProgress(cfg *config, progress *prometheus.GaugeVec, read *int64, done <-chan struct{}) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			if cfg.pvcSize <= 0 {
+				continue
+			}
+			pct := (float64(*read) / float64(cfg.pvcSize)) * 100
+			if pct > 100 {
+				pct = 100
+			}
+			progress.WithLabelValues(cfg.ownerUID).Set(pct)
+			klog.Infof("Progress: %.0f%% (%d/%d bytes)", pct, *read, cfg.pvcSize)
+		}
+	}
 }
 
 // entityDownloadToV3FileURL rewrites a PE entity_download Location to the

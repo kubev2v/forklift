@@ -44,14 +44,14 @@ func (r *DestinationClient) SetPopulatorCrOwnership() error {
 	for i := range list.Items {
 		populatorCr := &list.Items[i]
 		pvc := &core.PersistentVolumeClaim{}
-		if gerr := r.Destination.Get(context.TODO(), client.ObjectKey{
+		if r.Destination.Get(context.TODO(), client.ObjectKey{
 			Namespace: populatorCr.Namespace,
 			Name:      populatorCr.Name,
-		}, pvc); gerr != nil {
+		}, pvc) != nil {
 			continue
 		}
 		populatorCrCopy := populatorCr.DeepCopy()
-		if oerr := k8sutil.SetOwnerReference(pvc, populatorCr, r.Scheme()); oerr != nil {
+		if k8sutil.SetOwnerReference(pvc, populatorCr, r.Scheme()) != nil {
 			continue
 		}
 		patch := client.MergeFrom(populatorCrCopy)

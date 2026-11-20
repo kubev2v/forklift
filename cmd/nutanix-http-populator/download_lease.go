@@ -72,7 +72,6 @@ func (h *downloadLeaseLocker) withLock(ctx context.Context, leaseKey string, wor
 	}
 	log := klog.Background().WithName("nutanix-http").WithName("lease")
 	leaseClient := h.clientset.CoordinationV1().Leases(h.namespace)
-	leaseDurationSec := int32(h.leaseDuration.Seconds())
 
 	testName := fmt.Sprintf("nutanix-http-%s-slot-0", leaseKey)
 	if _, err = leaseClient.Get(ctx, testName, metav1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
@@ -84,47 +83,13 @@ func (h *downloadLeaseLocker) withLock(ctx context.Context, leaseKey string, wor
 			return fmt.Errorf("context canceled while waiting for download lease: %w", ctx.Err())
 		}
 		for slot := 0; slot < h.maxConcurrentHolders; slot++ {
-			leaseName := fmt.Sprintf("nutanix-http-%s-slot-%d", leaseKey, slot)
-			now := metav1.NewMicroTime(time.Now())
-			lease := &coordinationv1.Lease{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      leaseName,
-					Namespace: h.namespace,
-				},
-				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       &holder,
-					LeaseDurationSeconds: &leaseDurationSec,
-					AcquireTime:          &now,
-					RenewTime:            &now,
-				},
+			acquired, err := h.tryAcquireSlot(ctx, leaseClient, holder, leaseKey, slot)
+			if err != nil {
+				return err
 			}
-			created, err := leaseClient.Create(ctx, lease, metav1.CreateOptions{})
-			if err == nil {
+			if acquired != nil {
 				log.Info("download lease acquired", "slot", slot, "key", leaseKey)
-				return h.execute(ctx, leaseClient, created, leaseKey, slot, work)
-			}
-			if !apierrors.IsAlreadyExists(err) {
-				return fmt.Errorf("create lease %s: %w", leaseName, err)
-			}
-			existing, getErr := leaseClient.Get(ctx, leaseName, metav1.GetOptions{})
-			if getErr != nil {
-				// Lost the race with a delete; try the next slot (or the
-				// outer retry) instead of tight-looping on this index.
-				if apierrors.IsNotFound(getErr) {
-					continue
-				}
-				return fmt.Errorf("get lease %s: %w", leaseName, getErr)
-			}
-			if h.expired(existing) {
-				existing.Spec.HolderIdentity = &holder
-				now := metav1.NewMicroTime(time.Now())
-				existing.Spec.AcquireTime = &now
-				existing.Spec.RenewTime = &now
-				updated, updateErr := leaseClient.Update(ctx, existing, metav1.UpdateOptions{})
-				if updateErr == nil {
-					log.Info("download lease acquired (takeover)", "slot", slot, "key", leaseKey)
-					return h.execute(ctx, leaseClient, updated, leaseKey, slot, work)
-				}
+				return h.execute(ctx, leaseClient, acquired, leaseKey, slot, work)
 			}
 		}
 		log.Info("all download lease slots taken, waiting", "slots", h.maxConcurrentHolders, "key", leaseKey)
@@ -134,6 +99,59 @@ func (h *downloadLeaseLocker) withLock(ctx context.Context, leaseKey string, wor
 			return fmt.Errorf("context canceled while waiting for download lease: %w", ctx.Err())
 		}
 	}
+}
+
+// tryAcquireSlot attempts to Create or take over one lease slot.
+// acquired is nil when the slot is held by someone else.
+func (h *downloadLeaseLocker) tryAcquireSlot(
+	ctx context.Context,
+	leaseClient coordinationclientv1.LeaseInterface,
+	holder, leaseKey string,
+	slot int,
+) (acquired *coordinationv1.Lease, err error) {
+	leaseDurationSec := int32(h.leaseDuration.Seconds())
+	leaseName := fmt.Sprintf("nutanix-http-%s-slot-%d", leaseKey, slot)
+	now := metav1.NewMicroTime(time.Now())
+	lease := &coordinationv1.Lease{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      leaseName,
+			Namespace: h.namespace,
+		},
+		Spec: coordinationv1.LeaseSpec{
+			HolderIdentity:       &holder,
+			LeaseDurationSeconds: &leaseDurationSec,
+			AcquireTime:          &now,
+			RenewTime:            &now,
+		},
+	}
+	created, err := leaseClient.Create(ctx, lease, metav1.CreateOptions{})
+	if err == nil {
+		return created, nil
+	}
+	if !apierrors.IsAlreadyExists(err) {
+		return nil, fmt.Errorf("create lease %s: %w", leaseName, err)
+	}
+	existing, getErr := leaseClient.Get(ctx, leaseName, metav1.GetOptions{})
+	if getErr != nil {
+		// Lost the race with a delete; try the next slot (or the
+		// outer retry) instead of tight-looping on this index.
+		if apierrors.IsNotFound(getErr) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get lease %s: %w", leaseName, getErr)
+	}
+	if !h.expired(existing) {
+		return nil, nil
+	}
+	existing.Spec.HolderIdentity = &holder
+	now = metav1.NewMicroTime(time.Now())
+	existing.Spec.AcquireTime = &now
+	existing.Spec.RenewTime = &now
+	updated, updateErr := leaseClient.Update(ctx, existing, metav1.UpdateOptions{})
+	if updateErr != nil {
+		return nil, nil
+	}
+	return updated, nil
 }
 
 func (h *downloadLeaseLocker) expired(lease *coordinationv1.Lease) bool {
@@ -200,7 +218,8 @@ func (h *downloadLeaseLocker) execute(
 	}
 	// Delete so the next waiter can Create immediately instead of waiting
 	// for LeaseDurationSeconds (~30s) after we stop renewing.
-	if delErr := leaseClient.Delete(context.Background(), lease.Name, metav1.DeleteOptions{}); delErr != nil && !apierrors.IsNotFound(delErr) {
+	// Use WithoutCancel so release still runs if the work context was canceled.
+	if delErr := leaseClient.Delete(context.WithoutCancel(ctx), lease.Name, metav1.DeleteOptions{}); delErr != nil && !apierrors.IsNotFound(delErr) {
 		log.Error(delErr, "failed to delete download lease", "slot", slot, "key", leaseKey)
 	}
 	log.Info("download lease released", "slot", slot, "key", leaseKey)

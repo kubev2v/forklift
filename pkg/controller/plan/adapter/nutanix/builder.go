@@ -70,6 +70,7 @@ const (
 	cookieHeaderKey          = "cookie"
 	populatorServiceAccount  = "populator"
 	populatorLeaseRoleName   = "nutanix-http-populator-lease"
+	errCatalogImageNotFound  = "catalog image not found"
 )
 
 // adapterPriority maps Nutanix adapter types to sort priority (lower = first).
@@ -672,7 +673,7 @@ func (r *Builder) elementHTTPSource(baseURL, name string, secret *core.Secret, c
 		return nil, err
 	}
 	if entity == nil {
-		return nil, liberr.New("catalog image not found", "image", name)
+		return nil, liberr.New(errCatalogImageNotFound, "image", name)
 	}
 	return &cdi.DataVolumeSourceHTTP{
 		URL:           fmt.Sprintf("%s/api/nutanix/v3/images/%s/file", baseURL, entity.Metadata.UUID),
@@ -718,7 +719,7 @@ func (r *Builder) resolveCentralDownload(client *Client, imageName string) (down
 		return "", "", err
 	}
 	if entity == nil {
-		return "", "", liberr.New("catalog image not found", "image", imageName)
+		return "", "", liberr.New(errCatalogImageNotFound, "image", imageName)
 	}
 	downloadURL, cookie, err = client.resolveImageV4DownloadURL(entity.ExtID)
 	if err != nil {
@@ -1461,7 +1462,7 @@ func (r *Builder) resolveHTTPPopulatorSource(
 			return "", "", ferr
 		}
 		if entity == nil {
-			return "", "", liberr.New("catalog image not found", "image", imageName)
+			return "", "", liberr.New(errCatalogImageNotFound, "image", imageName)
 		}
 		return fmt.Sprintf("%s/api/nutanix/v3/images/%s/file", baseURL, entity.Metadata.UUID),
 			providerSecretName, nil
