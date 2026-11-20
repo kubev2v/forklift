@@ -21,7 +21,7 @@ ARG BUILD_DATE=unknown
 
 LABEL \
         com.redhat.component="mtv-nutanix-http-populator-container" \
-        name="migration-toolkit-virtualization/mtv-nutanix-http-populator-rhel9" \
+        name="migration-toolkit-virtualization/mtv-nutanix-http-populator-rhel10" \
         license="Apache License 2.0" \
         io.k8s.display-name="Migration Toolkit for Virtualization" \
         io.k8s.description="Migration Toolkit for Virtualization - Nutanix HTTP Populator" \
