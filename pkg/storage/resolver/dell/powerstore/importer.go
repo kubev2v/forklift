@@ -28,6 +28,9 @@ func NewPowerstoreImporter(host, user, pass string, skipSSL bool) (*PowerstoreIm
 	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
 		return nil, fmt.Errorf("STORAGE_HOSTNAME must be a full URL with scheme (e.g. https://host), got %q", host)
 	}
+	if parsedURL.Scheme != "https" {
+		return nil, fmt.Errorf("STORAGE_HOSTNAME must use https, got %q", host)
+	}
 
 	return &PowerstoreImporter{
 		baseURL: strings.TrimRight(host, "/"),

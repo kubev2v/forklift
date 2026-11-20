@@ -50,7 +50,6 @@ func TestNewPowerstoreImporter(t *testing.T) {
 		want  string
 	}{
 		{"https://host", "https://host"},
-		{"http://host:8080", "http://host:8080"},
 		{"https://10.46.2.10", "https://10.46.2.10"},
 		{"https://10.46.2.10/", "https://10.46.2.10"},
 		{"10.46.2.10", "https://10.46.2.10"},
@@ -68,6 +67,7 @@ func TestNewPowerstoreImporter(t *testing.T) {
 
 	invalidTests := []string{
 		"",
+		"http://host:8080",
 	}
 	for _, input := range invalidTests {
 		_, err := NewPowerstoreImporter(input, "user", "pass", true)
