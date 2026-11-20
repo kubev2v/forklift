@@ -1,0 +1,110 @@
+# Puts the virt-v2v profiles on every node that can run a conversion, for
+# clusters with no other delivery mechanism. Prefer the Security Profiles
+# Operator where it is already in use. Nothing applies this, and the controller
+# ignores the profiles until VIRT_V2V_{SECCOMP,APPARMOR}_PROFILE_TYPE name them.
+#
+#   kubectl -n konveyor-forklift create configmap forklift-virt-v2v-profiles \
+#     --from-file=hack/seccomp/unshare.json \
+#     --from-file=hack/seccomp/apparmor-unshare.profile
+#   kubectl apply -f hack/seccomp/profile-installer.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: forklift-virt-v2v-profile-installer
+  namespace: konveyor-forklift
+  labels:
+    app: forklift
+    service: forklift-virt-v2v-profile-installer
+spec:
+  selector:
+    matchLabels:
+      service: forklift-virt-v2v-profile-installer
+  template:
+    metadata:
+      labels:
+        app: forklift
+        service: forklift-virt-v2v-profile-installer
+    spec:
+      # The installer only touches the node filesystem; it never talks to the
+      # API server.
+      automountServiceAccountToken: false
+      tolerations:
+        - operator: Exists
+      initContainers:
+        - name: install
+          image: docker.io/library/busybox:1.37.0
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              mkdir -p /host-seccomp/profiles
+              install -m 0644 /profiles/unshare.json /host-seccomp/profiles/unshare.json
+              install -m 0644 /profiles/apparmor-unshare.profile \
+                /host-seccomp/profiles/apparmor-unshare.profile
+              echo "installed seccomp profile"
+              # AppArmor is optional: nodes that do not enforce it have no
+              # apparmor_parser and need only the seccomp profile. The host
+              # names its own parser; a host without sh has no AppArmor either.
+              PARSER="$(chroot /host sh -c 'command -v apparmor_parser' || true)"
+              if [ -n "$PARSER" ]; then
+                # The userns rule is AppArmor 4.0 syntax. Parsers below 4.0
+                # reject it, and the systems they ship on do not mediate user
+                # namespaces, so the rule is stripped for them.
+                PARSER_MAJOR="$(chroot /host "$PARSER" --version \
+                  | sed -n 's/^AppArmor parser version \([0-9]*\).*/\1/p')"
+                if [ -z "$PARSER_MAJOR" ]; then
+                  echo "STOP: could not read the apparmor_parser major version"
+                  exit 1
+                fi
+                if [ "$PARSER_MAJOR" -lt 4 ]; then
+                  echo "apparmor_parser ${PARSER_MAJOR}.x predates userns mediation;" \
+                    "installing the profile without the userns rule"
+                  sed '/^[[:space:]]*userns,/d' /profiles/apparmor-unshare.profile \
+                    > /host-seccomp/profiles/apparmor-unshare.profile
+                fi
+                chroot /host "$PARSER" -r -W \
+                  /var/lib/kubelet/seccomp/profiles/apparmor-unshare.profile
+                echo "loaded AppArmor profile"
+              else
+                echo "no apparmor_parser on this node, skipping AppArmor"
+              fi
+          securityContext:
+            # Deliberate: loading an AppArmor profile writes into securityfs,
+            # which the runtime's default AppArmor profile denies. Narrowing to
+            # CAP_MAC_ADMIN would also require lifting the container's own
+            # AppArmor confinement, a pod field that only exists on Kubernetes
+            # 1.30+. privileged works uniformly, and this DaemonSet is opt-in:
+            # nothing in the default install applies it.
+            privileged: true
+            runAsUser: 0
+          volumeMounts:
+            - name: profiles
+              mountPath: /profiles
+            - name: host-seccomp
+              mountPath: /host-seccomp
+            - name: host
+              mountPath: /host
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: 1m
+              memory: 8Mi
+              ephemeral-storage: 8Mi
+            limits:
+              memory: 8Mi
+              ephemeral-storage: 8Mi
+      volumes:
+        - name: profiles
+          configMap:
+            name: forklift-virt-v2v-profiles
+        - name: host-seccomp
+          hostPath:
+            path: /var/lib/kubelet/seccomp
+            type: DirectoryOrCreate
+        - name: host
+          hostPath:
+            path: /
+            type: Directory
