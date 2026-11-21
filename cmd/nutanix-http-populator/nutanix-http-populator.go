@@ -37,7 +37,10 @@ const (
 	entityDownloadPathPrefix  = "/entity_download/"
 	httpDialTimeout           = 30 * time.Second
 	httpResponseHeaderTimeout = 60 * time.Second
+	httpBodyIdleTimeout       = 5 * time.Minute
 )
+
+var errBodyIdleTimeout = errors.New("download body idle timeout")
 
 type config struct {
 	volumePath           string
@@ -247,7 +250,7 @@ func downloadOnce(ctx context.Context, cfg *config, progress *prometheus.GaugeVe
 		return err
 	}
 
-	read, err := copyBodyToVolume(ctx, cfg, progress, resp.Body, file, start)
+	read, err := copyBodyToVolume(ctx, cfg, progress, &idleReader{r: resp.Body, idle: httpBodyIdleTimeout}, file, start)
 	if err != nil {
 		return err
 	}
@@ -350,7 +353,7 @@ func isRetryable(err error) bool {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return false
 	}
-	if errors.Is(err, io.ErrUnexpectedEOF) {
+	if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, errBodyIdleTimeout) {
 		return true
 	}
 	var netErr net.Error
@@ -363,7 +366,34 @@ func isRetryable(err error) bool {
 		strings.Contains(s, "connection reset") ||
 		strings.Contains(s, "broken pipe") ||
 		strings.Contains(s, "Server closed idle connection") ||
-		strings.Contains(s, "use of closed network connection")
+		strings.Contains(s, "use of closed network connection") ||
+		strings.Contains(s, "timeout awaiting response headers")
+}
+
+// idleReader fails a Read that makes no progress within idle.
+type idleReader struct {
+	r    io.Reader
+	idle time.Duration
+}
+
+func (i *idleReader) Read(p []byte) (int, error) {
+	type result struct {
+		n   int
+		err error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		n, err := i.r.Read(p)
+		ch <- result{n, err}
+	}()
+	timer := time.NewTimer(i.idle)
+	defer timer.Stop()
+	select {
+	case res := <-ch:
+		return res.n, res.err
+	case <-timer.C:
+		return 0, errBodyIdleTimeout
+	}
 }
 
 func openVolume(volumePath string) (*os.File, error) {

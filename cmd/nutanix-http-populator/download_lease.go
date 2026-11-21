@@ -25,6 +25,7 @@ const (
 	leaseRenewInterval   = 3 * time.Second
 	minLeaseDuration     = leaseRenewInterval + 2*time.Second
 	leaseCleanupBound    = 10 * time.Second
+	leaseRenewTimeout   = 5 * time.Second
 )
 
 // downloadLeaseLocker limits concurrent Nutanix HTTP downloads with the same
@@ -207,7 +208,9 @@ func (h *downloadLeaseLocker) execute(
 			case <-ticker.C:
 				now := metav1.NewMicroTime(time.Now())
 				lease.Spec.RenewTime = &now
-				updated, err := leaseClient.Update(renewCtx, lease, metav1.UpdateOptions{})
+				rctx, rcancel := context.WithTimeout(renewCtx, leaseRenewTimeout)
+				updated, err := leaseClient.Update(rctx, lease, metav1.UpdateOptions{})
+				rcancel()
 				if err != nil {
 					workCancel()
 					select {

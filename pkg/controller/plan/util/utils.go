@@ -135,15 +135,18 @@ func GetVolumeAndAccessMode(
 		return nil, nil, err
 	}
 
-	if len(storageProfile.Status.ClaimPropertySets) == 0 ||
-		len(storageProfile.Status.ClaimPropertySets[0].AccessModes) == 0 {
-		return nil, nil, fmt.Errorf("no accessMode defined on StorageProfile for StorageClass %q", destination.StorageClass)
-	}
-	if len(accessModes) == 0 {
-		accessModes = storageProfile.Status.ClaimPropertySets[0].AccessModes
+	needAccess := len(accessModes) == 0
+	sets := storageProfile.Status.ClaimPropertySets
+	if needAccess {
+		if len(sets) == 0 || len(sets[0].AccessModes) == 0 {
+			return nil, nil, fmt.Errorf("no accessMode defined on StorageProfile for StorageClass %q", destination.StorageClass)
+		}
+		accessModes = sets[0].AccessModes
 	}
 	if volumeMode == nil {
-		volumeMode = storageProfile.Status.ClaimPropertySets[0].VolumeMode
+		if len(sets) > 0 {
+			volumeMode = sets[0].VolumeMode
+		}
 		if volumeMode == nil {
 			volumeMode = &filesystemMode
 		}
