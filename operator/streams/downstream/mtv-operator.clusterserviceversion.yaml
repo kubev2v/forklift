@@ -772,6 +772,11 @@ spec:
         kind: NetworkMap
         name: networkmaps.forklift.konveyor.io
         version: v1beta1
+      - description: Nutanix HTTP Volume Populator
+        displayName: NutanixHTTPVolumePopulator
+        kind: NutanixHTTPVolumePopulator
+        name: nutanixhttpvolumepopulators.forklift.konveyor.io
+        version: v1beta1
       - description: OpenStack Volume Populator
         displayName: OpenstackVolumePopulator
         kind: OpenstackVolumePopulator

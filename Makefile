@@ -129,6 +129,7 @@ OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)
 POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG)
 OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)
 OPENSTACK_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG)
+NUTANIX_HTTP_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/nutanix-http-populator:$(REGISTRY_TAG)
 OVA_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG)
 HYPERV_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-hyperv-provider-server:$(REGISTRY_TAG)
 OVA_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG)
@@ -402,6 +403,7 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg HYPERV_PROVIDER_SERVER_IMAGE=$(HYPERV_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OVA_PROXY_IMAGE=$(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE=$(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg NUTANIX_HTTP_POPULATOR_IMAGE=$(NUTANIX_HTTP_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VIRT_V2V_IMAGE_RHEL9=$(VIRT_V2V_IMAGE_RHEL9)$(PLATFORM_SUFFIX) \
 		--build-arg COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE=$(COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg NBD_CONTAINER_IMAGE=$(NBD_CONTAINER_IMAGE)$(PLATFORM_SUFFIX)
@@ -460,6 +462,12 @@ build-openstack-populator-image: check_container_runtime
 
 push-openstack-populator-image: build-openstack-populator-image
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
+
+build-nutanix-http-populator-image: check_container_runtime
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(NUTANIX_HTTP_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/nutanix-http-populator/Containerfile .
+
+push-nutanix-http-populator-image: build-nutanix-http-populator-image
+	$(CONTAINER_CMD) push $(NUTANIX_HTTP_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
 
 build-vsphere-copy-offload-populator-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/vsphere-copy-offload-populator/Containerfile .
@@ -544,6 +552,7 @@ build-all-images: build-api-image \
                   build-populator-controller-image \
                   build-ovirt-populator-image \
                   build-openstack-populator-image\
+                  build-nutanix-http-populator-image\
                   build-vsphere-copy-offload-populator-image\
                   build-copy-appliance-template-builder-image \
                   build-nbd-container-image \
@@ -564,6 +573,7 @@ push-all-images:  push-api-image \
                   push-populator-controller-image \
                   push-ovirt-populator-image \
                   push-openstack-populator-image\
+                  push-nutanix-http-populator-image\
                   push-vsphere-copy-offload-populator-image\
                   push-copy-appliance-template-builder-image \
                   push-nbd-container-image \
@@ -637,6 +647,13 @@ push-vsphere-copy-offload-populator-image-manifest:
 		$(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)-arm64
 	$(CONTAINER_CMD) manifest push $(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)
 
+push-nutanix-http-populator-image-manifest:
+	$(CONTAINER_CMD) manifest rm $(NUTANIX_HTTP_POPULATOR_IMAGE) || true
+	$(CONTAINER_CMD) manifest create $(NUTANIX_HTTP_POPULATOR_IMAGE) \
+		$(NUTANIX_HTTP_POPULATOR_IMAGE)-amd64 \
+		$(NUTANIX_HTTP_POPULATOR_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(NUTANIX_HTTP_POPULATOR_IMAGE)
+
 push-ova-provider-server-image-manifest:
 	$(CONTAINER_CMD) manifest rm $(OVA_PROVIDER_SERVER_IMAGE) || true
 	$(CONTAINER_CMD) manifest create $(OVA_PROVIDER_SERVER_IMAGE) \
@@ -689,6 +706,7 @@ push-all-images-manifest: push-controller-image-manifest \
                           push-ovirt-populator-image-manifest \
                           push-openstack-populator-image-manifest \
                           push-vsphere-copy-offload-populator-image-manifest \
+                          push-nutanix-http-populator-image-manifest \
                           push-ova-provider-server-image-manifest \
                           push-hyperv-provider-server-image-manifest \
                           push-cli-download-image-manifest \

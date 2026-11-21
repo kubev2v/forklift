@@ -17,8 +17,10 @@ import (
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	cnv "kubevirt.io/api/core/v1"
 	libvirtxml "libvirt.org/go/libvirtxml"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 // newOrderingTestVM builds a VM whose Disks are deliberately not in
@@ -608,5 +610,64 @@ func TestDiskNames(t *testing.T) {
 		if actual != expected {
 			t.Fatalf("Expected %q: got %q", expected, actual)
 		}
+	}
+}
+
+func TestEnsureHTTPPopulatorCookieSecret_UsesGetCACert(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := core.AddToScheme(scheme); err != nil {
+		t.Fatalf("scheme: %v", err)
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+	plan := &api.Plan{
+		ObjectMeta: meta.ObjectMeta{Name: "plan-1", Namespace: "ns"},
+		Spec:       api.PlanSpec{TargetNamespace: "ns"},
+	}
+	builder := &Builder{Context: &plancontext.Context{
+		Plan: plan,
+		Migration: &api.Migration{
+			ObjectMeta: meta.ObjectMeta{UID: "migration-uid"},
+		},
+		Source: plancontext.Source{
+			Secret: &core.Secret{
+				// Legacy cacert key must be written as ca.crt on the cookie secret.
+				Data: map[string][]byte{
+					"cacert":             []byte("legacy-ca"),
+					"user":               []byte("admin"),
+					"password":           []byte("secret"),
+					"insecureSkipVerify": []byte("true"),
+				},
+			},
+		},
+		Destination: plancontext.Destination{Client: cl},
+		Log:         liblogging.WithName("test"),
+	}}
+
+	secret, err := builder.ensureHTTPPopulatorCookieSecret(
+		ref.Ref{ID: "vm-1"},
+		"disk-1",
+		"session=abc",
+		map[string]string{"migration": "migration-uid", "vmID": "vm-1"},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := string(secret.Data["Cookie"]); got != "session=abc" {
+		t.Fatalf("Cookie: got %q", got)
+	}
+	if got := string(secret.Data["ca.crt"]); got != "legacy-ca" {
+		t.Fatalf("expected ca.crt from GetCACert(cacert), got %q", got)
+	}
+	if _, ok := secret.Data["cacert"]; ok {
+		t.Fatal("cookie secret must not keep the legacy cacert key")
+	}
+	if got := string(secret.Data["insecureSkipVerify"]); got != "true" {
+		t.Fatalf("insecureSkipVerify: got %q", got)
+	}
+	if got := string(secret.Data["user"]); got != "admin" {
+		t.Fatalf("user: got %q", got)
+	}
+	if got := string(secret.Data["password"]); got != "secret" {
+		t.Fatalf("password: got %q", got)
 	}
 }

@@ -110,6 +110,11 @@ var (
 			resource:           api.VSphereXcopyVolumePopulatorResource,
 			regexKey:           "vsphere_xcopy_volume_populator",
 		},
+		api.NutanixHTTPVolumePopulatorKind: {
+			storageResourceKey: "url",
+			resource:           api.NutanixHTTPVolumePopulatorResource,
+			regexKey:           "nutanix_http_populator",
+		},
 	}
 
 	monitoredPVCs = map[string]interface{}{}
@@ -955,10 +960,17 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		completion = c.parseAndRecordCompletion(bodyStr, pvc, cr)
 	}
 
+	pr := populatorToResource[populatorKind]
+	if pr == nil {
+		return fmt.Errorf("unknown populator kind %q", populatorKind)
+	}
+	if pvc.Spec.DataSourceRef.APIGroup == nil {
+		return fmt.Errorf("PVC %s/%s DataSourceRef.APIGroup is nil", pvc.Namespace, pvc.Name)
+	}
 	gvr := schema.GroupVersionResource{
 		Group:    *pvc.Spec.DataSourceRef.APIGroup,
 		Version:  "v1beta1",
-		Resource: populatorToResource[populatorKind].resource,
+		Resource: pr.resource,
 	}
 
 	latestPopulator, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Get(context.TODO(), cr.GetName(), metav1.GetOptions{})
