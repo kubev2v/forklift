@@ -6,6 +6,7 @@ package ssh
 
 import (
 	"crypto"
+	"crypto/fips140"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -83,6 +84,7 @@ var (
 	// supportedKexAlgos specifies key-exchange algorithms implemented by this
 	// package in preference order, excluding those with security issues.
 	supportedKexAlgos = []string{
+		KeyExchangeMLKEM768X25519,
 		KeyExchangeCurve25519,
 		KeyExchangeECDHP256,
 		KeyExchangeECDHP384,
@@ -94,6 +96,7 @@ var (
 	// defaultKexAlgos specifies the default preference for key-exchange
 	// algorithms in preference order.
 	defaultKexAlgos = []string{
+		KeyExchangeMLKEM768X25519,
 		KeyExchangeCurve25519,
 		KeyExchangeECDHP256,
 		KeyExchangeECDHP384,
@@ -177,7 +180,6 @@ var (
 		CertAlgoRSASHA256v01,
 		CertAlgoRSASHA512v01,
 		CertAlgoRSAv01,
-		InsecureCertAlgoDSAv01,
 		CertAlgoECDSA256v01,
 		CertAlgoECDSA384v01,
 		CertAlgoECDSA521v01,
@@ -188,16 +190,13 @@ var (
 		KeyAlgoRSASHA256,
 		KeyAlgoRSASHA512,
 		KeyAlgoRSA,
-		InsecureKeyAlgoDSA,
 		KeyAlgoED25519,
 	}
 	// insecureHostKeyAlgos specifies host-key algorithms implemented by this
 	// package and which have security issues.
 	insecureHostKeyAlgos = []string{
 		KeyAlgoRSA,
-		InsecureKeyAlgoDSA,
 		CertAlgoRSAv01,
-		InsecureCertAlgoDSAv01,
 	}
 	// supportedPubKeyAuthAlgos specifies the supported client public key
 	// authentication algorithms. Note that this doesn't include certificate
@@ -226,13 +225,11 @@ var (
 		KeyAlgoRSASHA256,
 		KeyAlgoRSASHA512,
 		KeyAlgoRSA,
-		InsecureKeyAlgoDSA,
 	}
 	// insecurePubKeyAuthAlgos specifies client public key authentication
 	// algorithms implemented by this package and which have security issues.
 	insecurePubKeyAuthAlgos = []string{
 		KeyAlgoRSA,
-		InsecureKeyAlgoDSA,
 	}
 )
 
@@ -252,6 +249,49 @@ type Algorithms struct {
 	MACs           []string
 	HostKeys       []string
 	PublicKeyAuths []string
+}
+
+func init() {
+	supportedHostKeyAlgos = slices.Concat(supportedHostKeyAlgos, mldsaCertAlgos, mldsaKeyAlgos)
+	defaultHostKeyAlgos = slices.Concat(defaultHostKeyAlgos, mldsaCertAlgos, mldsaKeyAlgos)
+	supportedPubKeyAuthAlgos = slices.Concat(supportedPubKeyAuthAlgos, mldsaKeyAlgos)
+	defaultPubKeyAuthAlgos = slices.Concat(defaultPubKeyAuthAlgos, mldsaKeyAlgos)
+
+	if fips140.Enabled() {
+		defaultHostKeyAlgos = slices.DeleteFunc(defaultHostKeyAlgos, func(algo string) bool {
+			_, err := hashFunc(underlyingAlgo(algo))
+			return err != nil
+		})
+		defaultPubKeyAuthAlgos = slices.DeleteFunc(defaultPubKeyAuthAlgos, func(algo string) bool {
+			_, err := hashFunc(underlyingAlgo(algo))
+			return err != nil
+		})
+	}
+}
+
+func hashFunc(format string) (crypto.Hash, error) {
+	switch format {
+	case KeyAlgoRSASHA256, KeyAlgoECDSA256, KeyAlgoSKED25519, KeyAlgoSKECDSA256:
+		return crypto.SHA256, nil
+	case KeyAlgoECDSA384:
+		return crypto.SHA384, nil
+	case KeyAlgoRSASHA512, KeyAlgoECDSA521:
+		return crypto.SHA512, nil
+	case KeyAlgoED25519:
+		// KeyAlgoED25519 doesn't pre-hash.
+		return 0, nil
+	case KeyAlgoMLDSA44, KeyAlgoMLDSA65, KeyAlgoMLDSA87:
+		// ML-DSA doesn't pre-hash. This case is not build tagged, availability
+		// is decided by mldsaKeyAlgos.
+		return 0, nil
+	case KeyAlgoRSA:
+		if fips140.Enabled() {
+			return 0, fmt.Errorf("ssh: hash algorithm for format %q not allowed in FIPS 140 mode", format)
+		}
+		return crypto.SHA1, nil
+	default:
+		return 0, fmt.Errorf("ssh: hash algorithm for format %q not mapped", format)
+	}
 }
 
 // SupportedAlgorithms returns algorithms currently implemented by this package,
@@ -281,21 +321,6 @@ func InsecureAlgorithms() Algorithms {
 
 var supportedCompressions = []string{compressionNone}
 
-// hashFuncs keeps the mapping of supported signature algorithms to their
-// respective hashes needed for signing and verification.
-var hashFuncs = map[string]crypto.Hash{
-	KeyAlgoRSA:         crypto.SHA1,
-	KeyAlgoRSASHA256:   crypto.SHA256,
-	KeyAlgoRSASHA512:   crypto.SHA512,
-	InsecureKeyAlgoDSA: crypto.SHA1,
-	KeyAlgoECDSA256:    crypto.SHA256,
-	KeyAlgoECDSA384:    crypto.SHA384,
-	KeyAlgoECDSA521:    crypto.SHA512,
-	// KeyAlgoED25519 doesn't pre-hash.
-	KeyAlgoSKECDSA256: crypto.SHA256,
-	KeyAlgoSKED25519:  crypto.SHA256,
-}
-
 // algorithmsForKeyFormat returns the supported signature algorithms for a given
 // public key format (PublicKey.Type), in order of preference. See RFC 8332,
 // Section 2. See also the note in sendKexInit on backwards compatibility.
@@ -310,11 +335,44 @@ func algorithmsForKeyFormat(keyFormat string) []string {
 	}
 }
 
+// keyFormatForAlgorithm returns the key format corresponding to the given
+// signature algorithm. It returns an empty string if the signature algorithm is
+// invalid or unsupported.
+func keyFormatForAlgorithm(sigAlgo string) string {
+	switch sigAlgo {
+	case KeyAlgoRSA, KeyAlgoRSASHA256, KeyAlgoRSASHA512:
+		return KeyAlgoRSA
+	case CertAlgoRSAv01, CertAlgoRSASHA256v01, CertAlgoRSASHA512v01:
+		return CertAlgoRSAv01
+	case KeyAlgoED25519,
+		KeyAlgoSKED25519,
+		KeyAlgoSKECDSA256,
+		KeyAlgoECDSA256,
+		KeyAlgoECDSA384,
+		KeyAlgoECDSA521,
+		CertAlgoECDSA256v01,
+		CertAlgoECDSA384v01,
+		CertAlgoECDSA521v01,
+		CertAlgoSKECDSA256v01,
+		CertAlgoED25519v01,
+		CertAlgoSKED25519v01,
+		KeyAlgoMLDSA44,
+		KeyAlgoMLDSA65,
+		KeyAlgoMLDSA87,
+		CertAlgoMLDSA44v01Go,
+		CertAlgoMLDSA65v01Go,
+		CertAlgoMLDSA87v01Go:
+		return sigAlgo
+	default:
+		return ""
+	}
+}
+
 // isRSA returns whether algo is a supported RSA algorithm, including certificate
 // algorithms.
 func isRSA(algo string) bool {
 	algos := algorithmsForKeyFormat(KeyAlgoRSA)
-	return contains(algos, underlyingAlgo(algo))
+	return slices.Contains(algos, underlyingAlgo(algo))
 }
 
 func isRSACert(algo string) bool {
@@ -340,7 +398,12 @@ func findCommon(what string, client []string, server []string, isClient bool) (s
 	for _, c := range client {
 		for _, s := range server {
 			if c == s {
-				return c, nil
+				// Return the name from the local list, not the peer's, which
+				// would keep the peer's whole name list alive (see parseNameList).
+				if isClient {
+					return c, nil
+				}
+				return s, nil
 			}
 		}
 	}
@@ -368,7 +431,7 @@ type AlgorithmNegotiationError struct {
 }
 
 func (a *AlgorithmNegotiationError) Error() string {
-	return fmt.Sprintf("ssh: no common algorithm for %s; we offered: %v, peer offered: %v",
+	return fmt.Sprintf("ssh: no common algorithm for %s; we offered: %q, peer offered: %q",
 		a.What, a.SupportedAlgorithms, a.RequestedAlgorithms)
 }
 
@@ -493,7 +556,7 @@ func (c *Config) SetDefaults() {
 	if c.Rand == nil {
 		c.Rand = rand.Reader
 	}
-	if c.Ciphers == nil {
+	if len(c.Ciphers) == 0 {
 		c.Ciphers = defaultCiphers
 	}
 	var ciphers []string
@@ -505,7 +568,7 @@ func (c *Config) SetDefaults() {
 	}
 	c.Ciphers = ciphers
 
-	if c.KeyExchanges == nil {
+	if len(c.KeyExchanges) == 0 {
 		c.KeyExchanges = defaultKexAlgos
 	}
 	var kexs []string
@@ -513,14 +576,14 @@ func (c *Config) SetDefaults() {
 		if kexAlgoMap[k] != nil {
 			// Ignore the KEX if we have no kexAlgoMap definition.
 			kexs = append(kexs, k)
-			if k == KeyExchangeCurve25519 && !contains(c.KeyExchanges, keyExchangeCurve25519LibSSH) {
+			if k == KeyExchangeCurve25519 && !slices.Contains(c.KeyExchanges, keyExchangeCurve25519LibSSH) {
 				kexs = append(kexs, keyExchangeCurve25519LibSSH)
 			}
 		}
 	}
 	c.KeyExchanges = kexs
 
-	if c.MACs == nil {
+	if len(c.MACs) == 0 {
 		c.MACs = defaultMACs
 	}
 	var macs []string
