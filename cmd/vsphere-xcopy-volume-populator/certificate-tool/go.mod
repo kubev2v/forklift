@@ -1,6 +1,6 @@
 module certificate-tool
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/spf13/cobra v1.9.1
@@ -49,7 +49,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
