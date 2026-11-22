@@ -240,7 +240,6 @@ func (r *Client) getVM(vmRef ref.Ref) (vm *libclient.VM, err error) {
 		vms := []libclient.VM{}
 		opts := libclient.VMListOpts{}
 		opts.Name = vmRef.Name
-		opts.Limit = 1
 		err = r.List(&vms, &opts)
 		if err != nil {
 			return
@@ -276,7 +275,6 @@ func (r *Client) getImage(imageRef ref.Ref) (image *libclient.Image, err error) 
 		opts.Name = imageRef.Name
 		opts.SortKey = "created_at"
 		opts.SortDir = "desc"
-		opts.Limit = 1
 		err = r.List(&images, &opts)
 		if err != nil {
 			return
@@ -312,7 +310,6 @@ func (r *Client) getVolume(volumeRef ref.Ref) (volume *libclient.Volume, err err
 		opts := libclient.VolumeListOpts{}
 		opts.Name = volumeRef.Name
 		opts.Sort = "created_at:desc"
-		opts.Limit = 1
 		err = r.List(&volumes, &opts)
 		if err != nil {
 			return
@@ -558,7 +555,6 @@ func (r *Client) getSnapshotFromVolume(vm *libclient.VM, volumeID string) (snaps
 	opts := libclient.SnapshotListOpts{}
 	opts.Name = snapshotName
 	opts.VolumeID = volumeID
-	opts.Limit = 1
 	err = r.List(&snapshots, &opts)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -587,7 +583,6 @@ func (r *Client) getVolumeFromSnapshot(vm *libclient.VM, snapshotID string) (vol
 	opts := libclient.VolumeListOpts{}
 	opts.Name = volumeName
 	opts.Metadata = metadata
-	opts.Limit = 1
 	err = r.List(&volumes, &opts)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -616,7 +611,6 @@ func (r *Client) getImageFromVolume(vm *libclient.VM, volumeID string) (image *l
 	opts.Name = imageName
 	opts.SortKey = "created_at"
 	opts.SortDir = "desc"
-	opts.Limit = 1
 	err = r.List(&images, &opts)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -635,7 +629,6 @@ func (r *Client) getVmSnapshotImage(vm *libclient.VM) (vmImage *libclient.Image,
 	vmSnapshotImageName := getVmSnapshotName(r.Context, vm.ID)
 	opts := &libclient.ImageListOpts{}
 	opts.Name = vmSnapshotImageName
-	opts.Limit = 1
 	opts.SortKey = "created_at"
 	opts.SortDir = "desc"
 	images, err := r.VMGetSnapshotImages(opts)
