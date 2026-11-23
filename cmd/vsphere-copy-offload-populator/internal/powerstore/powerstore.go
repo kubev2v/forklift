@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/dell/gopowerstore"
@@ -379,6 +380,10 @@ func NewPowerstoreClonner(hostname, username, password string, sslSkipVerify boo
 	if password == "" {
 		return PowerstoreClonner{}, fmt.Errorf("password is required")
 	}
+	hostname, err := powerstoreAPIEndpoint(hostname)
+	if err != nil {
+		return PowerstoreClonner{}, fmt.Errorf("invalid STORAGE_HOSTNAME: %w", err)
+	}
 
 	log.V(2).Info("creating PowerStore client", "hostname", hostname)
 	clientOptions := gopowerstore.NewClientOptions()
@@ -425,4 +430,24 @@ func NewPowerstoreClonner(hostname, username, password string, sslSkipVerify boo
 	}
 
 	return clonner, nil
+}
+
+func powerstoreAPIEndpoint(hostname string) (string, error) {
+	if !strings.Contains(hostname, "://") {
+		hostname = "https://" + hostname
+	}
+
+	endpoint, err := url.Parse(hostname)
+	if err != nil || endpoint.Host == "" || (!strings.EqualFold(endpoint.Scheme, "http") && !strings.EqualFold(endpoint.Scheme, "https")) {
+		return "", fmt.Errorf("expected a host or HTTP(S) URL, got %q", hostname)
+	}
+	endpoint.Scheme = strings.ToLower(endpoint.Scheme)
+
+	basePath := strings.TrimRight(endpoint.Path, "/")
+	if basePath != "/api/rest" && !strings.HasSuffix(basePath, "/api/rest") {
+		endpoint.Path = basePath + "/api/rest"
+		endpoint.RawPath = ""
+	}
+
+	return endpoint.String(), nil
 }
