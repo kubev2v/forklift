@@ -713,11 +713,153 @@ func (r *KubeVirt) GetDeepInspectionConversion(vm *plan.VMStatus) (*api.Conversi
 	return r.getConversion(labels)
 }
 
+// getHyperVDiskPaths returns the disk paths for a Hyper-V VM. The source
+// inventory exposes disk details in different shapes depending on the provider
+// implementation, so inspect the VM status generically for path-bearing values.
+func (r *KubeVirt) getHyperVDiskPaths(vm *plan.VMStatus) ([]string, error) {
+	if vm == nil {
+		return nil, liberr.New("Hyper-V VM is nil")
+	}
+	srcVM, err := r.Source.Inventory.VM(&vm.Ref)
+	if err != nil {
+		return nil, liberr.Wrap(err, "vm", vm.String())
+	}
+	hvVM, ok := srcVM.(*hvwebmodel.VM)
+	if !ok {
+		return nil, liberr.New("unexpected VM type for Hyper-V provider")
+	}
+	var paths []string
+	for _, disk := range hvVM.Disks {
+		if disk.SMBPath != "" {
+			paths = append(paths, disk.SMBPath)
+		}
+	}
+	if len(paths) == 0 {
+		return nil, liberr.New("no Hyper-V disk SMB paths found for VM")
+	}
+	return paths, nil
+}
+
+// CreateDeepInspectionConversionHyperV creates a DeepInspection Conversion CR
+// for a Hyper-V VM. disks are accessed directly via SMB after power-off.
+func (r *KubeVirt) CreateDeepInspectionConversionHyperV(
+	vm *plan.VMStatus, planName, planID string,
+) (*api.Conversion, error) {
+	// Attach the inspection pod to the plan's transfer network (if any) so it
+	// reaches the source over the same network as the conversion pods.
+	transferNetworkAnnotations, err := r.transferNetworkAnnotations()
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	// Ensure SMB CSI credentials exist on the destination cluster so the
+	// CSI driver can stage the volume (required for remote destinations).
+	csiSecretName, csiSecretNS, err := r.EnsureSMBCSISecret(vm)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	// Build SMB PV/PVC (same as virt-v2v pod uses)
+	pv := r.BuildPVForSMB(vm, csiSecretName, csiSecretNS)
+	pv, err = r.EnsurePVForSMB(pv)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	pvc := r.BuildPVCForSMB(pv, vm)
+	pvc, err = r.EnsureProviderStoragePVC(pvc, api.HyperV)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	// Get disk paths from inventory
+	diskPaths, err := r.getHyperVDiskPaths(vm)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	// Connection secret must live next to the inspection pod so the
+	// conversion ensurer can mount it via DestinationClient.
+	connSecretData := map[string][]byte{
+		"smbUrl": []byte(hvutil.SMBUrl(r.Source.Secret)),
+	}
+	connLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID,
+		map[string]string{kConnection: "true"})
+	connSecretSpec := r.buildConversionSecret(
+		r.Plan.Spec.TargetNamespace,
+		planName+"-"+vm.ID+"-di-",
+		connLabels,
+		connSecretData,
+	)
+	connSecret, err := r.ensureConversionSecret(r.Destination.Client, connSecretSpec)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	crLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID, nil)
+	spec := api.ConversionSpec{
+		Type:            api.DeepInspection,
+		TargetNamespace: r.Plan.Spec.TargetNamespace,
+		Destination: core.ObjectReference{
+			Namespace: r.Destination.Provider.Namespace,
+			Name:      r.Destination.Provider.Name,
+		},
+		VM: vm.Ref,
+		Connection: api.Connection{
+			Secret: core.ObjectReference{
+				Namespace: connSecret.Namespace,
+				Name:      connSecret.Name,
+			},
+		},
+		Settings: map[string]string{
+			"V2V_SOURCE":    "hyperv",
+			"V2V_DISK_PATH": strings.Join(diskPaths, ","),
+		},
+		XfsCompatibility: r.Plan.Spec.XfsCompatibility,
+		// No VDDKImage for Hyper-V
+		ExtraVolumes: []core.Volume{
+			{
+				Name: "hyperv-storage",
+				VolumeSource: core.VolumeSource{
+					PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+						ClaimName: pvc.Name,
+						ReadOnly:  true,
+					},
+				},
+			},
+		},
+		ExtraMounts: []core.VolumeMount{
+			{
+				Name:      "hyperv-storage",
+				MountPath: "/hyperv",
+				ReadOnly:  true,
+			},
+		},
+		PodSettings: api.PodSettings{
+			ServiceAccount:             resolveServiceAccount(r.Plan),
+			TransferNetworkAnnotations: transferNetworkAnnotations,
+		},
+	}
+	cr := r.buildConversion(planName, vm.ID, crLabels, spec)
+	return r.ensureConversion(cr)
+}
+
 // CreateDeepInspectionConversion creates a new DeepInspection Conversion CR and
 // returns it.
 func (r *KubeVirt) CreateDeepInspectionConversion(
 	vm *plan.VMStatus, snapshotMoref, planName, planID string,
 ) (*api.Conversion, error) {
+	// Attach the inspection pod to the plan's transfer network (if any) so it
+	// reaches the source (VDDK or copy appliance NBD) over the same network as
+	// the conversion pods.
+	transferNetworkAnnotations, err := r.transferNetworkAnnotations()
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	useCopyApplianceTemplateNBD := settings.Settings.EnabledForPlan(r.Plan)
+	convSettings := map[string]string{api.SpecSettingsSnapshotMorefKey: snapshotMoref}
+	vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
+
 	// Connection secret goes to Plan.Namespace on the management cluster
 	// (DeepInspection pods run there, not on the destination cluster).
 	connSecretData := r.buildDeepInspectionConnectionSecretData()
@@ -792,7 +934,8 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 		VDDKImage:        settings.GetVDDKImage(r.Source.Provider.Spec.Settings),
 		DiskEncryption:   diskEncryption,
 		PodSettings: api.PodSettings{
-			ServiceAccount: resolveServiceAccount(r.Plan),
+			ServiceAccount:             resolveServiceAccount(r.Plan),
+			TransferNetworkAnnotations: transferNetworkAnnotations,
 		},
 	}
 	cr := r.buildConversion(planName, vm.ID, crLabels, spec)
@@ -3927,62 +4070,21 @@ func (r *KubeVirt) vmAllButMigrationLabels(vmRef ref.Ref) (labels map[string]str
 	return
 }
 
-// guessTransferNetworkDefaultRoute determines the default gateway IP address for the transfer network
-// by checking the NetworkAttachmentDefinition in the following priority order:
-//
-//  1. Checks the AnnForkliftNetworkRoute annotation on the NAD
-//  2. Parses the NAD's spec.config JSON and looks for the default route (0.0.0.0/0 or ::/0)
-//     in the ipam.routes array, extracting the gateway IP from the matching route entry
-//
-// Returns:
-//   - route: The gateway IP address as a string (e.g., "192.168.1.1")
-//   - found: true if a route was found, false otherwise
-func (r *KubeVirt) guessTransferNetworkDefaultRoute(netAttachDef *k8snet.NetworkAttachmentDefinition) (route string, found bool) {
-	// First, try to get the default route from the annotation.
-	route, found = netAttachDef.Annotations[AnnForkliftNetworkRoute]
-	if found {
-		return route, true
+// transferNetworkAnnotations returns the Multus pod annotations for the
+// Plan's TransferNetwork. The returned map is empty when no transfer network
+// is configured.
+func (r *KubeVirt) transferNetworkAnnotations() (map[string]string, error) {
+	annotations := map[string]string{}
+	if r.Plan.Spec.TransferNetwork == nil {
+		return annotations, nil
 	}
-
-	// If the route annotation is not set, try to get the default route from the gw config value.
-	// Parse the Config string which is a JSON string containing network configuration.
-	if netAttachDef.Spec.Config != "" {
-		var config CNINetworkConfig
-		err := json.Unmarshal([]byte(netAttachDef.Spec.Config), &config)
-		if err != nil {
-			// If we can't parse the config, just return not found
-			return "", false
-		}
-
-		// Look for the default route (0.0.0.0/0 or ::/0) in the routes
-		for _, r := range config.IPAM.Routes {
-			if r.Dst == "0.0.0.0/0" || r.Dst == "::/0" {
-				return r.GW, true
-			}
-		}
+	if err := r.setTransferNetwork(annotations); err != nil {
+		return nil, liberr.Wrap(err)
 	}
-
-	return "", false
+	return annotations, nil
 }
 
-// setTransferNetwork configures the transfer network for the DataVolume's importer pod
-// by setting appropriate annotations based on whether a default gateway route can be determined.
-//
-// Behavior:
-//   - If a default gateway is found (via annotation or NAD config): Sets the
-//     k8s.v1.cni.cncf.io/networks annotation with the gateway IP in default-route
-//   - If route annotation is explicitly set to "none" (AnnForkliftRouteValueNone):
-//     Sets k8s.v1.cni.cncf.io/networks annotation without default-route field.
-//     Useful for example when only ESXi hosts are accessible via transfer network
-//     but vCenter is not.
-//   - If no route annotation exists and no gateway found in NAD config:
-//     Falls back to setting the legacy
-//     v1.multus-cni.io/default-network annotation with the NAD's namespaced name
-//
-// The default gateway is discovered by checking the NAD annotation and IPAM config
-// (see guessTransferNetworkDefaultRoute for details).
-//
-// FIXME: the codepath using the multus annotation should be phased out.
+// setTransferNetwork fetches the Plan TransferNetwork NAD and applies Multus annotations.
 func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error) {
 	key := client.ObjectKey{
 		Namespace: r.Plan.Spec.TransferNetwork.Namespace,
