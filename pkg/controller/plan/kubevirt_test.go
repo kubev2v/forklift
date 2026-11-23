@@ -1108,6 +1108,170 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			Expect(mgmtClient.Get(context.TODO(), client.ObjectKey{Namespace: planNamespace, Name: mgmtLeftover.Name}, &v1.Pod{})).
 				To(Succeed())
 		})
+
+		ginkgo.It("attaches the deep inspection pod to the plan transfer network", func() {
+			const (
+				vmID          = "hv-vm-2"
+				planNamespace = "openshift-mtv"
+				targetNS      = "migrations"
+			)
+
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "transfer-nad",
+					Namespace: planNamespace,
+					Annotations: map[string]string{
+						AnnForkliftNetworkRoute: "192.168.1.1",
+					},
+				},
+			}
+
+			scheme := runtime.NewScheme()
+			_ = v1.AddToScheme(scheme)
+			_ = k8snet.AddToScheme(scheme)
+			_ = v1beta1.SchemeBuilder.AddToScheme(scheme)
+			mgmtClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(nad).Build()
+
+			hvType := v1beta1.HyperV
+			srcProvider := &v1beta1.Provider{
+				ObjectMeta: metav1.ObjectMeta{Name: "hyperv", Namespace: planNamespace},
+				Spec:       v1beta1.ProviderSpec{Type: &hvType},
+			}
+
+			transferNetwork := &v1.ObjectReference{Namespace: nad.Namespace, Name: nad.Name}
+			kubevirt := &KubeVirt{
+				Context: &plancontext.Context{
+					Client: mgmtClient,
+					Destination: plancontext.Destination{
+						Client: fake.NewClientBuilder().WithScheme(scheme).Build(),
+						Provider: &v1beta1.Provider{
+							ObjectMeta: metav1.ObjectMeta{Name: "host", Namespace: planNamespace},
+						},
+					},
+					Log:       KubeVirtLog,
+					Migration: createMigration(),
+					Plan:      createPlanKubevirt(transferNetwork),
+					Source: plancontext.Source{
+						Provider: srcProvider,
+						Secret: &v1.Secret{
+							Data: map[string][]byte{"smbUrl": []byte("//hyperv.example/share")},
+						},
+						Inventory: &hypervInventoryStub{
+							vm: &hvweb.VM{
+								VM1: hvweb.VM1{
+									Disks: []hvmodel.Disk{{SMBPath: "/hyperv/system.vhdx"}},
+								},
+							},
+						},
+					},
+				},
+			}
+			kubevirt.Plan.ObjectMeta = metav1.ObjectMeta{
+				Name:      "hv-plan",
+				Namespace: planNamespace,
+				UID:       "plan-uid",
+			}
+			kubevirt.Plan.Spec.TargetNamespace = targetNS
+			kubevirt.Plan.Provider.Source = srcProvider
+
+			vm := &plan.VMStatus{}
+			vm.ID = vmID
+			vm.Ref = ref.Ref{ID: vmID}
+
+			cr, err := kubevirt.CreateDeepInspectionConversionHyperV(vm, "hv-plan", "plan-uid")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cr).ToNot(BeNil())
+
+			annotations := cr.Spec.PodSettings.TransferNetworkAnnotations
+			Expect(annotations).ToNot(BeNil())
+			Expect(annotations).To(HaveKey(AnnTransferNetwork))
+
+			var networks []k8snet.NetworkSelectionElement
+			err = json.Unmarshal([]byte(annotations[AnnTransferNetwork]), &networks)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(networks).To(HaveLen(1))
+			Expect(networks[0].Name).To(Equal(nad.Name))
+			Expect(networks[0].Namespace).To(Equal(nad.Namespace))
+			Expect(networks[0].GatewayRequest[0].String()).To(Equal("192.168.1.1"))
+		})
+	})
+
+	ginkgo.Describe("CreateDeepInspectionConversion", func() {
+		newVSphereKubeVirt := func(nad *k8snet.NetworkAttachmentDefinition) *KubeVirt {
+			var objs []runtime.Object
+			if nad != nil {
+				objs = append(objs, nad)
+			}
+			kubevirt := createKubeVirt(objs...)
+			vsphereType := v1beta1.VSphere
+			kubevirt.Source = plancontext.Source{
+				Provider: &v1beta1.Provider{
+					ObjectMeta: metav1.ObjectMeta{Name: "vsphere", Namespace: "test"},
+					Spec:       v1beta1.ProviderSpec{Type: &vsphereType},
+				},
+				Secret: &v1.Secret{
+					Data: map[string][]byte{"user": []byte("admin")},
+				},
+			}
+			kubevirt.Plan.ObjectMeta = metav1.ObjectMeta{
+				Name:      "test-plan",
+				Namespace: "test",
+				UID:       "plan-uid",
+			}
+			kubevirt.Plan.Provider.Source = kubevirt.Source.Provider
+			return kubevirt
+		}
+
+		ginkgo.It("attaches the deep inspection pod to the plan transfer network", func() {
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						AnnForkliftNetworkRoute: "192.168.1.1",
+					},
+				},
+			}
+
+			kubevirt := newVSphereKubeVirt(nad)
+			kubevirt.Plan.Spec.TransferNetwork = &v1.ObjectReference{
+				Namespace: nad.Namespace,
+				Name:      nad.Name,
+			}
+
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+			vm.Ref = ref.Ref{ID: "vm-1"}
+
+			cr, err := kubevirt.CreateDeepInspectionConversion(vm, "snapshot-moref", "test-plan", "plan-uid")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cr).ToNot(BeNil())
+
+			annotations := cr.Spec.PodSettings.TransferNetworkAnnotations
+			Expect(annotations).ToNot(BeNil())
+			Expect(annotations).To(HaveKey(AnnTransferNetwork))
+
+			var networks []k8snet.NetworkSelectionElement
+			err = json.Unmarshal([]byte(annotations[AnnTransferNetwork]), &networks)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(networks).To(HaveLen(1))
+			Expect(networks[0].Name).To(Equal(nad.Name))
+			Expect(networks[0].Namespace).To(Equal(nad.Namespace))
+			Expect(networks[0].GatewayRequest[0].String()).To(Equal("192.168.1.1"))
+		})
+
+		ginkgo.It("leaves the transfer network annotations unset without a plan transfer network", func() {
+			kubevirt := newVSphereKubeVirt(nil)
+
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-2"
+			vm.Ref = ref.Ref{ID: "vm-2"}
+
+			cr, err := kubevirt.CreateDeepInspectionConversion(vm, "snapshot-moref", "test-plan", "plan-uid")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cr).ToNot(BeNil())
+			Expect(cr.Spec.PodSettings.TransferNetworkAnnotations).To(BeEmpty())
+		})
 	})
 
 	ginkgo.Describe("buildHyperVPreCopyInitContainer", func() {

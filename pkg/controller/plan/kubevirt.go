@@ -768,6 +768,13 @@ func (r *KubeVirt) getHyperVDiskPaths(vm *plan.VMStatus) ([]string, error) {
 func (r *KubeVirt) CreateDeepInspectionConversionHyperV(
 	vm *plan.VMStatus, planName, planID string,
 ) (*api.Conversion, error) {
+	// Attach the inspection pod to the plan's transfer network (if any) so it
+	// reaches the source over the same network as the conversion pods.
+	transferNetworkAnnotations, err := r.transferNetworkAnnotations()
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
 	// Ensure SMB CSI credentials exist on the destination cluster so the
 	// CSI driver can stage the volume (required for remote destinations).
 	csiSecretName, csiSecretNS, err := r.EnsureSMBCSISecret(vm)
@@ -851,7 +858,8 @@ func (r *KubeVirt) CreateDeepInspectionConversionHyperV(
 			},
 		},
 		PodSettings: api.PodSettings{
-			ServiceAccount: resolveServiceAccount(r.Plan),
+			ServiceAccount:             resolveServiceAccount(r.Plan),
+			TransferNetworkAnnotations: transferNetworkAnnotations,
 		},
 	}
 	cr := r.buildConversion(planName, vm.ID, crLabels, spec)
@@ -863,6 +871,14 @@ func (r *KubeVirt) CreateDeepInspectionConversionHyperV(
 func (r *KubeVirt) CreateDeepInspectionConversion(
 	vm *plan.VMStatus, snapshotMoref, planName, planID string,
 ) (*api.Conversion, error) {
+	// Attach the inspection pod to the plan's transfer network (if any) so it
+	// reaches the source (VDDK or copy appliance NBD) over the same network as
+	// the conversion pods.
+	transferNetworkAnnotations, err := r.transferNetworkAnnotations()
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
 	useCopyApplianceTemplateNBD := settings.Settings.EnabledForPlan(r.Plan)
 	convSettings := map[string]string{api.SpecSettingsSnapshotMorefKey: snapshotMoref}
 	vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
@@ -965,7 +981,8 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 		VDDKImage:        vddkImage,
 		DiskEncryption:   diskEncryption,
 		PodSettings: api.PodSettings{
-			ServiceAccount: resolveServiceAccount(r.Plan),
+			ServiceAccount:             resolveServiceAccount(r.Plan),
+			TransferNetworkAnnotations: transferNetworkAnnotations,
 		},
 	}
 	cr := r.buildConversion(planName, vm.ID, crLabels, spec)
@@ -4426,6 +4443,20 @@ func (r *KubeVirt) vmAllButMigrationLabels(vmRef ref.Ref) (labels map[string]str
 	labels = r.vmLabels(vmRef)
 	delete(labels, kMigration)
 	return
+}
+
+// transferNetworkAnnotations returns the Multus pod annotations for the
+// Plan's TransferNetwork. The returned map is empty when no transfer network
+// is configured.
+func (r *KubeVirt) transferNetworkAnnotations() (map[string]string, error) {
+	annotations := map[string]string{}
+	if r.Plan.Spec.TransferNetwork == nil {
+		return annotations, nil
+	}
+	if err := r.setTransferNetwork(annotations); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	return annotations, nil
 }
 
 // setTransferNetwork fetches the Plan TransferNetwork NAD and applies Multus annotations.
