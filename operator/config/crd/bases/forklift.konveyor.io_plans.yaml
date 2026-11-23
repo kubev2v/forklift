@@ -1261,6 +1261,10 @@ spec:
                     "net-{{.NetworkIndex}}"
                     "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
                 type: string
+              offloadPopulatorPriorityClassName:
+                description: OffloadPopulatorPriorityClassName sets the existing PriorityClass
+                  for vSphere XCOPY populator pods.
+                type: string
               preCopySourceDisks:
                 description: |-
                   PreCopySourceDisks enables two-phase disk transfer for Hyper-V migrations.

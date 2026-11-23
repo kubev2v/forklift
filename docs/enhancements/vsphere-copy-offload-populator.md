@@ -116,6 +116,21 @@ The core design involves custom Kubernetes resources (`VSphereXcopyVolumePopulat
 a containerised CLI populator, and dependencies on vSphere/ESXi capabilities (`VAAI`, `vmkfstools`, `vmkfstools-wrapper`)
 and storage array configuration.
 
+### PriorityClass for XCOPY populator pods
+
+A Plan can set `spec.offloadPopulatorPriorityClassName` to assign an existing Kubernetes PriorityClass to newly created
+vSphere XCOPY populator pods:
+
+```yaml
+spec:
+  offloadPopulatorPriorityClassName: xcopy-migration
+```
+
+The named PriorityClass must exist when the pod is created. If it is missing, Kubernetes rejects pod creation and the
+populator controller records a warning event on the PVC and retries. If the field is omitted, Forklift leaves
+`priorityClassName` unset and the current cluster defaulting behavior applies. PriorityClass affects scheduler ordering;
+it does not prevent kubelet eviction under node pressure, and descheduler policies should be reviewed separately.
+
 ### Test Plan
 - Not detailed in sources. A comprehensive test plan would need to cover:
 - Unit tests for the populator logic and storage vendor implementations.

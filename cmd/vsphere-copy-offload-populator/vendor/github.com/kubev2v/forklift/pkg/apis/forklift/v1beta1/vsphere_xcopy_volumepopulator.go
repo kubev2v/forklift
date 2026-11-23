@@ -21,6 +21,9 @@ type VSphereXcopyVolumePopulator struct {
 }
 
 type VSphereXcopyVolumePopulatorSpec struct {
+	// PriorityClassName sets the scheduling priority for the XCOPY populator pod.
+	// +optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 	// VmId is the VM object id in vSphere
 	VmId string `json:"vmId"`
 	// VmdkPath is the full path the vmdk disk. A valid path format is

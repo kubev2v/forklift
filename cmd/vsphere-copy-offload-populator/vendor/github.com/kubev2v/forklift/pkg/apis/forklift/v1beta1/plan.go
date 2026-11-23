@@ -63,6 +63,9 @@ type PlanSpec struct {
 	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
 	ServiceAccount string `json:"serviceAccount,omitempty"`
+	// OffloadPopulatorPriorityClassName sets the existing PriorityClass for vSphere XCOPY populator pods.
+	// +optional
+	OffloadPopulatorPriorityClassName string `json:"offloadPopulatorPriorityClassName,omitempty"`
 	// TargetLabels are labels that should be applied to the target virtual machines.
 	// Note: System-managed labels (migration, plan, vmID, app) will override any user-defined
 	// labels with the same keys to ensure proper system functionality.
