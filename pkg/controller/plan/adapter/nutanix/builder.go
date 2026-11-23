@@ -19,6 +19,7 @@ import (
 	providerbase "github.com/kubev2v/forklift/pkg/controller/base"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -1365,19 +1366,6 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				"storageContainer", disk.StorageContainerUUID)
 		}
 
-		// Default to Filesystem: NFS-backed storage classes (e.g. nfs-csi,
-		// common for this path) don't support raw Block volumes. The storage
-		// map can override for block-capable backends. The copy binary handles
-		// both (writes /mnt/disk.img in filesystem mode).
-		volumeMode := core.PersistentVolumeFilesystem
-		if destination.VolumeMode != "" {
-			volumeMode = destination.VolumeMode
-		}
-		accessMode := core.ReadWriteOnce
-		if destination.AccessMode != "" {
-			accessMode = destination.AccessMode
-		}
-
 		pvcAnnotations := map[string]string{}
 		for k, v := range annotations {
 			pvcAnnotations[k] = v
@@ -1387,6 +1375,20 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		pvcAnnotations[planbase.AnnDiskSource] = disk.UUID
 
 		storageClass := destination.StorageClass
+		accessModes, volumeMode, err := utils.GetVolumeAndAccessMode(r.Destination.Client, storageClass)
+		if err != nil {
+			return nil, liberr.Wrap(err, "storageClass", storageClass)
+		}
+
+		capacity := disk.DiskSizeBytes
+		if volumeMode != nil && *volumeMode == core.PersistentVolumeFilesystem {
+			capacity, err = utils.CalculateSpaceWithCDIOverhead(
+				r.Destination.Client, storageClass, disk.DiskSizeBytes)
+			if err != nil {
+				return nil, liberr.Wrap(err, "storageClass", storageClass)
+			}
+		}
+
 		// Include the migration UID so a retried migration gets fresh CRs/PVCs
 		// instead of colliding (AlreadyExists) with a stale one from a prior
 		// attempt that points at an image a previous Finalize already deleted.
@@ -1408,12 +1410,12 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				Annotations: pvcAnnotations,
 			},
 			Spec: core.PersistentVolumeClaimSpec{
-				AccessModes:      []core.PersistentVolumeAccessMode{accessMode},
+				AccessModes:      accessModes,
 				StorageClassName: &storageClass,
-				VolumeMode:       &volumeMode,
+				VolumeMode:       volumeMode,
 				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
-						core.ResourceStorage: *resource.NewQuantity(disk.DiskSizeBytes, resource.BinarySI),
+						core.ResourceStorage: *resource.NewQuantity(capacity, resource.BinarySI),
 					},
 				},
 				DataSourceRef: &core.TypedObjectReference{

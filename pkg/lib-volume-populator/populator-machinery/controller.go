@@ -1173,6 +1173,36 @@ func updatePopulatorProgress(progress int64, cr *unstructured.Unstructured) erro
 }
 
 func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
+	// Only project the secret into the pod when a secret name is configured;
+	// an empty name would produce invalid references to a nameless secret.
+	var envFrom []corev1.EnvFromSource
+	var env []corev1.EnvVar
+	if secretName != "" {
+		envFrom = []corev1.EnvFromSource{
+			{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+				},
+			},
+		}
+		// Explicit mapping required because Kubernetes drops dotted keys (ca.crt)
+		// when injecting via EnvFrom. Populator binaries expect "cacert" env var.
+		env = append(env, corev1.EnvVar{
+			Name: "cacert",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key:      "ca.crt",
+					Optional: ptr.To(true),
+				},
+			},
+		})
+	}
+
 	return corev1.PodSpec{
 		Containers: []corev1.Container{
 			{
@@ -1186,31 +1216,8 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 						Drop: []corev1.Capability{"ALL"},
 					},
 				},
-				EnvFrom: []corev1.EnvFromSource{
-					{
-						SecretRef: &corev1.SecretEnvSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: secretName,
-							},
-						},
-					},
-				},
-				// Explicit mapping required because Kubernetes drops dotted keys (ca.crt)
-				// when injecting via EnvFrom. Populator binaries expect "cacert" env var.
-				Env: []corev1.EnvVar{
-					{
-						Name: "cacert",
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: secretName,
-								},
-								Key:      "ca.crt",
-								Optional: ptr.To(true),
-							},
-						},
-					},
-				},
+				EnvFrom: envFrom,
+				Env:     env,
 			},
 		},
 		SecurityContext: &corev1.PodSecurityContext{
