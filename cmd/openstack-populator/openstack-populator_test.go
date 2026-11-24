@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func setupMockServer() (*httptest.Server, string, int, error) {
@@ -178,4 +180,17 @@ func TestPopulate(t *testing.T) {
 	}
 
 	_ = os.Remove(fileName)
+}
+
+func TestUpdateProgressDoesNotPanic(t *testing.T) {
+	progress := prometheus.NewCounterVec(
+		prometheus.CounterOpts{Name: "test_openstack_populator_progress", Help: "test"},
+		[]string{"ownerUID"},
+	)
+	read := int64(50)
+	countingReader := &CountingReader{read: &read, total: 100}
+
+	// Must not panic when the metric has never been incremented (Counter may be unset).
+	updateProgress(countingReader, progress, "uid-1")
+	updateProgress(countingReader, progress, "uid-1")
 }

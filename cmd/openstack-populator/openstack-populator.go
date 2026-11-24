@@ -167,6 +167,11 @@ func updateProgress(countingReader *CountingReader, progress *prometheus.Counter
 	metric := &dto.Metric{}
 	if err := progress.WithLabelValues(ownerUID).Write(metric); err != nil {
 		klog.Errorf("updateProgress: failed to write metric; %v", err)
+		return
+	}
+	//skip when Counter is unset instead of panicking.
+	if metric.Counter == nil {
+		return
 	}
 
 	currentProgress := (float64(*countingReader.read) / float64(countingReader.total)) * 100
