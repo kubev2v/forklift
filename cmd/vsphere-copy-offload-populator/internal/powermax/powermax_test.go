@@ -3,6 +3,8 @@ package powermax
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -38,8 +40,13 @@ func TestNewPowermaxClonner(t *testing.T) {
 
 		os.Setenv("POWERMAX_SYMMETRIX_ID", "123")
 		os.Setenv("POWERMAX_PORT_GROUP_NAME", "456")
+		versionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			fmt.Fprintln(w, `{"version":"10.4.0"}`)
+		}))
+		defer versionServer.Close()
 
 		mockClient.EXPECT().Authenticate(gomock.Any(), gomock.Any()).Return(nil)
+		mockClient.EXPECT().GetHTTPClient().Return(versionServer.Client())
 		mockClient.EXPECT().GetSymmetrixByID(gomock.Any(), "123").Return(&v100.Symmetrix{
 			SymmetrixID: "123",
 			Model:       "PowerMax_2500",
@@ -52,9 +59,10 @@ func TestNewPowermaxClonner(t *testing.T) {
 		}
 		defer func() { newClientWithArgs = origNewClientWithArgs }()
 
-		clonner, err := NewPowermaxClonner("host", "user", "pass", true)
+		clonner, err := NewPowermaxClonner(versionServer.URL, "user", "pass", true)
 		g.Expect(err).ToNot(gomega.HaveOccurred())
 		g.Expect(clonner).ToNot(gomega.BeNil())
+		g.Expect(clonner.useV1InitiatorAPI).To(gomega.BeTrue())
 		g.Expect(clonner.symmetrixID).To(gomega.Equal("123"))
 		g.Expect(clonner.portGroup).To(gomega.Equal("456"))
 		g.Expect(clonner.arrayInfo.Vendor).To(gomega.Equal("Dell"))

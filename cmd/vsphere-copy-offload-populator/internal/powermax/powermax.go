@@ -5,9 +5,14 @@ package powermax
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -15,11 +20,14 @@ import (
 
 	gopowermax "github.com/dell/gopowermax/v2"
 	pmxtypes "github.com/dell/gopowermax/v2/types/v100"
+	goversion "github.com/hashicorp/go-version"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
+
+const unisphereRequestTimeout = 10 * time.Minute
 
 type PowermaxClonner struct {
 	client              gopowermax.Pmax
@@ -28,6 +36,10 @@ type PowermaxClonner struct {
 	initiatorID         string
 	storageGroupID      string
 	hostID              string
+	hostname            string
+	username            string
+	password            string
+	useV1InitiatorAPI   bool
 	maskingViewID       string
 	volumeStorageGroups []string
 	arrayInfo           populator.StorageArrayInfo
@@ -126,16 +138,32 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(_ string, clonnerIqn []string) (po
 	}
 	p.log.V(2).Info("filtered initiators by protocol", "protocol", protocol, "initiators", filteredInitiators)
 
-	// Direct initiator lookup (1 API call per initiator instead of N+1)
+	// Resolve initiators to a host, preferring the first host that matches.
 	for _, filteredInit := range filteredInitiators {
 		lookupID := initiatorToLookupID(filteredInit)
 		var initiator *pmxtypes.Initiator
 
 		if protocol == "SCSI_FC" {
-			// FC initiators from ESXi are in WWNN:WWPN format, but the PowerMax API
-			// expects initiator IDs in <director>:<port>:<wwn> format (e.g., OR-2C:0:10000000c99debc3).
-			// Use GetInitiatorList with the WWPN to find the correct PowerMax initiator ID.
 			wwpn := extractWWPN(lookupID)
+			if p.useV1InitiatorAPI {
+				var hostID string
+				err = retryOnTransient(ctx, p.log, "GetInitiatorV1", func() error {
+					var e error
+					hostID, e = p.getV1InitiatorHost(ctx, wwpn)
+					return e
+				})
+				if err != nil {
+					return nil, fmt.Errorf("failed to look up initiator WWPN %s: %w", wwpn, err)
+				}
+				if hostID == "" {
+					p.log.V(2).Info("no host found for WWPN", "wwpn", wwpn)
+					continue
+				}
+				p.hostID = hostID
+				p.log.Info("found matching host", "host_id", p.hostID, "initiator", lookupID)
+				break
+			}
+
 			var initList *pmxtypes.InitiatorList
 			err = retryOnTransient(ctx, p.log, "GetInitiatorList", func() error {
 				var e error
@@ -448,12 +476,22 @@ func NewPowermaxClonner(hostname, username, password string, sslSkipVerify bool)
 		client:      client,
 		symmetrixID: symID,
 		portGroup:   portGroup,
+		hostname:    hostname,
+		username:    username,
+		password:    password,
 		arrayInfo: populator.StorageArrayInfo{
 			Vendor:  "Dell",
 			Product: "PowerMax",
 		},
 		log: log,
 	}
+
+	version, err := getCurrentUnisphereVersion(context.TODO(), client, hostname, username, password)
+	if err != nil {
+		return PowermaxClonner{}, fmt.Errorf("failed to get Unisphere version: %w", err)
+	}
+	clonner.useV1InitiatorAPI = isVersionAtLeast(version, "10.4")
+	log.V(2).Info("Unisphere API version detected", "version", version, "v1_initiator_api", clonner.useV1InitiatorAPI)
 
 	// Fetch model and version from the API
 	sym, err := client.GetSymmetrixByID(context.TODO(), symID)
@@ -466,6 +504,110 @@ func NewPowermaxClonner(hostname, username, password string, sslSkipVerify bool)
 	}
 
 	return clonner, nil
+}
+
+type initiatorV1Response struct {
+	Initiators []struct {
+		Hosts []struct {
+			ID string `json:"id"`
+		} `json:"hosts"`
+	} `json:"initiators"`
+}
+
+func (p *PowermaxClonner) getV1InitiatorHost(ctx context.Context, wwpn string) (string, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, unisphereRequestTimeout)
+	defer cancel()
+
+	endpoint, err := url.JoinPath(p.hostname, "univmax/rest/v1/systems", url.PathEscape(p.symmetrixID), "initiators")
+	if err != nil {
+		return "", err
+	}
+	parsedURL, err := url.Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+	query := parsedURL.Query()
+	query.Set("select", "name,hosts.id,host_id")
+	query.Set("filter", "name eq "+wwpn)
+	parsedURL.RawQuery = query.Encode()
+
+	req, err := http.NewRequestWithContext(requestCtx, http.MethodGet, parsedURL.String(), nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Application-Type", "csi")
+	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(p.username+":"+p.password)))
+
+	resp, err := p.client.GetHTTPClient().Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return "", &pmxtypes.Error{HTTPStatusCode: resp.StatusCode, Message: string(body)}
+	}
+
+	var result initiatorV1Response
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("failed to parse v1 initiator response: %w", err)
+	}
+	if len(result.Initiators) == 0 || len(result.Initiators[0].Hosts) == 0 {
+		return "", nil
+	}
+	return result.Initiators[0].Hosts[0].ID, nil
+}
+
+func getCurrentUnisphereVersion(ctx context.Context, client gopowermax.Pmax, hostname, username, password string) (string, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, unisphereRequestTimeout)
+	defer cancel()
+
+	requestURL, err := url.JoinPath(hostname, "univmax/restapi/version")
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequestWithContext(requestCtx, http.MethodGet, requestURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(username+":"+password)))
+	resp, err := client.GetHTTPClient().Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return "", &pmxtypes.Error{HTTPStatusCode: resp.StatusCode, Message: string(body)}
+	}
+	var version pmxtypes.Version
+	if err := json.Unmarshal(body, &version); err != nil {
+		return "", fmt.Errorf("failed to parse Unisphere version response: %w", err)
+	}
+	if version.Version == "" {
+		return "", fmt.Errorf("Unisphere version response did not include a version")
+	}
+	return version.Version, nil
+}
+
+func isVersionAtLeast(currentVersion, minimumVersion string) bool {
+	current, err := goversion.NewVersion(currentVersion)
+	if err != nil {
+		return false
+	}
+	minimum, err := goversion.NewVersion(minimumVersion)
+	if err != nil {
+		return false
+	}
+	return current.GreaterThanOrEqual(minimum)
 }
 
 func generateRandomString(length int) (string, error) {
