@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -78,5 +79,45 @@ func TestLoadProviderCredentials_StillReadsFingerprintAlongsideCACert(t *testing
 	}
 	if creds.TLSCACert == "" {
 		t.Fatal("expected TLSCACert to still be set alongside fingerprint")
+	}
+}
+
+func TestResolveCACertPath_ReturnsPathWhenStatSucceeds(t *testing.T) {
+	dir := t.TempDir()
+	writeSecretFile(t, dir, "ca.crt", "fake")
+	statFn := func(p string) (os.FileInfo, error) { return os.Stat(p) }
+
+	got, err := resolveCACertPath(dir, statFn)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(dir, "ca.crt")
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestResolveCACertPath_NotExistMeansEmptyPathNoError(t *testing.T) {
+	statFn := func(string) (os.FileInfo, error) { return nil, os.ErrNotExist }
+
+	got, err := resolveCACertPath("/secrets", statFn)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("expected empty path when ca.crt does not exist, got %q", got)
+	}
+}
+
+func TestResolveCACertPath_OtherStatErrorIsReturned(t *testing.T) {
+	wantErr := errors.New("permission denied")
+	statFn := func(string) (os.FileInfo, error) { return nil, wantErr }
+
+	_, err := resolveCACertPath("/secrets", statFn)
+	if err == nil {
+		t.Fatal("expected an error to be returned for a non-not-exist stat error")
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected error to wrap %v, got %v", wantErr, err)
 	}
 }

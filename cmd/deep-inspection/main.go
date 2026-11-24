@@ -168,9 +168,9 @@ func loadProviderCredentials() (vmdetect.Credentials, error) {
 
 	// TLSCACert must be a file path (tlsconfig.LoadCACertPool reads it itself),
 	// not file content, so this checks existence rather than reading the file.
-	caCertPath := filepath.Join(secretDir, "ca.crt")
-	if _, statErr := os.Stat(caCertPath); statErr != nil {
-		caCertPath = ""
+	caCertPath, err := resolveCACertPath(secretDir, os.Stat)
+	if err != nil {
+		return vmdetect.Credentials{}, err
 	}
 
 	return vmdetect.Credentials{
@@ -180,6 +180,20 @@ func loadProviderCredentials() (vmdetect.Credentials, error) {
 		TLSThumbprint: fingerprint,
 		TLSCACert:     caCertPath,
 	}, nil
+}
+
+// resolveCACertPath returns the ca.crt path when it exists, an empty string
+// when it doesn't, or an error for any other stat failure (e.g. a permission
+// error), which should not be silently treated as "no CA cert configured".
+func resolveCACertPath(secretDir string, statFn func(string) (os.FileInfo, error)) (string, error) {
+	caCertPath := filepath.Join(secretDir, "ca.crt")
+	if _, err := statFn(caCertPath); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", nil
+		}
+		return "", fmt.Errorf("stat ca cert file %q: %w", caCertPath, err)
+	}
+	return caCertPath, nil
 }
 
 func readSecretDataFile(basename string) (string, error) {
