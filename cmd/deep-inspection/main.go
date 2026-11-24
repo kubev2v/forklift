@@ -29,7 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
+var (
 	secretDir = "/etc/secret"
 )
 
@@ -165,11 +165,20 @@ func loadProviderCredentials() (vmdetect.Credentials, error) {
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return vmdetect.Credentials{}, err
 	}
+
+	// TLSCACert must be a file path (tlsconfig.LoadCACertPool reads it itself),
+	// not file content, so this checks existence rather than reading the file.
+	caCertPath := filepath.Join(secretDir, "ca.crt")
+	if _, statErr := os.Stat(caCertPath); statErr != nil {
+		caCertPath = ""
+	}
+
 	return vmdetect.Credentials{
 		VCenterURL:    url,
 		Username:      user,
 		Password:      password,
 		TLSThumbprint: fingerprint,
+		TLSCACert:     caCertPath,
 	}, nil
 }
 
