@@ -21,6 +21,12 @@ spec:
     - jsonPath: .spec.image
       name: Image
       type: string
+    - jsonPath: .spec.aap.jobTemplateId
+      name: AAPTemplateID
+      type: integer
+    - jsonPath: .metadata.annotations['forklift.konveyor.io/aap-job-template-name']
+      name: AAPTemplate
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date

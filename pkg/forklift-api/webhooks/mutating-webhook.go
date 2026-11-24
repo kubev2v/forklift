@@ -19,3 +19,7 @@ func ServePlanMutator(resp http.ResponseWriter, req *http.Request, client client
 func ServeProviderMutator(resp http.ResponseWriter, req *http.Request, client client.Client) {
 	mutating_webhooks.Serve(resp, req, &mutators.ProviderMutator{Client: client})
 }
+
+func ServeHookMutator(resp http.ResponseWriter, req *http.Request, client client.Client) {
+	mutating_webhooks.Serve(resp, req, &mutators.HookMutator{Client: client})
+}
