@@ -147,17 +147,21 @@ func (h ProviderHandler) AddCount(ctx *gin.Context, r *Provider) (err error) {
 	}
 	r.StorageClassCount = int64(len(storageclasses))
 
+	// Calico capability.
+	r.Calico = h.CalicoCapability()
+
 	return nil
 }
 
 // REST Resource.
 type Provider struct {
 	Resource
-	Type              string       `json:"type"`
-	Object            api.Provider `json:"object"`
-	VMCount           int64        `json:"vmCount"`
-	NetworkCount      int64        `json:"networkCount"`
-	StorageClassCount int64        `json:"storageClassCount"`
+	Type              string           `json:"type"`
+	Object            api.Provider     `json:"object"`
+	VMCount           int64            `json:"vmCount"`
+	NetworkCount      int64            `json:"networkCount"`
+	StorageClassCount int64            `json:"storageClassCount"`
+	Calico            CalicoCapability `json:"calico"`
 }
 
 // Set fields with the specified object.

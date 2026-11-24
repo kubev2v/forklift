@@ -30,6 +30,16 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 				base.Handler{Container: container},
 			},
 		},
+		&CalicoNetworkHandler{
+			Handler: Handler{
+				base.Handler{Container: container},
+			},
+		},
+		&CalicoIPPoolHandler{
+			Handler: Handler{
+				base.Handler{Container: container},
+			},
+		},
 		&NadHandler{
 			Handler: Handler{
 				base.Handler{Container: container},
