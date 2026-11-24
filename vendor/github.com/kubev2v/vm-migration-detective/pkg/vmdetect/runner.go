@@ -20,6 +20,7 @@ type Detector struct {
 	inspector   persistent.InspectorInterface
 	credentials Credentials
 	logger      *logrus.Logger
+	sslVerify   string // TLS verify option for virt-v2v-inspector vpx:// URL
 }
 
 // DetectorConfig contains configuration for creating a Detector
@@ -33,12 +34,22 @@ type DetectorConfig struct {
 	VirtInspectorPath *string
 	// VirtV2vInspectorPath is the path to virt-v2v-inspector executable (optional, uses system PATH if nil)
 	VirtV2vInspectorPath *string
-	// Timeout for inspection operations (optional, defaults to 30 minutes if nil)
+	// Timeout for virt-inspector operations (optional, defaults to 30 minutes if nil)
 	Timeout *time.Duration
 	// Logger for logging (optional, can be nil)
 	Logger *logrus.Logger
 	// DB for persistent caching (optional, can be nil for memory-only caching)
 	DB DB
+
+	// V2VTimeout is retained for source compatibility with existing callers.
+	// Deprecated: virt-v2v-inspector timeout and cancellation are controlled by
+	// the context passed to Detect.
+	V2VTimeout *time.Duration
+
+	// SSLVerify controls TLS verification for the virt-v2v-inspector vpx:// URL
+	// (e.g. "no_verify=1" or "cacert=/path/to/ca-bundle.crt").
+	// Optional; defaults to "no_verify=1". Only used when a Detect call sets RunVirtV2v.
+	SSLVerify *string
 }
 
 // NewDetector creates a new Detector with an internally managed inspector instance
@@ -105,10 +116,16 @@ func NewDetector(config DetectorConfig) (*Detector, error) {
 		return nil, fmt.Errorf("failed to create inspector: %w", err)
 	}
 
+	sslVerify := "no_verify=1"
+	if config.SSLVerify != nil {
+		sslVerify = *config.SSLVerify
+	}
+
 	return &Detector{
 		inspector:   inspector,
 		credentials: config.Credentials,
 		logger:      config.Logger,
+		sslVerify:   sslVerify,
 	}, nil
 }
 
@@ -117,6 +134,14 @@ type DetectParams struct {
 	Ctx           context.Context
 	VMMoref       string
 	SnapshotMoref string
+
+	// RunVirtV2v selects the virt-v2v-inspector migration-convertibility dry-run.
+	// When true, virt-inspector, fstab, and disk-access checks are skipped,
+	// and Detect's checkTypes argument is ignored. Results, OSInfo, Applications,
+	// Filesystems, and Mountpoints remain unset. V2VOSInfo is populated on success,
+	// and Passed reflects only the v2v outcome.
+	// Default false runs virt-inspector and the requested standard checks.
+	RunVirtV2v bool
 }
 
 // DetectResult contains the results of detection operations
@@ -125,7 +150,8 @@ type DetectResult struct {
 	Results []checks.CheckResult `json:"results"`
 	// AllConcerns aggregates all concerns from all checks
 	AllConcerns []checks.Concern `json:"all_concerns"`
-	// Passed indicates if all checks passed (no concerns found)
+	// Passed indicates if all executed checks passed (no concerns found).
+	// In RunVirtV2v mode, it reflects only the virt-v2v-inspector outcome.
 	Passed bool `json:"passed"`
 	// OSInfo contains operating system metadata (without nested collections)
 	OSInfo *OSInfo `json:"os_info,omitempty"`
@@ -135,6 +161,9 @@ type DetectResult struct {
 	Filesystems []types.Filesystem `json:"filesystems,omitempty"`
 	// Mountpoints contains mountpoint information
 	Mountpoints []types.Mountpoint `json:"mountpoints,omitempty"`
+	// V2VOSInfo contains OS metadata from the virt-v2v-inspector pass.
+	// Populated only when RunVirtV2v was true and the pass succeeded.
+	V2VOSInfo *OSInfo `json:"v2v_os_info,omitempty"`
 }
 
 // OSInfo contains operating system metadata without nested collections
@@ -152,8 +181,16 @@ type OSInfo struct {
 	OSInfo            string `json:"osinfo,omitempty"`
 }
 
+// CheckSelection carries optional per-run inspection toggles for the internal
+// detect path. Public callers use DetectParams; this is the internal seam.
+type CheckSelection struct {
+	RunVirtV2v bool
+}
+
 // Detect executes validation checks on a VM snapshot
-// If checkTypes is empty, all checks are run. Otherwise, only specified checks are executed.
+// When RunVirtV2v is false, an empty checkTypes runs all standard checks;
+// otherwise, only the specified checks are executed.
+// When RunVirtV2v is true, only virt-v2v-inspector runs and checkTypes is ignored.
 func (r *Detector) Detect(params DetectParams, checkTypes ...checks.CheckType) (*DetectResult, error) {
 	// Validate required parameters
 	if params.Ctx == nil {
@@ -172,24 +209,40 @@ func (r *Detector) Detect(params DetectParams, checkTypes ...checks.CheckType) (
 		return nil, fmt.Errorf("failed to get snapshot disk info: %w", err)
 	}
 
-	// Get virt-inspector data for OS and application information
-	inspectorData, err := r.inspector.InspectWithVirt(params.Ctx, params.VMMoref, params.SnapshotMoref, diskInfo)
+	return r.detectWithDiskInfo(params.Ctx, params.VMMoref, params.SnapshotMoref, diskInfo, CheckSelection{RunVirtV2v: params.RunVirtV2v}, checkTypes...)
+}
+
+// detectWithDiskInfo runs either the standard checks or the
+// virt-v2v-inspector dry-run using pre-fetched disk info. It is the
+// internal seam that keeps the public Detect signature unchanged while
+// remaining directly testable.
+//
+// When RunVirtV2v is true, ONLY the virt-v2v-inspector dry-run runs — the
+// standard virt-inspector and checks (fstab, disk access) are skipped because
+// the two tracks are independent: separate endpoints, pools, and user actions.
+func (r *Detector) detectWithDiskInfo(ctx context.Context, vmMoref, snapshotMoref string, diskInfo *types.SnapshotDiskInfo, sel CheckSelection, checkTypes ...checks.CheckType) (*DetectResult, error) {
+	if sel.RunVirtV2v {
+		return r.detectV2VOnly(ctx, vmMoref, snapshotMoref, diskInfo)
+	}
+	return r.detectStandard(ctx, vmMoref, snapshotMoref, diskInfo, checkTypes...)
+}
+
+// detectStandard runs virt-inspector and the standard checks (fstab, disk access).
+func (r *Detector) detectStandard(ctx context.Context, vmMoref, snapshotMoref string, diskInfo *types.SnapshotDiskInfo, checkTypes ...checks.CheckType) (*DetectResult, error) {
+	inspectorData, err := r.inspector.InspectWithVirt(ctx, vmMoref, snapshotMoref, diskInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get inspection data: %w", err)
 	}
 
-	// Determine which checks to run
 	checksToRun := checkTypes
 	if len(checksToRun) == 0 {
-		// Run all checks by default
 		checksToRun = checks.AllCheckTypes()
 	}
 
-	// Create inspection params with the shared inspector
 	inspectionParams := internalchecks.InspectionParams{
-		Ctx:           params.Ctx,
-		VMMoref:       params.VMMoref,
-		SnapshotMoref: params.SnapshotMoref,
+		Ctx:           ctx,
+		VMMoref:       vmMoref,
+		SnapshotMoref: snapshotMoref,
 		DiskInfo:      diskInfo,
 		Inspector:     r.inspector,
 	}
@@ -208,14 +261,10 @@ func (r *Detector) Detect(params DetectParams, checkTypes ...checks.CheckType) (
 		case checks.CheckTypeDiskAccess:
 			check = internalchecks.NewDiskAccessCheck()
 		default:
-			// Unknown check type, skip
 			continue
 		}
 
-		// Run the check
 		checkResult := check.Run(inspectionParams)
-
-		// Convert internal CheckResult to public CheckResult
 		result = checks.CheckResult{
 			CheckType: checkType,
 			Passed:    checkResult.Passed,
@@ -231,17 +280,13 @@ func (r *Detector) Detect(params DetectParams, checkTypes ...checks.CheckType) (
 		}
 	}
 
-	// Extract OS info and other inspection data
 	var osInfo *OSInfo
 	var applications []types.Application
 	var filesystems []types.Filesystem
 	var mountpoints []types.Mountpoint
 
 	if inspectorData != nil && len(inspectorData.Operatingsystems) > 0 {
-		// Get the first operating system (typically there's only one)
 		os := inspectorData.Operatingsystems[0]
-
-		// Extract OS metadata only (no nested collections)
 		osInfo = &OSInfo{
 			Name:              os.Name,
 			Distro:            os.Distro,
@@ -256,17 +301,12 @@ func (r *Detector) Detect(params DetectParams, checkTypes ...checks.CheckType) (
 			OSInfo:            os.OSInfo,
 		}
 
-		// Extract applications from nested structure
 		if len(os.Applications.Application) > 0 {
 			applications = os.Applications.Application
 		}
-
-		// Extract filesystems from nested structure
 		if len(os.Filesystems.Filesystem) > 0 {
 			filesystems = os.Filesystems.Filesystem
 		}
-
-		// Extract mountpoints from nested structure
 		if len(os.Mountpoints.Mountpoint) > 0 {
 			mountpoints = os.Mountpoints.Mountpoint
 		}
@@ -281,6 +321,49 @@ func (r *Detector) Detect(params DetectParams, checkTypes ...checks.CheckType) (
 		Filesystems:  filesystems,
 		Mountpoints:  mountpoints,
 	}, nil
+}
+
+// detectV2VOnly runs only the virt-v2v-inspector dry-run, without the standard
+// virt-inspector or checks. The two tracks are independent: v2v does not need
+// virt-inspector data, and its concerns should not include standard check results.
+func (r *Detector) detectV2VOnly(ctx context.Context, vmMoref, snapshotMoref string, diskInfo *types.SnapshotDiskInfo) (*DetectResult, error) {
+	result := &DetectResult{Passed: true}
+
+	v2vData, v2vErr := r.inspector.InspectWithVirtV2v(ctx, vmMoref, snapshotMoref, diskInfo, r.sslVerify)
+	if v2vErr != nil {
+		result.AllConcerns = append(result.AllConcerns, checks.Concern{
+			ID:       "virt-v2v-dry-run-failed",
+			Category: checks.ConcernCategoryCritical,
+			Label:    "virt-v2v dry-run failed",
+			Message:  fmt.Sprintf("virt-v2v-inspector dry-run failed: %v", v2vErr),
+		})
+		result.Passed = false
+	} else {
+		result.V2VOSInfo = osInfoFromV2V(v2vData)
+	}
+
+	return result, nil
+}
+
+// osInfoFromV2V maps the single OS in a virt-v2v-inspector result to *OSInfo.
+// virt-v2v XML reports one OS (not a list) and has no hostname field.
+func osInfoFromV2V(x *types.VirtV2VInspectorXML) *OSInfo {
+	if x == nil {
+		return nil
+	}
+	os := x.OS
+	return &OSInfo{
+		Name:              os.Name,
+		Distro:            os.Distro,
+		MajorVersion:      os.MajorVersion,
+		MinorVersion:      os.MinorVersion,
+		Architecture:      os.Arch,
+		Product:           os.ProductName,
+		Root:              os.Root,
+		PackageFormat:     os.PackageFormat,
+		PackageManagement: os.PackageManagement,
+		OSInfo:            os.Osinfo,
+	}
 }
 
 // getSnapshotDiskInfo queries vSphere for snapshot disk information
@@ -314,6 +397,7 @@ func (r *Detector) getSnapshotDiskInfo(ctx context.Context, vmMoref, snapshotMor
 	// Convert internal type to public type
 	return &types.SnapshotDiskInfo{
 		VMMoref:             info.VMMoref,
+		VMName:              info.VMName,
 		SnapshotMoref:       info.SnapshotMoref,
 		DiskPaths:           nil, // Library queries these internally
 		BaseDiskPaths:       nil, // Library queries these internally

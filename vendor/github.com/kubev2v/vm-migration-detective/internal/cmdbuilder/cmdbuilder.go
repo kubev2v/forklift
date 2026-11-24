@@ -1,11 +1,15 @@
 package cmdbuilder
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -189,29 +193,138 @@ func (b *CmdBuilder) Command(ctx context.Context, name string) *exec.Cmd {
 	return cmd
 }
 
-// RunSeparate runs the command and returns stdout and stderr independently.
-// Returns ctx.Err() directly on cancellation or timeout.
-func (b *CmdBuilder) RunSeparate(ctx context.Context, name string) (stdout, stderr []byte, err error) {
+// RunCombined runs the command and returns merged stdout+stderr. It invokes
+// onLine (if non-nil) with each line as it is produced. Returns ctx.Err()
+// directly on cancellation or timeout.
+func (b *CmdBuilder) RunCombined(ctx context.Context, name string, onLine func(line string)) ([]byte, error) {
 	cmd := b.Command(ctx, name)
-	var outBuf, errBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &errBuf
-	err = cmd.Run()
-	if err != nil && ctx.Err() != nil {
-		return outBuf.Bytes(), errBuf.Bytes(), ctx.Err()
+	cmd.WaitDelay = time.Second
+
+	pr, pw := io.Pipe()
+	cmd.Stdout = pw
+	cmd.Stderr = pw
+
+	var buf bytes.Buffer
+	var mu sync.Mutex
+	var scanErr error
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer func() { _ = pr.Close() }()
+		scanner := bufio.NewScanner(pr)
+		scanner.Split(splitCommandOutputLines)
+		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			mu.Lock()
+			buf.WriteString(line)
+			buf.WriteByte('\n')
+			mu.Unlock()
+			if onLine != nil {
+				onLine(line)
+			}
+		}
+		scanErr = scanner.Err()
+	}()
+
+	err := cmd.Start()
+	if err != nil {
+		_ = pw.Close()
+		<-done
+		return nil, err
 	}
-	return outBuf.Bytes(), errBuf.Bytes(), err
+	if b.logger != nil {
+		b.logger.WithField("pid", cmd.Process.Pid).Info("Process started")
+	}
+
+	err = cmd.Wait()
+	_ = pw.Close()
+	<-done
+
+	if err != nil && ctx.Err() != nil {
+		return buf.Bytes(), ctx.Err()
+	}
+	if err == nil && scanErr != nil {
+		return buf.Bytes(), scanErr
+	}
+	return buf.Bytes(), err
 }
 
-// RunCombined runs the command and returns merged stdout+stderr.
-// Returns ctx.Err() directly on cancellation or timeout.
-func (b *CmdBuilder) RunCombined(ctx context.Context, name string) ([]byte, error) {
+// RunSeparate runs the command and returns stdout and stderr independently,
+// while streaming stderr lines through onLine for live progress. Stdout is
+// captured into a buffer (suitable for structured output like XML). Returns
+// ctx.Err() directly on cancellation or timeout.
+func (b *CmdBuilder) RunSeparate(ctx context.Context, name string, onLine func(line string)) (stdout, stderr []byte, err error) {
 	cmd := b.Command(ctx, name)
-	output, err := cmd.CombinedOutput()
-	if err != nil && ctx.Err() != nil {
-		return output, ctx.Err()
+	cmd.WaitDelay = 5 * time.Second
+
+	var stdoutBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+
+	stderrPr, stderrPw := io.Pipe()
+	cmd.Stderr = stderrPw
+
+	var stderrBuf bytes.Buffer
+	var scanErr error
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer func() { _ = stderrPr.Close() }()
+		scanner := bufio.NewScanner(stderrPr)
+		scanner.Split(splitCommandOutputLines)
+		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			stderrBuf.WriteString(line)
+			stderrBuf.WriteByte('\n')
+			if onLine != nil {
+				onLine(line)
+			}
+		}
+		scanErr = scanner.Err()
+	}()
+
+	err = cmd.Start()
+	if err != nil {
+		_ = stderrPw.Close()
+		<-done
+		return nil, nil, err
 	}
-	return output, err
+	if b.logger != nil {
+		b.logger.WithField("pid", cmd.Process.Pid).Info("Process started")
+	}
+
+	err = cmd.Wait()
+	_ = stderrPw.Close()
+	<-done
+
+	if err != nil && ctx.Err() != nil {
+		return stdoutBuf.Bytes(), stderrBuf.Bytes(), ctx.Err()
+	}
+	if err == nil && scanErr != nil {
+		return stdoutBuf.Bytes(), stderrBuf.Bytes(), scanErr
+	}
+	return stdoutBuf.Bytes(), stderrBuf.Bytes(), err
+}
+
+func splitCommandOutputLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	for i, b := range data {
+		if b != '\r' && b != '\n' {
+			continue
+		}
+		if b == '\r' && i == len(data)-1 && !atEOF {
+			return 0, nil, nil
+		}
+		advance = i + 1
+		if b == '\r' && advance < len(data) && data[advance] == '\n' {
+			advance++
+		}
+		return advance, data[:i], nil
+	}
+	if atEOF && len(data) > 0 {
+		return len(data), data, nil
+	}
+	return 0, nil, nil
 }
 
 // ExitCode extracts the exit code from a run error; returns -1 if not available.

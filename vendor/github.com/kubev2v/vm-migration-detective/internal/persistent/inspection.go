@@ -51,7 +51,7 @@ type Inspector struct {
 // NewInspector creates a new Inspector that supports both inspection methods
 // virtInspectorPath: path to virt-inspector executable (uses system PATH if empty)
 // virtV2vInspectorPath: path to virt-v2v-inspector executable (uses system PATH if empty)
-// timeout: timeout for inspection operations (defaults to 5 minutes if zero)
+// timeout: timeout for virt-inspector operations (defaults to 5 minutes if zero)
 // credentials: vCenter access credentials
 // logger: logger instance for logging (can be nil)
 // db: database implementation provided by caller (can be nil for memory-only caching)
@@ -69,7 +69,7 @@ func NewInspector(virtInspectorPath string, virtV2vInspectorPath string, timeout
 
 	return &Inspector{
 		virtInspector:      inspection.NewVirtInspector(virtInspectorPath, timeout, logger),
-		virtV2vInspector:   inspection.NewVirtV2vInspector(virtV2vInspectorPath, timeout, logger),
+		virtV2vInspector:   inspection.NewVirtV2vInspector(virtV2vInspectorPath, logger),
 		db:                 db,
 		credentials:        credentials,
 		tlsConfig:          tlsConfig,

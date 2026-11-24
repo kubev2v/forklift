@@ -16,10 +16,11 @@ import (
 	"github.com/kubev2v/vm-migration-detective/internal/cmdbuilder"
 	"github.com/kubev2v/vm-migration-detective/internal/tlsconfig"
 	"github.com/kubev2v/vm-migration-detective/internal/vddk"
+	"github.com/kubev2v/vm-migration-detective/internal/vsphere"
 	"github.com/sirupsen/logrus"
 )
 
-// NBDKitSession represents an NBD server session created by nbdkit with VDDK plugin
+// NBDKitSession represents an NBD server session created by nbdkit.
 type NBDKitSession struct {
 	NBDURL       string // Unix socket path or NBD URL
 	socketPath   string // Unix socket path (if using Unix socket)
@@ -30,7 +31,8 @@ type NBDKitSession struct {
 	stdoutBuf    *bytes.Buffer
 }
 
-// OpenWithNBDKitVDDK opens a VMware snapshot using nbdkit with VDDK plugin directly
+// OpenWithNBDKitVDDK opens a VMware snapshot using nbdkit with the available transport.
+// VDDK is preferred when installed; NFC is used when VDDK is unavailable.
 // Parameters:
 //   - vmMoref: VM managed object reference (e.g., "vm-123")
 //   - snapshotMoref: Snapshot managed object reference (e.g., "snapshot-456")
@@ -50,6 +52,56 @@ func OpenWithNBDKitVDDK(
 	tlsConfig *tlsconfig.Config,
 	logger *logrus.Logger,
 ) (*NBDKitSession, error) {
+	return openWithNBDKit(ctx, vmMoref, snapshotMoref, baseDiskPath, vcenterURL, username, password, tlsConfig, nil, logger)
+}
+
+type snapshotDiskPathResolver interface {
+	GetSnapshotDiskFilePath(ctx context.Context, snapshotMoref, baseDiskPath string) (string, error)
+}
+
+// resolveNBDKitThumbprint returns the thumbprint nbdkit's VDDK plugin should
+// use. A configured thumbprint is returned as-is. Otherwise computeFn is
+// called to retrieve one from the vCenter certificate - VDDK needs a
+// thumbprint to connect even when tlsConfig.Insecure is true, so this is
+// attempted regardless of that flag. Computation failure is fatal when not
+// in insecure mode (the caller asked for verified TLS and couldn't get it);
+// in insecure mode it is not, since the caller has already opted out of
+// certificate verification and nbdkit will simply skip TLS verification too.
+func resolveNBDKitThumbprint(
+	tlsConfig *tlsconfig.Config,
+	vcenterHost string,
+	logger *logrus.Logger,
+	computeFn func(string, *tlsconfig.Config) (string, error),
+) (string, error) {
+	if thumbprint := tlsConfig.ForNBDKit(); thumbprint != "" {
+		return thumbprint, nil
+	}
+
+	computed, err := computeFn(vcenterHost, tlsConfig)
+	if err != nil {
+		if !tlsConfig.Insecure {
+			return "", fmt.Errorf("failed to get vCenter thumbprint: %w", err)
+		}
+		if logger != nil {
+			logger.WithError(err).Warn("Failed to compute vCenter thumbprint in insecure mode, proceeding without it")
+		}
+		return "", nil
+	}
+	return computed, nil
+}
+
+func openWithNBDKit(
+	ctx context.Context,
+	vmMoref string,
+	snapshotMoref string,
+	baseDiskPath string,
+	vcenterURL string,
+	username string,
+	password string,
+	tlsConfig *tlsconfig.Config,
+	pathResolver snapshotDiskPathResolver,
+	logger *logrus.Logger,
+) (*NBDKitSession, error) {
 	// Parse vCenter URL to extract hostname
 	parsedURL, err := url.Parse(vcenterURL)
 	if err != nil {
@@ -62,21 +114,12 @@ func OpenWithNBDKitVDDK(
 		return nil, fmt.Errorf("TLS configuration is required")
 	}
 
-	// Get thumbprint from TLS config or compute it
-	var thumbprint string
-	thumbprint = tlsConfig.ForNBDKit()
-
-	// If no thumbprint in config but we have CA or insecure mode,
-	// try to retrieve it for nbdkit (which requires thumbprint)
-	if thumbprint == "" && !tlsConfig.Insecure {
-		if logger != nil {
-			logger.Debug("No thumbprint in config, computing from vCenter certificate")
-		}
-		computed, err := tlsconfig.GetVCenterThumbprint(vcenterHost, tlsConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get vCenter thumbprint: %w", err)
-		}
-		thumbprint = computed
+	// Get thumbprint from TLS config or compute it. nbdkit's VDDK plugin needs
+	// a thumbprint to connect even in insecure mode, so this is attempted
+	// regardless of tlsConfig.Insecure; only the failure handling differs.
+	thumbprint, err := resolveNBDKitThumbprint(tlsConfig, vcenterHost, logger, tlsconfig.GetVCenterThumbprint)
+	if err != nil {
+		return nil, err
 	}
 
 	if logger != nil && thumbprint != "" {
@@ -87,12 +130,6 @@ func OpenWithNBDKitVDDK(
 	// Create temporary Unix socket for nbdkit (more reliable than TCP port)
 	socketPath := filepath.Join("/tmp", fmt.Sprintf("nbdkit-%s.sock", uuid.New().String()))
 
-	// Create temporary password file for secure password passing
-	passwordFile, err := createNBDKitPasswordFile(password)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create password file: %w", err)
-	}
-
 	vddkLibDir := vddk.GetLibDir()
 	nbdkitPlugin := "vddk"
 	if info, err := os.Stat(vddkLibDir); err != nil || !info.IsDir() {
@@ -102,6 +139,28 @@ func OpenWithNBDKitVDDK(
 		} else if _, err := os.Stat(nbdkitPlugin); err != nil {
 			return nil, fmt.Errorf("VDDK library directory or nbdkit-nfc plugin not found")
 		}
+	}
+
+	diskFile := baseDiskPath
+	if nbdkitPlugin != "vddk" {
+		if pathResolver == nil {
+			vsphereClient, err := vsphere.NewClient(ctx, vcenterURL, username, password, tlsConfig, logger)
+			if err != nil {
+				return nil, fmt.Errorf("failed to connect to vSphere to resolve snapshot disk path: %w", err)
+			}
+			defer vsphereClient.Close()
+			pathResolver = vsphereClient
+		}
+		diskFile, err = pathResolver.GetSnapshotDiskFilePath(ctx, snapshotMoref, baseDiskPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve NFC snapshot disk path: %w", err)
+		}
+	}
+
+	// Create temporary password file only after backend-specific path resolution succeeds.
+	passwordFile, err := createNBDKitPasswordFile(password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create password file: %w", err)
 	}
 
 	nbdkitCmd := cmdbuilder.New().
@@ -116,7 +175,7 @@ func OpenWithNBDKitVDDK(
 		SensitiveArg(fmt.Sprintf("password=+%s", passwordFile), "password=+***").
 		Add(fmt.Sprintf("vm=moref=%s", vmMoref)).
 		Add(fmt.Sprintf("snapshot=%s", snapshotMoref)).
-		Add(fmt.Sprintf("file=%s", baseDiskPath)).
+		Add(fmt.Sprintf("file=%s", diskFile)).
 		AddIf(nbdkitPlugin == "vddk", fmt.Sprintf("libdir=%s", vddkLibDir)).
 		AddIf(thumbprint != "", fmt.Sprintf("thumbprint=%s", thumbprint))
 
@@ -125,7 +184,8 @@ func OpenWithNBDKitVDDK(
 			"socket_path":    socketPath,
 			"vm_moref":       vmMoref,
 			"snapshot_moref": snapshotMoref,
-			"disk_path":      baseDiskPath,
+			"base_disk_path": baseDiskPath,
+			"disk_path":      diskFile,
 			"plugin":         nbdkitPlugin,
 		}).Info("Starting nbdkit")
 	}
