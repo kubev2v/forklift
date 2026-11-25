@@ -821,5 +821,9 @@ spec:
         kind: CopyAppliance
         name: copyappliances.forklift.konveyor.io
   relatedImages:
+    - name: validation_controller
+      image: "${VALIDATION_CONTROLLER_IMAGE}"
+    - name: validation_runner
+      image: "${VALIDATION_RUNNER_IMAGE}"
     - name: copy_appliance_template_builder
       image: "${COPY_APPLIANCE_TEMPLATE_BUILDER_IMAGE}"
