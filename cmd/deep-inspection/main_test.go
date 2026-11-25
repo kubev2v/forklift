@@ -7,16 +7,6 @@ import (
 	"testing"
 )
 
-// withSecretDir points secretDir at dir for the duration of the test and
-// restores the original value afterward, since secretDir is a package-level
-// variable shared across loadProviderCredentials calls.
-func withSecretDir(t *testing.T, dir string) {
-	t.Helper()
-	original := secretDir
-	secretDir = dir
-	t.Cleanup(func() { secretDir = original })
-}
-
 func writeSecretFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
@@ -24,15 +14,14 @@ func writeSecretFile(t *testing.T, dir, name, content string) {
 	}
 }
 
-func TestLoadProviderCredentials_ReadsCACertPathWhenPresent(t *testing.T) {
+func TestLoadProviderCredentialsFromDir_ReadsCACertPathWhenPresent(t *testing.T) {
 	dir := t.TempDir()
-	withSecretDir(t, dir)
 	writeSecretFile(t, dir, "url", "https://vcenter.example.com")
 	writeSecretFile(t, dir, "user", "admin")
 	writeSecretFile(t, dir, "password", "secret")
 	writeSecretFile(t, dir, "ca.crt", "-----BEGIN CERTIFICATE-----\nfake\n-----END CERTIFICATE-----")
 
-	creds, err := loadProviderCredentials()
+	creds, err := loadProviderCredentialsFromDir(dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -43,14 +32,13 @@ func TestLoadProviderCredentials_ReadsCACertPathWhenPresent(t *testing.T) {
 	}
 }
 
-func TestLoadProviderCredentials_NoCACertFileMeansEmptyTLSCACert(t *testing.T) {
+func TestLoadProviderCredentialsFromDir_NoCACertFileMeansEmptyTLSCACert(t *testing.T) {
 	dir := t.TempDir()
-	withSecretDir(t, dir)
 	writeSecretFile(t, dir, "url", "https://vcenter.example.com")
 	writeSecretFile(t, dir, "user", "admin")
 	writeSecretFile(t, dir, "password", "secret")
 
-	creds, err := loadProviderCredentials()
+	creds, err := loadProviderCredentialsFromDir(dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -60,16 +48,15 @@ func TestLoadProviderCredentials_NoCACertFileMeansEmptyTLSCACert(t *testing.T) {
 	}
 }
 
-func TestLoadProviderCredentials_StillReadsFingerprintAlongsideCACert(t *testing.T) {
+func TestLoadProviderCredentialsFromDir_StillReadsFingerprintAlongsideCACert(t *testing.T) {
 	dir := t.TempDir()
-	withSecretDir(t, dir)
 	writeSecretFile(t, dir, "url", "https://vcenter.example.com")
 	writeSecretFile(t, dir, "user", "admin")
 	writeSecretFile(t, dir, "password", "secret")
 	writeSecretFile(t, dir, "fingerprint", "AA:BB:CC")
 	writeSecretFile(t, dir, "ca.crt", "-----BEGIN CERTIFICATE-----\nfake\n-----END CERTIFICATE-----")
 
-	creds, err := loadProviderCredentials()
+	creds, err := loadProviderCredentialsFromDir(dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,5 +106,49 @@ func TestResolveCACertPath_OtherStatErrorIsReturned(t *testing.T) {
 	}
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected error to wrap %v, got %v", wantErr, err)
+	}
+}
+
+func TestResolveCACertPath_FallsBackToLegacyCacertFieldName(t *testing.T) {
+	dir := t.TempDir()
+	writeSecretFile(t, dir, "cacert", "legacy-fake")
+	statFn := func(p string) (os.FileInfo, error) { return os.Stat(p) }
+
+	got, err := resolveCACertPath(dir, statFn)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(dir, "cacert")
+	if got != want {
+		t.Fatalf("expected fallback to legacy %q, got %q", want, got)
+	}
+}
+
+func TestResolveCACertPath_PrefersCACrtOverLegacyCacert(t *testing.T) {
+	dir := t.TempDir()
+	writeSecretFile(t, dir, "ca.crt", "standard-fake")
+	writeSecretFile(t, dir, "cacert", "legacy-fake")
+	statFn := func(p string) (os.FileInfo, error) { return os.Stat(p) }
+
+	got, err := resolveCACertPath(dir, statFn)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(dir, "ca.crt")
+	if got != want {
+		t.Fatalf("expected standard ca.crt to be preferred, got %q", got)
+	}
+}
+
+func TestResolveCACertPath_NeitherFieldPresentMeansEmptyPath(t *testing.T) {
+	dir := t.TempDir()
+	statFn := func(p string) (os.FileInfo, error) { return os.Stat(p) }
+
+	got, err := resolveCACertPath(dir, statFn)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("expected empty path when neither ca.crt nor cacert exist, got %q", got)
 	}
 }
