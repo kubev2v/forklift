@@ -361,6 +361,29 @@ VVol datastores use CSI import in the same migration plan.
 | Vendor | `storageVendorProduct` value | Annotation |
 | ------ | ---------------------------- | ---------- |
 | HPE Primera/3PAR/Alletra | `primera3par` | `csi.hpe.com/importVolAsClone` |
+| Dell PowerStore (RDM only) | `powerstore` | `import.storage.dell.com/volumeName` |
+| Dell PowerMax (RDM only) | `powermax` | `import.storage.dell.com/volumeName` |
+
+For Dell PowerStore, the destination StorageClass must set
+`import.storage.dell.com/enabled: "true"` and
+`import.storage.dell.com/allowedNamespaces` (comma-separated, including the plan's
+target namespace), and the PowerStore CSI driver must run with the
+csi-metadata-retriever. Because the RDM LUN stays mapped to the ESXi host after the
+VM is powered off, also set `import.storage.dell.com/allowMappedSource: "true"` on a
+StorageClass used only for cold migration. VVol disks are not supported.
+
+For Dell PowerMax, the destination StorageClass must configure the following parameters:
+- `importEnabled: "true"` — enables volume import on the StorageClass (without this, PVC imports are rejected with PermissionDenied).
+- `importAllowedNamespaces` — comma-separated list of allowed target namespaces, including the plan's namespace.
+- `importSourceStorageGroups` — comma-separated list of approved source Storage Groups containing the source device.
+- `SYMID` — must match the storage array's 12-digit Symmetrix ID (`POWERMAX_SYMMETRIX_ID`).
+
+The storage secret must contain `POWERMAX_SYMMETRIX_ID` and an HTTPS `STORAGE_HOSTNAME` pointing to the Unisphere REST API. The resolver queries Unisphere by WWN to identify the volume and annotates the PVC with `import.storage.dell.com/volumeName: "<symmetrixID>/<deviceID>"`.
+
+**Limitations & driver constraints:**
+- **RDM only**: VVol and VMDK disks are not supported (both Forklift and the PowerMax CSI driver reject VVol devices).
+- **Physical-mode RDMs**: Virtual-mode RDMs with active VM snapshots are rejected to prevent data loss (snapshot data resides on VMFS); virtual-mode RDMs without snapshots fall through to standard migration paths.
+- **Driver-side validations**: The PowerMax CSI driver also rejects boot LUN devices, SRDF-protected devices, and devices already tagged with `csi-`.
 
 ### Setup CSI Volume Import
 
