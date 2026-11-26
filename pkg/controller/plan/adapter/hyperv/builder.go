@@ -396,8 +396,7 @@ func (r *Builder) mapDataVolume(vm *model.VM, disk hyperv.Disk, diskIndex int, d
 		},
 		StorageClassName: &storageClass,
 	}
-	if r.Plan.Spec.PreCopySourceDisks {
-		// qemu-img writes to a raw block device during SMB pre-copy, destination storage-class must support Block.
+	if r.Plan.Spec.PreCopySourceDisks || r.Plan.IsWarm() {
 		blockMode := core.PersistentVolumeBlock
 		storageSpec.VolumeMode = &blockMode
 	}
@@ -412,6 +411,10 @@ func (r *Builder) mapDataVolume(vm *model.VM, disk hyperv.Disk, diskIndex int, d
 		dv.Annotations = make(map[string]string)
 	}
 	dv.Annotations[planbase.AnnDiskSource] = disk.ID
+	// Without this the PVC sort in getPVCs sees -1 for every disk and
+	// leaves the order to the API server, so /dev/blockN can be paired
+	// with the wrong disk.
+	dv.Annotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
 
 	targetVmName := planbase.ResolveTargetVmName(r.Plan, vm.ID, vm.Name)
 

@@ -157,6 +157,18 @@ func getEnvBool(name string, def bool) bool {
 	return LookupBool(name, def)
 }
 
+// getEnvFloat reads a float64 environment variable, or returns def when unset.
+func getEnvFloat(name string, def float64) (float64, error) {
+	if s, found := os.LookupEnv(name); found {
+		n, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return 0, liberr.New(name + " must be a number")
+		}
+		return n, nil
+	}
+	return def, nil
+}
+
 // GetVDDKImage gets the VDDK image from provider spec settings with fall back to global settings.
 func GetVDDKImage(providerSpecSettings map[string]string) string {
 	vddkImage := providerSpecSettings[api.VDDK]

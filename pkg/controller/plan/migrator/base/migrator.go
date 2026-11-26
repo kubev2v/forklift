@@ -367,7 +367,7 @@ func (r *BaseMigrator) warmCopyApplianceItinerary() *libitr.Itinerary {
 			{Name: api.PhasePreHook, All: HasPreHook},
 			{Name: api.PhaseCreateInitialSnapshot},
 			{Name: api.PhaseWaitForInitialSnapshot},
-			{Name: api.PhaseStoreInitialSnapshotDeltas, All: VSphere},
+			{Name: api.PhaseStoreInitialSnapshotDeltas, All: HasDeltaTracking},
 			{Name: api.PhaseCreateCopyAppliance},
 			{Name: api.PhaseWaitForCopyAppliance},
 			{Name: api.PhasePreflightInspection, All: RunInspection},
@@ -377,13 +377,13 @@ func (r *BaseMigrator) warmCopyApplianceItinerary() *libitr.Itinerary {
 			{Name: api.PhaseCopyingPaused},
 			{Name: api.PhaseReleaseCopyAppliance},
 			{Name: api.PhaseWaitForCopyApplianceReleased},
-			{Name: api.PhaseRemovePreviousSnapshot, All: VSphere},
-			{Name: api.PhaseWaitForPreviousSnapshotRemoval, All: VSphere},
+			{Name: api.PhaseRemovePreviousSnapshot, All: HasDeltaTracking},
+			{Name: api.PhaseWaitForPreviousSnapshotRemoval, All: HasDeltaTracking},
 			{Name: api.PhaseRefreshCopyAppliance},
 			{Name: api.PhaseWaitForRefreshedCopyAppliance},
 			{Name: api.PhaseCreateSnapshot},
 			{Name: api.PhaseWaitForSnapshot},
-			{Name: api.PhaseStoreSnapshotDeltas, All: VSphere},
+			{Name: api.PhaseStoreSnapshotDeltas, All: HasDeltaTracking},
 			{Name: api.PhaseAddCheckpoint},
 			// Precopy loop end
 			{Name: api.PhaseStorePowerState},
@@ -392,8 +392,8 @@ func (r *BaseMigrator) warmCopyApplianceItinerary() *libitr.Itinerary {
 			// Detach before snapshot remove so the base VMDK is not locked for consolidation.
 			{Name: api.PhaseReleaseCopyApplianceBeforeCutover},
 			{Name: api.PhaseWaitForCopyApplianceReleasedBeforeCutover},
-			{Name: api.PhaseRemovePenultimateSnapshot, All: VSphere},
-			{Name: api.PhaseWaitForPenultimateSnapshotRemoval, All: VSphere},
+			{Name: api.PhaseRemovePenultimateSnapshot, All: HasDeltaTracking},
+			{Name: api.PhaseWaitForPenultimateSnapshotRemoval, All: HasDeltaTracking},
 			{Name: api.PhaseCreateFinalSnapshot},
 			{Name: api.PhaseWaitForFinalSnapshot},
 			{Name: api.PhaseRefreshCopyApplianceBeforeFinalize},
@@ -402,13 +402,13 @@ func (r *BaseMigrator) warmCopyApplianceItinerary() *libitr.Itinerary {
 			{Name: api.PhaseFinalize},
 			{Name: api.PhaseReleaseCopyApplianceBeforeFinalSnap},
 			{Name: api.PhaseWaitForCopyApplianceReleasedBeforeFinalSnap},
-			{Name: api.PhaseRemoveFinalSnapshot, All: VSphere},
+			{Name: api.PhaseRemoveFinalSnapshot, All: HasDeltaTracking},
 			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
 			{Name: api.PhaseConvertGuest, All: RequiresConversion},
 			{Name: api.PhaseCreateVM},
 			{Name: api.PhaseWaitForGuestReboots, All: WindowsWaitForGuestReboot},
 			{Name: api.PhasePostHook, All: HasPostHook},
-			{Name: api.PhaseWaitForFinalSnapshotRemoval, All: VSphere | WaitForFinalSnapshotConsolidation},
+			{Name: api.PhaseWaitForFinalSnapshotRemoval, All: HasDeltaTracking | WaitForFinalSnapshotConsolidation},
 			{Name: api.PhaseTeardownCopyAppliance},
 			{Name: api.PhaseCompleted},
 		},
@@ -423,35 +423,35 @@ func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
 			{Name: api.PhasePreHook, All: HasPreHook},
 			{Name: api.PhaseCreateInitialSnapshot},
 			{Name: api.PhaseWaitForInitialSnapshot},
-			{Name: api.PhaseStoreInitialSnapshotDeltas, All: VSphere},
+			{Name: api.PhaseStoreInitialSnapshotDeltas, All: HasDeltaTracking},
 			{Name: api.PhasePreflightInspection, All: RunInspection},
 			{Name: api.PhaseCreateDataVolumes},
 			// Precopy loop start
 			{Name: api.PhaseCopyDisks},
 			{Name: api.PhaseCopyingPaused},
-			{Name: api.PhaseRemovePreviousSnapshot, All: VSphere},
-			{Name: api.PhaseWaitForPreviousSnapshotRemoval, All: VSphere},
+			{Name: api.PhaseRemovePreviousSnapshot, All: HasDeltaTracking},
+			{Name: api.PhaseWaitForPreviousSnapshotRemoval, All: HasDeltaTracking},
 			{Name: api.PhaseCreateSnapshot},
 			{Name: api.PhaseWaitForSnapshot},
-			{Name: api.PhaseStoreSnapshotDeltas, All: VSphere},
+			{Name: api.PhaseStoreSnapshotDeltas, All: HasDeltaTracking},
 			{Name: api.PhaseAddCheckpoint},
 			// Precopy loop end
 			{Name: api.PhaseStorePowerState},
 			{Name: api.PhasePowerOffSource},
 			{Name: api.PhaseWaitForPowerOff},
-			{Name: api.PhaseRemovePenultimateSnapshot, All: VSphere},
-			{Name: api.PhaseWaitForPenultimateSnapshotRemoval, All: VSphere},
+			{Name: api.PhaseRemovePenultimateSnapshot, All: HasDeltaTracking},
+			{Name: api.PhaseWaitForPenultimateSnapshotRemoval, All: HasDeltaTracking},
 			{Name: api.PhaseCreateFinalSnapshot},
 			{Name: api.PhaseWaitForFinalSnapshot},
 			{Name: api.PhaseAddFinalCheckpoint},
 			{Name: api.PhaseFinalize},
-			{Name: api.PhaseRemoveFinalSnapshot, All: VSphere},
+			{Name: api.PhaseRemoveFinalSnapshot, All: HasDeltaTracking},
 			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
 			{Name: api.PhaseConvertGuest, All: RequiresConversion},
 			{Name: api.PhaseCreateVM},
 			{Name: api.PhaseWaitForGuestReboots, All: WindowsWaitForGuestReboot},
 			{Name: api.PhasePostHook, All: HasPostHook},
-			{Name: api.PhaseWaitForFinalSnapshotRemoval, All: VSphere | WaitForFinalSnapshotConsolidation},
+			{Name: api.PhaseWaitForFinalSnapshotRemoval, All: HasDeltaTracking | WaitForFinalSnapshotConsolidation},
 			{Name: api.PhaseCompleted},
 		},
 	}
@@ -522,19 +522,17 @@ func (r *BaseMigrator) resumeConversionItinerary() *libitr.Itinerary {
 	}
 }
 
-// Step predicate.
+// BasePredicate decides which itinerary steps apply to a VM.
 type BasePredicate struct {
-	// VM listed on the plan.
-	vm *plan.VM
-	// Plan context
+	vm      *plan.VM
 	context *plancontext.Context
-	// Cached ShouldUseV2vForTransfer result (one destination API path per VM per pipeline build).
+	// Cached ShouldUseV2vForTransfer (one destination lookup per pipeline build).
 	useV2vForTransfer *bool
 	useV2vResolved    bool
 	useV2vErr         error
 }
 
-// ensureUseV2vForTransfer loads and caches ShouldUseV2vForTransfer at most once per BasePredicate.
+// ensureUseV2vForTransfer caches Plan.ShouldUseV2vForTransfer once per predicate.
 func (r *BasePredicate) ensureUseV2vForTransfer() (bool, error) {
 	if r.useV2vResolved {
 		if r.useV2vErr != nil {
@@ -552,7 +550,7 @@ func (r *BasePredicate) ensureUseV2vForTransfer() (bool, error) {
 	return result, nil
 }
 
-// Evaluate predicate flags.
+// Evaluate returns whether a predicate flag is satisfied for this VM/plan.
 func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	switch flag {
 	case HasPreHook:
@@ -577,8 +575,9 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		allowed = useV2vForTransfer
 	case OpenstackImageMigration:
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
-	case VSphere:
-		allowed = r.context.Plan.IsSourceProviderVSphere()
+	case HasDeltaTracking:
+		// Warm incremental copy: vSphere CBT or Hyper-V AVHDX checkpoints.
+		allowed = r.context.Plan.IsSourceProviderVSphere() || r.context.Plan.IsSourceProviderHyperV()
 	case RunInspection:
 		allowed = r.context.Plan.ShouldRunPreflightInspection()
 	case WindowsWaitForGuestReboot:
@@ -593,12 +592,15 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 			break
 		}
 		win, _ := IsWindowsFromInventory(r.context.Source.Inventory, r.vm.Ref)
-		if !win {
+		if !win && !r.context.Plan.IsSourceProviderHyperV() {
+			// Hyper-V guestOS may be unknown at pipeline build (KVP needs a
+			// running VM). Runtime rechecks IsWindows and skips non-Windows.
 			break
 		}
 		allowed = r.context.Source.Provider.RequiresConversion() && !r.context.Plan.Spec.SkipGuestConversion
 	case WaitForFinalSnapshotConsolidation:
-		allowed = settings.Settings.WaitForFinalSnapshotConsolidation
+		// vSphere-only UI wait. Hyper-V cleanup is PhaseRemoveFinalSnapshot.
+		allowed = settings.Settings.WaitForFinalSnapshotConsolidation && r.context.Plan.IsSourceProviderVSphere()
 	case CopyAppliance:
 		allowed = settings.Settings.EnabledForPlan(r.context.Plan)
 	}
