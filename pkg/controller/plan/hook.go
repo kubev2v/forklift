@@ -12,7 +12,7 @@ import (
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
