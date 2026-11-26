@@ -445,14 +445,15 @@ func (api *BlockStorageAPI) CreateCloneLdev(snapshotGroupName string, snapshotPo
 	headers["Response-Job-Status"] = "Completed"
 
 	body := map[string]string{
-		"snapshotGroupName": snapshotGroupName,
-		"snapshotPoolId":    snapshotPoolId,
-		"pvolLdevId":        pvolLdevId,
-		"svolLdevId":        svolLdevId,
-		"isClone":           "true",
-		"canCascade":        "true",
-		"clonesAutomation":  "true",
-		"copySpeed":         copySpeed,
+		"snapshotGroupName":        snapshotGroupName,
+		"snapshotPoolId":           snapshotPoolId,
+		"pvolLdevId":               pvolLdevId,
+		"svolLdevId":               svolLdevId,
+		"isClone":                  "true",
+		"canCascade":               "true",
+		"clonesAutomation":         "true",
+		"copySpeed":                copySpeed,
+		"isDataReductionForceCopy": "true",
 	}
 	bodyJson, _ := json.Marshal(body)
 	klog.V(2).Infof("CreateCloneLdev request body: %s", string(bodyJson))

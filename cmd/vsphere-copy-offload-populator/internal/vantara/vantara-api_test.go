@@ -645,6 +645,11 @@ func TestCreateCloneLdev(t *testing.T) {
 			if got["clonesAutomation"] != "true" {
 				t.Errorf("clonesAutomation: got=%q want=%q", got["clonesAutomation"], "true")
 			}
+			// Hitachi requires this when the source LDEV has capacity saving enabled.
+			// Omitting it fails the clone with KART40065-E.
+			if got["isDataReductionForceCopy"] != "true" {
+				t.Errorf("isDataReductionForceCopy: got=%q want=%q", got["isDataReductionForceCopy"], "true")
+			}
 
 			w.WriteHeader(http.StatusAccepted)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
