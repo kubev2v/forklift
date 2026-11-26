@@ -174,13 +174,15 @@ func (h *NetworkHandler) filter(ctx *gin.Context, list *[]model.Network) (err er
 // REST Resource.
 type Network struct {
 	Resource
-	Variant  string          `json:"variant"`
-	DVSwitch *model.Ref      `json:"dvSwitch,omitempty"`
-	VlanId   string          `json:"vlanId"`
-	Host     []model.DVSHost `json:"host"`
-	Tag      string          `json:"tag,omitempty"`
-	Key      string          `json:"key,omitempty"`
-	MaxMTU   int32           `json:"maxMtu,omitempty"`
+	Variant  string               `json:"variant"`
+	DVSwitch *model.Ref           `json:"dvSwitch,omitempty"`
+	VlanId   string               `json:"vlanId"`
+	Host     []model.DVSHost      `json:"host"`
+	Tag      string               `json:"tag,omitempty"`
+	Key      string               `json:"key,omitempty"`
+	MaxMTU   int32                `json:"maxMtu,omitempty"`
+	Teaming  *model.TeamingPolicy `json:"teaming,omitempty"`
+	LACP     []model.LACPGroup    `json:"lacp,omitempty"`
 }
 
 // Build the resource using the model.
@@ -191,12 +193,19 @@ func (r *Network) With(m *model.Network) {
 	case model.NetStandard:
 		r.Tag = m.Tag
 	case model.NetDvPortGroup:
+		if m.Teaming != (model.TeamingPolicy{}) {
+			r.Teaming = &m.Teaming
+		}
 		r.DVSwitch = &m.DVSwitch
 		r.Key = m.Key
 		r.VlanId = m.VlanId
 	case model.OpaqueNetwork:
 		r.Key = m.Key
 	case model.NetDvSwitch:
+		if m.Teaming != (model.TeamingPolicy{}) {
+			r.Teaming = &m.Teaming
+		}
+		r.LACP = m.LACP
 		r.Host = m.Host
 		r.MaxMTU = m.MaxMTU
 	}
