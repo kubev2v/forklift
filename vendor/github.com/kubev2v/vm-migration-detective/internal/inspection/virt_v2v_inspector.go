@@ -6,34 +6,42 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/kubev2v/vm-migration-detective/internal/cmdbuilder"
 	"github.com/kubev2v/vm-migration-detective/internal/tlsconfig"
 	"github.com/kubev2v/vm-migration-detective/internal/vddk"
+	"github.com/kubev2v/vm-migration-detective/internal/vsphere"
 	"github.com/kubev2v/vm-migration-detective/pkg/types"
 	"github.com/sirupsen/logrus"
 )
 
+// virtV2vProgressLine matches virt-v2v-inspector's own high-level phase markers,
+// e.g. "[   0.0] Setting up the source: ..." — while excluding guest kernel
+// boot log lines that use the same bracket style with microsecond precision.
+var virtV2vProgressLine = regexp.MustCompile(`^\[\s*\d+\.\d\]`)
+
+// shouldLogVirtV2vLine also preserves supermin diagnostics in the live log.
+func shouldLogVirtV2vLine(line string) bool {
+	return virtV2vProgressLine.MatchString(line) || strings.Contains(strings.ToLower(line), "supermin:")
+}
+
 // VirtV2vInspector handles VM inspection operations using virt-v2v-inspector
 type VirtV2vInspector struct {
 	virtV2vInspectorPath string
-	timeout              time.Duration
 	logger               *logrus.Logger
 }
 
-// NewVirtV2vInspector creates a new VirtV2vInspector instance
-func NewVirtV2vInspector(virtV2vInspectorPath string, timeout time.Duration, logger *logrus.Logger) *VirtV2vInspector {
+// NewVirtV2vInspector creates a new VirtV2vInspector instance. The process runs
+// until its caller's context is cancelled.
+func NewVirtV2vInspector(virtV2vInspectorPath string, logger *logrus.Logger) *VirtV2vInspector {
 	if virtV2vInspectorPath == "" {
 		virtV2vInspectorPath = "virt-v2v-inspector" // Use system PATH
 	}
-	if timeout == 0 {
-		timeout = 5 * time.Minute
-	}
 	return &VirtV2vInspector{
 		virtV2vInspectorPath: virtV2vInspectorPath,
-		timeout:              timeout,
 		logger:               logger,
 	}
 }
@@ -49,136 +57,163 @@ func (i *VirtV2vInspector) Inspect(
 	tlsConfig *tlsconfig.Config,
 	diskInfo *types.SnapshotDiskInfo, // Snapshot disk info from vm_service
 ) (*types.VirtV2VInspectorXML, error) {
+	if tlsConfig == nil {
+		return nil, fmt.Errorf("TLS configuration is required")
+	}
+	sslVerify := tlsConfig.ForVirtV2V(tlsConfig.RootCAPath)
+
 	i.logger.WithFields(logrus.Fields{
 		"vm_moref":       vmMoref,
 		"snapshot_moref": snapshotMoref,
 		"vcenter_url":    vcenterURL,
 	}).Info("Running virt-v2v-inspector on snapshot")
 
-	// Build libvirt connection URL for vSphere
-	// Format: vpx://username@vcenter/compute-resource-path?ssl-verify
-	// The path must point to a compute resource (host/cluster), not the datacenter or VM
-	// The VM name is specified as a positional argument after "--"
-	// Username is in URL (needed by virt-v2v-inspector to pass to VDDK)
-	// Password is provided via -ip file (secure)
-	// Extract hostname from vCenter URL
+	if diskInfo.VMName == "" {
+		return nil, fmt.Errorf("VM name is required for virt-v2v-inspector (vmMoref %s has no name)", vmMoref)
+	}
+
 	vcenterHost := extractHostname(vcenterURL)
-
-	// URL-encode username to handle special characters like @
-	// The @ symbol in the username needs to be percent-encoded as %40
-	// because @ is used as a delimiter between username and hostname in URLs
-	encodedUsername := url.QueryEscape(username)
-
-	// Use the compute resource path from diskInfo (e.g., "/Datacenter/Cluster/host.example.com")
-	// This is required for vpx:// URLs - they need a compute resource, not just a datacenter
-	computeResourcePath := diskInfo.ComputeResourcePath
-	if computeResourcePath == "" {
-		return nil, fmt.Errorf("compute resource path is required for vpx:// URL")
-	}
-
-	// Validate TLS config
-	if tlsConfig == nil {
-		return nil, fmt.Errorf("TLS configuration is required")
-	}
-
-	// Build the TLS verification parameter from the configured TLS policy.
-	// CA mode passes the CA bundle path to virt-v2v; insecure and thumbprint
-	// modes use no_verify=1, with thumbprint verification handled by nbdkit.
-	sslVerify := tlsConfig.ForVirtV2V(tlsConfig.RootCAPath)
-
-	// Build vpx:// URL with username
-	// virt-v2v-inspector extracts the username from this URL to pass to VDDK internally
-	// Password is kept secure in separate file via -ip parameter
-	// Add SSL verification parameter
-	libvirtURL := fmt.Sprintf("vpx://%s@%s%s?%s",
-		encodedUsername, bracketIPv6(vcenterHost), computeResourcePath, sslVerify)
-
-	// Create context with timeout
-	inspectCtx, cancel := context.WithTimeout(ctx, i.timeout)
-	defer cancel()
-
-	// Create a password file for VDDK authentication
-	// VDDK uses -io vddk-password=+file to read password securely
-	passwordFile, err := i.createPasswordFile(password)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create password file: %w", err)
-	}
-	defer func() { _ = os.Remove(passwordFile) }()
-
-	// Get thumbprint from TLS config or compute it
-	var thumbprint string
-	thumbprint = tlsConfig.ForNBDKit()
-
-	// If no thumbprint is configured, retrieve it for nbdkit. Secure modes
-	// must fail closed if the certificate cannot be verified or fingerprinted.
-	if thumbprint == "" && !tlsConfig.Insecure {
-		if i.logger != nil {
-			i.logger.Debug("No thumbprint in config, computing from vCenter certificate")
-		}
-		computed, err := tlsconfig.GetVCenterThumbprint(vcenterHost, tlsConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get vCenter certificate thumbprint: %w", err)
-		}
-		thumbprint = computed
-	}
 	vddkLibDir := vddk.GetLibDir()
-	vddkLibPath := vddk.GetLibPath()
+	useVDDK := false
+	if info, err := os.Stat(vddkLibDir); err == nil && info.IsDir() {
+		useVDDK = true
+	}
 
-	diskUnlock := resolveDiskUnlock(i.logger)
+	var vsphereClient *vsphere.Client
+	if !useVDDK {
+		client, err := vsphere.NewClient(ctx, vcenterURL, username, password, tlsConfig, i.logger)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to vSphere for NFC disk inputs: %w", err)
+		}
+		vsphereClient = client
+		defer vsphereClient.Close()
+	}
 
 	cmdArgs := cmdbuilder.New().
 		WithLogger(i.logger).
 		FilterEnv("LD_LIBRARY_PATH", func(val string) string {
 			var kept []string
 			for _, p := range strings.Split(val, ":") {
-				if p != vddkLibPath && !strings.Contains(p, "vmware-vix-disklib") {
+				if p != vddk.GetLibPath() && !strings.Contains(p, "vmware-vix-disklib") {
 					kept = append(kept, p)
 				}
 			}
 			return strings.Join(kept, ":")
 		}).
 		SetEnv("LIBGUESTFS_DEBUG", "1").
-		Add("-v", "-x").
-		Flag("-i", "libvirt").
-		Flag("-ic", libvirtURL).
-		Flag("-ip", passwordFile)
+		Add("-v", "-x")
 
-	nbdkitPlugin := "vddk"
-	if info, err := os.Stat(vddkLibDir); err != nil || !info.IsDir() {
-		nbdkitPlugin = "nfc"
-	}
-	cmdArgs.Flag("-it", nbdkitPlugin).
-		FlagIf(thumbprint != "", "-io", fmt.Sprintf("%s-thumbprint=%s", nbdkitPlugin, thumbprint)).
-		FlagIf(nbdkitPlugin == "vddk" && vddkLibDir != "", "-io", fmt.Sprintf("vddk-libdir=%s", vddkLibDir))
-
-	for _, baseDiskPath := range diskInfo.BaseDiskPaths {
-		if baseDiskPath != "" {
-			cmdArgs.Flag("-io", fmt.Sprintf("%s-file=%s", nbdkitPlugin, baseDiskPath))
+	baseDiskPaths, err := resolveBaseDiskPaths(diskInfo.BaseDiskPaths, func() ([]string, error) {
+		if vsphereClient != nil {
+			return vsphereClient.GetBaseDiskPaths(ctx, vmMoref)
 		}
+		return queryBaseDiskPathsFromVSphere(ctx, vcenterURL, username, password, vmMoref, tlsConfig, i.logger)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine base disk paths for virt-v2v-inspector: %w", err)
 	}
 
+	if useVDDK {
+		// Preserve the native vpx/libvirt input path when VDDK is installed.
+		computeResourcePath := diskInfo.ComputeResourcePath
+		if computeResourcePath == "" {
+			return nil, fmt.Errorf("compute resource path is required for vpx:// URL")
+		}
+		encodedUsername := url.QueryEscape(username)
+		libvirtURL := fmt.Sprintf("vpx://%s@%s%s?%s",
+			encodedUsername, bracketIPv6(vcenterHost), computeResourcePath, sslVerify)
+
+		passwordFile, err := i.createPasswordFile(password)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create password file: %w", err)
+		}
+		defer func() { _ = os.Remove(passwordFile) }()
+
+		thumbprint := tlsConfig.ForNBDKit()
+		if thumbprint == "" && !tlsConfig.Insecure {
+			thumbprint, err = tlsconfig.GetVCenterThumbprint(vcenterHost, tlsConfig)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get vCenter certificate thumbprint: %w", err)
+			}
+		}
+
+		cmdArgs.Flag("-i", "libvirt").
+			Flag("-ic", libvirtURL).
+			Flag("-ip", passwordFile).
+			Flag("-it", "vddk").
+			FlagIf(thumbprint != "", "-io", fmt.Sprintf("vddk-thumbprint=%s", thumbprint)).
+			FlagIf(vddkLibDir != "", "-io", fmt.Sprintf("vddk-libdir=%s", vddkLibDir))
+		cmdArgs.Add("--no-selinux-relabel", "--no-fstrim")
+
+		for _, baseDiskPath := range baseDiskPaths {
+			if baseDiskPath != "" {
+				cmdArgs.Flag("-io", fmt.Sprintf("vddk-file=%s", baseDiskPath))
+			}
+		}
+
+		// libvirt's vpx:// driver looks up domains by VM display name, not moref.
+		cmdArgs.Add("--", diskInfo.VMName)
+	} else {
+		// The installed virt-v2v-inspector rejects "-it nfc". Expose each NFC
+		// session as a raw NBD disk instead, which its disk input supports.
+		i.logger.WithFields(logrus.Fields{
+			"vm_moref":       vmMoref,
+			"snapshot_moref": snapshotMoref,
+			"disk_count":     len(baseDiskPaths),
+		}).Info("Opening NFC NBD inputs for virt-v2v-inspector")
+
+		cmdArgs.Add("-i", "disk", "-if", "raw")
+		for _, baseDiskPath := range baseDiskPaths {
+			if baseDiskPath == "" {
+				continue
+			}
+
+			session, err := openWithNBDKit(ctx, vmMoref, snapshotMoref, baseDiskPath,
+				vcenterURL, username, password, tlsConfig, vsphereClient, i.logger)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open NFC NBD input for disk %q: %w", baseDiskPath, err)
+			}
+			defer session.Close()
+
+			if err := session.WaitForReady(30 * time.Second); err != nil {
+				return nil, fmt.Errorf("NFC NBD input for disk %q did not become ready: %w", baseDiskPath, err)
+			}
+			cmdArgs.Add(session.NBDURL)
+		}
+		cmdArgs.Add("--no-selinux-relabel", "--no-fstrim")
+	}
+
+	diskUnlock := resolveDiskUnlock(i.logger)
 	if args := diskUnlock.Args(); len(args) > 0 {
 		cmdArgs.Add(args...)
 	}
 
-	cmdArgs.Add("--", vmMoref)
-
-	output, err := cmdArgs.RunCombined(inspectCtx, i.virtV2vInspectorPath)
-	if inspectCtx.Err() != nil {
-		if inspectCtx.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("virt-v2v-inspector command timed out after %v", i.timeout)
+	// XML goes to stdout, debug/error output to stderr. Stderr is streamed
+	// line-by-line so phase markers appear in real time; stdout is buffered.
+	stdout, stderr, err := cmdArgs.RunSeparate(ctx, i.virtV2vInspectorPath, func(line string) {
+		if shouldLogVirtV2vLine(line) {
+			i.logger.WithField("vm_moref", vmMoref).Info(line)
 		}
-		return nil, fmt.Errorf("virt-v2v-inspector command was cancelled: %w", inspectCtx.Err())
+	})
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("virt-v2v-inspector command was cancelled: %w", ctx.Err())
 	}
 
-	outputStr := string(output)
+	stdoutStr := string(stdout)
+	stderrStr := string(stderr)
+	if len(stderr) > 0 && i.logger != nil {
+		i.logger.WithField("stderr", stderrStr).Debug("virt-v2v-inspector stderr output")
+	}
+
 	if err != nil {
 		exitCode := cmdbuilder.ExitCode(err)
 
-		// Check if this is likely an encrypted disk error
-		if encrypted, reason := isEncryptedDiskError(outputStr); encrypted {
+		// Check if this is likely an encrypted disk error (check both stdout and stderr)
+		combinedOutput := stdoutStr + stderrStr
+		if encrypted, reason := isEncryptedDiskError(combinedOutput); encrypted {
 			i.logger.WithFields(logrus.Fields{
-				"output":          outputStr,
+				"stdout":          stdoutStr,
+				"stderr":          stderrStr,
 				"exit_code":       exitCode,
 				"executable":      i.virtV2vInspectorPath,
 				"args":            cmdArgs.MaskedArgs(),
@@ -196,70 +231,29 @@ func (i *VirtV2vInspector) Inspect(
 		}
 
 		i.logger.WithFields(logrus.Fields{
-			"output":     outputStr,
+			"stdout":     stdoutStr,
+			"stderr":     stderrStr,
 			"exit_code":  exitCode,
 			"executable": i.virtV2vInspectorPath,
 			"args":       cmdArgs.MaskedArgs(),
 		}).Error("virt-v2v-inspector failed")
 
-		// Include output in error message for better debugging
-		if outputStr != "" {
-			return nil, fmt.Errorf("virt-v2v-inspector failed (exit code %d): %w\nOutput: %s", exitCode, err, outputStr)
+		// Extract meaningful error lines from stderr for the error message.
+		// Full output is already logged above.
+		if summary := extractErrorSummary(stderrStr); summary != "" {
+			return nil, fmt.Errorf("virt-v2v-inspector failed (exit code %d): %s", exitCode, summary)
 		}
 		return nil, fmt.Errorf("virt-v2v-inspector failed (exit code %d): %w", exitCode, err)
 	}
 
-	// Extract XML from output (virt-v2v-inspector with -v -x may output debug messages)
-	// Look for XML content - it should start with <?xml or <v2v-inspection>
-	xmlStart := strings.Index(outputStr, "<?xml")
-	if xmlStart == -1 {
-		xmlStart = strings.Index(outputStr, "<v2v-inspection")
-	}
-	if xmlStart == -1 {
-		xmlStart = strings.Index(outputStr, "<operatingsystem")
-	}
-	if xmlStart == -1 {
-		xmlStart = strings.Index(outputStr, "<inspection")
-	}
-
-	var xmlData []byte
-	if xmlStart >= 0 {
-		// Extract XML portion from output
-		xmlData = []byte(outputStr[xmlStart:])
-		// Find the end of XML (look for closing </v2v-inspection> tag first, then fallback to </operatingsystem>)
-		xmlEnd := strings.LastIndex(string(xmlData), "</v2v-inspection>")
-		if xmlEnd > 0 {
-			xmlEnd += len("</v2v-inspection>")
-			xmlData = xmlData[:xmlEnd]
-		} else {
-			// Fallback: look for </operatingsystem> if </v2v-inspection> not found
-			xmlEnd = strings.LastIndex(string(xmlData), "</operatingsystem>")
-			if xmlEnd > 0 {
-				xmlEnd += len("</operatingsystem>")
-				xmlData = xmlData[:xmlEnd]
-			}
-		}
-		if i.logger != nil {
-			xmlPreview := string(xmlData)
-			if len(xmlPreview) > 1000 {
-				xmlPreview = xmlPreview[:1000] + "... (truncated)"
-			}
-			i.logger.WithField("xml_extracted", xmlPreview).Debug("Extracted XML from output")
-		}
-	} else {
-		// No XML found, try parsing the whole output
-		xmlData = output
-		if i.logger != nil {
-			i.logger.Warn("No XML markers found in output, attempting to parse entire output")
-		}
-	}
-
-	inspectionData, err := parseV2VInspectionXML(xmlData)
+	// Use stdout for XML parsing (stderr contains debug logs)
+	inspectionData, err := parseV2VInspectionXML(stdout)
 	if err != nil {
 		if i.logger != nil {
 			i.logger.WithFields(logrus.Fields{
 				"error":  err,
-				"output": outputStr,
+				"stdout": stdoutStr,
+				"stderr": stderrStr,
 			}).Error("Failed to parse virt-v2v-inspector XML output")
 		}
 		return nil, fmt.Errorf("failed to parse virt-v2v-inspector output: %w", err)
@@ -283,6 +277,33 @@ func extractHostname(urlStr string) string {
 
 	// If parsing fails, assume it's already a hostname
 	return urlStr
+}
+
+// resolveBaseDiskPaths returns existing when non-empty, otherwise the result of
+// query. Separated from the vSphere call so the empty/populated/error branches
+// are unit-testable without a live vCenter.
+func resolveBaseDiskPaths(existing []string, query func() ([]string, error)) ([]string, error) {
+	if len(existing) > 0 {
+		return existing, nil
+	}
+	return query()
+}
+
+// queryBaseDiskPathsFromVSphere traverses the backing chain to get base disk
+// paths. Mirrors VirtInspector.getBaseDiskPathsFromVSphere so virt-v2v-inspector
+// works when the caller did not pre-populate diskInfo.BaseDiskPaths.
+func queryBaseDiskPathsFromVSphere(ctx context.Context, vcenterURL, username, password, vmMoref string, tlsConfig *tlsconfig.Config, logger *logrus.Logger) ([]string, error) {
+	vsphereClient, err := vsphere.NewClient(ctx, vcenterURL, username, password, tlsConfig, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to vSphere: %w", err)
+	}
+	defer vsphereClient.Close()
+
+	baseDiskPaths, err := vsphereClient.GetBaseDiskPaths(ctx, vmMoref)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get base disk paths: %w", err)
+	}
+	return baseDiskPaths, nil
 }
 
 // createPasswordFile creates a temporary file with the password

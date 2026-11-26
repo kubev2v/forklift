@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
+	"sync"
 
 	"github.com/kubev2v/vm-migration-detective/internal/tlsconfig"
 	"github.com/sirupsen/logrus"
@@ -20,8 +22,37 @@ import (
 
 // Client represents a vSphere client for querying disk information
 type Client struct {
-	client *govmomi.Client
-	logger *logrus.Logger
+	client              *govmomi.Client
+	logger              *logrus.Logger
+	snapshotDeviceCache snapshotDeviceCache
+}
+
+type snapshotDeviceCache struct {
+	mu      sync.Mutex
+	devices map[string][]vimtypes.BaseVirtualDevice
+}
+
+func (cache *snapshotDeviceCache) get(
+	ctx context.Context,
+	snapshotMoref string,
+	load func(context.Context, string) ([]vimtypes.BaseVirtualDevice, error),
+) ([]vimtypes.BaseVirtualDevice, error) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	if devices, ok := cache.devices[snapshotMoref]; ok {
+		return devices, nil
+	}
+
+	devices, err := load(ctx, snapshotMoref)
+	if err != nil {
+		return nil, err
+	}
+	if cache.devices == nil {
+		cache.devices = make(map[string][]vimtypes.BaseVirtualDevice)
+	}
+	cache.devices[snapshotMoref] = devices
+	return devices, nil
 }
 
 // NewClient creates a new vSphere client with TLS configuration
@@ -143,6 +174,73 @@ func (c *Client) GetBaseDiskPaths(ctx context.Context, vmMoref string) ([]string
 	return baseDiskPaths, nil
 }
 
+// GetSnapshotDiskFilePath finds the snapshot-level backing file for a base disk.
+// NFC matches file= to the snapshot's top-level backing filename, while VDDK
+// resolves the snapshot chain itself and continues to use the base disk path.
+func (c *Client) GetSnapshotDiskFilePath(ctx context.Context, snapshotMoref, baseDiskPath string) (string, error) {
+	devices, err := c.snapshotDeviceCache.get(ctx, snapshotMoref, c.retrieveSnapshotDevices)
+	if err != nil {
+		return "", err
+	}
+
+	diskFile, err := resolveSnapshotDiskFilePath(devices, baseDiskPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve disk path %q in snapshot %s: %w", baseDiskPath, snapshotMoref, err)
+	}
+	return diskFile, nil
+}
+
+func (c *Client) retrieveSnapshotDevices(ctx context.Context, snapshotMoref string) ([]vimtypes.BaseVirtualDevice, error) {
+	snapshotRef := vimtypes.ManagedObjectReference{
+		Type:  "VirtualMachineSnapshot",
+		Value: snapshotMoref,
+	}
+
+	var snapshot mo.VirtualMachineSnapshot
+	pc := property.DefaultCollector(c.client.Client)
+	if err := pc.RetrieveOne(ctx, snapshotRef, []string{"config.hardware.device"}, &snapshot); err != nil {
+		return nil, fmt.Errorf("failed to retrieve snapshot %s config: %w", snapshotMoref, err)
+	}
+	return snapshot.Config.Hardware.Device, nil
+}
+
+func resolveSnapshotDiskFilePath(devices []vimtypes.BaseVirtualDevice, baseDiskPath string) (string, error) {
+	normalizedBasePath := normalizeDiskPath(baseDiskPath)
+	for _, device := range devices {
+		disk, ok := device.(*vimtypes.VirtualDisk)
+		if !ok {
+			continue
+		}
+
+		backing, ok := disk.Backing.(*vimtypes.VirtualDiskFlatVer2BackingInfo)
+		if !ok {
+			continue
+		}
+
+		topBackingPath := backing.FileName
+		for current := backing; current != nil; current = current.Parent {
+			if normalizeDiskPath(current.FileName) != normalizedBasePath {
+				continue
+			}
+			if strings.TrimSpace(topBackingPath) == "" {
+				return "", fmt.Errorf("top-level snapshot backing path is empty")
+			}
+			return topBackingPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("disk %q not found in snapshot backing chain", baseDiskPath)
+}
+
+func normalizeDiskPath(path string) string {
+	path = strings.TrimSpace(path)
+	before, after, ok := strings.Cut(path, "]")
+	if !ok {
+		return path
+	}
+	return before + "] " + strings.TrimSpace(after)
+}
+
 // traverseBackingChain traverses the full backing chain to find the base disk
 // With multiple snapshots, we may have: vm-000002.vmdk -> vm-000001.vmdk -> vm.vmdk
 // We need to traverse all the way to the base disk (the one with no parent)
@@ -246,6 +344,7 @@ func (c *Client) FindVMByName(ctx context.Context, datacenter, vmName string) (s
 // SnapshotDiskInfo contains snapshot disk information for inspection
 type SnapshotDiskInfo struct {
 	VMMoref             string
+	VMName              string // VM display name, required as the libvirt domain name for virt-v2v-inspector
 	SnapshotMoref       string
 	ComputeResourcePath string
 }
@@ -260,10 +359,11 @@ func (c *Client) GetSnapshotDiskInfo(ctx context.Context, vmMoref, snapshotMoref
 	}
 	vm := object.NewVirtualMachine(c.client.Client, vmRef)
 
-	// Get VM properties (we only need runtime.host for compute resource path)
+	// Get VM properties: runtime.host for compute resource path, name for the
+	// libvirt domain name virt-v2v-inspector needs (it cannot look up VMs by moref)
 	var vmMo mo.VirtualMachine
 	pc := property.DefaultCollector(c.client.Client)
-	err := pc.RetrieveOne(ctx, vm.Reference(), []string{"runtime.host"}, &vmMo)
+	err := pc.RetrieveOne(ctx, vm.Reference(), []string{"runtime.host", "name"}, &vmMo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get VM properties: %w", err)
 	}
@@ -273,37 +373,45 @@ func (c *Client) GetSnapshotDiskInfo(ctx context.Context, vmMoref, snapshotMoref
 	// Create finder for ObjectReference calls
 	finder := find.NewFinder(c.client.Client, true)
 
-	// Get compute resource path (host/cluster) for vpx:// URL
+	// Get compute resource path (host/cluster) for vpx:// URL. vSphere's
+	// InventoryPath includes the structural "host" folder, and standalone
+	// hosts appear as a ComputeResource followed by a HostSystem. libvirt's vpx
+	// URI omits that folder; standalone hosts need one path component, while
+	// clustered hosts need both the cluster and host components.
 	var computeResourcePath string
 	if vmMo.Runtime.Host != nil {
-		host, err := finder.ObjectReference(ctx, *vmMo.Runtime.Host)
-		if err == nil {
-			if hostObj, ok := host.(*object.HostSystem); ok {
-				computeResourcePath = hostObj.InventoryPath
-				if c.logger != nil {
-					c.logger.WithField("compute_resource_path", computeResourcePath).Debug("Got compute resource path from host")
-				}
-			}
+		var hostMo mo.HostSystem
+		err = pc.RetrieveOne(ctx, *vmMo.Runtime.Host, []string{"parent", "name"}, &hostMo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get host compute resource: %w", err)
+		}
+		if hostMo.Parent == nil {
+			return nil, fmt.Errorf("host for VM '%s' has no compute resource parent", vmMoref)
 		}
 
-		// If we couldn't get the host path, try to get it from the host's parent (cluster)
-		if computeResourcePath == "" {
-			var hostMo mo.HostSystem
-			err = pc.RetrieveOne(ctx, *vmMo.Runtime.Host, []string{"parent"}, &hostMo)
-			if err == nil && hostMo.Parent != nil {
-				parentObj, err := finder.ObjectReference(ctx, *hostMo.Parent)
-				if err == nil {
-					switch obj := parentObj.(type) {
-					case *object.ClusterComputeResource:
-						computeResourcePath = obj.InventoryPath
-					case *object.ComputeResource:
-						computeResourcePath = obj.InventoryPath
-					}
-					if c.logger != nil && computeResourcePath != "" {
-						c.logger.WithField("compute_resource_path", computeResourcePath).Debug("Got compute resource path from parent")
-					}
-				}
-			}
+		parentObj, err := finder.ObjectReference(ctx, *hostMo.Parent)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find host compute resource: %w", err)
+		}
+
+		isCluster := false
+		var resourceInventoryPath string
+		switch obj := parentObj.(type) {
+		case *object.ClusterComputeResource:
+			isCluster = true
+			resourceInventoryPath = obj.InventoryPath
+		case *object.ComputeResource:
+			resourceInventoryPath = obj.InventoryPath
+		default:
+			return nil, fmt.Errorf("unexpected host compute resource type %T", parentObj)
+		}
+
+		computeResourcePath, err = vpxPathFromComputeResource(resourceInventoryPath, hostMo.Name, isCluster)
+		if err != nil {
+			return nil, err
+		}
+		if c.logger != nil {
+			c.logger.WithField("compute_resource_path", computeResourcePath).Debug("Got libvirt vpx path from host compute resource")
 		}
 	}
 
@@ -321,7 +429,28 @@ func (c *Client) GetSnapshotDiskInfo(ctx context.Context, vmMoref, snapshotMoref
 
 	return &SnapshotDiskInfo{
 		VMMoref:             vmMoref,
+		VMName:              vmMo.Name,
 		SnapshotMoref:       snapshotMoref,
 		ComputeResourcePath: computeResourcePath,
 	}, nil
+}
+
+func vpxPathFromComputeResource(inventoryPath, hostName string, isCluster bool) (string, error) {
+	const hostFolder = "/host/"
+	index := strings.Index(inventoryPath, hostFolder)
+	if index < 0 {
+		return "", fmt.Errorf("compute resource inventory path %q does not contain the vSphere host folder", inventoryPath)
+	}
+
+	// Remove the structural host folder while preserving the resource path.
+	// For a standalone host, the ComputeResource itself names the host. For a
+	// cluster, append the ESXi host below the cluster path.
+	path := inventoryPath[:index] + inventoryPath[index+len("/host"):]
+	if isCluster {
+		if hostName == "" {
+			return "", fmt.Errorf("host name is required to build a clustered vpx path")
+		}
+		path = strings.TrimSuffix(path, "/") + "/" + hostName
+	}
+	return path, nil
 }

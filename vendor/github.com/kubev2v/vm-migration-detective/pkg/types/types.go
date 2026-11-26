@@ -12,6 +12,7 @@ import (
 // Supports multiple disks - DiskPaths and BaseDiskPaths are arrays
 type SnapshotDiskInfo struct {
 	VMMoref             string
+	VMName              string // VM display name, required as the libvirt domain name for virt-v2v-inspector
 	SnapshotMoref       string
 	DiskPaths           []string // Current disk paths (may include snapshot deltas)
 	BaseDiskPaths       []string // Base disk paths (without snapshot deltas)

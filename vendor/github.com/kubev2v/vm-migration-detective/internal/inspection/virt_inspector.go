@@ -129,10 +129,15 @@ func (i *VirtInspector) attemptInspect(
 		}).Debug("Using VM and snapshot morefs from caller")
 
 		// Query vSphere to get base disk paths by traversing backing chain
-		baseDiskPaths, err := i.getBaseDiskPathsFromVSphere(ctx, vcenterURL, username, password, diskInfo.VMMoref, tlsConfig)
+		vsphereClient, baseDiskPaths, err := i.getBaseDiskPathsFromVSphere(ctx, vcenterURL, username, password, diskInfo.VMMoref, tlsConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query base disk paths from vSphere: %w", err)
 		}
+		defer func() {
+			if vsphereClient != nil {
+				vsphereClient.Close()
+			}
+		}()
 
 		i.logger.WithFields(logrus.Fields{
 			"disk_count":      len(baseDiskPaths),
@@ -151,16 +156,9 @@ func (i *VirtInspector) attemptInspect(
 				"base_disk_path": baseDiskPath,
 			}).Debug("Starting NBDkit session for disk")
 
-			nbdkitSession, err := OpenWithNBDKitVDDK(
-				openCtx,
-				diskInfo.VMMoref,
-				diskInfo.SnapshotMoref,
-				baseDiskPath,
-				vcenterURL,
-				username,
-				password,
-				tlsConfig,
-				i.logger,
+			nbdkitSession, err := openWithNBDKit(
+				openCtx, diskInfo.VMMoref, diskInfo.SnapshotMoref, baseDiskPath,
+				vcenterURL, username, password, tlsConfig, vsphereClient, i.logger,
 			)
 			if err != nil {
 				// Close any sessions we've already created
@@ -182,6 +180,8 @@ func (i *VirtInspector) attemptInspect(
 				return nil, fmt.Errorf("NBD server not ready for disk %d: %w", idx, err)
 			}
 		}
+		vsphereClient.Close()
+		vsphereClient = nil
 
 		// Create a cleanup function that closes all sessions
 		sessionCloser = func() {
@@ -214,7 +214,7 @@ func (i *VirtInspector) attemptInspect(
 	}
 
 	// XML goes to stdout, debug logs to stderr.
-	stdout, stderr, err := diskArgs.RunSeparate(inspectCtx, i.virtInspectorPath)
+	stdout, stderr, err := diskArgs.RunSeparate(inspectCtx, i.virtInspectorPath, nil)
 
 	// Log stderr (debug output) separately
 	if len(stderr) > 0 && i.logger != nil {
@@ -393,7 +393,7 @@ func (i *VirtInspector) InspectLocal(ctx context.Context, diskArgs []string) (*t
 		cmd.Add(args...)
 	}
 
-	stdout, stderr, err := cmd.RunSeparate(inspectCtx, i.virtInspectorPath)
+	stdout, stderr, err := cmd.RunSeparate(inspectCtx, i.virtInspectorPath, nil)
 
 	if len(stderr) > 0 && i.logger != nil {
 		i.logger.WithField("stderr", string(stderr)).Debug("virt-inspector stderr output (local)")
@@ -433,19 +433,19 @@ func (i *VirtInspector) InspectLocal(ctx context.Context, diskArgs []string) (*t
 }
 
 // getBaseDiskPathsFromVSphere queries vSphere to get base disk paths by traversing the backing chain
-func (i *VirtInspector) getBaseDiskPathsFromVSphere(ctx context.Context, vcenterURL, username, password, vmMoref string, tlsConfig *tlsconfig.Config) ([]string, error) {
+func (i *VirtInspector) getBaseDiskPathsFromVSphere(ctx context.Context, vcenterURL, username, password, vmMoref string, tlsConfig *tlsconfig.Config) (*vsphere.Client, []string, error) {
 	// Import the vsphere package
 	vsphereClient, err := vsphere.NewClient(ctx, vcenterURL, username, password, tlsConfig, i.logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to vSphere: %w", err)
+		return nil, nil, fmt.Errorf("failed to connect to vSphere: %w", err)
 	}
-	defer vsphereClient.Close()
 
 	// Query base disk paths
 	baseDiskPaths, err := vsphereClient.GetBaseDiskPaths(ctx, vmMoref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get base disk paths: %w", err)
+		vsphereClient.Close()
+		return nil, nil, fmt.Errorf("failed to get base disk paths: %w", err)
 	}
 
-	return baseDiskPaths, nil
+	return vsphereClient, baseDiskPaths, nil
 }

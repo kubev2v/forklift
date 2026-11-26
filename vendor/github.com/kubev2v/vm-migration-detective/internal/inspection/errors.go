@@ -1,6 +1,9 @@
 package inspection
 
-import "strings"
+import (
+	"strings"
+	"unicode/utf8"
+)
 
 // isEncryptedDiskError returns (true, reason) when the output looks like an
 // encrypted-disk failure, or (false, "") otherwise. The reason string names
@@ -18,20 +21,22 @@ func isEncryptedDiskError(output string) (bool, string) {
 	}
 
 	// Strong encryption indicators checked before access-rights exclusions.
+	// These must be specific enough to avoid false positives in verbose debug
+	// output (-v -x / LIBGUESTFS_DEBUG=1), which contains kernel boot messages
+	// ("Key type encrypted registered"), TLS cipher config ("cipher list
+	// ECDHE+AESGCM"), and kernel module loading ("crypto_engine.ko"). Single
+	// words like "encrypted", "cipher", "crypto_", "aes-" are too broad.
 	strongIndicators := []string{
-		"encryption",
-		"encrypted",
 		"luks",
 		"unknown cipher",
 		"requires a passphrase",
 		"dm-crypt",
 		"cryptsetup",
-		"crypto_",
-		"cipher",
-		"aes-",
 		"encryption format",
 		"encrypted disk",
 		"encrypted volume",
+		"disk encryption",
+		"is encrypted",
 	}
 	for _, indicator := range strongIndicators {
 		if strings.Contains(lowerOutput, indicator) {
@@ -76,4 +81,90 @@ func isEncryptedDiskError(output string) (bool, string) {
 	}
 
 	return false, ""
+}
+
+const maxErrorSummaryLen = 500
+
+// extractErrorSummary pulls the salient error lines from virt-v2v-inspector
+// stderr. With -v -x and LIBGUESTFS_DEBUG=1, stderr can be megabytes of debug
+// output; this returns only the lines that name the actual failure. Returns ""
+// when no error lines are found.
+func extractErrorSummary(stderr string) string {
+	if stderr == "" {
+		return ""
+	}
+
+	markers := []string{
+		"virt-v2v: error:",
+		"virt-v2v-inspector: error:",
+		"libguestfs: error:",
+		"nbdkit: vddk",
+		"vixdisklib",
+		"nfc error",
+	}
+	errorIndicators := []string{"error", "failed", "failure", "cannot", "unable"}
+
+	var errorLines []string
+	seen := make(map[string]bool)
+	for _, line := range splitOutputLines(stderr) {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		lower := strings.ToLower(trimmed)
+		for _, marker := range markers {
+			if strings.Contains(lower, marker) && containsAny(lower, errorIndicators) && !seen[trimmed] {
+				errorLines = append(errorLines, trimmed)
+				seen[trimmed] = true
+				break
+			}
+		}
+	}
+
+	if len(errorLines) > 0 {
+		return truncateRuneSafe(strings.Join(errorLines, "; "), maxErrorSummaryLen)
+	}
+
+	// Fallback: last three non-empty lines (error output is typically near the end).
+	lines := splitOutputLines(stderr)
+	start := 0
+	if len(lines) > 3 {
+		start = len(lines) - 3
+	}
+	var tail []string
+	for _, l := range lines[start:] {
+		if t := strings.TrimSpace(l); t != "" {
+			tail = append(tail, t)
+		}
+	}
+	if len(tail) == 0 {
+		return ""
+	}
+	return truncateRuneSafe(strings.Join(tail, "; "), maxErrorSummaryLen)
+}
+
+func splitOutputLines(output string) []string {
+	return strings.FieldsFunc(output, func(r rune) bool {
+		return r == '\r' || r == '\n'
+	})
+}
+
+func containsAny(s string, values []string) bool {
+	for _, value := range values {
+		if strings.Contains(s, value) {
+			return true
+		}
+	}
+	return false
+}
+
+func truncateRuneSafe(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	t := s[:max]
+	for len(t) > 0 && !utf8.ValidString(t) {
+		t = t[:len(t)-1]
+	}
+	return t + "..."
 }
