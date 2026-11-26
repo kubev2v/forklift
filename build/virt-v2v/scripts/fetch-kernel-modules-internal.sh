@@ -13,15 +13,6 @@ if [[ -s "${rpm_out}" ]]; then
     exit 0
 fi
 
-shopt -s nullglob
-for existing in "${dest_dir}"/kernel-modules-internal-*.x86_64.rpm; do
-    if [[ -s "${existing}" ]]; then
-        echo "Already present: ${existing}"
-        exit 0
-    fi
-done
-shopt -u nullglob
-
 if [[ -n "${KERNEL_MODULES_INTERNAL_RPM_PATH:-}" ]]; then
     cp -f "${KERNEL_MODULES_INTERNAL_RPM_PATH}" "${rpm_out}"
     echo "OK: copied to ${rpm_out}"
