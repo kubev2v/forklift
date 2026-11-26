@@ -101,8 +101,8 @@ func checkSameOrigin(r *http.Request) bool {
 func (u *Upgrader) selectSubprotocol(r *http.Request, responseHeader http.Header) string {
 	if u.Subprotocols != nil {
 		clientProtocols := Subprotocols(r)
-		for _, serverProtocol := range u.Subprotocols {
-			for _, clientProtocol := range clientProtocols {
+		for _, clientProtocol := range clientProtocols {
+			for _, serverProtocol := range u.Subprotocols {
 				if clientProtocol == serverProtocol {
 					return clientProtocol
 				}
@@ -130,7 +130,8 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request, responseHeade
 	}
 
 	if !tokenListContainsValue(r.Header, "Upgrade", "websocket") {
-		return u.returnError(w, r, http.StatusBadRequest, badHandshake+"'websocket' token not found in 'Upgrade' header")
+		w.Header().Set("Upgrade", "websocket")
+		return u.returnError(w, r, http.StatusUpgradeRequired, badHandshake+"'websocket' token not found in 'Upgrade' header")
 	}
 
 	if r.Method != http.MethodGet {
@@ -172,14 +173,10 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request, responseHeade
 		}
 	}
 
-	h, ok := w.(http.Hijacker)
-	if !ok {
-		return u.returnError(w, r, http.StatusInternalServerError, "websocket: response does not implement http.Hijacker")
-	}
-	var brw *bufio.ReadWriter
-	netConn, brw, err := h.Hijack()
+	netConn, brw, err := http.NewResponseController(w).Hijack()
 	if err != nil {
-		return u.returnError(w, r, http.StatusInternalServerError, err.Error())
+		return u.returnError(w, r, http.StatusInternalServerError,
+			"websocket: hijack: "+err.Error())
 	}
 
 	if brw.Reader.Buffered() > 0 {
