@@ -2,10 +2,14 @@ package plan
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/base"
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
@@ -16,11 +20,43 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeClient "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+// deleteFailClient fails Delete calls so destination teardown can be tested.
+type deleteFailClient struct {
+	client.Client
+}
+
+func (c *deleteFailClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+	return fmt.Errorf("simulated delete failure")
+}
+
+// listNotFoundClient returns NotFound on List (e.g. missing CRD / API).
+type listNotFoundClient struct {
+	client.Client
+}
+
+func (c *listNotFoundClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	return k8serr.NewNotFound(schema.GroupResource{Resource: "datavolumes"}, "")
+}
+
+// pvcListFailClient fails only PVC lists so later kinds can still be swept.
+type pvcListFailClient struct {
+	client.Client
+}
+
+func (c *pvcListFailClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	if _, ok := list.(*core.PersistentVolumeClaimList); ok {
+		return fmt.Errorf("simulated PVC list failure")
+	}
+	return c.Client.List(ctx, list, opts...)
+}
 
 var controllerLog = logging.WithName("controllerTest")
 
@@ -28,6 +64,7 @@ func newTestScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	_ = core.AddToScheme(scheme)
 	_ = cdi.AddToScheme(scheme)
+	_ = api.SchemeBuilder.AddToScheme(scheme)
 	return scheme
 }
 
@@ -779,5 +816,561 @@ var _ = ginkgo.Describe("criticalOrErrorCondition", func() {
 			"old condition should be included")
 		gomega.Expect(result).NotTo(gomega.ContainSubstring("Map.Storage"),
 			"recent condition should be excluded")
+	})
+})
+
+var _ = ginkgo.Describe("handlePlanDeletion", func() {
+	const (
+		planName      = "teardown-plan"
+		planNamespace = "teardown-ns"
+		targetNS      = "target-ns"
+	)
+
+	labels := func() map[string]string {
+		return map[string]string{
+			kPlanName:      planName,
+			kPlanNamespace: planNamespace,
+		}
+	}
+
+	ginkgo.It("should remove the finalizer after destination cleanup times out", func() {
+		ocpType := api.OpenShift
+		destProvider := &api.Provider{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "host-dest",
+				Namespace: planNamespace,
+			},
+			Spec: api.ProviderSpec{
+				Type: &ocpType,
+			},
+		}
+		deletedAt := meta.NewTime(time.Now().Add(-planTeardownTimeout - time.Minute))
+		plan := &api.Plan{
+			ObjectMeta: meta.ObjectMeta{
+				Name:              planName,
+				Namespace:         planNamespace,
+				DeletionTimestamp: &deletedAt,
+				Finalizers:        []string{api.PlanFinalizer},
+			},
+			Spec: api.PlanSpec{
+				TargetNamespace: targetNS,
+				Provider: provider.Pair{
+					Destination: core.ObjectReference{
+						Name:      destProvider.Name,
+						Namespace: destProvider.Namespace,
+					},
+				},
+			},
+		}
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "orphan-pvc",
+				Namespace: targetNS,
+				Labels:    labels(),
+			},
+		}
+		r := newTestReconciler(destProvider, plan, pvc)
+		r.Client = &deleteFailClient{Client: r.Client}
+
+		_, err := r.handlePlanDeletion(context.TODO(), plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// Fake client GCs the Plan once DeletionTimestamp is set and
+		// finalizers are cleared. NotFound means the finalizer was removed.
+		got := &api.Plan{}
+		err = r.Get(context.TODO(), types.NamespacedName{
+			Name: planName, Namespace: planNamespace,
+		}, got)
+		if !k8serr.IsNotFound(err) {
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(got.Finalizers).NotTo(gomega.ContainElement(api.PlanFinalizer))
+		}
+	})
+
+	ginkgo.It("should skip destination sweep when provider is NotFound", func() {
+		deletedAt := meta.NewTime(time.Now())
+		plan := &api.Plan{
+			ObjectMeta: meta.ObjectMeta{
+				Name:              planName,
+				Namespace:         planNamespace,
+				DeletionTimestamp: &deletedAt,
+				Finalizers:        []string{api.PlanFinalizer},
+			},
+			Spec: api.PlanSpec{
+				TargetNamespace: targetNS,
+				Provider: provider.Pair{
+					Destination: core.ObjectReference{
+						Name:      "missing-dest",
+						Namespace: planNamespace,
+					},
+				},
+			},
+		}
+		r := newTestReconciler(plan)
+
+		result, err := r.handlePlanDeletion(context.TODO(), plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(result.RequeueAfter).To(gomega.BeZero())
+
+		got := &api.Plan{}
+		err = r.Get(context.TODO(), types.NamespacedName{
+			Name: planName, Namespace: planNamespace,
+		}, got)
+		if !k8serr.IsNotFound(err) {
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(got.Finalizers).NotTo(gomega.ContainElement(api.PlanFinalizer))
+		}
+	})
+
+	ginkgo.It("should delete destination leftovers and host CopyAppliance on teardown", func() {
+		ocpType := api.OpenShift
+		destProvider := &api.Provider{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "host-dest",
+				Namespace: planNamespace,
+			},
+			Spec: api.ProviderSpec{
+				Type: &ocpType,
+				// Empty URL => host provider. destinationClient uses local client.
+			},
+		}
+		deletedAt := meta.NewTime(time.Now())
+		plan := &api.Plan{
+			ObjectMeta: meta.ObjectMeta{
+				Name:              planName,
+				Namespace:         planNamespace,
+				DeletionTimestamp: &deletedAt,
+				Finalizers:        []string{api.PlanFinalizer},
+			},
+			Spec: api.PlanSpec{
+				TargetNamespace: targetNS,
+				Provider: provider.Pair{
+					Destination: core.ObjectReference{
+						Name:      destProvider.Name,
+						Namespace: destProvider.Namespace,
+					},
+				},
+			},
+		}
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "orphan-pvc",
+				Namespace: targetNS,
+				Labels:    labels(),
+			},
+		}
+		appliance := &api.CopyAppliance{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "orphan-appliance",
+				Namespace: planNamespace,
+				Labels:    labels(),
+			},
+		}
+		r := newTestReconciler(destProvider, plan, pvc, appliance)
+
+		_, err := r.handlePlanDeletion(context.TODO(), plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		gomega.Expect(objectExists(r.Client, types.NamespacedName{
+			Name: "orphan-pvc", Namespace: targetNS,
+		}, &core.PersistentVolumeClaim{})).To(gomega.BeFalse())
+		gomega.Expect(objectExists(r.Client, types.NamespacedName{
+			Name: "orphan-appliance", Namespace: planNamespace,
+		}, &api.CopyAppliance{})).To(gomega.BeFalse())
+
+		got := &api.Plan{}
+		err = r.Get(context.TODO(), types.NamespacedName{
+			Name: planName, Namespace: planNamespace,
+		}, got)
+		if !k8serr.IsNotFound(err) {
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(got.Finalizers).NotTo(gomega.ContainElement(api.PlanFinalizer))
+		}
+	})
+
+	ginkgo.It("should resolve destination secret with empty namespace to provider namespace", func() {
+		ocpType := api.OpenShift
+		destProvider := &api.Provider{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "remote-dest",
+				Namespace: planNamespace,
+			},
+			Spec: api.ProviderSpec{
+				Type: &ocpType,
+				URL:  "https://remote.example.com",
+				Secret: core.ObjectReference{
+					Name: "dest-secret",
+					// Namespace intentionally empty.
+				},
+			},
+		}
+		secret := &core.Secret{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "dest-secret",
+				Namespace: planNamespace,
+			},
+		}
+		plan := &api.Plan{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      planName,
+				Namespace: planNamespace,
+			},
+			Spec: api.PlanSpec{
+				TargetNamespace: targetNS,
+				Provider: provider.Pair{
+					Destination: core.ObjectReference{
+						Name:      destProvider.Name,
+						Namespace: destProvider.Namespace,
+					},
+				},
+			},
+		}
+		r := newTestReconciler(destProvider, secret, plan)
+
+		_, err := r.destinationClient(plan)
+		gomega.Expect(errors.Is(err, errDestinationUnavailable)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should cancel in-flight VMs when the Plan is deleted", func() {
+		ocpType := api.OpenShift
+		hostProvider := &api.Provider{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "host-dest",
+				Namespace: planNamespace,
+			},
+			Spec: api.ProviderSpec{
+				Type: &ocpType,
+			},
+		}
+		netMap := &api.NetworkMap{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "net-map",
+				Namespace: planNamespace,
+			},
+			Status: api.MapStatus{
+				Conditions: libcnd.Conditions{
+					List: []libcnd.Condition{{Type: libcnd.Ready, Status: True}},
+				},
+			},
+		}
+		storageMap := &api.StorageMap{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "storage-map",
+				Namespace: planNamespace,
+			},
+			Status: api.MapStatus{
+				Conditions: libcnd.Conditions{
+					List: []libcnd.Condition{{Type: libcnd.Ready, Status: True}},
+				},
+			},
+		}
+		deletedAt := meta.NewTime(time.Now())
+		plan := &api.Plan{
+			ObjectMeta: meta.ObjectMeta{
+				Name:              planName,
+				Namespace:         planNamespace,
+				DeletionTimestamp: &deletedAt,
+				Finalizers:        []string{api.PlanFinalizer},
+			},
+			Spec: api.PlanSpec{
+				TargetNamespace: targetNS,
+				Provider: provider.Pair{
+					Source: core.ObjectReference{
+						Name:      hostProvider.Name,
+						Namespace: hostProvider.Namespace,
+					},
+					Destination: core.ObjectReference{
+						Name:      hostProvider.Name,
+						Namespace: hostProvider.Namespace,
+					},
+				},
+				Map: planapi.Map{
+					Network: core.ObjectReference{
+						Name:      netMap.Name,
+						Namespace: netMap.Namespace,
+					},
+					Storage: core.ObjectReference{
+						Name:      storageMap.Name,
+						Namespace: storageMap.Namespace,
+					},
+				},
+			},
+			Status: api.PlanStatus{
+				Migration: planapi.MigrationStatus{
+					VMs: []*planapi.VMStatus{{
+						Pipeline: []*planapi.Step{},
+						VM: planapi.VM{
+							Ref: ref.Ref{ID: "vm-1", Name: "vm-1"},
+						},
+					}},
+					History: []planapi.Snapshot{{
+						Migration: planapi.SnapshotRef{
+							Namespace: planNamespace,
+							Name:      "active-mig",
+							UID:       "00000000-0000-0000-0000-000000000001",
+						},
+					}},
+				},
+			},
+		}
+		r := newTestReconciler(hostProvider, netMap, storageMap, plan)
+
+		r.cancelInFlightMigration(plan)
+
+		gomega.Expect(plan.Status.Migration.VMs[0].HasCondition(Canceled)).To(gomega.BeTrue())
+		gomega.Expect(plan.Status.Migration.ActiveSnapshot().HasCondition(Canceled)).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should not add PlanFinalizer when the Plan is already deleting", func() {
+		deletedAt := meta.NewTime(time.Now())
+		plan := &api.Plan{
+			ObjectMeta: meta.ObjectMeta{
+				Name:              planName,
+				Namespace:         planNamespace,
+				DeletionTimestamp: &deletedAt,
+				// Fake client requires some finalizer when DeletionTimestamp is set.
+				Finalizers: []string{"other/finalizer"},
+			},
+			Spec: api.PlanSpec{
+				TargetNamespace: targetNS,
+				Provider: provider.Pair{
+					Destination: core.ObjectReference{
+						Name:      "host-dest",
+						Namespace: planNamespace,
+					},
+				},
+			},
+		}
+		r := newTestReconciler(plan)
+
+		_, err := r.Reconcile(context.TODO(), reconcile.Request{
+			NamespacedName: types.NamespacedName{Name: planName, Namespace: planNamespace},
+		})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		got := &api.Plan{}
+		gomega.Expect(r.Get(context.TODO(), types.NamespacedName{
+			Name: planName, Namespace: planNamespace,
+		}, got)).To(gomega.Succeed())
+		gomega.Expect(got.Finalizers).NotTo(gomega.ContainElement(api.PlanFinalizer))
+		gomega.Expect(got.Finalizers).To(gomega.ContainElement("other/finalizer"))
+	})
+
+	ginkgo.It("should still clean destination leftovers when PlanFinalizer is missing", func() {
+		ocpType := api.OpenShift
+		destProvider := &api.Provider{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "host-dest",
+				Namespace: planNamespace,
+			},
+			Spec: api.ProviderSpec{
+				Type: &ocpType,
+			},
+		}
+		deletedAt := meta.NewTime(time.Now())
+		plan := &api.Plan{
+			ObjectMeta: meta.ObjectMeta{
+				Name:              planName,
+				Namespace:         planNamespace,
+				DeletionTimestamp: &deletedAt,
+				Finalizers:        []string{"other/finalizer"},
+			},
+			Spec: api.PlanSpec{
+				TargetNamespace: targetNS,
+				Provider: provider.Pair{
+					Destination: core.ObjectReference{
+						Name:      destProvider.Name,
+						Namespace: destProvider.Namespace,
+					},
+				},
+			},
+		}
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "orphan-pvc",
+				Namespace: targetNS,
+				Labels:    labels(),
+			},
+		}
+		r := newTestReconciler(destProvider, plan, pvc)
+
+		_, err := r.Reconcile(context.TODO(), reconcile.Request{
+			NamespacedName: types.NamespacedName{Name: planName, Namespace: planNamespace},
+		})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		gomega.Expect(objectExists(r.Client, types.NamespacedName{
+			Name: "orphan-pvc", Namespace: targetNS,
+		}, &core.PersistentVolumeClaim{})).To(gomega.BeFalse())
+
+		got := &api.Plan{}
+		gomega.Expect(r.Get(context.TODO(), types.NamespacedName{
+			Name: planName, Namespace: planNamespace,
+		}, got)).To(gomega.Succeed())
+		gomega.Expect(got.Finalizers).NotTo(gomega.ContainElement(api.PlanFinalizer))
+	})
+
+	ginkgo.It("should continue sweeping later kinds when an earlier list fails", func() {
+		ocpType := api.OpenShift
+		destProvider := &api.Provider{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "host-dest",
+				Namespace: planNamespace,
+			},
+			Spec: api.ProviderSpec{
+				Type: &ocpType,
+			},
+		}
+		deletedAt := meta.NewTime(time.Now())
+		plan := &api.Plan{
+			ObjectMeta: meta.ObjectMeta{
+				Name:              planName,
+				Namespace:         planNamespace,
+				DeletionTimestamp: &deletedAt,
+				Finalizers:        []string{api.PlanFinalizer},
+			},
+			Spec: api.PlanSpec{
+				TargetNamespace: targetNS,
+				Provider: provider.Pair{
+					Destination: core.ObjectReference{
+						Name:      destProvider.Name,
+						Namespace: destProvider.Namespace,
+					},
+				},
+			},
+		}
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "orphan-pvc",
+				Namespace: targetNS,
+				Labels:    labels(),
+			},
+		}
+		secret := &core.Secret{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "orphan-secret",
+				Namespace: targetNS,
+				Labels:    labels(),
+			},
+		}
+		cm := &core.ConfigMap{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "orphan-cm",
+				Namespace: targetNS,
+				Labels:    labels(),
+			},
+		}
+		r := newTestReconciler(destProvider, plan, pvc, secret, cm)
+		r.Client = &pvcListFailClient{Client: r.Client}
+
+		result, err := r.handlePlanDeletion(context.TODO(), plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(result.RequeueAfter).To(gomega.BeNumerically(">", 0))
+
+		gomega.Expect(objectExists(r.Client, types.NamespacedName{
+			Name: "orphan-pvc", Namespace: targetNS,
+		}, &core.PersistentVolumeClaim{})).To(gomega.BeTrue())
+		gomega.Expect(objectExists(r.Client, types.NamespacedName{
+			Name: "orphan-secret", Namespace: targetNS,
+		}, &core.Secret{})).To(gomega.BeFalse())
+		gomega.Expect(objectExists(r.Client, types.NamespacedName{
+			Name: "orphan-cm", Namespace: targetNS,
+		}, &core.ConfigMap{})).To(gomega.BeFalse())
+		gomega.Expect(r.Get(context.TODO(), types.NamespacedName{
+			Name: planName, Namespace: planNamespace,
+		}, &api.Plan{})).To(gomega.Succeed())
+	})
+
+	ginkgo.It("should requeue when destination list returns NotFound", func() {
+		ocpType := api.OpenShift
+		destProvider := &api.Provider{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "host-dest",
+				Namespace: planNamespace,
+			},
+			Spec: api.ProviderSpec{
+				Type: &ocpType,
+			},
+		}
+		deletedAt := meta.NewTime(time.Now())
+		plan := &api.Plan{
+			ObjectMeta: meta.ObjectMeta{
+				Name:              planName,
+				Namespace:         planNamespace,
+				DeletionTimestamp: &deletedAt,
+				Finalizers:        []string{api.PlanFinalizer},
+			},
+			Spec: api.PlanSpec{
+				TargetNamespace: targetNS,
+				Provider: provider.Pair{
+					Destination: core.ObjectReference{
+						Name:      destProvider.Name,
+						Namespace: destProvider.Namespace,
+					},
+				},
+			},
+		}
+		r := newTestReconciler(destProvider, plan)
+		r.Client = &listNotFoundClient{Client: r.Client}
+
+		result, err := r.handlePlanDeletion(context.TODO(), plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(result.RequeueAfter).To(gomega.BeNumerically(">", 0))
+
+		got := &api.Plan{}
+		gomega.Expect(r.Get(context.TODO(), types.NamespacedName{
+			Name: planName, Namespace: planNamespace,
+		}, got)).To(gomega.Succeed())
+		gomega.Expect(got.Finalizers).To(gomega.ContainElement(api.PlanFinalizer))
+	})
+
+	ginkgo.It("should requeue when destination deletes fail before timeout", func() {
+		ocpType := api.OpenShift
+		destProvider := &api.Provider{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "host-dest",
+				Namespace: planNamespace,
+			},
+			Spec: api.ProviderSpec{
+				Type: &ocpType,
+			},
+		}
+		deletedAt := meta.NewTime(time.Now())
+		plan := &api.Plan{
+			ObjectMeta: meta.ObjectMeta{
+				Name:              planName,
+				Namespace:         planNamespace,
+				DeletionTimestamp: &deletedAt,
+				Finalizers:        []string{api.PlanFinalizer},
+			},
+			Spec: api.PlanSpec{
+				TargetNamespace: targetNS,
+				Provider: provider.Pair{
+					Destination: core.ObjectReference{
+						Name:      destProvider.Name,
+						Namespace: destProvider.Namespace,
+					},
+				},
+			},
+		}
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "orphan-pvc",
+				Namespace: targetNS,
+				Labels:    labels(),
+			},
+		}
+		r := newTestReconciler(destProvider, plan, pvc)
+		r.Client = &deleteFailClient{Client: r.Client}
+
+		result, err := r.handlePlanDeletion(context.TODO(), plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(result.RequeueAfter).To(gomega.BeNumerically(">", 0))
+
+		got := &api.Plan{}
+		gomega.Expect(r.Get(context.TODO(), types.NamespacedName{
+			Name: planName, Namespace: planNamespace,
+		}, got)).To(gomega.Succeed())
+		gomega.Expect(got.Finalizers).To(gomega.ContainElement(api.PlanFinalizer))
 	})
 })
