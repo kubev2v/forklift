@@ -171,6 +171,19 @@ Feature gates enable or disable specific Forklift capabilities.
 | `populator_container_requests_cpu` | `100m` | `POPULATOR_CONTAINER_REQUESTS_CPU` | CPU request |
 | `populator_container_requests_memory` | `512Mi` | `POPULATOR_CONTAINER_REQUESTS_MEMORY` | Memory request |
 
+These size the populator pods launched during migrations, not the volume populator controller itself.
+
+### Volume Populator Controller Container
+
+Resources of the `forklift-populator-controller` container in the `forklift-volume-populator-controller` Deployment.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `populator_controller_container_limits_cpu` | `1000m` | CPU limit |
+| `populator_controller_container_limits_memory` | `1Gi` | Memory limit |
+| `populator_controller_container_requests_cpu` | `100m` | CPU request |
+| `populator_controller_container_requests_memory` | `150Mi` | Memory request |
+
 ---
 
 ## Container Image Settings
