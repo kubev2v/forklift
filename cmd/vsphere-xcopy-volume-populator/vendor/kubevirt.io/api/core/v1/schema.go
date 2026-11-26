@@ -49,6 +49,26 @@ const (
 	DiskErrorPolicyEnospace DiskErrorPolicy = "enospace"
 )
 
+type PanicDeviceModel string
+
+const (
+	Hyperv  PanicDeviceModel = "hyperv"
+	Isa     PanicDeviceModel = "isa"
+	Pvpanic PanicDeviceModel = "pvpanic"
+)
+
+// RebootPolicy specifies how the domain should behave when a guest reboot is triggered.
+// +kubebuilder:validation:Enum=Reboot;Terminate
+type RebootPolicy string
+
+const (
+	// RebootPolicyReboot allows the guest to silently reboot without notifying KubeVirt (default behavior).
+	RebootPolicyReboot RebootPolicy = "Reboot"
+	// RebootPolicyTerminate terminates the VMI on guest reboot, allowing the VMI to be recreated
+	// by the controllers (e.g., to pick up new configuration from VM).
+	RebootPolicyTerminate RebootPolicy = "Terminate"
+)
+
 /*
  ATTENTION: Rerun code generators when comments on structs or fields are modified.
 */
@@ -113,6 +133,24 @@ type ServiceAccountVolumeSource struct {
 	// Name of the service account in the pod's namespace to use.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+}
+
+// ContainerPathVolumeSource represents a path from the virt-launcher container
+// to be exposed to the VM via virtiofs. The path must correspond to an existing
+// volumeMount in the virt-launcher pod's compute container.
+type ContainerPathVolumeSource struct {
+	// Path is the absolute path within the virt-launcher container to expose to the VM.
+	// The path must correspond to an existing volumeMount in the compute container.
+	// +kubebuilder:validation:MaxLength=4096
+	// +kubebuilder:validation:XValidation:rule="self.startsWith('/')",message="path must be absolute (start with '/')"
+	// +kubebuilder:validation:XValidation:rule="!self.contains('..')",message="path must not contain '..'"
+	Path string `json:"path"`
+	// ReadOnly controls whether the volume is exposed as read-only to the VM.
+	// Defaults to true. Write access is not currently supported.
+	// +optional
+	// +kubebuilder:default:=true
+	// +kubebuilder:validation:XValidation:rule="self == true",message="readOnly must be true, write access is not supported"
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
 // DownwardMetricsVolumeSource adds a very small disk to VMIs which contains a limited view of host and guest
@@ -213,6 +251,13 @@ type DomainSpec struct {
 	// Launch Security setting of the vmi.
 	// +optional
 	LaunchSecurity *LaunchSecurity `json:"launchSecurity,omitempty"`
+	// RebootPolicy specifies how the guest should behave on reboot.
+	// Reboot (default): The guest is allowed to reboot silently.
+	// Terminate: The VMI will be terminated on guest reboot, allowing
+	// higher level controllers (such as the VM controller) to recreate
+	// the VMI with any updated configuration such as boot order changes.
+	// +optional
+	RebootPolicy *RebootPolicy `json:"rebootPolicy,omitempty"`
 }
 
 // Chassis specifies the chassis info passed to the domain.
@@ -361,7 +406,7 @@ type NUMAGuestMappingPassthrough struct {
 type NUMA struct {
 	// GuestMappingPassthrough will create an efficient guest topology based on host CPUs exclusively assigned to a pod.
 	// The created topology ensures that memory and CPUs on the virtual numa nodes never cross boundaries of host numa nodes.
-	// +opitonal
+	// +optional
 	GuestMappingPassthrough *NUMAGuestMappingPassthrough `json:"guestMappingPassthrough,omitempty"`
 }
 
@@ -393,6 +438,10 @@ type Memory struct {
 	// MaxGuest allows to specify the maximum amount of memory which is visible inside the Guest OS.
 	// The delta between MaxGuest and Guest is the amount of memory that can be hot(un)plugged.
 	MaxGuest *resource.Quantity `json:"maxGuest,omitempty"`
+	// ReservedOverhead configures the memory overhead applied to a VM
+	// and its characteristics.
+	// +optional
+	ReservedOverhead *ReservedOverhead `json:"reservedOverhead,omitempty"`
 }
 
 type MemoryStatus struct {
@@ -405,6 +454,10 @@ type MemoryStatus struct {
 	// GuestRequested specifies how much memory was requested (hotplug) for the VirtualMachine.
 	// +optional
 	GuestRequested *resource.Quantity `json:"guestRequested,omitempty"`
+	// MemoryOverhead specifies the memory overhead added by the virtualization infrastructure
+	// for the virt-launcher pod.
+	// +optional
+	MemoryOverhead *resource.Quantity `json:"memoryOverhead,omitempty"`
 }
 
 // Hugepages allow to use hugepages for the VirtualMachineInstance instead of regular memory.
@@ -412,6 +465,36 @@ type Hugepages struct {
 	// PageSize specifies the hugepage size, for x86_64 architecture valid values are 1Gi and 2Mi.
 	PageSize string `json:"pageSize,omitempty"`
 }
+
+type ReservedOverhead struct {
+	// AddedOverhead determines the memory overhead that will be reserved
+	// for the VM. It increases the virt-launcher pod memory limit.
+	// +optional
+	AddedOverhead *resource.Quantity `json:"addedOverhead,omitempty"`
+	// RequiresLock determines whether the VM's and its overhead memory
+	// need to be locked or not. It is a common practice to enable this
+	// if vDPA, VFIO or any other specialized hardware that depends on
+	// DMA is being used by the VM.
+	// False - (Default) memory lock RLimits are not modified.
+	// True - Memory lock RLimits will be updated to consider VM memory
+	//        size and memory overhead
+	// +optional
+	// +kubebuilder:validation:Enum=NotRequired;Required
+	MemLock *MemLockRequirement `json:"memLock,omitempty"`
+}
+
+// MemLockRequirement describes whether the VM memory and its overhead
+// needs to be locked or not.
+type MemLockRequirement string
+
+const (
+	// MemLockRequired means that the VM memory and its overhead
+	// could be locked by a device or any other condition.
+	MemLockRequired = "Required"
+	// MemLockNotRequired means that the VM memory and its overhead
+	// is not going to be locked.
+	MemLockNotRequired = "NotRequired"
+)
 
 type Machine struct {
 	// QEMU machine type is the actual chipset of the VirtualMachineInstance.
@@ -440,6 +523,9 @@ type ACPI struct {
 	// be a binary blob that follows the ACPI SLIC standard, see:
 	// https://learn.microsoft.com/en-us/previous-versions/windows/hardware/design/dn653305(v=vs.85)
 	SlicNameRef string `json:"slicNameRef,omitempty"`
+	// Similar to SlicNameRef, another ACPI entry that is used in more recent Windows versions.
+	// The above points to the spec of MSDM too.
+	MsdmNameRef string `json:"msdmNameRef,omitempty"`
 }
 
 type Devices struct {
@@ -501,6 +587,10 @@ type Devices struct {
 	// DownwardMetrics creates a virtio serials for exposing the downward metrics to the vmi.
 	// +optional
 	DownwardMetrics *DownwardMetrics `json:"downwardMetrics,omitempty"`
+	// PanicDevices provides additional crash information when a guest crashes.
+	// +optional
+	// +listtype=atomic
+	PanicDevices []PanicDevice `json:"panicDevices,omitempty"`
 	// Filesystems describes filesystem which is connected to the vmi.
 	// +optional
 	// +listType=atomic
@@ -518,6 +608,9 @@ type Devices struct {
 	// Whether to emulate a TPM device.
 	// +optional
 	TPM *TPMDevice `json:"tpm,omitempty"`
+	// Video describes the video device configuration for the vmi.
+	// +optional
+	Video *VideoDevice `json:"video,omitempty"`
 }
 
 // Represent a subset of client devices that can be accessed by VMI. At the
@@ -547,12 +640,19 @@ type SoundDevice struct {
 }
 
 type TPMDevice struct {
-	// Enabled allows a user to explictly disable the vTPM even when one is enabled by a preference referenced by the VirtualMachine
+	// Enabled allows a user to explicitly disable the vTPM even when one is enabled by a preference referenced by the VirtualMachine
 	// Defaults to True
 	Enabled *bool `json:"enabled,omitempty"`
 	// Persistent indicates the state of the TPM device should be kept accross reboots
 	// Defaults to false
 	Persistent *bool `json:"persistent,omitempty"`
+}
+
+type VideoDevice struct {
+	// Type specifies the video device type (e.g., virtio, vga, bochs, ramfb).
+	// If not specified, the default is architecture-dependent (VGA for BIOS-based VMs, Bochs for EFI-based VMs on AMD64; virtio for Arm and s390x).
+	// +optional
+	Type string `json:"type,omitempty"`
 }
 
 type InputBus string
@@ -593,12 +693,29 @@ type DownwardMetrics struct{}
 
 type GPU struct {
 	// Name of the GPU device as exposed by a device plugin
-	Name              string       `json:"name"`
-	DeviceName        string       `json:"deviceName"`
+	Name string `json:"name"`
+	// DeviceName is the name of the device provisioned by device-plugins
+	DeviceName string `json:"deviceName,omitempty"`
+	// ClaimRequest provides the ClaimName from vmi.spec.resourceClaims[].name and
+	// requestName from resourceClaim.spec.devices.requests[].name
+	// This field should only be configured if one of the feature-gates GPUsWithDRA or HostDevicesWithDRA is enabled.
+	// This feature is in alpha.
+	*ClaimRequest     `json:",inline"`
 	VirtualGPUOptions *VGPUOptions `json:"virtualGPUOptions,omitempty"`
 	// If specified, the virtual network interface address and its tag will be provided to the guest via config drive
 	// +optional
 	Tag string `json:"tag,omitempty"`
+}
+
+type ClaimRequest struct {
+	// ClaimName needs to be provided from the list vmi.spec.resourceClaims[].name where this
+	// device is allocated
+	// +optional
+	ClaimName *string `json:"claimName,omitempty"`
+	// RequestName needs to be provided from resourceClaim.spec.devices.requests[].name where this
+	// device is requested
+	// +optional
+	RequestName *string `json:"requestName,omitempty"`
 }
 
 type VGPUOptions struct {
@@ -616,10 +733,24 @@ type VGPUDisplayOptions struct {
 	RamFB *FeatureState `json:"ramFB,omitempty"`
 }
 
+type PanicDevice struct {
+	// Model specifies what type of panic device is provided.
+	// The panic model used when this attribute is missing depends on the hypervisor and guest arch.
+	// One of: isa, hyperv, pvpanic.
+	// +optional
+	Model *PanicDeviceModel `json:"model,omitempty"`
+}
+
 type HostDevice struct {
 	Name string `json:"name"`
-	// DeviceName is the resource name of the host device exposed by a device plugin
-	DeviceName string `json:"deviceName"`
+	// DeviceName is the name of the device provisioned by device-plugins
+	DeviceName string `json:"deviceName,omitempty"`
+	// ClaimRequest provides the ClaimName from vmi.spec.resourceClaims[].name and
+	// requestName from resourceClaim.spec.devices.requests[].name
+	// this fields requires DRA feature gate enabled
+	// This field should only be configured if one of the feature-gates GPUsWithDRA or HostDevicesWithDRA is enabled.
+	// This feature is in alpha.
+	*ClaimRequest `json:",inline"`
 	// If specified, the virtual network interface address and its tag will be provided to the guest via config drive
 	// +optional
 	Tag string `json:"tag,omitempty"`
@@ -646,7 +777,11 @@ type Disk struct {
 	// +optional
 	DedicatedIOThread *bool `json:"dedicatedIOThread,omitempty"`
 	// Cache specifies which kvm disk cache mode should be used.
-	// Supported values are: CacheNone, CacheWriteThrough.
+	// Supported values are:
+	// none: Guest I/O not cached on the host, but may be kept in a disk cache.
+	// writethrough: Guest I/O cached on the host but written through to the physical medium. Slowest but with most guarantees.
+	// writeback: Guest I/O cached on the host.
+	// Defaults to none if the storage supports O_DIRECT, otherwise writethrough.
 	// +optional
 	Cache DriverCache `json:"cache,omitempty"`
 	// IO specifies which QEMU disk IO mode should be used.
@@ -665,12 +800,17 @@ type Disk struct {
 	// If specified, it can change the default error policy (stop) for the disk
 	// +optional
 	ErrorPolicy *DiskErrorPolicy `json:"errorPolicy,omitempty"`
+	// ChangedBlockTracking indicates this disk should have CBT option
+	// Defaults to false.
+	// +optional
+	ChangedBlockTracking *bool `json:"changedBlockTracking,omitempty"`
 }
 
 // CustomBlockSize represents the desired logical and physical block size for a VM disk.
 type CustomBlockSize struct {
-	Logical  uint `json:"logical"`
-	Physical uint `json:"physical"`
+	Logical            uint  `json:"logical,omitempty"`
+	Physical           uint  `json:"physical,omitempty"`
+	DiscardGranularity *uint `json:"discardGranularity,omitempty"`
 }
 
 // BlockSize provides the option to change the block size presented to the VM for a disk.
@@ -715,6 +855,11 @@ type DiskTarget struct {
 type LaunchSecurity struct {
 	// AMD Secure Encrypted Virtualization (SEV).
 	SEV *SEV `json:"sev,omitempty"`
+	// AMD SEV-SNP flags defined by the SEV-SNP specifications.
+	// +optional
+	SNP *SEVSNP `json:"snp,omitempty"`
+	// Intel Trust Domain Extensions (TDX).
+	TDX *TDX `json:"tdx,omitempty"`
 }
 
 type SEV struct {
@@ -722,7 +867,7 @@ type SEV struct {
 	// Note: due to security reasons it is not allowed to enable guest debugging. Therefore NoDebug flag is not exposed to users and is always true.
 	Policy *SEVPolicy `json:"policy,omitempty"`
 	// If specified, run the attestation process for a vmi.
-	// +opitonal
+	// +optional
 	Attestation *SEVAttestation `json:"attestation,omitempty"`
 	// Base64 encoded session blob.
 	Session string `json:"session,omitempty"`
@@ -737,7 +882,13 @@ type SEVPolicy struct {
 	EncryptedState *bool `json:"encryptedState,omitempty"`
 }
 
+type SEVSNP struct {
+}
+
 type SEVAttestation struct {
+}
+
+type TDX struct {
 }
 
 type LunTarget struct {
@@ -846,6 +997,10 @@ type VolumeSource struct {
 	DownwardMetrics *DownwardMetricsVolumeSource `json:"downwardMetrics,omitempty"`
 	// MemoryDump is attached to the virt launcher and is populated with a memory dump of the vmi
 	MemoryDump *MemoryDumpVolumeSource `json:"memoryDump,omitempty"`
+	// ContainerPath exposes a path from the virt-launcher container to the VM via virtiofs.
+	// The path must correspond to an existing volumeMount in the compute container.
+	// +optional
+	ContainerPath *ContainerPathVolumeSource `json:"containerPath,omitempty"`
 }
 
 // HotplugVolumeSource Represents the source of a volume to mount which are capable
@@ -917,6 +1072,28 @@ type ContainerDiskSource struct {
 	// More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
 	// +optional
 	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy,omitempty"`
+}
+
+type UtilityVolumeType string
+
+const (
+	// MemoryDump represents a utility volume which will be used to collect memory dump
+	MemoryDump UtilityVolumeType = "MemoryDump"
+
+	// Backup represents a utility volume which will be used to collect backup output
+	Backup UtilityVolumeType = "Backup"
+)
+
+type UtilityVolume struct {
+	// UtilityVolume's name.
+	// Must be unique within the vmi, including regular Volumes.
+	Name string `json:"name"`
+	// PersistentVolumeClaimVolumeSource defines the PVC
+	// that is hotplugged to virt-launcher
+	v1.PersistentVolumeClaimVolumeSource `json:",inline"`
+	// Type represents the type of the utility volume.
+	// +optional
+	Type *UtilityVolumeType `json:"type,omitempty"`
 }
 
 // Exactly one of its members must be set.
@@ -1096,8 +1273,10 @@ type Features struct {
 }
 
 type SyNICTimer struct {
-	Enabled *bool         `json:"enabled,omitempty"`
-	Direct  *FeatureState `json:"direct,omitempty"`
+	FeatureState `json:",inline"`
+
+	// +optional
+	Direct *FeatureState `json:"direct,omitempty"`
 }
 
 // Represents if a feature is enabled or disabled.
@@ -1109,10 +1288,8 @@ type FeatureState struct {
 }
 
 type FeatureAPIC struct {
-	// Enabled determines if the feature should be enabled or disabled on the guest.
-	// Defaults to true.
-	// +optional
-	Enabled *bool `json:"enabled,omitempty"`
+	FeatureState `json:",inline"`
+
 	// EndOfInterrupt enables the end of interrupt notification in the guest.
 	// Defaults to false.
 	// +optional
@@ -1120,10 +1297,8 @@ type FeatureAPIC struct {
 }
 
 type FeatureSpinlocks struct {
-	// Enabled determines if the feature should be enabled or disabled on the guest.
-	// Defaults to true.
-	// +optional
-	Enabled *bool `json:"enabled,omitempty"`
+	FeatureState `json:",inline"`
+
 	// Retries indicates the number of retries.
 	// Must be a value greater or equal 4096.
 	// Defaults to 4096.
@@ -1132,13 +1307,23 @@ type FeatureSpinlocks struct {
 }
 
 type FeatureVendorID struct {
-	// Enabled determines if the feature should be enabled or disabled on the guest.
-	// Defaults to true.
-	// +optional
-	Enabled *bool `json:"enabled,omitempty"`
+	FeatureState `json:",inline"`
+
 	// VendorID sets the hypervisor vendor id, visible to the vmi.
 	// String up to twelve characters.
 	VendorID string `json:"vendorid,omitempty"`
+}
+
+type TLBFlush struct {
+	FeatureState `json:",inline"`
+
+	// Direct allows sending the TLB flush command directly to the hypervisor.
+	// It can be useful to optimize performance in nested virtualization cases, such as Windows VBS.
+	// +optional
+	Direct *FeatureState `json:"direct,omitempty"`
+	// Extended allows the guest to execute partial TLB flushes. It can be helpful for general purpose workloads.
+	// +optional
+	Extended *FeatureState `json:"extended,omitempty"`
 }
 
 // Hyperv specific features.
@@ -1189,7 +1374,7 @@ type FeatureHyperv struct {
 	// TLBFlush improves performances in overcommited environments. Requires vpindex.
 	// Defaults to the machine type setting.
 	// +optional
-	TLBFlush *FeatureState `json:"tlbflush,omitempty"`
+	TLBFlush *TLBFlush `json:"tlbflush,omitempty"`
 	// IPI improves performances in overcommited environments. Requires vpindex.
 	// Defaults to the machine type setting.
 	// +optional
@@ -1374,6 +1559,7 @@ type InterfaceBindingMethod struct {
 	// Deprecated: Removed in v1.3
 	// +optional
 	DeprecatedPasst *DeprecatedInterfacePasst `json:"passt,omitempty"`
+	PasstBinding    *InterfacePasstBinding    `json:"passtBinding,omitempty"`
 }
 
 // InterfaceBridge connects to a given network via a linux bridge.
@@ -1398,6 +1584,9 @@ type DeprecatedInterfaceMacvtap struct{}
 // DeprecatedInterfacePasst is an alias to the deprecated InterfacePasst
 // Deprecated: Removed in v1.3
 type DeprecatedInterfacePasst struct{}
+
+// InterfacePasstBinding connects to a given network using passt usermode networking.
+type InterfacePasstBinding struct{}
 
 // PluginBinding represents a binding implemented in a plugin.
 type PluginBinding struct {
