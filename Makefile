@@ -123,6 +123,8 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_TAG)
 API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG)
 VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG)
+VALIDATION_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-validation-controller:$(REGISTRY_TAG)
+VALIDATION_RUNNER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-validation-runner:$(REGISTRY_TAG)
 VIRT_V2V_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG)
 VIRT_V2V_IMAGE_RHEL9 ?= $(VIRT_V2V_IMAGE)
 OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)
@@ -332,6 +334,18 @@ push-api-image: build-api-image
 build-validation-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) --build-arg TARGETARCH=$(PLATFORM_ARCH) -t $(VALIDATION_IMAGE)$(PLATFORM_SUFFIX) -f build/validation/Containerfile .
 
+build-validation-controller-image: check_container_runtime
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(VALIDATION_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) -f build/validation-controller/Containerfile .
+
+push-validation-controller-image: build-validation-controller-image
+	$(CONTAINER_CMD) push $(VALIDATION_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX)
+
+build-validation-runner-image: check_container_runtime
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(VALIDATION_RUNNER_IMAGE)$(PLATFORM_SUFFIX) -f build/validation-runner/Containerfile .
+
+push-validation-runner-image: build-validation-runner-image
+	$(CONTAINER_CMD) push $(VALIDATION_RUNNER_IMAGE)$(PLATFORM_SUFFIX)
+
 push-validation-image: build-validation-image
 	$(CONTAINER_CMD) push $(VALIDATION_IMAGE)$(PLATFORM_SUFFIX)
 
@@ -390,6 +404,8 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg CONTROLLER_IMAGE=$(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg API_IMAGE=$(API_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VALIDATION_IMAGE=$(VALIDATION_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg VALIDATION_CONTROLLER_IMAGE=$(VALIDATION_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg VALIDATION_RUNNER_IMAGE=$(VALIDATION_RUNNER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OPERATOR_IMAGE=$(OPERATOR_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) \
@@ -539,6 +555,8 @@ build-all-images: ## Build all container images
 build-all-images: build-api-image \
                   build-controller-image \
                   build-validation-image \
+                  build-validation-controller-image \
+                  build-validation-runner-image \
                   build-operator-image \
                   build-virt-v2v-image \
                   build-populator-controller-image \
@@ -559,6 +577,8 @@ push-all-images: ## Push all container images
 push-all-images:  push-api-image \
                   push-controller-image \
                   push-validation-image \
+                  push-validation-controller-image \
+                  push-validation-runner-image \
                   push-operator-image \
                   push-virt-v2v-image \
                   push-populator-controller-image \

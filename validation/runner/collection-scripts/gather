@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+#
+# Copyright (C) 2026 Red Hat, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Must-gather entry point for virt-cluster-validate.
+#
+# Usage:
+#   oc adm must-gather --image=<image> -- /usr/bin/gather
+#   oc adm must-gather --image=<image> -- /usr/bin/gather --profile basic-v1
+#   oc adm must-gather --image=<image> -- CHECKS=nodes,basic /usr/bin/gather
+#   oc adm must-gather --image=<image> -- SKIP_CHECKS=rebalance,bare-metal TIMEOUT=5m /usr/bin/gather
+#
+
+set -euo pipefail
+
+BASE_DIR="${VIRT_VALIDATE_BASE_DIR:-/opt/app-root/src}"
+
+# Download oc and virtctl from cluster
+"${BASE_DIR}/bin/download-tools.sh"
+
+# Debug mode: execute DEBUG_TOOL if set
+if [[ -n "${DEBUG_TOOL:-}" ]]; then
+    exec /bin/bash -c "${DEBUG_TOOL}"
+fi
+
+# Check if running in must-gather mode
+if [[ "${POD_NAME:-}" != *"must-gather"* ]]; then
+    exec "${BASE_DIR}/virt-cluster-validate" -v
+fi
+
+profile=""
+while (($#)); do
+    case "$1" in
+        --profile)
+            if (($# < 2)); then
+                echo "virt-cluster-validate: --profile requires a profile name" >&2
+                exit 2
+            fi
+            profile="$2"
+            shift 2
+            ;;
+        --profile=*)
+            profile="${1#--profile=}"
+            shift
+            ;;
+        --help|-h)
+            cat <<'EOF'
+Usage: /usr/bin/gather [--profile PROFILE]
+
+Options:
+  --profile PROFILE  Run an explicit validation profile instead of the default check set.
+EOF
+            exit 0
+            ;;
+        *)
+            echo "virt-cluster-validate: unknown gather argument: $1" >&2
+            exit 2
+            ;;
+    esac
+done
+
+OUTPUT_DIR="${MUST_GATHER:-/must-gather}/virt-cluster-validate"
+
+# Export the must-gather namespace so check scripts create resources there.
+# When the must-gather namespace is deleted, all resources are cleaned up automatically.
+MG_NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace 2>/dev/null || echo "")
+if [[ -n "${MG_NAMESPACE}" ]]; then
+    export VIRT_VALIDATE_NAMESPACE="${MG_NAMESPACE}"
+    echo "virt-cluster-validate: using namespace ${MG_NAMESPACE} for test resources"
+fi
+
+mkdir -p "${OUTPUT_DIR}/logs"
+
+RUNNER_ARGS=("-o" "ctrf" "--log-dir" "${OUTPUT_DIR}/logs" "--junit-file" "${OUTPUT_DIR}/junit-results.xml")
+
+if [[ -n "${profile}" ]]; then
+    RUNNER_ARGS+=("--profile" "${profile}")
+fi
+
+if [[ -n "${CHECKS:-}" ]]; then
+    RUNNER_ARGS+=("--include" "${CHECKS}")
+fi
+
+if [[ -n "${SKIP_CHECKS:-}" ]]; then
+    RUNNER_ARGS+=("--exclude" "${SKIP_CHECKS}")
+fi
+
+if [[ -n "${TIMEOUT:-}" ]]; then
+    RUNNER_ARGS+=("--timeout" "${TIMEOUT}")
+fi
+
+if [[ -n "${CONCURRENCY:-}" ]]; then
+    RUNNER_ARGS+=("--concurrency" "${CONCURRENCY}")
+fi
+
+echo "virt-cluster-validate: running with args: ${RUNNER_ARGS[*]}"
+
+cd "${BASE_DIR}"
+
+rc=0
+"${BASE_DIR}/virt-cluster-validate" "${RUNNER_ARGS[@]}" \
+    > "${OUTPUT_DIR}/ctrf-results.json" \
+    2> "${OUTPUT_DIR}/runner.log" \
+    || rc=$?
+
+echo "virt-cluster-validate: finished with exit code ${rc}" | tee -a "${OUTPUT_DIR}/runner.log"
+
+# Print a human-readable summary so the user sees results in the must-gather output
+if [[ -f "${OUTPUT_DIR}/ctrf-results.json" ]]; then
+    python3 -c "
+import json, sys
+r = json.load(open(sys.argv[1]))['results']
+s = r['summary']
+print()
+print('=' * 60)
+print('  virt-cluster-validate results')
+print('=' * 60)
+for t in r['tests']:
+    icon = {'passed': 'PASS', 'failed': 'FAIL', 'skipped': 'SKIP'}.get(t['status'], '????')
+    print(f'  [{icon}] {t[\"name\"]}')
+    if t.get('message'):
+        print(f'         {t[\"message\"]}')
+print('-' * 60)
+print(f'  Passed: {s[\"passed\"]}  Failed: {s[\"failed\"]}  Skipped: {s[\"skipped\"]}  Total: {s[\"tests\"]}')
+print('=' * 60)
+print()
+" "${OUTPUT_DIR}/ctrf-results.json"
+fi
+
+# Sync to ensure all data is written before must-gather tars the results
+sync
+
+# Always exit 0 -- must-gather should not fail because checks found issues.
+# The CTRF results carry the pass/fail signal.
+exit 0

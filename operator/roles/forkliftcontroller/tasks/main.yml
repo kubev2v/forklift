@@ -223,6 +223,30 @@
       merge_type: "merge"
 
   - name: "Setup inventory route"
+  - when: not k8s_cluster|bool
+    block:
+    - name: "Setup virtualization validation controller RBAC"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'validation-controller/rbac.yml.j2') }}"
+    - name: "Setup virtualization validation controller deployment"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'validation-controller/deployment.yml.j2') }}"
+    - name: "Setup virtualization validation controller metrics service"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'validation-controller/service.yml.j2') }}"
+    - name: "Setup virtualization validation controller service monitor"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'validation-controller/servicemonitor.yml.j2') }}"
+    - name: "Setup virtualization validation controller network policies"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'validation-controller/networkpolicy.yml.j2') }}"
+
+  - name: "Setup inventory route"
     k8s:
       state: present
       definition: "{{ lookup('template', 'controller/route-inventory.yml.j2') }}"

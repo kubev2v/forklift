@@ -1,0 +1,18 @@
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+USER 0
+RUN microdnf update -y && \
+    microdnf install -y python3.11 jq tar gzip rsync which util-linux-core && \
+    microdnf clean all && \
+    ln -s /usr/bin/python3.11 /usr/bin/python3 && \
+    chown 1001:0 /usr/local/bin
+
+USER 1001
+WORKDIR /opt/app-root/src
+COPY validation/runner/virt-cluster-validate .
+COPY validation/runner/bin/ bin/
+COPY validation/runner/checks.d/ checks.d/
+COPY validation/runner/README.md .
+COPY validation/runner/collection-scripts/gather /usr/bin/gather
+ENV PATH="/opt/app-root/src/bin:${PATH}"
+ENTRYPOINT ["/usr/bin/gather"]

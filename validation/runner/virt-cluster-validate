@@ -1,0 +1,989 @@
+#!/usr/bin/env python3
+#
+# Copyright (C) 2026 Red Hat, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+import io, os, sys, json, argparse, tempfile, time, threading, subprocess, signal, random, shutil, base64
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, wait
+from pathlib import Path
+from xml.etree.ElementTree import Element, ElementTree, SubElement
+
+active_processes = set()
+active_processes_lock = threading.Lock()
+
+def terminate_active_checks(signum, _frame):
+    """Forward pod termination to check process groups so their EXIT traps run."""
+    with active_processes_lock:
+        processes = list(active_processes)
+    for process in processes:
+        try:
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            pass
+    raise SystemExit(128 + signum)
+
+class Colors:
+    GREEN, RED, YELLOW, NC = '\033[0;32m', '\033[0;31m', '\033[1;33m', '\033[0m'
+
+PROFILES = {
+    "basic-v1": {
+        "cluster_checks": [
+            "checks.d/10-openshift.d/00-login.d/test.sh",
+            "checks.d/50-openshift-virtualization.d/00-installation.d/test.sh",
+            "checks.d/50-openshift-virtualization.d/10-quota.d/test.sh",
+            "checks.d/50-openshift-virtualization.d/90-canary-workflow.d/test.sh",
+        ],
+        "node_checks": [],
+    },
+    "basic-all-nodes-v1": {
+        "cluster_checks": [
+            "checks.d/10-openshift.d/00-login.d/test.sh",
+            "checks.d/50-openshift-virtualization.d/00-installation.d/test.sh",
+            "checks.d/50-openshift-virtualization.d/10-quota.d/test.sh",
+        ],
+        "node_checks": ["checks.d/50-openshift-virtualization.d/90-canary-workflow.d/test.sh"],
+    },
+}
+
+def format_time(seconds):
+    """Converts seconds into a MM:SS string."""
+    m, s = divmod(int(seconds), 60)
+    return f"{m:02d}:{s:02d}"
+
+def parse_timespan(value):
+    """Parses a human-friendly timespan string (e.g. 2m, 45s, 180) into integer seconds."""
+    if value.isdigit():
+        return int(value)
+    value = value.lower().strip()
+    if value.endswith('m'):
+        return int(value[:-1]) * 60
+    if value.endswith('s'):
+        return int(value[:-1])
+    raise argparse.ArgumentTypeError(f"Invalid timespan: '{value}'. Use format like '2m', '45s', or '180'.")
+
+class TerminalUI:
+    """Encapsulates all thread-safe terminal rendering logic."""
+    def __init__(self, test_files, is_tty):
+        self.is_tty = is_tty
+        self.total = len(test_files)
+        self.line_map = {str(t): i for i, t in enumerate(test_files)}
+        self.lock = threading.Lock()
+        self.term_width = shutil.get_terminal_size((80, 24)).columns
+
+    def _truncate(self, text, max_len):
+        """Truncate text to fit within max_len, adding ellipsis if needed."""
+        if len(text) <= max_len:
+            return text
+        return text[:max_len-3] + "..."
+
+    def init_display(self, test_files):
+        if not self.is_tty: return
+        # Reserve space for "[WARN] MM:SS " prefix (16 chars)
+        path_max = self.term_width - 16
+        for t in test_files:
+            truncated = self._truncate(str(t), path_max)
+            print(f"[    ] --:-- {truncated}")
+        print() # Space for progress bar
+        sys.stdout.flush()
+
+    def update_test(self, test_path, status, duration="--:--"):
+        if not self.is_tty: return
+        lines_up = (self.total - self.line_map[test_path]) + 1
+        # Reserve space for status and duration
+        path_max = self.term_width - 16
+        truncated = self._truncate(test_path, path_max)
+        with self.lock:
+            # Move up, clear line, write status, move back down
+            print(f"\033[{lines_up}A\r\033[K{status} {duration} {truncated}\033[{lines_up}B", end="", flush=True)
+
+    def update_progress(self, completed, elapsed):
+        if not self.is_tty: return
+        pct = int((completed / self.total) * 100) if self.total else 100
+        fill = int(20 * completed // self.total) if self.total else 20
+        bar = '#' * fill + '-' * (20 - fill)
+        progress_line = f"Progress: [{bar}] {pct}% ({completed}/{self.total}) | {format_time(elapsed)}"
+        truncated = self._truncate(progress_line, self.term_width)
+        with self.lock:
+            print(f"\r\033[K{truncated}", end="", flush=True)
+
+    def clear_progress(self):
+        if not self.is_tty: return
+        with self.lock:
+            print("\r\033[K", end="", flush=True)
+
+def simulate_test(test_file, stream_output=False, timeout_secs=180):
+    """Simulates a test execution (random runtimes up to 6s, random pass/fail)."""
+    sleep_time = random.uniform(0.5, 6.0)
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+    # Simulate a timeout if the randomly generated sleep time is longer than the actual timeout
+    if sleep_time > timeout_secs:
+        time.sleep(timeout_secs)
+        log_lines = [f"[{ts}] TIMEOUT: Test exceeded {timeout_secs} seconds and was killed."]
+        if stream_output:
+            print(log_lines[0])
+        return {
+            "testpath": str(test_file),
+            "success": False,
+            "cancelled": True,
+            "duration": timeout_secs,
+            "report_messages": [],
+            "log": log_lines,
+            "errors": log_lines,
+            "warnings": []
+        }
+
+    time.sleep(sleep_time)
+    # Randomize success, but heavily bias toward PASS for a more realistic dashboard
+    success = random.choice([True, True, True, False])
+
+    log_lines = [f"[{ts}] Executing simulated test..."]
+    if stream_output:
+        print(log_lines[0])
+
+    if success:
+        if random.random() > 0.8:
+            has_warnings = True
+            report_messages = [f"WARN: Simulated warning in {test_file.name}"]
+        else:
+            has_warnings = False
+            report_messages = [f"INFO: Successfully simulated execution of {test_file.name}"]
+    else:
+        has_warnings = False
+        report_messages = [f"FAIL: Simulated failure occurred in {test_file.name}"]
+
+    return {
+        "testpath": str(test_file),
+        "success": success,
+        "has_warnings": has_warnings,
+        "cancelled": False,
+        "duration": sleep_time,
+        "report_messages": report_messages,
+        "log": log_lines,
+        "errors": log_lines if not success else [],
+        "warnings": []
+    }
+
+def read_ctrf_steps(steps_path, report_messages=None):
+    steps = []
+    step_indexes = {}
+    if not steps_path.exists():
+        return steps
+    for line in steps_path.read_text().splitlines():
+        try:
+            step = json.loads(line)
+        except json.JSONDecodeError:
+            if report_messages is not None:
+                report_messages.append("WARN: Ignoring malformed CTRF step record")
+            continue
+        if not isinstance(step, dict) or not isinstance(step.get("name"), str) or not isinstance(step.get("status"), str):
+            if report_messages is not None:
+                report_messages.append("WARN: Ignoring incomplete CTRF step record")
+            continue
+        if step["name"] in step_indexes:
+            steps[step_indexes[step["name"]]] = step
+        else:
+            step_indexes[step["name"]] = len(steps)
+            steps.append(step)
+    return steps
+
+
+def run_test(test_file, env, stream_output=False, timeout_secs=180, progress_callback=None):
+    """Executes a single test script in an isolated temporary directory with a timeout."""
+    test_env = env.copy()
+
+    with tempfile.TemporaryDirectory(prefix="virt_validate_") as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Sandbox mirroring
+        for item in test_file.parent.iterdir():
+            if item.is_file():
+                (temp_path / item.name).symlink_to(item.absolute())
+
+        with tempfile.TemporaryFile() as report_f:
+            fd = report_f.fileno()
+            os.set_inheritable(fd, True)
+            test_env["TEST_REPORT_FD"] = str(fd)
+            artifacts_path = temp_path / "artifacts"
+            test_env["VIRT_VALIDATE_ARTIFACTS_FILE"] = str(artifacts_path)
+            steps_path = temp_path / "steps.jsonl"
+            test_env["VIRT_VALIDATE_STEPS_FILE"] = str(steps_path)
+
+            start_ts = time.monotonic()
+
+            process = subprocess.Popen(
+                ["bash", "-xe", test_file.name],
+                cwd=temp_path, env=test_env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, pass_fds=(fd,),
+                start_new_session=True
+            )
+            with active_processes_lock:
+                active_processes.add(process)
+
+            stop_progress = threading.Event()
+            def publish_progress():
+                last_steps = None
+                while not stop_progress.is_set():
+                    steps = read_ctrf_steps(steps_path)
+                    if steps != last_steps:
+                        last_steps = steps
+                        progress_callback(steps)
+                    stop_progress.wait(0.2)
+            progress_thread = None
+            if progress_callback:
+                progress_thread = threading.Thread(target=publish_progress, daemon=True)
+                progress_thread.start()
+
+            timed_out = [False]
+            GRACE_PERIOD = 10
+            def kill_proc():
+                timed_out[0] = True
+                try:
+                    pgid = os.getpgid(process.pid)
+                    os.killpg(pgid, signal.SIGTERM)
+                    try:
+                        process.wait(timeout=GRACE_PERIOD)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(pgid, signal.SIGKILL)
+                except Exception:
+                    pass
+
+            timer = threading.Timer(timeout_secs, kill_proc)
+            timer.start()
+
+            log_lines = []
+            try:
+                # Iterate process output live for accurate timestamps
+                for line in process.stdout:
+                    ts_line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] {line.rstrip()}"
+                    log_lines.append(ts_line)
+                    if stream_output:
+                        print(ts_line)
+            finally:
+                timer.cancel()
+                with active_processes_lock:
+                    active_processes.discard(process)
+
+            stop_progress.set()
+            if progress_thread:
+                progress_thread.join()
+
+            process.wait()
+            duration = time.monotonic() - start_ts
+
+            skipped = False
+            if timed_out[0]:
+                ts_line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] TIMEOUT: Test exceeded {timeout_secs} seconds and was killed."
+                log_lines.append(ts_line)
+                if stream_output:
+                    print(ts_line)
+                success = False
+            else:
+                success = process.returncode == 0
+                skipped = process.returncode == 77
+
+            report_f.seek(0)
+            report_messages = report_f.read().decode('utf-8').splitlines()
+            artifacts = {}
+            if artifacts_path.exists():
+                for line in artifacts_path.read_text().splitlines():
+                    key, separator, value = line.partition("=")
+                    if separator and key and value:
+                        artifacts[key] = value
+            steps = read_ctrf_steps(steps_path, report_messages)
+
+            if not success and not skipped and not report_messages:
+                if timed_out[0]:
+                    report_messages = [f"FAIL: Test exceeded {timeout_secs}s timeout and was killed"]
+                else:
+                    last_lines = [l.split("] ", 1)[-1] for l in log_lines[-3:] if "] +" not in l]
+                    hint = last_lines[-1] if last_lines else f"exit code {process.returncode}"
+                    report_messages = [f"FAIL: {hint}"]
+
+    has_warnings = any(msg.startswith("WARN:") for msg in report_messages)
+
+    return {
+        "testpath": str(test_file),
+        "success": success or skipped,
+        "skipped": skipped,
+        "has_warnings": has_warnings,
+        "cancelled": timed_out[0],
+        "duration": duration,
+        "report_messages": report_messages,
+        "log": log_lines,
+        "errors": log_lines if not success else [],
+        "warnings": [line for line in log_lines if "warn" in line.lower()],
+        "artifacts": artifacts,
+        "steps": steps,
+    }
+
+def execution_task(test_file, node_name=None, hostname=None, failure=None, profile=None):
+    testpath = str(test_file)
+    is_canary_workflow = testpath == "checks.d/50-openshift-virtualization.d/90-canary-workflow.d/test.sh"
+    planned_steps = []
+    if is_canary_workflow and profile:
+        planned_steps = [
+            {"name": "Start VM", "status": "pending", "extra": {"state": "queued"}},
+            {"name": "Snapshot", "status": "pending", "extra": {"state": "queued"}},
+        ]
+        if profile in ("basic-v1", "basic-all-nodes-v1"):
+            planned_steps.append({"name": "Live migrate VM", "status": "pending", "extra": {"state": "queued"}})
+    elif profile and testpath == "checks.d/50-openshift-virtualization.d/70-live-migration.d/test.sh":
+        planned_steps = [{"name": "Live migrate VM", "status": "pending", "extra": {"state": "queued"}}]
+    if node_name:
+        return {
+            "test_file": test_file,
+            "testpath": testpath,
+            "test_id": f"{profile}/canary-workflow" if is_canary_workflow and profile else "basic-v1/canary-vm",
+            "execution_id": f"node/{node_name}",
+            "name": f"Canary workflow on {node_name}" if is_canary_workflow else f"Canary VM starts on {node_name}",
+            "display": f"{testpath} [{node_name}]",
+            "parameters": {"requestedNodeName": node_name, "requestedNodeHostname": hostname} if hostname else {"requestedNodeName": node_name},
+            "node_name": node_name,
+            "hostname": hostname,
+            "failure": failure,
+            "steps": planned_steps,
+        }
+    task = {
+        "test_file": test_file,
+        "testpath": testpath,
+        "test_id": testpath.removeprefix("checks.d/"),
+        "execution_id": testpath.removeprefix("checks.d/"),
+        "name": testpath.removeprefix("checks.d/"),
+        "display": testpath,
+        "parameters": {},
+        "failure": failure,
+        "steps": planned_steps,
+    }
+    if is_canary_workflow:
+        task.update({
+            "test_id": f"{profile}/canary-workflow" if profile else "basic-v1/canary-workflow",
+            "execution_id": "cluster",
+            "name": "Cluster canary workflow",
+        })
+    return task
+
+
+def discover_worker_tasks(env, basic_test, profile):
+    command = ["oc", "get", "nodes", "-l", "node-role.kubernetes.io/worker", "-o", "json"]
+    response = subprocess.run(command, env=env, capture_output=True, text=True)
+    if response.returncode != 0:
+        message = response.stderr.strip() or response.stdout.strip() or "unable to list worker nodes"
+        return [execution_task(basic_test, "discovery", failure=f"FAIL: Worker discovery failed: {message}", profile=profile)]
+    try:
+        nodes = json.loads(response.stdout).get("items", [])
+    except json.JSONDecodeError:
+        return [execution_task(basic_test, "discovery", failure="FAIL: Worker discovery returned invalid JSON", profile=profile)]
+
+    tasks = []
+    for node in nodes:
+        metadata = node.get("metadata", {})
+        node_name = metadata.get("name", "")
+        if not node_name or node.get("spec", {}).get("unschedulable"):
+            continue
+        ready = any(condition.get("type") == "Ready" and condition.get("status") == "True"
+                    for condition in node.get("status", {}).get("conditions", []))
+        if not ready:
+            continue
+        hostname = metadata.get("labels", {}).get("kubernetes.io/hostname")
+        if hostname:
+            tasks.append(execution_task(basic_test, node_name, hostname, profile=profile))
+        else:
+            tasks.append(execution_task(basic_test, node_name, failure="FAIL: Worker has no kubernetes.io/hostname label", profile=profile))
+    if not tasks:
+        tasks.append(execution_task(basic_test, "discovery", failure="FAIL: No Ready, schedulable worker nodes found", profile=profile))
+    return tasks
+
+
+def execute_task(task, env, ui, stream_output, timeout_secs, mock, progress_callback=None):
+    """Wrapper that updates the terminal status before and after execution."""
+    started_at = int(time.time() * 1000)
+    ui.update_test(task["display"], "[    ]")
+    if task["failure"]:
+        result = {"testpath": task["testpath"], "success": False, "cancelled": False, "duration": 0, "report_messages": [task["failure"]], "log": [], "errors": [], "warnings": []}
+    else:
+        test_env = env.copy()
+        if task.get("node_name"):
+            test_env["VIRT_VALIDATE_NODE"] = task["node_name"]
+            test_env["VIRT_VALIDATE_NODE_HOSTNAME"] = task["hostname"]
+        result = simulate_test(task["test_file"], stream_output, timeout_secs) if mock else run_test(task["test_file"], test_env, stream_output, timeout_secs, lambda steps: progress_callback(task, steps) if progress_callback else None)
+    result["execution_id"] = task["execution_id"]
+    result["test_id"] = task["test_id"]
+    result["name"] = task["name"]
+    result["parameters"] = {**task["parameters"], **result.get("artifacts", {})}
+    result["display"] = task["display"]
+    result["start"] = started_at
+    result["stop"] = int(time.time() * 1000)
+    if result.get("cancelled"):
+        status_str = f"[{Colors.YELLOW}----{Colors.NC}]"
+    elif result.get("skipped"):
+        status_str = f"[{Colors.YELLOW}SKIP{Colors.NC}]"
+    elif not result["success"]:
+        status_str = f"[{Colors.RED}FAIL{Colors.NC}]"
+    elif result.get("has_warnings"):
+        status_str = f"[{Colors.YELLOW}WARN{Colors.NC}]"
+    else:
+        status_str = f"[{Colors.GREEN}PASS{Colors.NC}]"
+
+    ui.update_test(task["display"], status_str, format_time(result["duration"]))
+
+    return result
+
+def output_name(testpath):
+    return testpath.removeprefix("checks.d/")
+
+def junit_failure_message(result):
+    for msg in result.get("report_messages", []):
+        if msg.startswith("FAIL:"):
+            return msg[5:].strip()
+
+    if result.get("cancelled"):
+        return f'{output_name(result["testpath"])} timed out'
+
+    if result.get("log"):
+        return result["log"][-1].split("] ", 1)[-1]
+
+    return output_name(result["testpath"])
+
+def junit_system_out(result):
+    sections = []
+    for section_name in ("report_messages", "log", "errors", "warnings"):
+        values = result.get(section_name) or []
+        if not values:
+            continue
+        if sections:
+            sections.append("")
+        sections.append(f"[{section_name}]")
+        sections.extend(str(value) for value in values if str(value).strip())
+    return "\n".join(sections)
+
+def build_junit_xml(results, tasks, skipped, failures, verbose=False):
+    by_execution = {result["execution_id"]: result for result in results}
+    total_duration = sum(result["duration"] for result in results)
+
+    testsuites = Element("testsuites", name="virt-cluster-validate")
+    testsuite = SubElement(
+        testsuites,
+        "testsuite",
+        name="virt-cluster-validate",
+        tests=str(len(tasks)),
+        failures=str(failures),
+        errors="0",
+        skipped=str(skipped),
+        time=f"{total_duration:.3f}",
+    )
+
+    for task in tasks:
+        result = by_execution.get(task["execution_id"])
+        testcase = SubElement(
+            testsuite,
+            "testcase",
+            classname="virt-cluster-validate",
+            name=task["name"],
+            time=f"{0 if result is None else result['duration']:.3f}",
+        )
+
+        if result is None or result.get("skipped"):
+            SubElement(testcase, "skipped")
+            continue
+
+        output_text = junit_system_out(result)
+        include_system_out = verbose or result.get("cancelled") or not result["success"]
+        if include_system_out and output_text:
+            system_out = SubElement(testcase, "system-out")
+            system_out.text = output_text
+
+        if result.get("cancelled") or not result["success"]:
+            message = junit_failure_message(result)
+            failure = SubElement(testcase, "failure", message=message)
+            failure.text = output_text or message
+
+    output = io.StringIO()
+    ElementTree(testsuites).write(output, encoding="unicode", xml_declaration=True)
+    return output.getvalue()
+
+def print_details(results, verbose, skip_log_print=False):
+    """Prints the expanded logs and reports for relevant tests."""
+    if not verbose:
+        return
+
+    print(f"\n{'='*20} DETAILS {'='*20}")
+    for r in results:
+        # -v (verbose=1): show failed/warned checks only
+        # -vv (verbose>=2): show all checks
+        show_this_test = False
+        if verbose >= 2:
+            show_this_test = True
+        elif verbose == 1:
+            show_this_test = not r["success"] or r.get("has_warnings")
+
+        if show_this_test:
+            if r.get("cancelled"):
+                status_block = "[----]"
+            elif not r["success"]:
+                status_block = "[FAIL]"
+            elif r.get("has_warnings"):
+                status_block = "[WARN]"
+            else:
+                status_block = "[PASS]"
+
+            print(f"\n{status_block} {format_time(r['duration'])} {r['testpath']}")
+
+            # Print specific pass_with / fail_with messages
+            for msg in r["report_messages"]:
+                if msg.startswith("FAIL:"):
+                    c = Colors.RED
+                elif msg.startswith("WARN:"):
+                    c = Colors.YELLOW
+                else:
+                    c = ""
+                print(f"    {c}-> {msg}{Colors.NC if c else ''}")
+
+            # Print the log output
+            # -v: show logs only for failed tests (not warnings)
+            # -vv: show logs for all displayed tests
+            show_logs = False
+            if verbose >= 2:
+                show_logs = True
+            elif verbose == 1:
+                show_logs = not r["success"]  # Only failures, not warnings
+
+            if r["log"] and not r.get("cancelled") and show_logs and not skip_log_print:
+                print("    --- Test Output ---")
+                for line in r["log"]: print(f"    {line}")
+
+def write_provider_kubeconfig(path, url, token, insecure_skip_tls=False, ca_file=None):
+    """Write a kubeconfig that authenticates with a bearer token (kubectl-mtv provider style)."""
+    cluster = {"server": url}
+    if insecure_skip_tls:
+        cluster["insecure-skip-tls-verify"] = True
+    elif ca_file:
+        cluster["certificate-authority-data"] = base64.b64encode(
+            Path(ca_file).read_bytes()
+        ).decode("ascii")
+    kubeconfig = {
+        "apiVersion": "v1",
+        "kind": "Config",
+        "clusters": [{"name": "cluster", "cluster": cluster}],
+        "users": [{"name": "token", "user": {"token": token}}],
+        "contexts": [{"name": "default", "context": {"cluster": "cluster", "user": "token"}}],
+        "current-context": "default",
+    }
+    path.write_text(json.dumps(kubeconfig, indent=2) + "\n")
+    path.chmod(0o600)
+
+
+def resolve_provider_auth(args):
+    """Return (url, token, ca_file, insecure_skip_tls) from flags or env."""
+    url = args.url or os.environ.get("VIRT_VALIDATE_URL") or ""
+    token = args.token or os.environ.get("VIRT_VALIDATE_TOKEN") or ""
+    ca_file = args.ca_file or os.environ.get("VIRT_VALIDATE_CA_FILE") or ""
+    insecure_skip_tls = args.insecure_skip_tls or os.environ.get(
+        "VIRT_VALIDATE_INSECURE_SKIP_TLS", ""
+    ).lower() in ("1", "true", "yes")
+    if bool(url) != bool(token):
+        raise argparse.ArgumentTypeError(
+            "--url and --token must be provided together "
+            "(or set both VIRT_VALIDATE_URL and VIRT_VALIDATE_TOKEN)."
+        )
+    if ca_file and not url:
+        raise argparse.ArgumentTypeError(
+            "--ca-file requires --url (or set VIRT_VALIDATE_URL)."
+        )
+    if ca_file and insecure_skip_tls:
+        raise argparse.ArgumentTypeError(
+            "--ca-file and --insecure-skip-tls cannot be used together "
+            "(or set VIRT_VALIDATE_CA_FILE and VIRT_VALIDATE_INSECURE_SKIP_TLS)."
+        )
+    if ca_file:
+        try:
+            Path(ca_file).read_bytes()
+        except OSError as exc:
+            raise argparse.ArgumentTypeError(f"Could not read CA file {ca_file}: {exc}") from exc
+    return url, token, ca_file, insecure_skip_tls
+
+
+def ctrf_suite(testpath):
+    parts = testpath.split("/")
+    if len(parts) >= 2:
+        return parts[1].removesuffix(".d")
+    return ""
+
+
+def ctrf_test_entry(task, result=None, complete=False):
+    """Build one CTRF test entry, using pending until its check has completed."""
+    entry = {
+        "testId": task["test_id"],
+        "executionId": task["execution_id"],
+        "name": task["name"],
+        "status": "pending",
+        "suite": ctrf_suite(task["testpath"]),
+    }
+    parameters = dict(task["parameters"] if result is None else result.get("parameters", task["parameters"]))
+    if result is not None and result.get("has_warnings"):
+        parameters["forklift.konveyor.io/advisory-warning"] = "true"
+    if parameters:
+        entry["parameters"] = parameters
+    if result is None:
+        if task["steps"]:
+            entry["steps"] = task["steps"]
+        if complete:
+            entry["status"] = "skipped"
+            entry["duration"] = 0
+            entry["steps"] = [
+                {**step, "status": "skipped", "extra": {**step.get("extra", {}), "state": "skipped"}}
+                for step in task["steps"]
+            ]
+        return entry
+
+    if result.get("running"):
+        entry["status"] = "pending"
+        if result.get("steps"):
+            entry["steps"] = result["steps"]
+        return entry
+
+    if result.get("skipped"):
+        entry["status"] = "skipped"
+    elif result["success"]:
+        entry["status"] = "passed"
+    else:
+        entry["status"] = "failed"
+    entry["duration"] = int(result["duration"] * 1000)
+    entry["start"] = result.get("start")
+    entry["stop"] = result.get("stop")
+    if result["report_messages"]:
+        entry["message"] = "; ".join(result["report_messages"])
+    if not result["success"]:
+        entry["extra"] = {
+            "forklift.konveyor.io/reason": "ExecutionTimedOut" if result.get("cancelled") else "CheckFailed",
+            "forklift.konveyor.io/outcome": "TimedOut" if result.get("cancelled") else "Failed",
+        }
+    steps = result.get("steps") or task["steps"]
+    if steps:
+        if result.get("cancelled"):
+            entry["steps"] = [
+                step if step.get("status") != "pending" else
+                {**step, "status": "failed", "extra": {**step.get("extra", {}), "state": "timedOut"}}
+                if step.get("extra", {}).get("state") == "running" else
+                {**step, "status": "skipped", "extra": {**step.get("extra", {}), "state": "skipped"}}
+                for step in steps
+            ]
+        elif not result["success"]:
+            entry["steps"] = [
+                {**step, "status": "skipped", "extra": {**step.get("extra", {}), "state": "skipped"}}
+                if step.get("status") == "pending" else step
+                for step in steps
+            ]
+        else:
+            entry["steps"] = steps
+    if not result["success"]:
+        for step in entry.get("steps", []):
+            state = step.get("extra", {}).get("state")
+            if state != "timedOut":
+                continue
+            step_name = step["name"].replace(" ", "")
+            entry["extra"] = {
+                **entry["extra"],
+                "forklift.konveyor.io/reason": f"{step_name}TimedOut",
+            }
+            break
+    if not result["success"] and result["log"]:
+        entry["trace"] = "\n".join(result["log"])
+    return entry
+
+
+def build_ctrf_report(tasks, results, start_epoch_ms, stop_epoch_ms=None, complete=False):
+    """Build a complete, schema-valid CTRF snapshot for the selected checks."""
+    results_by_execution = {r["execution_id"]: r for r in results}
+    tests = [ctrf_test_entry(task, results_by_execution.get(task["execution_id"]), complete) for task in tasks]
+    counts = {status: sum(1 for test in tests if test["status"] == status)
+              for status in ("passed", "failed", "pending", "skipped")}
+    summary = {
+        "tests": len(tests),
+        "passed": counts["passed"],
+        "failed": counts["failed"],
+        "pending": counts["pending"],
+        "skipped": counts["skipped"],
+        "other": 0,
+        "start": start_epoch_ms,
+    }
+    # CTRF requires a timestamped summary even for an in-progress snapshot. Until
+    # the run completes, stop denotes the instant this snapshot was generated.
+    summary["stop"] = stop_epoch_ms or int(time.time() * 1000)
+    return {
+        "reportFormat": "CTRF",
+        "specVersion": "0.0.0",
+        "results": {
+            "tool": {"name": "virt-cluster-validate"},
+            "summary": summary,
+            "tests": tests,
+        },
+    }
+
+
+def write_ctrf_report(path, report):
+    """Atomically replace a CTRF snapshot so readers never see partial JSON."""
+    report_path = Path(path)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_path = tempfile.mkstemp(prefix=f".{report_path.name}.", dir=report_path.parent)
+    try:
+        with os.fdopen(fd, "w") as report_file:
+            json.dump(report, report_file, indent=2)
+            report_file.write("\n")
+            report_file.flush()
+            os.fsync(report_file.fileno())
+        os.replace(temp_path, report_path)
+    except BaseException:
+        try:
+            os.unlink(temp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def main():
+
+    signal.signal(signal.SIGTERM, terminate_active_checks)
+    signal.signal(signal.SIGINT, terminate_active_checks)
+    parser = argparse.ArgumentParser(description="Simple test runner for virt-cluster-validate checks.")
+    parser.add_argument("-o", "--output", choices=["human", "ctrf", "junit"], default="human", help="Output format (default: human)")
+    parser.add_argument("-v", "--verbose", action="count", default=0, help="Show test output: -v for failed/warned, -vv for all")
+    parser.add_argument("-f", "--fail-fast", nargs="?", const=1, type=int, metavar="N", help="Stop execution after N failures")
+    parser.add_argument("-s", "--select", metavar="PATH", help="Only run the specific test file provided (e.g. checks.d/10-openshift.d/10-nodes.d/test.sh)")
+    parser.add_argument("--profile", choices=PROFILES, help="Run a named validation profile")
+    parser.add_argument("--include", metavar="PATTERNS", help="Comma-separated substrings to match; only run tests whose path contains at least one pattern")
+    parser.add_argument("--exclude", metavar="PATTERNS", help="Comma-separated substrings to match; skip tests whose path contains any pattern")
+    parser.add_argument("--log-dir", metavar="DIR", help="Write per-check log files to this directory")
+    parser.add_argument("--report-file", metavar="PATH", help="Write atomic CTRF snapshots to this file")
+    parser.add_argument("--junit-file", metavar="PATH", help="Write JUnit XML to this file (in addition to stdout output)")
+    parser.add_argument("-t", "--timeout", type=parse_timespan, default="180", metavar="SPAN", help="Timeout for each test (e.g. 3m, 45s, 180; default: 180)")
+    parser.add_argument("-c", "--concurrency", type=int, default=os.cpu_count() or 4, metavar="N", help="Number of concurrent tests to run (default: CPU count)")
+    parser.add_argument("--url", metavar="URL", help="OpenShift API server URL (requires --token)")
+    parser.add_argument("--token", metavar="TOKEN", help="Bearer token for --url (service account or user token)")
+    parser.add_argument("--ca-file", metavar="PATH", help="CA certificate file for --url (or VIRT_VALIDATE_CA_FILE)")
+    parser.add_argument("--insecure-skip-tls", action="store_true", help="Skip TLS verification for --url (self-signed API certs)")
+    args = parser.parse_args()
+
+    try:
+        provider_url, token, ca_file, insecure_skip_tls = resolve_provider_auth(args)
+    except argparse.ArgumentTypeError as exc:
+        parser.error(str(exc))
+
+    # 1. Environment & Discovery
+    cache_dir = tempfile.mkdtemp(prefix="virt_validate_cache_")
+    try:
+        _run_with_cache(args, cache_dir, provider_url, token, ca_file, insecure_skip_tls)
+    finally:
+        shutil.rmtree(cache_dir, ignore_errors=True)
+
+
+def _run_with_cache(args, cache_dir, provider_url, token, ca_file, insecure_skip_tls):
+    env = {**os.environ,
+           "PATH": f"{os.path.abspath('bin')}{os.pathsep}{os.environ.get('PATH', '')}",
+           "VIRT_VALIDATE_CACHE_DIR": cache_dir}
+    env.pop("VIRT_VALIDATE_TOKEN", None)
+
+    if provider_url:
+        kubeconfig_path = Path(cache_dir) / "kubeconfig"
+        write_provider_kubeconfig(kubeconfig_path, provider_url, token, insecure_skip_tls, ca_file)
+        env["KUBECONFIG"] = str(kubeconfig_path)
+
+    if args.profile:
+        env["VIRT_VALIDATE_PROFILE"] = args.profile
+
+    is_mock = os.environ.get("VIRT_VALIDATE_MOCK") == "1"
+
+    # Check for global prerequisite
+    prerequisite_file = Path("checks.d/prerequisite.sh")
+    if prerequisite_file.exists():
+        prereq_result = run_test(prerequisite_file, env, stream_output=False, timeout_secs=args.timeout) if not is_mock else simulate_test(prerequisite_file, stream_output=False, timeout_secs=args.timeout)
+        prereq_stream = sys.stderr if args.output in ("ctrf", "junit") else sys.stdout
+
+        if prereq_result["success"]:
+            if args.output == "human":
+                print(f"{Colors.GREEN}[PASS]{Colors.NC} {format_time(prereq_result['duration'])} {prerequisite_file}")
+                print()
+        else:
+            print(f"{Colors.RED}[FAIL]{Colors.NC} {format_time(prereq_result['duration'])} {prerequisite_file}", file=prereq_stream)
+            print(f"\n{Colors.RED}PREREQUISITE FAILURE: Cannot proceed with tests.{Colors.NC}", file=prereq_stream)
+            for msg in prereq_result["report_messages"]:
+                print(f"    -> {msg}", file=prereq_stream)
+            if prereq_result["log"]:
+                print("    --- Prerequisite Output ---", file=prereq_stream)
+                for line in prereq_result["log"]:
+                    print(f"    {line}", file=prereq_stream)
+            sys.exit(2)
+
+    test_files = sorted(Path("checks.d").rglob("test*.sh"))
+
+    if args.profile:
+        profile = PROFILES[args.profile]
+        selected = set(profile["cluster_checks"] + profile["node_checks"] + profile.get("final_checks", []))
+        test_files = [test_file for test_file in test_files if str(test_file) in selected]
+    if args.include:
+        patterns = [p.strip() for p in args.include.split(",")]
+        test_files = [t for t in test_files if any(p in str(t) for p in patterns)]
+    if args.exclude:
+        patterns = [p.strip() for p in args.exclude.split(",")]
+        test_files = [t for t in test_files if not any(p in str(t) for p in patterns)]
+    if args.select:
+        test_files = [t for t in test_files if str(t) == args.select]
+
+    if not test_files:
+        now = int(time.time() * 1000)
+        if args.report_file:
+            write_ctrf_report(args.report_file, build_ctrf_report([], [], now, now, complete=True))
+        if args.junit_file:
+            Path(args.junit_file).write_text(build_junit_xml([], [], 0, 0, verbose=args.verbose > 0))
+        if args.output == "junit":
+            print(build_junit_xml([], [], 0, 0, verbose=args.verbose > 0))
+        elif args.output == "ctrf":
+            print(json.dumps(build_ctrf_report([], [], now, now, complete=True), indent=2))
+        else:
+            print("No tests found.")
+        sys.exit(0)
+
+    final_checks = set(PROFILES[args.profile].get("final_checks", [])) if args.profile else set()
+    tasks = [execution_task(test_file, profile=args.profile) for test_file in test_files if str(test_file) not in final_checks]
+    final_tasks = [execution_task(test_file, profile=args.profile) for test_file in test_files if str(test_file) in final_checks]
+    if args.profile:
+        node_checks = set(PROFILES[args.profile]["node_checks"])
+        node_tasks = [task for task in tasks if task["testpath"] in node_checks]
+        if node_tasks:
+            tasks = [task for task in tasks if task["testpath"] not in node_checks]
+            for task in node_tasks:
+                tasks.extend(discover_worker_tasks(env, task["test_file"], args.profile))
+    stages = [tasks]
+    if final_tasks:
+        stages.append(final_tasks)
+    tasks = tasks + final_tasks
+
+    # 2. UI Initialization
+    stream_output = bool(args.select and args.verbose and args.output == "human")
+    is_tty = args.output == "human" and sys.stdout.isatty() and not stream_output
+
+    displays = [task["display"] for task in tasks]
+    ui = TerminalUI(displays, is_tty)
+    ui.init_display(displays)
+
+    # 3. Execution
+    workers = args.concurrency
+    results = []
+    progress = {}
+    progress_lock = threading.Lock()
+    failed_count_live = 0
+    start_time = time.monotonic()
+    start_epoch_ms = int(time.time() * 1000)
+
+    if args.report_file:
+        write_ctrf_report(args.report_file, build_ctrf_report(tasks, results, start_epoch_ms))
+
+    def update_progress(task, steps):
+        with progress_lock:
+            progress[task["execution_id"]] = {
+                "running": True,
+                "execution_id": task["execution_id"],
+                "test_id": task["test_id"],
+                "name": task["name"],
+                "parameters": task["parameters"],
+                "steps": steps,
+            }
+
+    for stage in stages:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {executor.submit(execute_task, task, env, ui, stream_output, args.timeout, is_mock, update_progress): task for task in stage}
+            pending = set(futures.keys())
+            while pending:
+                done, pending = wait(pending, timeout=1.0)
+                for f in done:
+                    if not f.cancelled():
+                        r = f.result()
+                        results.append(r)
+                        with progress_lock:
+                            progress.pop(r["execution_id"], None)
+                        if not r["success"]:
+                            failed_count_live += 1
+                if args.report_file:
+                    with progress_lock:
+                        active_results = list(progress.values())
+                    write_ctrf_report(args.report_file, build_ctrf_report(tasks, results + active_results, start_epoch_ms))
+                if args.fail_fast and failed_count_live >= args.fail_fast:
+                    for p in pending:
+                        p.cancel()
+                ui.update_progress(len(results), time.monotonic() - start_time)
+        if args.fail_fast and failed_count_live >= args.fail_fast:
+            break
+
+    ui.clear_progress()
+
+    # 4. Mark Skipped Tests
+    executed_ids = {r["execution_id"] for r in results}
+    for task in (task for task in tasks if task["execution_id"] not in executed_ids):
+        ui.update_test(task["display"], f"[{Colors.YELLOW}SKIP{Colors.NC}]")
+
+    # 5. Output Results
+    results.sort(key=lambda x: x["execution_id"])
+    stop_epoch_ms = int(time.time() * 1000)
+    if args.report_file:
+        write_ctrf_report(args.report_file, build_ctrf_report(
+            tasks, results, start_epoch_ms, stop_epoch_ms, complete=True))
+
+    if args.log_dir:
+        os.makedirs(args.log_dir, exist_ok=True)
+        for r in results:
+            name = r["execution_id"].replace("/", "_")
+            with open(os.path.join(args.log_dir, f"{name}.log"), "w") as f:
+                f.write("\n".join(r["log"]))
+
+    # Unified Summary Calculation
+    skipped_by_test = sum(1 for r in results if r.get("skipped"))
+    passed = sum(1 for r in results if r["success"] and not r.get("has_warnings") and not r.get("skipped"))
+    warnings = sum(1 for r in results if r["success"] and r.get("has_warnings") and not r.get("skipped"))
+    cancelled = sum(1 for r in results if r.get("cancelled"))
+    failed = len(results) - passed - warnings - cancelled - skipped_by_test
+    skipped = len(tasks) - len(results) + skipped_by_test
+
+    summary = f"{Colors.RED}Failed: {failed}{Colors.NC}"
+    if warnings > 0: summary += f", {Colors.YELLOW}Warned: {warnings}{Colors.NC}"
+    if cancelled > 0: summary += f", {Colors.YELLOW}Cancelled: {cancelled}{Colors.NC}"
+    if skipped > 0: summary += f", {Colors.YELLOW}Skipped: {skipped}{Colors.NC}"
+    summary += f", {Colors.GREEN}Passed: {passed}{Colors.NC}"
+    summary += f", Total: {len(tasks)}"
+
+    if args.output == "human":
+        print_details(results, args.verbose, skip_log_print=stream_output)
+        print("-" * 40)
+        print(summary)
+        print(f"Total time: {format_time(time.monotonic() - start_time)}")
+
+        # Suggest -v flag if there are failures/warnings and verbose is not set
+        if args.verbose == 0 and (failed > 0 or warnings > 0):
+            print(f"\n{Colors.YELLOW}Hint: Run with -v to see details of failed/warned checks{Colors.NC}")
+    elif args.output == "ctrf":
+        print(json.dumps(build_ctrf_report(
+            tasks, results, start_epoch_ms, stop_epoch_ms, complete=True), indent=2))
+    elif args.output == "junit":
+        print(build_junit_xml(results, tasks, skipped, failed + cancelled, verbose=args.verbose > 0))
+
+    if args.junit_file:
+        Path(args.junit_file).write_text(build_junit_xml(results, tasks, skipped, failed + cancelled, verbose=args.verbose > 0))
+
+    sys.exit(1 if failed_count_live > 0 else 0)
+
+if __name__ == "__main__":
+    main()
