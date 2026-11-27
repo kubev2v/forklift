@@ -95,6 +95,13 @@ const (
 	AzureSnapshotRG    = "snapshotResourceGroup"
 	AzureTargetRegion  = "targetRegion"
 	AzureSnapshotClass = "volumeSnapshotClassName"
+	// Nutanix collector tuning (optional, Go duration strings e.g. "60s", "5m").
+	NutanixClientTimeout   = "nutanixClientTimeout"
+	NutanixRefreshInterval = "nutanixRefreshInterval"
+	// NutanixDiskTransferMethod selects how Nutanix VM disks are copied
+	// (see DiskTransferMethod values). "nfs" reads disks over NFS via the
+	// volume populator; empty/"default" uses the CDI HTTP import.
+	NutanixDiskTransferMethod = "diskTransferMethod"
 	// vSphere copyApplianceTemplate / copy-appliance placement (per provider).
 	CopyApplianceDatastore    = "copyApplianceDatastore"
 	CopyApplianceFolder       = "copyApplianceFolder"
@@ -107,6 +114,19 @@ const (
 const (
 	NutanixPrismCentral = "central"
 	NutanixPrismElement = "element"
+)
+
+// DiskTransferMethod is the value of the NutanixDiskTransferMethod provider
+// setting, selecting how VM disks are copied.
+type DiskTransferMethod string
+
+const (
+	// DiskTransferHTTP copies disks via the CDI HTTP import from the Prism
+	// Image Service (the default). An empty value is treated the same.
+	DiskTransferHTTP DiskTransferMethod = "http"
+	// DiskTransferNFS reads disks directly from the source storage over NFS
+	// via a volume populator. Currently supported only for Nutanix.
+	DiskTransferNFS DiskTransferMethod = "nfs"
 )
 
 // ESXi clone method values.

@@ -110,6 +110,11 @@ var (
 			resource:           api.VSphereXcopyVolumePopulatorResource,
 			regexKey:           "vsphere_xcopy_volume_populator",
 		},
+		api.NutanixNfsVolumePopulatorKind: {
+			storageResourceKey: "source_path",
+			resource:           api.NutanixNfsVolumePopulatorResource,
+			regexKey:           "nutanix_nfs_populator",
+		},
 	}
 
 	monitoredPVCs = map[string]interface{}{}
@@ -121,6 +126,12 @@ type populatorResource struct {
 	regexKey           string
 }
 
+// PodVolumeHook returns extra volumes and volume mounts (e.g. a read-only
+// NFS source mount) to attach to the populator pod for a given CR instance.
+// It is called once, when the populator pod is created. A nil hook adds no
+// extra volumes.
+type PodVolumeHook func(u *unstructured.Unstructured) ([]corev1.Volume, []corev1.VolumeMount, error)
+
 type controller struct {
 	populatedFromAnno string
 	kubeClient        kubernetes.Interface
@@ -128,6 +139,7 @@ type controller struct {
 	imageName         string
 	devicePath        string
 	mountPath         string
+	podVolumes        PodVolumeHook
 	pvcLister         corelisters.PersistentVolumeClaimLister
 	pvcSynced         cache.InformerSynced
 	pvLister          corelisters.PersistentVolumeLister
@@ -154,6 +166,7 @@ type controller struct {
 func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, prefix string,
 	gk schema.GroupKind, gvr schema.GroupVersionResource, mountPath, devicePath string,
 	populatorArgs func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error),
+	podVolumes PodVolumeHook,
 	resources *corev1.ResourceRequirements,
 	maxInFlight int,
 ) {
@@ -199,6 +212,7 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		imageName:         imageName,
 		devicePath:        devicePath,
 		mountPath:         mountPath,
+		podVolumes:        podVolumes,
 		populatedFromAnno: prefix + "/" + populatedFromAnnoSuffix,
 		pvcLister:         pvcInformer.Lister(),
 		pvcSynced:         pvcInformer.Informer().HasSynced,
@@ -708,6 +722,19 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 				}
 			}
 
+			// Extra populator-specific volumes (e.g. the Nutanix NFS source
+			// mount). Applied after the target volume so mounts never collide
+			// with the target PVC mount path.
+			if c.podVolumes != nil {
+				extraVolumes, extraMounts, err := c.podVolumes(crInstance)
+				if err != nil {
+					c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodCreationError, "Failed to build populator pod volumes: %s", err)
+					return err
+				}
+				pod.Spec.Volumes = append(pod.Spec.Volumes, extraVolumes...)
+				con.VolumeMounts = append(con.VolumeMounts, extraMounts...)
+			}
+
 			if waitForFirstConsumer {
 				pod.Spec.NodeName = nodeName
 			}
@@ -955,10 +982,16 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		completion = c.parseAndRecordCompletion(bodyStr, pvc, cr)
 	}
 
+	populatorResource, known := populatorToResource[populatorKind]
+	if !known || populatorResource == nil {
+		// Unknown kind: report instead of dereferencing a nil map entry and
+		// crashing the controller.
+		return fmt.Errorf("no resource mapping for populator kind %q", populatorKind)
+	}
 	gvr := schema.GroupVersionResource{
 		Group:    *pvc.Spec.DataSourceRef.APIGroup,
 		Version:  "v1beta1",
-		Resource: populatorToResource[populatorKind].resource,
+		Resource: populatorResource.resource,
 	}
 
 	latestPopulator, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Get(context.TODO(), cr.GetName(), metav1.GetOptions{})
@@ -1140,6 +1173,36 @@ func updatePopulatorProgress(progress int64, cr *unstructured.Unstructured) erro
 }
 
 func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
+	// Only project the secret into the pod when a secret name is configured;
+	// an empty name would produce invalid references to a nameless secret.
+	var envFrom []corev1.EnvFromSource
+	var env []corev1.EnvVar
+	if secretName != "" {
+		envFrom = []corev1.EnvFromSource{
+			{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+				},
+			},
+		}
+		// Explicit mapping required because Kubernetes drops dotted keys (ca.crt)
+		// when injecting via EnvFrom. Populator binaries expect "cacert" env var.
+		env = append(env, corev1.EnvVar{
+			Name: "cacert",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key:      "ca.crt",
+					Optional: ptr.To(true),
+				},
+			},
+		})
+	}
+
 	return corev1.PodSpec{
 		Containers: []corev1.Container{
 			{
@@ -1153,31 +1216,8 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 						Drop: []corev1.Capability{"ALL"},
 					},
 				},
-				EnvFrom: []corev1.EnvFromSource{
-					{
-						SecretRef: &corev1.SecretEnvSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: secretName,
-							},
-						},
-					},
-				},
-				// Explicit mapping required because Kubernetes drops dotted keys (ca.crt)
-				// when injecting via EnvFrom. Populator binaries expect "cacert" env var.
-				Env: []corev1.EnvVar{
-					{
-						Name: "cacert",
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: secretName,
-								},
-								Key:      "ca.crt",
-								Optional: ptr.To(true),
-							},
-						},
-					},
-				},
+				EnvFrom: envFrom,
+				Env:     env,
 			},
 		},
 		SecurityContext: &corev1.PodSecurityContext{
