@@ -357,6 +357,31 @@ func (api *BlockStorageAPI) AddPath(ldevId string, portId string, hostGroupNumbe
 	return nil
 }
 
+func retryAddPath(addPath func() error, sleep func(time.Duration)) error {
+	const maxAttempts = 6
+	var err error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		err = addPath()
+		if err == nil {
+			return nil
+		}
+		var storageErr *storageError
+		if !errors.As(err, &storageErr) || !strings.EqualFold(storageErr.ErrorCode.SSB1, lunConflictSSB1) || !strings.EqualFold(storageErr.ErrorCode.SSB2, lunConflictSSB2) {
+			return err
+		}
+		if attempt == maxAttempts {
+			break
+		}
+		delay, delayErr := retry.Backoff(lunMappingProcessingTime, lunMappingRetrySpread)
+		if delayErr != nil {
+			return fmt.Errorf("failed to calculate retry delay: %w", delayErr)
+		}
+		klog.Infof("LUN assignment conflict, retrying path mapping after %s (retry %d of %d)", delay, attempt, maxAttempts-1)
+		sleep(delay)
+	}
+	return fmt.Errorf("path mapping failed after %d attempts: %w", maxAttempts, err)
+}
+
 // DeletePath removes a path mapping for a LUN
 func (api *BlockStorageAPI) DeletePath(ldevId string, portId string, hostGroupNumber string, lunId string) error {
 	if err := api.ensureConnected(); err != nil {
