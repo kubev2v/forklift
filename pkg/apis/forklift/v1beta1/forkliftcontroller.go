@@ -946,6 +946,33 @@ type ForkliftControllerSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	PopulatorContainerRequestsMemory string `json:"populator_container_requests_memory,omitempty"`
 
+	// Volume Populator Controller Resource Configuration
+
+	// Volume Populator Controller CPU limit.
+	// +optional
+	// +kubebuilder:default="1000m"
+	// +kubebuilder:validation:Pattern=`^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	PopulatorControllerContainerLimitsCPU string `json:"populator_controller_container_limits_cpu,omitempty"`
+	// Volume Populator Controller memory limit.
+	// +optional
+	// +kubebuilder:default="1Gi"
+	// +kubebuilder:validation:Pattern=`^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	PopulatorControllerContainerLimitsMemory string `json:"populator_controller_container_limits_memory,omitempty"`
+	// Volume Populator Controller CPU request.
+	// +optional
+	// +kubebuilder:default="100m"
+	// +kubebuilder:validation:Pattern=`^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	PopulatorControllerContainerRequestsCPU string `json:"populator_controller_container_requests_cpu,omitempty"`
+	// Volume Populator Controller memory request.
+	// +optional
+	// +kubebuilder:default="150Mi"
+	// +kubebuilder:validation:Pattern=`^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	PopulatorControllerContainerRequestsMemory string `json:"populator_controller_container_requests_memory,omitempty"`
+
 	// Logging & General Settings
 
 	// Log verbosity level.

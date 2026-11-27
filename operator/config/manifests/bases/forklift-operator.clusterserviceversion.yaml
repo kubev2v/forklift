@@ -717,6 +717,26 @@ spec:
         path: populator_container_requests_memory
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator Controller CPU limit.
+        displayName: Populator Controller Container Limits CPU
+        path: populator_controller_container_limits_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator Controller memory limit.
+        displayName: Populator Controller Container Limits Memory
+        path: populator_controller_container_limits_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator Controller CPU request.
+        displayName: Populator Controller Container Requests CPU
+        path: populator_controller_container_requests_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator Controller memory request.
+        displayName: Populator Controller Container Requests Memory
+        path: populator_controller_container_requests_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Volume populator controller image. Optional. If left empty, the
           operator automatically sets this from the release payload.
         displayName: Populator Controller Image FQIN

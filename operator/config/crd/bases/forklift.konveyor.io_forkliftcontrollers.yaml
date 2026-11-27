@@ -743,6 +743,26 @@ spec:
                 description: Volume Populator memory request.
                 pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
+              populator_controller_container_limits_cpu:
+                default: 1000m
+                description: Volume Populator Controller CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
+                type: string
+              populator_controller_container_limits_memory:
+                default: 1Gi
+                description: Volume Populator Controller memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
+                type: string
+              populator_controller_container_requests_cpu:
+                default: 100m
+                description: Volume Populator Controller CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
+                type: string
+              populator_controller_container_requests_memory:
+                default: 150Mi
+                description: Volume Populator Controller memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
+                type: string
               populator_controller_image_fqin:
                 description: Volume populator controller image. Optional. If left
                   empty, the operator automatically sets this from the release payload.

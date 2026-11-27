@@ -730,6 +730,27 @@ spec:
           path: populator_container_requests_memory
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
+        # Volume Populator Controller Resource Configuration
+        - description: Volume Populator Controller CPU limit (default 1000m)
+          displayName: Volume Populator Controller CPU Limit
+          path: populator_controller_container_limits_cpu
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
+        - description: Volume Populator Controller memory limit (default 1Gi)
+          displayName: Volume Populator Controller Memory Limit
+          path: populator_controller_container_limits_memory
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
+        - description: Volume Populator Controller CPU request (default 100m)
+          displayName: Volume Populator Controller CPU Request
+          path: populator_controller_container_requests_cpu
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
+        - description: Volume Populator Controller memory request (default 150Mi)
+          displayName: Volume Populator Controller Memory Request
+          path: populator_controller_container_requests_memory
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
         # Logging & General Settings
         - description: Log verbosity level (default 3)
           displayName: Controller Log Level

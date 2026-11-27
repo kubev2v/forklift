@@ -6271,6 +6271,26 @@ spec:
                 description: Volume Populator memory request.
                 pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
+              populator_controller_container_limits_cpu:
+                default: 1000m
+                description: Volume Populator Controller CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
+                type: string
+              populator_controller_container_limits_memory:
+                default: 1Gi
+                description: Volume Populator Controller memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
+                type: string
+              populator_controller_container_requests_cpu:
+                default: 100m
+                description: Volume Populator Controller CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
+                type: string
+              populator_controller_container_requests_memory:
+                default: 150Mi
+                description: Volume Populator Controller memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
+                type: string
               populator_controller_image_fqin:
                 description: Volume populator controller image. Optional. If left
                   empty, the operator automatically sets this from the release payload.
@@ -14902,6 +14922,26 @@ spec:
       - description: Volume Populator memory request (default 512Mi)
         displayName: Volume Populator Memory Request
         path: populator_container_requests_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator Controller CPU limit (default 1000m)
+        displayName: Volume Populator Controller CPU Limit
+        path: populator_controller_container_limits_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator Controller memory limit (default 1Gi)
+        displayName: Volume Populator Controller Memory Limit
+        path: populator_controller_container_limits_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator Controller CPU request (default 100m)
+        displayName: Volume Populator Controller CPU Request
+        path: populator_controller_container_requests_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator Controller memory request (default 150Mi)
+        displayName: Volume Populator Controller Memory Request
+        path: populator_controller_container_requests_memory
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Log verbosity level (default 3)
