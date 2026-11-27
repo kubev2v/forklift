@@ -80,11 +80,6 @@ func TestStorageErrorFromFailedJob(t *testing.T) {
 	}
 }
 
-func testServerHostPort(s *httptest.Server) (string, string) {
-	host, port, _ := net.SplitHostPort(s.Listener.Addr().String())
-	return host, port
-}
-
 // TestNewBlockStorageAPI tests the constructor
 func TestNewBlockStorageAPI(t *testing.T) {
 	api := NewBlockStorageAPI("192.0.2.0", "8443", "storage123", "admin", "password")
