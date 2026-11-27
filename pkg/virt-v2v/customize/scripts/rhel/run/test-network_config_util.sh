@@ -45,8 +45,6 @@ test_dir() {
         chmod 600 "$TEST_DIR/etc/netplan/50-netplan.yaml"
     fi
 
-    # Clean up from previous runs
-    rm -f "$UDEV_RULES_FILE"
     mkdir -p $(dirname "$UDEV_RULES_FILE")
 
     # Source the script under test
