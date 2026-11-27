@@ -409,7 +409,7 @@ func retryAddPath(addPath func() error, sleep func(time.Duration)) error {
 		if delayErr != nil {
 			return fmt.Errorf("failed to calculate retry delay: %w", delayErr)
 		}
-		klog.Infof("LUN assignment conflict, retrying path mapping after %s (attempt %d of %d)", delay, attempt+1, maxAttempts)
+		klog.Infof("LUN assignment conflict, retrying path mapping after %s (retry %d of %d)", delay, attempt, maxAttempts-1)
 		sleep(delay)
 	}
 	return fmt.Errorf("path mapping failed after %d attempts: %w", maxAttempts, err)
