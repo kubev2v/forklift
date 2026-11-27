@@ -1449,6 +1449,16 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 			switch pod.Status.Phase {
 			case core.PodSucceeded:
+				// The VM was started only so the first-boot scripts could run;
+				// now apply the requested final power state (e.g. auto + source off).
+				// On failure, keep the pod so the next reconcile retries this patch
+				// instead of re-running the wait.
+				if ierr := r.kubevirt.RestoreFinalRunStrategy(vm); ierr != nil {
+					r.Log.Error(ierr, "Failed to restore final run strategy after wait-for-reboot.", "vm", vm.String())
+					step.AddError(ierr.Error())
+					err = nil
+					break
+				}
 				_ = r.kubevirt.DeleteWaitForRebootPod(vm)
 				r.NextPhase(vm)
 			case core.PodFailed:
