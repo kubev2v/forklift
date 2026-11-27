@@ -2,6 +2,8 @@ package resolver
 
 import (
 	"testing"
+
+	"github.com/vmware/govmomi/vim25/types"
 )
 
 func TestDiskBackingClassify(t *testing.T) {
@@ -44,5 +46,17 @@ func TestDiskBackingClassify(t *testing.T) {
 				t.Errorf("DetectDiskType() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestDiskBackingFromDevicesRDMCompatibilityMode(t *testing.T) {
+	disk := &types.VirtualDisk{VirtualDevice: types.VirtualDevice{Backing: &types.VirtualDiskRawDiskMappingVer1BackingInfo{
+		VirtualDeviceFileBackingInfo: types.VirtualDeviceFileBackingInfo{FileName: "[ds] vm/rdm.vmdk"},
+		DeviceName:                   "naa.60000970000197900046533030334545",
+		CompatibilityMode:            string(types.VirtualDiskCompatibilityModeVirtualMode),
+	}}}
+	got, err := DiskBackingFromDevices([]types.BaseVirtualDevice{disk}, "[ds] vm/rdm.vmdk")
+	if err != nil || !got.IsRDM || got.CompatibilityMode != "virtualMode" {
+		t.Fatalf("unexpected backing %+v, %v", got, err)
 	}
 }

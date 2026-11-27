@@ -36,6 +36,10 @@ type DiskBacking struct {
 	// NasRemoteHost is the NFS server the datastore mounts from. Used to confirm the
 	// source is served by the same array as the destination. Set only when IsNAS.
 	NasRemoteHost string
+	// CompatibilityMode is the RDM compatibility mode (physicalMode or virtualMode).
+	CompatibilityMode string
+	// VMHasSnapshots is true when the VM has snapshots. Set by the caller, not by DiskBackingFromDevices.
+	VMHasSnapshots bool
 }
 
 // DetectDiskType returns the DiskType for this backing.
@@ -93,9 +97,10 @@ func DiskBackingFromDevices(devices []types.BaseVirtualDevice, diskFile string) 
 			}
 			log.V(2).Info("disk is RDM-backed", "vmdk", diskFile, "device", backing.DeviceName, "lunUuid", backing.LunUuid)
 			return &DiskBacking{
-				IsRDM:      true,
-				DeviceName: backing.DeviceName,
-				LunUuid:    backing.LunUuid,
+				IsRDM:             true,
+				DeviceName:        backing.DeviceName,
+				LunUuid:           backing.LunUuid,
+				CompatibilityMode: backing.CompatibilityMode,
 			}, nil
 		}
 	}
