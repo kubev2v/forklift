@@ -14,11 +14,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/retry"
 	"k8s.io/klog/v2"
 )
 
 const requiredMajorVersion = 1
 const requiredMinorVersion = 9
+const lunConflictSSB1 = "B958"
+const lunConflictSSB2 = "0947"
+
+// The retry window assumes a one-second mapping operation and a 20.9T spread.
+const lunMappingProcessingTime = time.Second
+const lunMappingRetrySpread = 20900 * time.Millisecond
 
 // extractIPAddress extracts an IP address from a URL string
 func extractIPAddress(url string) (string, error) {
@@ -109,6 +116,18 @@ func (api *BlockStorageAPI) Snapshotpair() string {
 	return api.BaseURL + api.ObjectURL + "/snapshots"
 }
 
+type storageError struct {
+	raw       string
+	ErrorCode struct {
+		SSB1 string `json:"SSB1"`
+		SSB2 string `json:"SSB2"`
+	} `json:"errorCode"`
+}
+
+func (e *storageError) Error() string {
+	return e.raw
+}
+
 func (api *BlockStorageAPI) APIVersion() string {
 	return fmt.Sprintf("https://%s:%s/ConfigurationManager/configuration/version", api.GumIPAddr, api.Port)
 }
@@ -156,6 +175,11 @@ func (api *BlockStorageAPI) makeHTTPRequest(methodType, url string, body, header
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		bodyBytes, _ := io.ReadAll(resp.Body)
+		var storageErr storageError
+		if json.Unmarshal(bodyBytes, &storageErr) == nil && storageErr.ErrorCode.SSB1 != "" && storageErr.ErrorCode.SSB2 != "" {
+			storageErr.raw = string(bodyBytes)
+			return nil, fmt.Errorf("request failed with status %d: %w", resp.StatusCode, &storageErr)
+		}
 		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
@@ -215,13 +239,19 @@ func (api *BlockStorageAPI) InvokeAsyncCommand(methodType, url string, body, hea
 		jobResult, err := api.checkUpdate(fmt.Sprintf("%d", int(result["jobId"].(float64))), headers)
 		if err != nil {
 			klog.Errorf("Error checking job status: %v", err)
-			return "", err
+			return "", fmt.Errorf("error checking job status: %v", err)
 		}
 		status = jobResult["status"].(string)
 		state = jobResult["state"].(string)
 		if state == "Failed" {
-			jobError := jobResult["error"].(map[string]interface{})
-			return "", fmt.Errorf("Async job state: %s with error: %v", state, jobError)
+			jobError := jobResult["error"]
+			data, _ := json.Marshal(jobError)
+			var storageErr storageError
+			if json.Unmarshal(data, &storageErr) == nil && storageErr.ErrorCode.SSB1 != "" && storageErr.ErrorCode.SSB2 != "" {
+				storageErr.raw = string(data)
+				return "", fmt.Errorf("async job failed: %w", &storageErr)
+			}
+			return "", fmt.Errorf("async job failed: %v", jobError)
 		}
 		klog.Infof("Status: %s", status)
 		if waitTime*2 < 120 {
@@ -349,12 +379,40 @@ func (api *BlockStorageAPI) AddPath(ldevId string, portId string, hostGroupNumbe
 	bodyJson, _ := json.Marshal(body)
 	klog.V(2).Infof("AddPath request body: %s", string(bodyJson))
 
-	_, err := api.InvokeAsyncCommand("POST", url, body, headers)
+	err := retryAddPath(func() error {
+		_, err := api.InvokeAsyncCommand("POST", url, body, headers)
+		return err
+	}, time.Sleep)
 	if err != nil {
 		return fmt.Errorf("failed to add path for LDEV %s: %w", ldevId, err)
 	}
 
 	return nil
+}
+
+func retryAddPath(addPath func() error, sleep func(time.Duration)) error {
+	const maxAttempts = 6
+	var err error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		err = addPath()
+		if err == nil {
+			return nil
+		}
+		var storageErr *storageError
+		if !errors.As(err, &storageErr) || !strings.EqualFold(storageErr.ErrorCode.SSB1, lunConflictSSB1) || !strings.EqualFold(storageErr.ErrorCode.SSB2, lunConflictSSB2) {
+			return err
+		}
+		if attempt == maxAttempts {
+			break
+		}
+		delay, delayErr := retry.Backoff(lunMappingProcessingTime, lunMappingRetrySpread)
+		if delayErr != nil {
+			return fmt.Errorf("failed to calculate retry delay: %w", delayErr)
+		}
+		klog.Infof("LUN assignment conflict, retrying path mapping after %s (retry %d of %d)", delay, attempt, maxAttempts-1)
+		sleep(delay)
+	}
+	return fmt.Errorf("path mapping failed after %d attempts: %w", maxAttempts, err)
 }
 
 // DeletePath removes a path mapping for a LUN
