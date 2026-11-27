@@ -54,11 +54,11 @@ spec:
             value: "{{ populator_container_requests_memory }}"
           resources:
             limits:
-              cpu: {{ populator_controller_container_limits_cpu }}
-              memory: {{ populator_controller_container_limits_memory }}
+              cpu: "{{ populator_controller_container_limits_cpu }}"
+              memory: "{{ populator_controller_container_limits_memory }}"
             requests:
-              cpu: {{ populator_controller_container_requests_cpu }}
-              memory: {{ populator_controller_container_requests_memory }}
+              cpu: "{{ populator_controller_container_requests_cpu }}"
+              memory: "{{ populator_controller_container_requests_memory }}"
           ports:
             - containerPort: 8080
               name: http-endpoint
