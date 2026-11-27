@@ -604,6 +604,95 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 		})
 	})
 
+	ginkgo.Describe("RestoreFinalRunStrategy", func() {
+		var kubevirt *KubeVirt
+		var vm *plan.VMStatus
+
+		newTargetVM := func(kv *KubeVirt, vm *plan.VMStatus) *cnv.VirtualMachine {
+			always := cnv.RunStrategyAlways
+			return &cnv.VirtualMachine{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "target-vm",
+					Namespace: kv.Plan.Spec.TargetNamespace,
+					Labels:    kv.vmLabels(vm.Ref),
+				},
+				Spec: cnv.VirtualMachineSpec{RunStrategy: &always},
+			}
+		}
+
+		setup := func(withVM bool) {
+			kubevirt = createKubeVirt()
+			kubevirt.Plan.Spec.TargetNamespace = "target-ns"
+			vm = &plan.VMStatus{}
+			vm.Ref = ref.Ref{ID: "vm-1"}
+			if withVM {
+				Expect(kubevirt.Destination.Client.Create(context.TODO(), newTargetVM(kubevirt, vm))).To(Succeed())
+			}
+		}
+
+		runStrategy := func() cnv.VirtualMachineRunStrategy {
+			got := &cnv.VirtualMachine{}
+			key := client.ObjectKey{Namespace: "target-ns", Name: "target-vm"}
+			Expect(kubevirt.Destination.Client.Get(context.TODO(), key, got)).To(Succeed())
+			Expect(got.Spec.RunStrategy).ToNot(BeNil())
+			return *got.Spec.RunStrategy
+		}
+
+		ginkgo.It("should halt the VM when target power state is 'auto' and source was off", func() {
+			setup(true)
+			kubevirt.Plan.Spec.TargetPowerState = plan.TargetPowerStateAuto
+			vm.RestorePowerState = plan.VMPowerStateOff
+
+			Expect(kubevirt.RestoreFinalRunStrategy(vm)).To(Succeed())
+			Expect(runStrategy()).To(Equal(cnv.RunStrategyHalted))
+		})
+
+		ginkgo.It("should halt the VM when target power state is unset and source was off", func() {
+			setup(true)
+			kubevirt.Plan.Spec.TargetPowerState = ""
+			vm.RestorePowerState = plan.VMPowerStateOff
+
+			Expect(kubevirt.RestoreFinalRunStrategy(vm)).To(Succeed())
+			Expect(runStrategy()).To(Equal(cnv.RunStrategyHalted))
+		})
+
+		ginkgo.It("should keep the VM running when target power state is 'auto' and source was on", func() {
+			setup(true)
+			kubevirt.Plan.Spec.TargetPowerState = plan.TargetPowerStateAuto
+			vm.RestorePowerState = plan.VMPowerStateOn
+
+			Expect(kubevirt.RestoreFinalRunStrategy(vm)).To(Succeed())
+			Expect(runStrategy()).To(Equal(cnv.RunStrategyAlways))
+		})
+
+		ginkgo.It("should keep the VM running when plan target power state is 'on'", func() {
+			setup(true)
+			kubevirt.Plan.Spec.TargetPowerState = plan.TargetPowerStateOn
+			vm.RestorePowerState = plan.VMPowerStateOff
+
+			Expect(kubevirt.RestoreFinalRunStrategy(vm)).To(Succeed())
+			Expect(runStrategy()).To(Equal(cnv.RunStrategyAlways))
+		})
+
+		ginkgo.It("should halt the VM when VM-level 'off' overrides plan 'on'", func() {
+			setup(true)
+			kubevirt.Plan.Spec.TargetPowerState = plan.TargetPowerStateOn
+			vm.TargetPowerState = plan.TargetPowerStateOff
+			vm.RestorePowerState = plan.VMPowerStateOn
+
+			Expect(kubevirt.RestoreFinalRunStrategy(vm)).To(Succeed())
+			Expect(runStrategy()).To(Equal(cnv.RunStrategyHalted))
+		})
+
+		ginkgo.It("should not fail when the target VM does not exist", func() {
+			setup(false)
+			kubevirt.Plan.Spec.TargetPowerState = plan.TargetPowerStateAuto
+			vm.RestorePowerState = plan.VMPowerStateOff
+
+			Expect(kubevirt.RestoreFinalRunStrategy(vm)).To(Succeed())
+		})
+	})
+
 	ginkgo.Describe("CleanupCopiedConfigMaps", func() {
 		ginkgo.It("should delete extra-v2v-conf and customization-scripts ConfigMaps by name", func() {
 			extraCM := &v1.ConfigMap{
@@ -894,6 +983,7 @@ func createKubeVirt(objs ...runtime.Object) *KubeVirt {
 	scheme := runtime.NewScheme()
 	_ = v1.AddToScheme(scheme)
 	_ = k8snet.AddToScheme(scheme)
+	_ = cnv.AddToScheme(scheme)
 	v1beta1.SchemeBuilder.AddToScheme(scheme)
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
