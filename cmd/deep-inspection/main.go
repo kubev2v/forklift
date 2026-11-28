@@ -29,9 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	secretDir = "/etc/secret"
-)
+const secretDir = "/etc/secret"
 
 func main() {
 	log := logrus.New()
@@ -148,33 +146,66 @@ func detectLocalDisks(log *logrus.Logger) (*vmdetect.DetectResult, error) {
 }
 
 func loadProviderCredentials() (vmdetect.Credentials, error) {
-	url, err := readSecretDataFile("url")
+	return loadProviderCredentialsFromDir(secretDir)
+}
+
+func loadProviderCredentialsFromDir(dir string) (vmdetect.Credentials, error) {
+	url, err := readSecretDataFile(dir, "url")
 	if err != nil {
 		return vmdetect.Credentials{}, err
 	}
-	user, err := readSecretDataFile("user")
+	user, err := readSecretDataFile(dir, "user")
 	if err != nil {
 		return vmdetect.Credentials{}, err
 	}
-	password, err := readSecretDataFile("password")
+	password, err := readSecretDataFile(dir, "password")
 	if err != nil {
 		return vmdetect.Credentials{}, err
 	}
 
-	fingerprint, err := readSecretDataFile("fingerprint")
+	fingerprint, err := readSecretDataFile(dir, "fingerprint")
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return vmdetect.Credentials{}, err
 	}
+
+	// TLSCACert must be a file path (tlsconfig.LoadCACertPool reads it itself),
+	// not file content, so this checks existence rather than reading the file.
+	caCertPath, err := resolveCACertPath(dir, os.Stat)
+	if err != nil {
+		return vmdetect.Credentials{}, err
+	}
+
 	return vmdetect.Credentials{
 		VCenterURL:    url,
 		Username:      user,
 		Password:      password,
 		TLSThumbprint: fingerprint,
+		TLSCACert:     caCertPath,
 	}, nil
 }
 
-func readSecretDataFile(basename string) (string, error) {
-	p := filepath.Join(secretDir, basename)
+// resolveCACertPath returns the CA cert path when it exists, an empty string
+// when neither field is present, or an error for any other stat failure
+// (e.g. a permission error), which should not be silently treated as "no CA
+// cert configured". "ca.crt" is the standard Kubernetes Secret field and is
+// preferred; "cacert" is the deprecated legacy field kept for backward
+// compatibility (see pkg/lib/util.GetCACert).
+func resolveCACertPath(dir string, statFn func(string) (os.FileInfo, error)) (string, error) {
+	for _, name := range []string{"ca.crt", "cacert"} {
+		p := filepath.Join(dir, name)
+		if _, err := statFn(p); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			return "", fmt.Errorf("stat ca cert file %q: %w", p, err)
+		}
+		return p, nil
+	}
+	return "", nil
+}
+
+func readSecretDataFile(dir, basename string) (string, error) {
+	p := filepath.Join(dir, basename)
 	data, err := os.ReadFile(p)
 	if err != nil {
 		return "", fmt.Errorf("read provider credential file %q: %w", p, err)
