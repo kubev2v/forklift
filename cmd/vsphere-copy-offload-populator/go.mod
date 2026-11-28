@@ -3,23 +3,23 @@ module github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator
 go 1.26.0
 
 require (
-	github.com/dell/gopowermax/v2 v2.9.0
-	github.com/dell/gopowerstore v1.19.0
-	github.com/dell/goscaleio v1.20.0
-	github.com/hashicorp/go-version v1.7.0
-	github.com/infinidat/infinibox-csi-driver v0.0.0-20251022203528-1f6913cf29cb
+	github.com/dell/gopowermax/v2 v2.14.1
+	github.com/dell/gopowerstore v1.23.1
+	github.com/dell/goscaleio v1.24.1
+	github.com/hashicorp/go-version v1.9.0
+	github.com/infinidat/infinibox-csi-driver v0.0.0-20261111221130-26a69c5d760f
 	github.com/kubev2v/forklift v0.0.0-20251201013611-d4d1610e79df
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
-	github.com/onsi/ginkgo/v2 v2.27.4
-	github.com/onsi/gomega v1.38.2
-	github.com/stretchr/testify v1.10.0
-	github.com/vmware/govmomi v0.50.0
-	go.uber.org/mock v0.5.2
-	golang.org/x/crypto v0.58.1-0.20261009181718-2f1f834330b2
-	k8s.io/api v0.32.8
-	k8s.io/apimachinery v0.32.8
-	k8s.io/client-go v0.32.8
-	k8s.io/klog/v2 v2.130.1
+	github.com/onsi/ginkgo/v2 v2.34.0
+	github.com/onsi/gomega v1.44.0
+	github.com/stretchr/testify v1.12.1
+	github.com/vmware/govmomi v0.56.2
+	go.uber.org/mock v0.6.0
+	golang.org/x/crypto v0.59.0
+	k8s.io/api v0.37.2
+	k8s.io/apimachinery v0.37.2
+	k8s.io/client-go v0.37.2
+	k8s.io/klog/v2 v2.140.0
 )
 
 require (
@@ -119,7 +119,7 @@ require (
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.22.0
+	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
@@ -147,4 +147,4 @@ require (
 
 replace github.com/kubev2v/forklift => ../../
 
-replace github.com/infinidat/infinibox-csi-driver => github.com/amitosw15/infinibox-csi-driver v0.0.0-20260512123444-0b4db0405326
+replace github.com/infinidat/infinibox-csi-driver => github.com/amitosw15/infinibox-csi-driver 85780a1606a9
