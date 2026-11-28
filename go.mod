@@ -3,67 +3,67 @@ module github.com/kubev2v/forklift
 go 1.26.0
 
 require (
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.22.0
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.24.0
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.15.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v6 v6.4.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v6 v6.2.0
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/aws/aws-sdk-go-v2 v1.40.0
-	github.com/aws/aws-sdk-go-v2/config v1.32.1
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.1
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.274.0
-	github.com/aws/aws-sdk-go-v2/service/sts v1.41.1
-	github.com/dustin/go-humanize v1.0.1
-	github.com/gin-contrib/cors v1.7.5
-	github.com/gin-gonic/gin v1.10.0
+	github.com/aws/aws-sdk-go-v2 v1.48.0
+	github.com/aws/aws-sdk-go-v2/config v1.33.21
+	github.com/aws/aws-sdk-go-v2/credentials v1.21.3
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.350.0
+	github.com/aws/aws-sdk-go-v2/service/sts v1.53.0
+	github.com/dustin/go-humanize v1.1.0
+	github.com/gin-contrib/cors v1.7.11
+	github.com/gin-gonic/gin v1.12.0
 	github.com/go-logr/logr v1.4.4
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/go-cmp v0.7.0
-	github.com/google/go-containerregistry v0.20.2
+	github.com/google/go-containerregistry v0.22.1
 	github.com/google/uuid v1.6.0
 	github.com/gophercloud/gophercloud v1.14.1
-	github.com/gophercloud/utils v0.0.0-20230418172808-6eab72e966e1
+	github.com/gophercloud/utils v0.0.0-20231010081019-80377eca5d56
 	github.com/gorilla/websocket v1.5.3
-	github.com/hashicorp/go-version v1.7.0
+	github.com/hashicorp/go-version v1.9.0
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0
-	github.com/kubev2v/vm-migration-detective v0.0.0-20261006023354-140bc9526c2c
-	github.com/masterzen/winrm v0.0.0-20250927112105-5f8e6c707321
+	github.com/kubev2v/vm-migration-detective v0.0.0-20261124153838-859bc76ef369
+	github.com/masterzen/winrm v0.0.0-20261114181639-d693523ae428
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/ginkgo/v2 v2.27.4
-	github.com/onsi/gomega v1.38.2
-	github.com/openshift/api v0.0.0-20230613151523-ba04973d3ed1
-	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb
+	github.com/onsi/ginkgo/v2 v2.34.0
+	github.com/onsi/gomega v1.44.0
+	github.com/openshift/api 889c1f5c276a
+	github.com/openshift/client-go e591d492769c
 	github.com/openshift/library-go v0.0.0-20230626162119-954ade536d6d
-	github.com/ovirt/go-ovirt v0.0.0-20230808190322-9fd1992199b2
+	github.com/ovirt/go-ovirt e2dd5ef788e3
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.7.0
-	github.com/prometheus/client_golang v1.19.1
+	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
-	github.com/prometheus/common v0.55.0
-	github.com/sirupsen/logrus v1.9.3
-	github.com/vmware/govmomi v0.50.0
-	go.uber.org/mock v0.4.0
-	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.58.1-0.20261009181718-2f1f834330b2
+	github.com/prometheus/common v0.74.0
+	github.com/sirupsen/logrus v1.10.2
+	github.com/vmware/govmomi v0.56.2
+	go.uber.org/mock v0.6.0
+	go.uber.org/zap v1.28.0
+	golang.org/x/crypto v0.59.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.32.5
-	k8s.io/apiextensions-apiserver v0.32.5
-	k8s.io/apimachinery v0.32.5
-	k8s.io/apiserver v0.32.5
-	k8s.io/client-go v0.32.5
-	k8s.io/component-base v0.32.5
-	k8s.io/component-helpers v0.28.3
-	k8s.io/klog/v2 v2.130.1
-	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
-	kubevirt.io/api v1.6.0-beta.0.0.20250702170314-dd941825f5d3
-	kubevirt.io/containerized-data-importer-api v1.63.1-0.20251115214221-0b4e9b5c9c59
-	libvirt.org/go/libvirt v1.10009.1
-	libvirt.org/go/libvirtxml v1.11009.0
-	modernc.org/sqlite v1.39.1
-	sigs.k8s.io/controller-runtime v0.20.4
-	sigs.k8s.io/mcs-api v0.1.0
-	sigs.k8s.io/yaml v1.4.0
+	k8s.io/api v0.37.2
+	k8s.io/apiextensions-apiserver v0.37.2
+	k8s.io/apimachinery v0.37.2
+	k8s.io/apiserver v0.37.2
+	k8s.io/client-go v0.37.2
+	k8s.io/component-base v0.37.2
+	k8s.io/component-helpers v0.37.2
+	k8s.io/klog/v2 v2.140.0
+	k8s.io/utils v0.0.0-20261023123148-ca04ba58ecab
+	kubevirt.io/api v1.10.0
+	kubevirt.io/containerized-data-importer-api v1.66.1
+	libvirt.org/go/libvirt v1.12009.0
+	libvirt.org/go/libvirtxml v1.12008.0
+	modernc.org/sqlite v1.63.0
+	sigs.k8s.io/controller-runtime v0.25.3
+	sigs.k8s.io/mcs-api v0.5.2
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
@@ -194,4 +194,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.3 // indirect
 )
 
-replace github.com/gophercloud/gophercloud => github.com/kubev2v/gophercloud v0.0.0-20230629135522-9d701a75c760
+replace github.com/gophercloud/gophercloud => github.com/kubev2v/gophercloud b98471812a77
