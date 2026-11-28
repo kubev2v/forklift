@@ -229,6 +229,20 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              controller_nutanix_http_max_inflight_central:
+                default: 2
+                description: Max concurrent Nutanix HTTP populator downloads per Prism
+                  Central provider.
+                format: int32
+                minimum: 1
+                type: integer
+              controller_nutanix_http_max_inflight_element:
+                default: 10
+                description: Max concurrent Nutanix HTTP populator downloads per Prism
+                  Element provider.
+                format: int32
+                minimum: 1
+                type: integer
               controller_ocp_pvc_name_template:
                 description: |-
                   Global default Go template for generating PVC names during OpenShift (OCP) migrations.
@@ -746,6 +760,20 @@ spec:
               populator_controller_image_fqin:
                 description: Volume populator controller image. Optional. If left
                   empty, the operator automatically sets this from the release payload.
+                type: string
+              populator_nutanix_http_container_limits_memory:
+                default: 512Mi
+                description: Nutanix HTTP Volume Populator memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
+                type: string
+              populator_nutanix_http_container_requests_memory:
+                default: 128Mi
+                description: Nutanix HTTP Volume Populator memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
+                type: string
+              populator_nutanix_http_image_fqin:
+                description: Nutanix HTTP populator image. Optional. If left empty,
+                  the operator automatically sets this from the release payload.
                 type: string
               populator_openstack_image_fqin:
                 description: OpenStack populator image. Optional. If left empty, the

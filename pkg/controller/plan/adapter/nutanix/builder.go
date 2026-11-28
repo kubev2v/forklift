@@ -3,11 +3,13 @@ package nutanix
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/pem"
 	"fmt"
 	"net/url"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -16,12 +18,16 @@ import (
 	providerbase "github.com/kubev2v/forklift/pkg/controller/base"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	libutil "github.com/kubev2v/forklift/pkg/lib/util"
+	"github.com/kubev2v/forklift/pkg/settings"
 	v2vconfig "github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	core "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
@@ -32,6 +38,8 @@ import (
 	libvirtxml "libvirt.org/go/libvirtxml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	populator_machinery "github.com/kubev2v/forklift/pkg/lib-volume-populator/populator-machinery"
 )
 
 // Firmware boot types (model.VM.BootType).
@@ -58,8 +66,12 @@ const (
 //   - AdoptDownloadCookieSecretOwner, called from kubevirt.EnsureDataVolumes
 //   - RefreshImportCredentials, merged into the cookie Secret update on auth failure
 const (
-	labelDownloadCookie = "forklift.konveyor.io/nutanix-download-cookie"
-	cookieHeaderKey     = "cookie"
+	labelDownloadCookie      = "forklift.konveyor.io/nutanix-download-cookie"
+	labelHTTPPopulatorCookie = "forklift.konveyor.io/nutanix-http-populator"
+	cookieHeaderKey          = "cookie"
+	populatorServiceAccount  = "populator"
+	populatorLeaseRoleName   = "nutanix-http-populator-lease"
+	errCatalogImageNotFound  = "catalog image not found"
 )
 
 // adapterPriority maps Nutanix adapter types to sort priority (lower = first).
@@ -662,7 +674,7 @@ func (r *Builder) elementHTTPSource(baseURL, name string, secret *core.Secret, c
 		return nil, err
 	}
 	if entity == nil {
-		return nil, liberr.New("catalog image not found", "image", name)
+		return nil, liberr.New(errCatalogImageNotFound, "image", name)
 	}
 	return &cdi.DataVolumeSourceHTTP{
 		URL:           fmt.Sprintf("%s/api/nutanix/v3/images/%s/file", baseURL, entity.Metadata.UUID),
@@ -708,7 +720,7 @@ func (r *Builder) resolveCentralDownload(client *Client, imageName string) (down
 		return "", "", err
 	}
 	if entity == nil {
-		return "", "", liberr.New("catalog image not found", "image", imageName)
+		return "", "", liberr.New(errCatalogImageNotFound, "image", imageName)
 	}
 	downloadURL, cookie, err = client.resolveImageV4DownloadURL(entity.ExtID)
 	if err != nil {
@@ -1293,16 +1305,394 @@ func (r *Builder) LunPersistentVolumeClaims(_ ref.Ref) ([]core.PersistentVolumeC
 	return nil, nil
 }
 
+// SupportsVolumePopulators reports that Nutanix cold disk transfer uses
+// NutanixHTTPVolumePopulator on the host destination. Remote destinations
+// keep the CDI HTTP-import DataVolume path, because the volume-populator
+// controller only runs on the MTV host cluster.
 func (r *Builder) SupportsVolumePopulators() bool {
-	return false
+	return !r.Plan.IsWarm() && r.Plan.Provider.Destination.IsHost()
 }
 
-func (r *Builder) PopulatorVolumes(_ ref.Ref, _ map[string]string, _ string) ([]*core.PersistentVolumeClaim, error) {
-	return nil, planbase.VolumePopulatorNotSupportedError
+// PopulatorVolumes builds one target PVC per non-CDROM disk, each backed by a
+// NutanixHTTPVolumePopulator CR that downloads the catalog image PreTransferActions
+// created for that disk.
+func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
+	vm := &model.VM{}
+	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
+		return nil, liberr.Wrap(err, "vm", vmRef.String())
+	}
+
+	storageMap := map[string]api.DestinationStorage{}
+	for _, mapped := range r.Map.Storage.Spec.Map {
+		storageMap[mapped.Source.ID] = mapped.Destination
+	}
+
+	client := &Client{Context: r.Context}
+	if err = client.connect(); err != nil {
+		return nil, err
+	}
+	element, err := client.isPrismElement()
+	if err != nil {
+		return nil, err
+	}
+	leaseKey, err := client.prismClusterUUIDForLease(element)
+	if err != nil {
+		return nil, err
+	}
+
+	baseURL := strings.TrimRight(r.Source.Provider.Spec.URL, "/")
+	namespace := r.Plan.Spec.TargetNamespace
+	saName := annotations[populator_machinery.AnnPopulatorServiceAccount]
+	if saName == "" {
+		saName = populatorServiceAccount
+	}
+	if err = r.ensureHTTPPopulatorLeaseRBAC(namespace, saName); err != nil {
+		return nil, err
+	}
+	diskIndex := 0
+	endpoint := api.NutanixEndpointCentral
+	if element {
+		endpoint = api.NutanixEndpointElement
+	}
+	labels := map[string]string{
+		"migration":              string(r.Migration.UID),
+		"plan":                   string(r.Plan.GetUID()),
+		"vmID":                   vmRef.ID,
+		api.LabelSourceHost:      leaseKey,
+		api.LabelNutanixEndpoint: endpoint,
+	}
+	for _, disk := range dataDisks(vm) {
+		destination, mapped := storageMap[disk.StorageContainerUUID]
+		if !mapped {
+			return nil, liberr.New(
+				"no storage mapping for disk storage container",
+				"vm", vmRef.String(),
+				"disk", disk.UUID,
+				"storageContainer", disk.StorageContainerUUID)
+		}
+
+		imageName := migrationImageName(string(r.Migration.UID), vmRef, disk.UUID)
+		downloadURL, transferSecret, perr := r.resolveHTTPPopulatorSource(
+			element, baseURL, imageName, vmRef, disk.UUID, secretName, client)
+		if perr != nil {
+			return nil, liberr.Wrap(perr, "vm", vmRef.String(), "disk", disk.UUID)
+		}
+
+		pvcAnnotations := map[string]string{}
+		for k, v := range annotations {
+			pvcAnnotations[k] = v
+		}
+		pvcAnnotations[planbase.AnnDiskSource] = disk.UUID
+		pvcAnnotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
+		if pvcAnnotations[populator_machinery.AnnPopulatorServiceAccount] == "" {
+			pvcAnnotations[populator_machinery.AnnPopulatorServiceAccount] = saName
+		}
+
+		sum := sha256.Sum256([]byte(fmt.Sprintf("%s-%s-%s", r.Migration.UID, vmRef.ID, disk.UUID)))
+		name := fmt.Sprintf("nhvp-%x", sum[:12])
+
+		storageClass := destination.StorageClass
+		accessModes, volumeMode, err := utils.GetVolumeAndAccessMode(r.Destination.Client, destination)
+		if err != nil {
+			return nil, liberr.Wrap(err, "storageClass", storageClass)
+		}
+
+		capacity := disk.DiskSizeBytes
+		if volumeMode != nil && *volumeMode == core.PersistentVolumeFilesystem {
+			capacity, err = utils.CalculateSpaceWithCDIOverhead(
+				r.Destination.Client, storageClass, disk.DiskSizeBytes)
+			if err != nil {
+				return nil, liberr.Wrap(err, "storageClass", storageClass)
+			}
+		}
+
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace:   namespace,
+				Name:        name,
+				Labels:      labels,
+				Annotations: pvcAnnotations,
+			},
+			Spec: core.PersistentVolumeClaimSpec{
+				AccessModes:      accessModes,
+				StorageClassName: &storageClass,
+				VolumeMode:       volumeMode,
+				Resources: core.VolumeResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceStorage: *resource.NewQuantity(capacity, resource.BinarySI),
+					},
+				},
+				DataSourceRef: &core.TypedObjectReference{
+					APIGroup: &api.SchemeGroupVersion.Group,
+					Kind:     api.NutanixHTTPVolumePopulatorKind,
+					Name:     name,
+				},
+			},
+		}
+
+		populator := &api.NutanixHTTPVolumePopulator{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+				Labels:    labels,
+			},
+			Spec: api.NutanixHTTPVolumePopulatorSpec{
+				URL:           downloadURL,
+				SecretName:    transferSecret,
+				DiskSizeBytes: disk.DiskSizeBytes,
+			},
+		}
+
+		if err = r.ensureHTTPPopulatorPVCAndCR(pvc, populator); err != nil {
+			return nil, err
+		}
+		pvcs = append(pvcs, pvc)
+		diskIndex++
+	}
+	return pvcs, nil
 }
 
-func (r *Builder) PopulatorTransferredBytes(_ *core.PersistentVolumeClaim) (int64, error) {
-	return 0, planbase.VolumePopulatorNotSupportedError
+// resolveHTTPPopulatorSource returns the download URL and the secret the
+// populator pod should EnvFrom. Prism Element uses Basic Auth from the
+// provider secret copy; Prism Central uses a Cookie secret that also carries
+// TLS material (ca.crt / insecureSkipVerify).
+func (r *Builder) resolveHTTPPopulatorSource(
+	element bool,
+	baseURL, imageName string,
+	vmRef ref.Ref,
+	diskUUID, providerSecretName string,
+	client *Client,
+) (downloadURL, secretName string, err error) {
+	if element {
+		entity, ferr := client.findImageByName(imageName)
+		if ferr != nil {
+			return "", "", ferr
+		}
+		if entity == nil {
+			return "", "", liberr.New(errCatalogImageNotFound, "image", imageName)
+		}
+		return fmt.Sprintf("%s/api/nutanix/v3/images/%s/file", baseURL, entity.Metadata.UUID),
+			providerSecretName, nil
+	}
+
+	downloadURL, cookie, err := r.resolveCentralDownload(client, imageName)
+	if err != nil {
+		return "", "", err
+	}
+	secret, err := r.ensureHTTPPopulatorCookieSecret(vmRef, diskUUID, cookie, map[string]string{
+		"migration":      string(r.Migration.UID),
+		"plan":           string(r.Plan.GetUID()),
+		"plan-name":      r.Plan.Name,
+		"plan-namespace": r.Plan.Namespace,
+		"vm":             vmRef.ID,
+		"vmID":           vmRef.ID,
+		"resource":       "vm-config",
+	})
+	if err != nil {
+		return "", "", err
+	}
+	return downloadURL, secret.Name, nil
+}
+
+// httpPopulatorCookieData builds EnvFrom data for the HTTP populator: Cookie
+// plus Basic Auth / TLS material from the provider secret for PE v3 /file fallback.
+func httpPopulatorCookieData(provider *core.Secret, cookie string) map[string][]byte {
+	data := map[string][]byte{"Cookie": []byte(cookie)}
+	if user, ok := provider.Data["user"]; ok {
+		data["user"] = user
+	}
+	if password, ok := provider.Data["password"]; ok {
+		data["password"] = password
+	}
+	if ca, ok := libutil.GetCACert(provider); ok {
+		data["ca.crt"] = ca
+	}
+	if insecure, ok := provider.Data["insecureSkipVerify"]; ok {
+		data["insecureSkipVerify"] = insecure
+	}
+	return data
+}
+
+// ensureHTTPPopulatorCookieSecret creates/updates the per-disk Secret the
+// populator EnvFroms for Prism Central downloads: Cookie plus ca.crt /
+// insecureSkipVerify for the TLS client.
+func (r *Builder) ensureHTTPPopulatorCookieSecret(
+	vmRef ref.Ref,
+	diskUUID, cookie string,
+	labels map[string]string,
+) (*core.Secret, error) {
+	secretLabels := map[string]string{
+		labelHTTPPopulatorCookie: "true",
+		planbase.AnnDiskSource:   diskUUID,
+	}
+	for k, v := range labels {
+		secretLabels[k] = v
+	}
+	data := httpPopulatorCookieData(r.Source.Secret, cookie)
+
+	selector := map[string]string{
+		labelHTTPPopulatorCookie: "true",
+		planbase.AnnDiskSource:   diskUUID,
+	}
+	if migrationID, ok := labels["migration"]; ok && migrationID != "" {
+		selector["migration"] = migrationID
+	}
+	list := &core.SecretList{}
+	err := r.Destination.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(selector),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", diskUUID)
+	}
+
+	if len(list.Items) > 0 {
+		secret := &list.Items[0]
+		secret.Data = data
+		secret.StringData = nil
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+		for k, v := range secretLabels {
+			secret.Labels[k] = v
+		}
+		if err = r.Destination.Update(context.TODO(), secret); err != nil {
+			return nil, liberr.Wrap(err, "secret", secret.Name, "disk", diskUUID)
+		}
+		return secret, nil
+	}
+
+	secret := &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace: r.Plan.Spec.TargetNamespace,
+			GenerateName: strings.Join(
+				[]string{r.Plan.Name, vmRef.ID, "httppop"},
+				"-") + "-",
+			Labels: secretLabels,
+			Annotations: map[string]string{
+				planbase.AnnDiskSource: diskUUID,
+			},
+		},
+		Data: data,
+	}
+	if err = r.Destination.Create(context.TODO(), secret); err != nil {
+		return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", diskUUID)
+	}
+	return secret, nil
+}
+
+func populatorLeaseRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{{
+		APIGroups: []string{"coordination.k8s.io"},
+		Resources: []string{"leases"},
+		Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+	}}
+}
+
+func ensureRoleBindingSubject(binding *rbacv1.RoleBinding, subject rbacv1.Subject) {
+	for _, s := range binding.Subjects {
+		if s.Kind == subject.Kind && s.Name == subject.Name && s.Namespace == subject.Namespace {
+			return
+		}
+	}
+	binding.Subjects = append(binding.Subjects, subject)
+}
+
+// ensureHTTPPopulatorLeaseRBAC creates the populator ServiceAccount and lease
+// Role/RoleBinding used by nutanix-http-populator pods (same pattern as xcopy).
+func (r *Builder) ensureHTTPPopulatorLeaseRBAC(namespace, saName string) error {
+	if saName == "" {
+		saName = populatorServiceAccount
+	}
+	sa := &core.ServiceAccount{
+		ObjectMeta: meta.ObjectMeta{Name: saName, Namespace: namespace},
+	}
+	if err := r.Destination.Create(context.TODO(), sa, &client.CreateOptions{}); err != nil && !k8serr.IsAlreadyExists(err) {
+		return liberr.Wrap(err, "serviceAccount", saName)
+	}
+
+	leaseNS := settings.Settings.HostLeaseNamespace
+	if leaseNS == "" {
+		leaseNS = "openshift-mtv"
+	}
+	rules := populatorLeaseRules()
+	role := &rbacv1.Role{
+		ObjectMeta: meta.ObjectMeta{Name: populatorLeaseRoleName, Namespace: leaseNS},
+		Rules:      rules,
+	}
+	if _, err := controllerutil.CreateOrPatch(context.TODO(), r.Destination.Client, role, func() error {
+		role.Rules = rules
+		return nil
+	}); err != nil {
+		return liberr.Wrap(err, "role", populatorLeaseRoleName)
+	}
+
+	binding := &rbacv1.RoleBinding{
+		ObjectMeta: meta.ObjectMeta{Name: populatorLeaseRoleName + "-binding", Namespace: leaseNS},
+	}
+	subject := rbacv1.Subject{
+		Kind:      "ServiceAccount",
+		Name:      saName,
+		Namespace: namespace,
+	}
+	if _, err := controllerutil.CreateOrPatch(context.TODO(), r.Destination.Client, binding, func() error {
+		binding.RoleRef = rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     populatorLeaseRoleName,
+			APIGroup: "rbac.authorization.k8s.io",
+		}
+		ensureRoleBindingSubject(binding, subject)
+		return nil
+	}); err != nil {
+		return liberr.Wrap(err, "roleBinding", populatorLeaseRoleName+"-binding")
+	}
+	return nil
+}
+
+func (r *Builder) ensureHTTPPopulatorPVCAndCR(pvc *core.PersistentVolumeClaim, populator *api.NutanixHTTPVolumePopulator) error {
+	err := r.Destination.Create(context.TODO(), pvc, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return liberr.Wrap(err)
+	}
+	created := &core.PersistentVolumeClaim{}
+	if err = r.Destination.Get(context.TODO(), client.ObjectKey{Namespace: pvc.Namespace, Name: pvc.Name}, created); err != nil {
+		return liberr.Wrap(err)
+	}
+	pvc.ObjectMeta = created.ObjectMeta
+
+	populator.OwnerReferences = []meta.OwnerReference{{
+		APIVersion: "v1",
+		Kind:       "PersistentVolumeClaim",
+		Name:       created.Name,
+		UID:        created.UID,
+	}}
+	err = r.Destination.Create(context.TODO(), populator, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return liberr.Wrap(err)
+	}
+	return nil
+}
+
+func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (int64, error) {
+	populator := &api.NutanixHTTPVolumePopulator{}
+	err := r.Destination.Get(context.TODO(), client.ObjectKey{Namespace: pvc.Namespace, Name: pvc.Name}, populator)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			return 0, nil
+		}
+		return 0, liberr.Wrap(err)
+	}
+	pct := 0.0
+	if populator.Status.Progress != "" {
+		if parsed, perr := strconv.ParseFloat(populator.Status.Progress, 64); perr == nil {
+			pct = parsed
+		}
+	}
+	return int64(pct / 100.0 * float64(populator.Spec.DiskSizeBytes)), nil
 }
 
 func (r *Builder) PopulatorOffloadInfo(_ *core.PersistentVolumeClaim) (map[string]string, error) {
@@ -1317,8 +1707,8 @@ func (r *Builder) SetPopulatorDataSourceLabels(_ ref.Ref, _ []*core.PersistentVo
 	return nil
 }
 
-func (r *Builder) GetPopulatorTaskName(_ *core.PersistentVolumeClaim) (string, error) {
-	return "", nil
+func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (string, error) {
+	return pvc.Annotations[planbase.AnnDiskSource], nil
 }
 
 func (r *Builder) PreferenceName(_ ref.Ref, _ *core.ConfigMap) (string, error) {

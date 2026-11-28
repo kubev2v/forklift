@@ -12,6 +12,9 @@ const (
 	PopulatorContainerLimitsMemory   = "POPULATOR_CONTAINER_LIMITS_MEMORY"
 	PopulatorContainerRequestsCpu    = "POPULATOR_CONTAINER_REQUESTS_CPU"
 	PopulatorContainerRequestsMemory = "POPULATOR_CONTAINER_REQUESTS_MEMORY"
+
+	NutanixHTTPPopulatorContainerLimitsMemory   = "NUTANIX_HTTP_POPULATOR_CONTAINER_LIMITS_MEMORY"
+	NutanixHTTPPopulatorContainerRequestsMemory = "NUTANIX_HTTP_POPULATOR_CONTAINER_REQUESTS_MEMORY"
 )
 
 var (
@@ -19,6 +22,9 @@ var (
 	DefaultPopulatorContainerLimitsMemory   = resource.NewQuantity(1<<30, resource.BinarySI)
 	DefaultPopulatorContainerRequestsCpu    = resource.NewMilliQuantity(100, resource.DecimalSI)
 	DefaultPopulatorContainerRequestsMemory = resource.NewQuantity(512<<20, resource.BinarySI)
+
+	DefaultNutanixHTTPPopulatorContainerLimitsMemory   = resource.NewQuantity(512<<20, resource.BinarySI)
+	DefaultNutanixHTTPPopulatorContainerRequestsMemory = resource.NewQuantity(128<<20, resource.BinarySI)
 )
 
 type Populator struct {
@@ -26,6 +32,9 @@ type Populator struct {
 	ContainerLimitsMemory   resource.Quantity
 	ContainerRequestsCpu    resource.Quantity
 	ContainerRequestsMemory resource.Quantity
+
+	NutanixHTTPContainerLimitsMemory   resource.Quantity
+	NutanixHTTPContainerRequestsMemory resource.Quantity
 }
 
 func (r *Populator) Load() {
@@ -73,4 +82,26 @@ func (r *Populator) Load() {
 	} else {
 		r.ContainerRequestsMemory = *DefaultPopulatorContainerRequestsMemory
 	}
+
+	r.NutanixHTTPContainerLimitsMemory = quantityFromEnv(
+		NutanixHTTPPopulatorContainerLimitsMemory,
+		*DefaultNutanixHTTPPopulatorContainerLimitsMemory,
+	)
+	r.NutanixHTTPContainerRequestsMemory = quantityFromEnv(
+		NutanixHTTPPopulatorContainerRequestsMemory,
+		*DefaultNutanixHTTPPopulatorContainerRequestsMemory,
+	)
+}
+
+func quantityFromEnv(name string, fallback resource.Quantity) resource.Quantity {
+	val, found := os.LookupEnv(name)
+	if !found {
+		return fallback
+	}
+	q, err := resource.ParseQuantity(val)
+	if err != nil {
+		klog.Warningf("Invalid %s value %q, using fallback: %v", name, val, err)
+		return fallback
+	}
+	return q
 }

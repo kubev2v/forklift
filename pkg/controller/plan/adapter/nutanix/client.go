@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -62,6 +63,9 @@ const prismCentralPath = "/api/nutanix/v3/prism_central"
 type Client struct {
 	libclient.Client
 	Context *plancontext.Context
+	// prismClusterUUID is the connected Prism's own cluster UUID (PC self or
+	// PE AOS), memoized for download lease keys within this Client.
+	prismClusterUUID string
 }
 
 func (r *Client) connect() error {
@@ -385,6 +389,45 @@ func (r *Client) isPrismElement() (bool, error) {
 	default:
 		return false, liberr.New("unexpected status detecting Prism endpoint type", "status", status)
 	}
+}
+
+// prismClusterUUIDForLease returns the UUID of the Prism endpoint itself
+// (Central self-cluster or Element AOS), used as the HTTP populator download
+// lease key so concurrent migrations against the same Prism share one pool.
+func (r *Client) prismClusterUUIDForLease(element bool) (string, error) {
+	if r.prismClusterUUID != "" {
+		return r.prismClusterUUID, nil
+	}
+	if element {
+		var cluster struct {
+			UUID string `json:"uuid"`
+		}
+		url := fmt.Sprintf("%s/PrismGateway/services/rest/v1/cluster", r.URL)
+		status, err := r.Get(url, &cluster)
+		if err != nil {
+			return "", liberr.Wrap(err)
+		}
+		if status != http.StatusOK || cluster.UUID == "" {
+			return "", liberr.New("failed to resolve Prism Element cluster UUID", "status", status)
+		}
+		r.prismClusterUUID = strings.ToLower(cluster.UUID)
+		return r.prismClusterUUID, nil
+	}
+	var pc struct {
+		Resources struct {
+			ClusterUUID string `json:"cluster_uuid"`
+		} `json:"resources"`
+	}
+	url := fmt.Sprintf("%s%s", r.URL, prismCentralPath)
+	status, err := r.Get(url, &pc)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+	if status != http.StatusOK || pc.Resources.ClusterUUID == "" {
+		return "", liberr.New("failed to resolve Prism Central cluster UUID", "status", status)
+	}
+	r.prismClusterUUID = strings.ToLower(pc.Resources.ClusterUUID)
+	return r.prismClusterUUID, nil
 }
 
 // vmDisks looks up a VM's disks from inventory.

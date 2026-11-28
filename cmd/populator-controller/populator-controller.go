@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
@@ -24,6 +25,11 @@ const (
 	groupName               = "forklift.konveyor.io"
 	apiVersion              = "v1beta1"
 	maxPopulatorInFlightEnv = "MAX_POPULATOR_INFLIGHT"
+
+	nutanixHTTPMaxInflightCentralEnv = "NUTANIX_HTTP_MAX_INFLIGHT_CENTRAL"
+	nutanixHTTPMaxInflightElementEnv = "NUTANIX_HTTP_MAX_INFLIGHT_ELEMENT"
+	defaultNutanixHTTPMaxCentral     = 2
+	defaultNutanixHTTPMaxElement     = 10
 )
 
 type populator struct {
@@ -56,6 +62,13 @@ var populators = map[string]populator{
 		imageVar:        "VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE",
 		metricsEndpoint: ":8082",
 	},
+	"nutanix-http": {
+		kind:            "NutanixHTTPVolumePopulator",
+		resource:        "nutanixhttpvolumepopulators",
+		controllerFunc:  getNutanixHTTPPopulatorPodArgs,
+		imageVar:        "NUTANIX_HTTP_POPULATOR_IMAGE",
+		metricsEndpoint: ":8083",
+	},
 }
 
 func main() {
@@ -76,6 +89,7 @@ func main() {
 	var populatorSettings settings.Populator
 	populatorSettings.Load()
 	resources := buildResources(&populatorSettings)
+	nutanixHTTPResources := buildNutanixHTTPResources(&populatorSettings)
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -85,7 +99,7 @@ func main() {
 		stop <- true
 	}()
 
-	for _, populator := range populators {
+	for name, populator := range populators {
 		imageName, ok := os.LookupEnv(populator.imageVar)
 		if !ok {
 			klog.Warning("Couldn't find", "imageVar", populator.imageVar)
@@ -96,9 +110,13 @@ func main() {
 		gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: populator.resource}
 		controllerFunc := populator.controllerFunc
 		metricsEndpoint := populator.metricsEndpoint
+		res := resources
+		if name == "nutanix-http" {
+			res = nutanixHTTPResources
+		}
 		go func() {
 			populator_machinery.RunController(masterURL, kubeconfig, imageName, metricsEndpoint, metricsPath,
-				prefix, gk, gvr, mountPath, devicePath, controllerFunc, resources, maxInFlight)
+				prefix, gk, gvr, mountPath, devicePath, controllerFunc, res, maxInFlight)
 			<-stop
 		}()
 	}
@@ -113,6 +131,15 @@ func getEnvInt(name string, def int) int {
 		}
 	}
 	return def
+}
+
+func nutanixHTTPDownloadSlots(endpoint string) int {
+	switch endpoint {
+	case v1beta1.NutanixEndpointElement:
+		return getEnvInt(nutanixHTTPMaxInflightElementEnv, defaultNutanixHTTPMaxElement)
+	default:
+		return getEnvInt(nutanixHTTPMaxInflightCentralEnv, defaultNutanixHTTPMaxCentral)
+	}
 }
 
 func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ corev1.PersistentVolumeClaim) ([]string, error) {
@@ -147,6 +174,38 @@ func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _
 	args = append(args, "--cr-name="+openstackPopulator.Name)
 	args = append(args, "--cr-namespace="+openstackPopulator.Namespace)
 
+	return args, nil
+}
+
+func getNutanixHTTPPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ corev1.PersistentVolumeClaim) ([]string, error) {
+	var populator v1beta1.NutanixHTTPVolumePopulator
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &populator)
+	if err != nil {
+		return nil, err
+	}
+	endpoint, _, _ := unstructured.NestedString(u.Object, "metadata", "labels", v1beta1.LabelNutanixEndpoint)
+	leaseKey, _, _ := unstructured.NestedString(u.Object, "metadata", "labels", v1beta1.LabelSourceHost)
+	args := []string{
+		"--volume-path=" + getVolumePath(rawBlock),
+		"--url=" + populator.Spec.URL,
+		"--secret-name=" + populator.Spec.SecretName,
+		"--cr-name=" + populator.Name,
+		"--cr-namespace=" + populator.Namespace,
+		"--download-slots=" + strconv.Itoa(nutanixHTTPDownloadSlots(endpoint)),
+	}
+	if leaseKey != "" {
+		args = append(args, "--lease-key="+leaseKey)
+	}
+	if ns := os.Getenv("HOST_LEASE_NAMESPACE"); ns != "" {
+		args = append(args, "--lease-namespace="+ns)
+	}
+	if dur := os.Getenv("HOST_LEASE_DURATION_SECONDS"); dur != "" {
+		seconds, err := strconv.Atoi(dur)
+		if err != nil || seconds < 5 || seconds > 2147483647 {
+			return nil, fmt.Errorf("invalid HOST_LEASE_DURATION_SECONDS %q: want integer seconds in [5, 2147483647]", dur)
+		}
+		args = append(args, fmt.Sprintf("--lease-duration-seconds=%d", seconds))
+	}
 	return args, nil
 }
 
@@ -189,6 +248,19 @@ func buildResources(s *settings.Populator) *corev1.ResourceRequirements {
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    s.ContainerRequestsCpu,
 			corev1.ResourceMemory: s.ContainerRequestsMemory,
+		},
+	}
+}
+
+func buildNutanixHTTPResources(s *settings.Populator) *corev1.ResourceRequirements {
+	return &corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    s.ContainerLimitsCpu,
+			corev1.ResourceMemory: s.NutanixHTTPContainerLimitsMemory,
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    s.ContainerRequestsCpu,
+			corev1.ResourceMemory: s.NutanixHTTPContainerRequestsMemory,
 		},
 	}
 }

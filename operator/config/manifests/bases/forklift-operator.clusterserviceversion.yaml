@@ -91,6 +91,11 @@ spec:
       kind: OpenstackVolumePopulator
       name: openstackvolumepopulators.forklift.konveyor.io
       version: v1beta1
+    - description: Nutanix HTTP Volume Populator
+      displayName: NutanixHTTPVolumePopulator
+      kind: NutanixHTTPVolumePopulator
+      name: nutanixhttpvolumepopulators.forklift.konveyor.io
+      version: v1beta1
     - description: VM conversion and inspection lifecycle manager
       displayName: Conversion
       kind: Conversion

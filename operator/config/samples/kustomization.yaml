@@ -7,6 +7,7 @@ resources:
 - forklift_v1beta1_networkmap.yaml
 - forklift_v1beta1_ovirt_populator.yaml
 - forklift_v1beta1_openstack_populator.yaml
+- forklift_v1beta1_nutanix_http_volume_populator.yaml
 - forklift_v1beta1_plan.yaml
 - forklift_v1beta1_provider.yaml
 - forklift_v1beta1_storagemap.yaml

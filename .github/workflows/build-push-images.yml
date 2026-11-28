@@ -40,6 +40,9 @@ jobs:
           - name: openstack-populator
             file: build/openstack-populator/Containerfile
             repo: openstack-populator
+          - name: nutanix-http-populator
+            file: build/nutanix-http-populator/Containerfile
+            repo: nutanix-http-populator
           - name: forklift-ova-provider-server
             file: build/ova-provider-server/Containerfile
             repo: forklift-ova-provider-server

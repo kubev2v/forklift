@@ -124,4 +124,14 @@ const (
 // Labels.
 const (
 	LabelSourceHost = "sourceHost"
+	// LabelNutanixEndpoint marks a NutanixHTTPVolumePopulator as Prism Element
+	// or Prism Central so the populator controller can apply the matching
+	// concurrent-download limit.
+	LabelNutanixEndpoint = "nutanixEndpoint"
+)
+
+// NutanixEndpoint label values for LabelNutanixEndpoint.
+const (
+	NutanixEndpointElement = "element"
+	NutanixEndpointCentral = "central"
 )

@@ -28,9 +28,12 @@ spec:
             value: "{{ populator_ovirt_image_fqin or lookup('env', 'OVIRT_POPULATOR_IMAGE') or lookup('env', 'RELATED_IMAGE_RHV_POPULATOR') }}"
           - name: OPENSTACK_POPULATOR_IMAGE
             value: "{{ populator_openstack_image_fqin or lookup('env', 'OPENSTACK_POPULATOR_IMAGE') or lookup('env', 'RELATED_IMAGE_OPENSTACK_POPULATOR') }}"
+          - name: NUTANIX_HTTP_POPULATOR_IMAGE
+            value: "{{ populator_nutanix_http_image_fqin or lookup('env', 'NUTANIX_HTTP_POPULATOR_IMAGE') or lookup('env', 'RELATED_IMAGE_NUTANIX_HTTP_POPULATOR') }}"
 {% if feature_copy_offload|bool %}
           - name: VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE
             value: "{{ populator_vsphere_copy_offload_image_fqin or lookup('env', 'VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE') or lookup('env', 'RELATED_IMAGE_VSPHERE_COPY_OFFLOAD_POPULATOR') }}"
+{% endif %}
 {% if controller_host_lease_namespace is defined %}
           - name: HOST_LEASE_NAMESPACE
             value: "{{ controller_host_lease_namespace }}"
@@ -39,10 +42,17 @@ spec:
           - name: HOST_LEASE_DURATION_SECONDS
             value: "{{ controller_host_lease_duration_seconds }}"
 {% endif %}
-{% endif %}
 {% if controller_max_populator_inflight is number %}
           - name: MAX_POPULATOR_INFLIGHT
             value: "{{ controller_max_populator_inflight }}"
+{% endif %}
+{% if controller_nutanix_http_max_inflight_central is number %}
+          - name: NUTANIX_HTTP_MAX_INFLIGHT_CENTRAL
+            value: "{{ controller_nutanix_http_max_inflight_central }}"
+{% endif %}
+{% if controller_nutanix_http_max_inflight_element is number %}
+          - name: NUTANIX_HTTP_MAX_INFLIGHT_ELEMENT
+            value: "{{ controller_nutanix_http_max_inflight_element }}"
 {% endif %}
           - name: POPULATOR_CONTAINER_LIMITS_CPU
             value: "{{ populator_container_limits_cpu }}"
@@ -52,6 +62,10 @@ spec:
             value: "{{ populator_container_requests_cpu }}"
           - name: POPULATOR_CONTAINER_REQUESTS_MEMORY
             value: "{{ populator_container_requests_memory }}"
+          - name: NUTANIX_HTTP_POPULATOR_CONTAINER_LIMITS_MEMORY
+            value: "{{ populator_nutanix_http_container_limits_memory | default('512Mi') }}"
+          - name: NUTANIX_HTTP_POPULATOR_CONTAINER_REQUESTS_MEMORY
+            value: "{{ populator_nutanix_http_container_requests_memory | default('128Mi') }}"
           ports:
             - containerPort: 8080
               name: http-endpoint
