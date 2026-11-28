@@ -5219,13 +5219,19 @@ func (r *KubeVirt) IsCopyOffload(pvcs []*core.PersistentVolumeClaim) bool {
 	return false
 }
 
-// determineRunStrategy determines the appropriate run strategy based on the target power state configuration
-func (r *KubeVirt) determineRunStrategy(vm *plan.VMStatus) cnv.VirtualMachineRunStrategy {
-	// Determine the target power state based on plan configuration
-	targetPowerState := vm.TargetPowerState
-	if targetPowerState == "" {
-		targetPowerState = r.Plan.Spec.TargetPowerState
+// targetPowerState returns the VM-level target power state, falling back to the plan-level setting.
+func (r *KubeVirt) targetPowerState(vm *plan.VMStatus) plan.TargetPowerState {
+	if vm.TargetPowerState != "" {
+		return vm.TargetPowerState
 	}
+	return r.Plan.Spec.TargetPowerState
+}
+
+// determineRunStrategy determines the run strategy used when the target VM is created.
+// Windows guests are started (Always) when wait-for-reboot is enabled so the virt-v2v
+// first-boot scripts can run; RestoreFinalRunStrategy applies the final state afterwards.
+func (r *KubeVirt) determineRunStrategy(vm *plan.VMStatus) cnv.VirtualMachineRunStrategy {
+	targetPowerState := r.targetPowerState(vm)
 
 	if settings.Settings.WindowsWaitForReboot &&
 		targetPowerState != plan.TargetPowerStateOff {
@@ -5237,7 +5243,13 @@ func (r *KubeVirt) determineRunStrategy(vm *plan.VMStatus) cnv.VirtualMachineRun
 		}
 	}
 
-	switch targetPowerState {
+	return r.finalRunStrategy(vm)
+}
+
+// finalRunStrategy returns the run strategy matching the requested final power state
+// of the target VM (on, off, or auto = match the source VM).
+func (r *KubeVirt) finalRunStrategy(vm *plan.VMStatus) cnv.VirtualMachineRunStrategy {
+	switch r.targetPowerState(vm) {
 	case plan.TargetPowerStateOn:
 		// Force target VM to be powered on
 		return cnv.RunStrategyAlways
@@ -5251,6 +5263,53 @@ func (r *KubeVirt) determineRunStrategy(vm *plan.VMStatus) cnv.VirtualMachineRun
 		}
 		return cnv.RunStrategyHalted
 	}
+}
+
+// RestoreFinalRunStrategy halts the target VM when its final power state should be off.
+// It is used after the Windows wait-for-reboot step, where the VM was created with
+// RunStrategyAlways only to let the first-boot scripts run. It is a no-op when the
+// final state is running, the VM is already halted, or the target VM does not exist.
+func (r *KubeVirt) RestoreFinalRunStrategy(vm *plan.VMStatus) (err error) {
+	if r.finalRunStrategy(vm) != cnv.RunStrategyHalted {
+		return
+	}
+	list := &cnv.VirtualMachineList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(r.vmAllButMigrationLabels(vm.Ref)),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for i := range list.Items {
+		object := &list.Items[i]
+		if object.Spec.RunStrategy != nil && *object.Spec.RunStrategy == cnv.RunStrategyHalted {
+			continue
+		}
+		original := object.DeepCopy()
+		halted := cnv.RunStrategyHalted
+		object.Spec.RunStrategy = &halted
+		object.Spec.Running = nil
+		err = r.Destination.Client.Patch(context.TODO(), object, client.MergeFrom(original))
+		if err != nil {
+			if k8serr.IsNotFound(err) {
+				err = nil
+				continue
+			}
+			err = liberr.Wrap(err)
+			return
+		}
+		r.Log.Info(
+			"Set target VM runStrategy to Halted to match the final power state.",
+			"vm", path.Join(object.Namespace, object.Name),
+			"source", vm.String())
+	}
+	return
 }
 
 func getVirtV2vImage(plan *api.Plan) string {
