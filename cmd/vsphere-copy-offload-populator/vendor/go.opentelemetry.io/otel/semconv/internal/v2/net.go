@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package internal // import "go.opentelemetry.io/otel/semconv/internal/v2"
+package internal
 
 import (
 	"net"
@@ -29,6 +29,8 @@ type NetConv struct {
 	NetTransportInProc attribute.KeyValue
 }
 
+// Transport returns a network transport attribute for the given network
+// as returned by net.Dial or similar.
 func (c *NetConv) Transport(network string) attribute.KeyValue {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
@@ -112,10 +114,12 @@ func (c *NetConv) Server(address string, ln net.Listener) []attribute.KeyValue {
 	return attr
 }
 
+// HostName returns a network host name attribute for name.
 func (c *NetConv) HostName(name string) attribute.KeyValue {
 	return c.NetHostNameKey.String(name)
 }
 
+// HostPort returns a network host port attribute for port.
 func (c *NetConv) HostPort(port int) attribute.KeyValue {
 	return c.NetHostPortKey.Int(port)
 }
@@ -257,18 +261,22 @@ func (c *NetConv) Peer(address string) []attribute.KeyValue {
 	return attrs
 }
 
+// PeerName returns a network peer name attribute for name.
 func (c *NetConv) PeerName(name string) attribute.KeyValue {
 	return c.NetPeerNameKey.String(name)
 }
 
+// PeerPort returns a network peer port attribute for port.
 func (c *NetConv) PeerPort(port int) attribute.KeyValue {
 	return c.NetPeerPortKey.Int(port)
 }
 
+// SockPeerAddr returns a network socket peer address attribute for addr.
 func (c *NetConv) SockPeerAddr(addr string) attribute.KeyValue {
 	return c.NetSockPeerAddrKey.String(addr)
 }
 
+// SockPeerPort returns a network socket peer port attribute for port.
 func (c *NetConv) SockPeerPort(port int) attribute.KeyValue {
 	return c.NetSockPeerPortKey.Int(port)
 }
@@ -287,27 +295,25 @@ func splitHostPort(hostport string) (host string, port int) {
 		addrEnd := strings.LastIndex(hostport, "]")
 		if addrEnd < 0 {
 			// Invalid hostport.
-			return
+			return host, port
 		}
 		if i := strings.LastIndex(hostport[addrEnd:], ":"); i < 0 {
 			host = hostport[1:addrEnd]
-			return
+			return host, port
 		}
-	} else {
-		if i := strings.LastIndex(hostport, ":"); i < 0 {
-			host = hostport
-			return
-		}
+	} else if !strings.Contains(hostport, ":") {
+		host = hostport
+		return host, port
 	}
 
 	host, pStr, err := net.SplitHostPort(hostport)
 	if err != nil {
-		return
+		return host, port
 	}
 
 	p, err := strconv.ParseUint(pStr, 10, 16)
 	if err != nil {
-		return
+		return host, port
 	}
 	return host, int(p) // nolint: gosec  // Bit size of 16 checked above.
 }
